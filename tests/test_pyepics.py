@@ -1,5 +1,5 @@
 import numpy
-import matplotlib.pyplot as pl
+#import matplotlib.pyplot as pl
 
 from epics import PV, ca
 
@@ -10,6 +10,9 @@ with open('bpmcorr.txt', 'r') as file:
 # Get the BPM names from Epics
 p = PV('atf2:name')
 bpm_names = p.get()
+
+print(type(bpm_names))
+
 
 # Use list comprehension to filter out strings starting with 'Z' or 'z'
 bpm_names_from_cfg = [string for string in bpmcorr if not string.lower().startswith('z')]
