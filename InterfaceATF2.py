@@ -55,12 +55,14 @@ class InterfaceATF2:
         ]
     
     def read_icts(self):
-        print("Reading ICT's...")
+        print("Reading ict's...")
         charge = []
         for ict in self.ict_names:
             pv = PV(f'{ict}')
             charge.append(pv.get())
-        icts = { "names": np.array(self.ict_names), "charge": np.array(charge) }
+        names = np.array(self.ict_names)
+        charge = np.array(charge)
+        icts = { "names": names, "charge": charge }
         return icts
 
     def read_correctors(self):

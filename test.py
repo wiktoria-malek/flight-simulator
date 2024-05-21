@@ -12,12 +12,19 @@ except:
     pass
 
 # Define interface    
-I = InterfaceATF2(nsamples=10)
+I = InterfaceATF2(nsamples=1)
 
 # Prepare for data taking
 S = State(I)
 S.get_machine()
+S.save('Data/uno')
 
+U = State(I)
+U.load('Data/uno')
+U.save('Data/tre')
+
+
+print('SAVED!')
 print(S.get_icts('ext:EXTcharge'))
 
 if False:

@@ -43,9 +43,10 @@ class State:
         icts = self.icts
         if names is not None:
             ict_indexes = np.array([index for index, string in enumerate(icts['names']) if string in names])
+            print('sei', type(icts['charge']))
             icts = {
-                "names": icts['names'][ict_indexes],
-                "charge": icts['charge'][ict_indexes]
+                "names": self.icts['names'][ict_indexes],
+                "charge": self.icts['charge'][ict_indexes]
             }
         return icts         
 
@@ -66,18 +67,18 @@ class State:
         with open(filename, "r") as json_file:
             data = json.load(json_file)
         self.correctors = {
-            "names": data['correctors']['names'],
+            "names": np.array(data['correctors']['names']),
             "bdes": np.array(data['correctors']['bdes']),
             "bact": np.array(data['correctors']['bact']),
         }
         self.bpms = {
-            "names": data['bpms']['names'],
+            "names": np.array(data['bpms']['names']),
             "x": np.array(data['bpms']['x']),
             "y": np.array(data['bpms']['y']),
             "tmit": np.array(data['bpms']['tmit'])
         }
         self.icts = {
-            "names": data['icts']['names'],
+            "names": np.array(data['icts']['names']),
             "charge": np.array(data['icts']['charge']),
         }
         self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
@@ -85,15 +86,21 @@ class State:
     def save(self, basename):
         time_str = self.timestamp.strftime("%Y%m%d_%H%M%S")
         filename = f"{basename}_{time_str}.json"
-        correctors = self.correctors
-        correctors['bdes'] = correctors['bdes'].tolist()
-        correctors['bact'] = correctors['bact'].tolist()
-        bpms = self.bpms
-        bpms['x'] = bpms['x'].tolist()
-        bpms['y'] = bpms['y'].tolist()
-        bpms['tmit'] = bpms['tmit'].tolist()
-        icts = self.icts
-        icts['charge'] = icts['charge'].tolist()
+        correctors = {
+            'names': self.correctors['names'].tolist(),
+            'bdes': self.correctors['bdes'].tolist(),
+            'bact': self.correctors['bact'].tolist()
+        }
+        bpms = {
+            'names': self.bpms['names'].tolist(),
+            'x': self.bpms['x'].tolist(),
+            'y': self.bpms['y'].tolist(),
+            'tmit': self.bpms['tmit'].tolist()
+        }
+        icts = {
+            'names': self.icts['names'].tolist(),
+            'charge': self.icts['charge'].tolist()
+        }
         state = {
             "correctors": correctors,
             "bpms": bpms,
