@@ -20,10 +20,10 @@ I = InterfaceATF2_Linac (nsamples=10)
 S = State ()
 S.get_machine (I)
 
-# save the reference file
+# Save the reference file
 F = S.save (basename='machine_status')
 
-# Installing CTRL-C signal handler
+# Install CTRL-C signal handler
 def signal_handler(sig, frame, var):
     print('Caught CTRL-C, exiting gracefully!')
     S = var[0]
