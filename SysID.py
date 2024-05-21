@@ -36,9 +36,16 @@ signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F)))
 
 # The list of correctors to use 
 C = [
-    'ZH1L', 'ZV1L', 'ZV2L', 'ZH2L', 'ZV3L', 'ZH3L'#, 'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L',
-    #'ZH6L', 'ZV6L', 'ZH7L', 'ZV7L', 'ZH8L', 'ZV8L', 'ZH9L', 'ZV9L', 'ZH10L', 'ZV10L',
-    #'ZH11L', 'ZV11L', 'ZH12L', 'ZV12L'
+    'ZH1L', 'ZV1L', 'ZV2L', 'ZH2L', 'ZV3L', 'ZH3L', 'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L',
+    'ZH6L', 'ZV6L', 'ZH7L', 'ZV7L', 'ZH8L', 'ZV8L', 'ZH9L', 'ZV9L', 'ZH10L', 'ZV10L',
+    'ZH11L', 'ZV11L'
+]
+
+# The list of bmps to use
+B = [
+    "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L",
+    "ML1L", "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L",
+    "ML8L", "ML9L", "ML10L", "ML11L", "ML12L"
 ]
 
 # Extra functions
@@ -59,7 +66,7 @@ def plot_orbit(orbit, figure):
 plt.ion()
 
 # Kick to achieve 1mm max excursion
-kicks = 0.05 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
+kicks = 0.1 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
 max_oscillation = 0.150 # mm
 
 # 10 loops to measure the response matrix
@@ -75,51 +82,49 @@ for iter in range (Niter):
 
         # '+' excitation 
         print(f"Corrector {corrector} '+' excitation...")
-        I.vary_correctors (corrector, +kick)
+        I.write_correctors(corrector, corr['bdes'] + kick)
         S.get_machine (I)
         S.save (filename=f'DATA_{corrector}_p{iter:04d}.json')
-        Op = S.get_orbit ()
+        Op = S.get_orbit (B)
         plot_orbit(Op, 1)
         
         # '-' excitation 
         print(f"Corrector {corrector} '-' excitation...")
-        I.vary_correctors (corrector, -2*kick)
+        I.write_correctors(corrector, corr['bdes'] - kick)
         S.get_machine (I)
         S.save (filename=f'DATA_{corrector}_m{iter:04d}.json')
-        Om = S.get_orbit ()
+        Om = S.get_orbit (B)
         plot_orbit(Om, 2)
+        
+        # reset corrector
+        I.write_correctors(corrector, corr['bdes'])
         
         # Orbit difference
         Diff_x = (Op['x'] - Om['x']) / 2.0
         Diff_y = (Op['y'] - Om['y']) / 2.0
+        Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(orbit['stdx'].size)
+        Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(orbit['stdy'].size)
         
-        # Tunes the kicker omplitude
-        print('maxX = ', np.max (Diff_x))
-        print('maxY = ', np.max (Diff_y))
-
+        # Tunes the kickers omplitude
         if corrector.lower().startswith('zh'):
-            kicks[icorr] *= max_oscillation / np.max (Diff_x)
+            kicks[icorr] *= max_oscillation / np.max(np.absolute(Diff_x))
         else:
-            kicks[icorr] *= max_oscillation / np.max (Diff_y)
+            kicks[icorr] *= max_oscillation / np.max(np.absolute(Diff_y))
 
         # weighted average
-        kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick;
-
+        kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
         np.savetxt('kicks.txt', kicks, delimiter='\n')
 
         # Plot orbit    
         plt.figure(3)
         plt.clf()
-        plt.plot (Diff_x, lw=2, label="X")
-        plt.plot (Diff_y, lw=2, label="Y")
+        plt.errorbar (range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
+        plt.errorbar (range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
         plt.legend (loc='upper left')
         plt.xlabel ('Bpm [#]')
         plt.ylabel ('Orbit [mm]')
         plt.draw()
-        plt.pause(0.1)  
-    
-        # reset corrector
-        I.write_correctors(corrector, corr['bdes'])
+        plt.pause(0.1)
 
 plt.ioff()  # Turn off interactive mode
 plt.show()  # Show the final plot                       
