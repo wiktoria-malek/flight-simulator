@@ -60,11 +60,7 @@ class InterfaceATF2:
         names = np.array(self.corrs)
         bdes = np.array(bdes)
         bact = np.array(bact)
-        correctors = {
-            "names": names,
-            "bdes": bdes,
-            "bact": bact
-        }
+        correctors = { "names": names, "bdes": bdes, "bact": bact }
         return correctors
     
     def read_bpms(self):
@@ -82,12 +78,7 @@ class InterfaceATF2:
         x = np.vstack(x)
         y = np.vstack(y)
         tmit = np.vstack(tmit)
-        bpms = {
-            "names": names,
-            "x": x,
-            "y": y,
-            "tmit": tmit
-        }
+        bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
 
     def write_correctors(self, names, corr_vals):

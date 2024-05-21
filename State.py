@@ -49,16 +49,7 @@ class State:
         faulty = (x == 0.0) & (y == 0.0)
         x[faulty] = np.NaN
         y[faulty] = np.NaN
-        orbit = {
-            "names": names,
-            "x": x,
-            "y": y,
-            "stdx": stdx,
-            "stdy": stdy,
-            "tmit": tmit,
-            "faulty": faulty,
-            "nbpms": len(x)
-        }
+        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(x) }
         return orbit
 
     def load(self, filename):
