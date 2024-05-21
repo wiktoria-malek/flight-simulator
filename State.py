@@ -3,28 +3,18 @@ import numpy as np
 import json
 
 class State:
-    def __init__(self, interface=None,filename=None):
-        if interface is not None:
-            self.interface = interface
-        else:
-            self.interface = None
+    def __init__(self, filename=None):
         if filename is not None:
             self.load(filename)
 
-    def get_machine(self):
-        self.correctors = self.interface.read_correctors()
-        self.bpms = self.interface.read_bpms()
-        self.icts = self.interface.read_icts()
+    def get_machine(self, interface):
+        self.correctors = interface.read_correctors()
+        self.bpms = interface.read_bpms()
+        self.icts = interface.read_icts()
         self.timestamp = datetime.now()
 
-    def vary_correctors(self, names, corr_vals):
-        self.interface.vary_correctors(names, corr_vals)
-        self.get_machine()
-
-    def write_to_machine(self):
-        print(self.correctors['names'])
-        print(self.correctors['bdes'])
-        self.interface.write_correctors(self.correctors['names'], self.correctors['bdes'])
+    def write_to_machine(self,interface):
+        interface.write_correctors(self.correctors['names'], self.correctors['bdes'])
 
     def get_correctors(self, names=None):
         correctors = self.correctors
