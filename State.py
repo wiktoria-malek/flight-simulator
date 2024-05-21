@@ -7,7 +7,7 @@ class State:
         if filename is not None:
             self.load(filename)
 
-    def get_machine(self, interface):
+    def get_machine (self, interface):
         self.correctors = interface.read_correctors()
         self.bpms = interface.read_bpms()
         self.icts = interface.read_icts()
@@ -52,10 +52,10 @@ class State:
 
     def get_orbit(self, names=None):
         bpms = self.get_bpms(names)
-        x = np.mean(bpms['x'],axis=0)
-        y = np.mean(bpms['y'],axis=0)
-        stdx = np.std(bpms['x'],axis=0)
-        stdy = np.std(bpms['y'],axis=0)
+        x = np.mean(bpms['x'],axis=0) # mm
+        y = np.mean(bpms['y'],axis=0) # mm
+        stdx = np.std(bpms['x'],axis=0) # mm
+        stdy = np.std(bpms['y'],axis=0) # mm
         tmit = np.mean(bpms['tmit'],axis=0)
         faulty = (x == 0.0) & (y == 0.0)
         x[faulty] = np.NaN

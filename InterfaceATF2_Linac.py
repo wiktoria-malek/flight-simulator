@@ -82,8 +82,8 @@ class InterfaceATF2_Linac:
             tmit.append(a[self.bpm_indexes, 3])
             time.sleep(1)
         names = np.array(self.bpms)
-        x = np.vstack(x)
-        y = np.vstack(y)
+        x = np.vstack(x) / 1e3 # mm
+        y = np.vstack(y) / 1e3 # mm
         tmit = np.vstack(tmit)
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
