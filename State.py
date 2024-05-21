@@ -3,8 +3,13 @@ import numpy as np
 import json
 
 class State:
-    def __init__(self, interface):
-        self.interface = interface;
+    def __init__(self, interface=None,filename=None):
+        if interface is not None:
+            self.interface = interface
+        else:
+            self.interface = None
+        if filename is not None:
+            self.load(filename)
 
     def get_machine(self):
         self.correctors = self.interface.read_correctors()
@@ -15,7 +20,12 @@ class State:
     def vary_correctors(self, names, corr_vals):
         self.interface.vary_correctors(names, corr_vals)
         self.get_machine()
-            
+
+    def write_to_machine(self):
+        print(self.correctors['names'])
+        print(self.correctors['bdes'])
+        self.interface.write_correctors(self.correctors['names'], self.correctors['bdes'])
+
     def get_correctors(self, names=None):
         correctors = self.correctors
         if names is not None:
@@ -83,9 +93,10 @@ class State:
         }
         self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
 
-    def save(self, basename):
-        time_str = self.timestamp.strftime("%Y%m%d_%H%M%S")
-        filename = f"{basename}_{time_str}.json"
+    def save(self, basename=None, filename=None):
+        if basename is not None:
+            time_str = self.timestamp.strftime("%Y%m%d_%H%M%S")
+            filename = f"{basename}_{time_str}.json"
         correctors = {
             'names': self.correctors['names'].tolist(),
             'bdes': self.correctors['bdes'].tolist(),
@@ -109,4 +120,5 @@ class State:
         }
         with open(filename, "w") as json_file:
             json.dump(state, json_file, indent=4)
+        return filename
             

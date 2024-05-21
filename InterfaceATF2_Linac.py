@@ -17,18 +17,13 @@ class InterfaceATF2_Linac:
             'ZX10T', 'ZX11T', 'ML1T', 'ZV13L'
         ]
         # ATF2' BPMs Epics names
-        # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         bpm_names = [
-            "MB1X", "MB2X", "MQF1X", "MQD2X", "MQF3X", "MQF4X", "MQD5X", "MQF6X",
-            "MQF7X", "MQD8X", "MQF9X", "MQD10X", "MQF11X", "MQD12X", "MQF13X",
-            "MQD14X", "MQF15X", "MQD16X", "MQF17X", "MQD18X", "MQF19X", "MQD20X",
-            "MQF21X", "IPBPM1", "IPBPM2", "nBPM1", "nBPM2", "nBPM3", "MQM16FF",
-            "MQM15FF", "MQM14FF", "MFB2FF", "MQM13FF", "MQM12FF", "MFB1FF",
-            "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9BFF", "MSF6FF", "MQF9AFF",
-            "MQD8FF", "MQF7FF", "MQD6FF", "MQF5BFF", "MSF5FF", "MQF5AFF",
-            "MQD4BFF", "MSD4FF", "MQD4AFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
-            "MSF1FF", "MQF1FF", "MSD0FF", "MQD0FF", "M1&2IP", "MPIP", "MDUMP",
-            "ICT1X", "ICTDUMP", "MW1X", "MW1IP", "MPREIP", "MIPA", "MIPB"
+            "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L",
+            "ML1L", "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L",
+            "ML8L", "ML9L", "ML10L", "ML11L", "ML12L", "ML13L",
+            "ML14L", "ML15L", "ML1T", "ML2T", "ML101T", "ML102T",
+            "ML103T", "ML3T", "ML104T", "ML4T", "ML105T", "ML5T",
+            "ML6T", "ML106T", "ML7T", "ML8T", "ML9T", "MB10T", "MB11T"
         ]
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         bpm_names_from_cfg = [string for string in bpmcorr if not string.lower().startswith('z')]
