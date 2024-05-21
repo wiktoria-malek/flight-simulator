@@ -9,6 +9,7 @@ class State:
     def get_machine(self):
         self.correctors = self.interface.read_correctors()
         self.bpms = self.interface.read_bpms()
+        self.icts = self.interface.read_icts()
         self.timestamp = datetime.now()
 
     def vary_correctors(self, names, corr_vals):
@@ -28,7 +29,6 @@ class State:
 
     def get_bpms(self, names=None):
         bpms = self.bpms
-        print(enumerate(bpms['names']))
         if names is not None:
             bpm_indexes = np.array([index for index, string in enumerate(bpms['names']) if string in names])
             bpms = {
@@ -38,6 +38,16 @@ class State:
                 "tmit": bpms['tmit'][:,bpm_indexes],
             }
         return bpms         
+
+    def get_icts(self, names=None):
+        icts = self.icts
+        if names is not None:
+            ict_indexes = np.array([index for index, string in enumerate(icts['names']) if string in names])
+            icts = {
+                "names": icts['names'][ict_indexes],
+                "charge": icts['charge'][ict_indexes]
+            }
+        return icts         
 
     def get_orbit(self, names=None):
         bpms = self.get_bpms(names)
@@ -66,6 +76,10 @@ class State:
             "y": np.array(data['bpms']['y']),
             "tmit": np.array(data['bpms']['tmit'])
         }
+        self.icts = {
+            "names": data['icts']['names'],
+            "charge": np.array(data['icts']['charge']),
+        }
         self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
 
     def save(self, basename):
@@ -78,11 +92,14 @@ class State:
         bpms['x'] = bpms['x'].tolist()
         bpms['y'] = bpms['y'].tolist()
         bpms['tmit'] = bpms['tmit'].tolist()
+        icts = self.icts
+        icts['charge'] = icts['charge'].tolist()
         state = {
             "correctors": correctors,
             "bpms": bpms,
+            "icts": icts,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
         }
         with open(filename, "w") as json_file:
             json.dump(state, json_file, indent=4)
-
+            

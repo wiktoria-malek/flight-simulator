@@ -6,7 +6,7 @@ from epics import PV, ca
 class InterfaceATF2:
     def __init__(self, nsamples=1):
         self.nsamples = nsamples
-        # Configuration file in beamline order
+        # Bpms and correctors in beamline order
         bpmcorr = [
             "MB2X", "ZV1X", "MQF1X", "ZV2X", "MQD2X", "MQF3X", "ZH1X", "ZV3X", "MQF4X",
             "ZH2X", "MQD5X", "ZV4X", "ZV5X", "MQF6X", "MQF7X", "ZH3X", "MQD8X", "ZV6X",
@@ -48,7 +48,21 @@ class InterfaceATF2:
         self.corrs = [string for string in self.bpmcorr if string.lower().startswith('z')]
         # Index of the selected BPMs in the Epics PV ATF2:monitors
         self.bpm_indexes = [index for index, string in enumerate(bpm_names) if string in self.bpms]
+        # Bunch current monitors
+        self.ict_names = [
+            'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
+            'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
+        ]
     
+    def read_icts(self):
+        print("Reading ICT's...")
+        charge = []
+        for ict in self.ict_names:
+            pv = PV(f'{ict}')
+            charge.append(pv.get())
+        icts = { "names": np.array(self.ict_names), "charge": np.array(charge) }
+        return icts
+
     def read_correctors(self):
         print("Reading correctors' strengths...")
         bdes, bact = [], []
@@ -72,8 +86,7 @@ class InterfaceATF2:
             x.append(a[self.bpm_indexes, 1])
             y.append(a[self.bpm_indexes, 2])
             tmit.append(a[self.bpm_indexes, 3])
-            if self.nsamples>0:
-                time.sleep(1)
+            time.sleep(1)
         names = np.array(self.bpms)
         x = np.vstack(x)
         y = np.vstack(y)
