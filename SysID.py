@@ -28,14 +28,19 @@ def signal_handler(sig, frame, var):
     print('Caught CTRL-C, exiting gracefully!')
     S = var[0]
     F = var[1]
+    DFS = var[2]
     S.load(F)
     try:
         S.write_to_machine(I)
+        if DFS:
+            I.reset_energy()
     except:
         pass
     exit(0)
 
-signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F)))
+DFS = True
+
+signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F,DFS)))
 
 # The list of correctors to use 
 C = [
@@ -71,6 +76,9 @@ plt.ion()
 # Kick to achieve 1mm max excursion
 kicks = 0.1 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
 max_oscillation = 0.150 # mm
+
+if DFS:
+    I.change_energy()
 
 # 10 loops to measure the response matrix
 print("Press CTRL-C to interrupt the program.")
@@ -127,10 +135,13 @@ for iter in range (Niter):
         plt.legend (loc='upper left')
         plt.xlabel ('Bpm [#]')
         plt.ylabel ('Orbit [mm]')
-        plt.title (f"Corrector '{corrector}'"}
+        plt.title (f"Corrector '{corrector}'")
         plt.draw()
         plt.pause(0.1)
 
 plt.ioff()  # Turn off interactive mode
 plt.show()  # Show the final plot                       
+
+if DfS:
+    I.reset_energy()
 
