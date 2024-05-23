@@ -16,7 +16,7 @@ os.makedirs (dir_name)
 os.chdir (dir_name)
 
 # Connect to interface ATF2 Linac
-I = InterfaceATF2_Linac (nsamples=10)
+I = InterfaceATF2_Linac (nsamples=5)
 S = State ()
 S.get_machine (I)
 

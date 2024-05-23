@@ -103,6 +103,7 @@ class InterfaceATF2_Linac:
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
             a = p.get().reshape((-1, 20))
+            status = a[self.bpm_indexes, 0]
             # Set elements that are not equal to 1 to zero
             status[status != 1] = 0
             x.append(a[self.bpm_indexes, 1])
