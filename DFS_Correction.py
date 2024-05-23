@@ -36,48 +36,82 @@ gain = 0.4
 wgt_orb = 1
 wgt_dfsx = 10
 wgt_dfsy = 10
-n_svx = 8
-n_svy = 10
+rcond = 0.001
 
-#
+# Correction!
 I = InterfaceATF2_Linac(nsamples=5)
 S = State ()
 
-# Nominal orbit
-S.get_machine (I)
-O0 = S.get_orbit(B)
+norm_Orbit_x = []
+norm_Orbit_y = []
+norm_Disp_x = []
+norm_Disp_y = []
 
-# Python's transpose.......
-O0x = O0['x'].reshape(-1,1)
-O0y = O0['y'].reshape(-1,1)
-O1x = O1['x'].reshape(-1,1)
-O1y = O1['y'].reshape(-1,1)
+# Turn on interactive plotting mode
+plt.ion()
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+fig.suptitle('Convergence')
 
-# Dispersive orbit
-#I.change_energy()
-#S.get_machine()
-O1 = S.get_orbit(B)
+for iteration in range(15):
 
-Bx = np.vstack((wgt_orb  * (O0x - B0x),
-                wgt_dfsx * (O1x - O0x))) 
+    # Nominal orbit
+    S.get_machine (I)
+    O0 = S.get_orbit(B)
 
-By = np.vstack((wgt_orb  * (O0y - B0y),
-                wgt_dfsx * (O1y - O0y))) 
+    # Dispersive orbit
+    #I.change_energy()
+    #S.get_machine()
+    #I.reset_energy()
+    O1 = S.get_orbit(B)
 
-Rxx = np.vstack((wgt_orb  *  R0xx,
-                 wgt_dfsx * (R1xx - R0xx)))
+    # Python's transpose.......
+    O0x = O0['x'].reshape(-1,1)
+    O0y = O0['y'].reshape(-1,1)
+    O1x = O1['x'].reshape(-1,1)
+    O1y = O1['y'].reshape(-1,1)
 
-Ryy = np.vstack((wgt_orb  *  R0yy,
-                 wgt_dfsx * (R1yy - R0yy)))
+    # DFS system of equations
+    Bx = np.vstack((wgt_orb  * (O0x - B0x),
+                    wgt_dfsx * (O1x - O0x)))
 
-print(O0['x'])
-print(B0x)
-print(Bx.shape)
-print(Rxx.shape)
-print(np.linalg.pinv(Rxx, rcond=0.0001).shape)
+    By = np.vstack((wgt_orb  * (O0y - B0y),
+                    wgt_dfsy * (O1y - O0y)))
 
-corrX = -gain * (np.linalg.pinv(Rxx, rcond=0.0001) @ Bx)
-corrY = -gain * (np.linalg.pinv(Ryy, rcond=0.0001) @ By)
+    Rxx = np.vstack((wgt_orb  *  R0xx,
+                     wgt_dfsx * (R1xx - R0xx)))
 
-print(corrX)
-print(corrY)
+    Ryy = np.vstack((wgt_orb  *  R0yy,
+                     wgt_dfsy * (R1yy - R0yy)))
+
+    corrX = -gain * (np.linalg.pinv(Rxx, rcond=rcond) @ Bx)
+    corrY = -gain * (np.linalg.pinv(Ryy, rcond=rcond) @ By)
+
+    norm_Orbit_x = np.hstack((norm_Orbit_x, np.linalg.norm(O0x - B0x)))
+    norm_Orbit_y = np.hstack((norm_Orbit_y, np.linalg.norm(O0y - B0y)))
+    norm_Disp_x = np.hstack((norm_Disp_x, np.linalg.norm(O1x - O0x)))
+    norm_Disp_y = np.hstack((norm_Disp_y, np.linalg.norm(O1y - O0y)))
+
+    # Clear previous plots
+    ax1.clear()
+    ax2.clear()
+
+    # Plot the updated data
+    ax1.plot(range(iteration+1), norm_Orbit_x)
+    ax1.plot(range(iteration+1), norm_Orbit_y)
+    ax1.legend (loc='upper left')
+    ax1.set_xlabel ('Iteration [#]')
+    ax1.set_ylabel ('norm Orbit difference [mm]')
+
+    ax2.plot(range(iteration+1), norm_Disp_x)
+    ax2.plot(range(iteration+1), norm_Disp_y)
+    ax2.legend (loc='upper left')
+    ax2.set_xlabel ('Iteration [#]')
+    ax2.set_ylabel ('norm Dispersion difference [mm]')
+
+    # Redraw the plot
+    plt.draw()
+    plt.pause(0.1)
+
+plt.ioff()  # Turn off interactive mode
+plt.show()  # Show the final plot
+

@@ -116,13 +116,13 @@ R.save('response.json')
 
 # Plots
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+fig.suptitle('Reference trajectory')
 
 # Plot on the first subplot
 ax1.plot(Bxx, label='Bxx')
 ax1.plot(Bxy, label='Bxy')
 ax1.set_xlabel('BPMs [#]')
 ax1.set_ylabel('Bx')
-ax1.set_title('Reference trajectory')
 ax1.legend()
 
 # Plot on the second subplot
