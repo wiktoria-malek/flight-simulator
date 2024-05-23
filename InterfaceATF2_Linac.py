@@ -56,7 +56,7 @@ class InterfaceATF2_Linac:
 
     def change_energy(self):
         pass
-        
+
     def reset_energy(self):
         pass
 
