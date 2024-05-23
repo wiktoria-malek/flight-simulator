@@ -7,7 +7,7 @@ class InterfaceATF2_Ext:
     def __init__(self, nsamples=1):
         self.nsamples = nsamples
         # Bpms and correctors in beamline order
-        bpmcorr = [
+        sequence = [
             "MB2X", "ZV1X", "MQF1X", "ZV2X", "MQD2X", "MQF3X", "ZH1X", "ZV3X", "MQF4X",
             "ZH2X", "MQD5X", "ZV4X", "ZV5X", "MQF6X", "MQF7X", "ZH3X", "MQD8X", "ZV6X",
             "MQF9X", "ZH4X", "FONTK1", "ZV7X", "FONTP1", "MQD10X", "ZH5X", "MQF11X",
@@ -35,18 +35,18 @@ class InterfaceATF2_Ext:
             "ICT1X", "ICTDUMP", "MW1X", "MW1IP", "MPREIP", "MIPA", "MIPB"
         ]
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
-        bpm_names_from_cfg = [string for string in bpmcorr if not string.lower().startswith('z')]
+        bpm_names_from_cfg = [string for string in sequence if not string.lower().startswith('z')]
         # Check if the bpms in the config files are known to Epics
         bpm_ok = all(bpm in bpm_names for bpm in bpm_names_from_cfg)
         if not bpm_ok:
             bpms_unknown = [bpm for bpm in bpm_names_from_cfg if bpm not in bpm_names]
             print(f'Unknown bpms {bpms_unknown} removed from list')
         # Only retain BPMs in config file which are known by Epics
-        bpmcorr_filtered = [element for element in bpmcorr if (element in bpm_names) or element.lower().startswith('z')]
+        sequence_filtered = [element for element in sequence if (element in bpm_names) or element.lower().startswith('z')]
         # Subset of BPMs and correctors from the config file
-        self.bpmcorr = bpmcorr_filtered
-        self.bpms = [string for string in self.bpmcorr if not string.lower().startswith('z')]
-        self.corrs = [string for string in self.bpmcorr if string.lower().startswith('z')]
+        self.sequence = sequence_filtered
+        self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
+        self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         # Index of the selected BPMs in the Epics PV ATF2:monitors
         self.bpm_indexes = [index for index, string in enumerate(bpm_names) if string in self.bpms]
         # Bunch current monitors
@@ -54,7 +54,25 @@ class InterfaceATF2_Ext:
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
-    
+
+    def get_sequence(self):
+        return self.sequence
+
+    def get_bpms_names(self):
+        return self.bpms
+
+    def get_correctors_names(self):
+        return self.corrs
+
+    def get_hcorrectors_names(self):
+        return [string for string in self.corrs if string.lower().startswith('zh')]
+
+    def get_vcorrectors_names(self):
+        return [string for string in self.corrs if string.lower().startswith('zv')]
+
+    def get_elements_position(self,names):
+        return [index for index, string in enumerate(self.sequence) if string in names]
+
     def read_icts(self):
         print("Reading ict's...")
         charge = []
@@ -91,8 +109,8 @@ class InterfaceATF2_Ext:
             tmit.append(a[self.bpm_indexes, 3])
             time.sleep(1)
         names = np.array(self.bpms)
-        x = np.vstack(x)
-        y = np.vstack(y)
+        x = np.vstack(x) / 1e3 # mm
+        y = np.vstack(y) / 1e3 # mm
         tmit = np.vstack(tmit)
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms

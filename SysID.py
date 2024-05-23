@@ -9,13 +9,13 @@ import signal
 import os
 
 # Create the working environment
-project_name = 'new_SYSID' 
+project_name = 'new_SYSID'
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 dir_name = f"Data/{project_name}_{time_str}"
 os.makedirs (dir_name)
 os.chdir (dir_name)
 
-# Connect interface to ATF2 Linac
+# Connect to interface ATF2 Linac
 I = InterfaceATF2_Linac (nsamples=10)
 S = State ()
 S.get_machine (I)

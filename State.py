@@ -11,10 +11,16 @@ class State:
         self.correctors = interface.read_correctors()
         self.bpms = interface.read_bpms()
         self.icts = interface.read_icts()
+        self.sequence = interface.get_sequence()
+        self.hcorrectors_names = interface.get_hcorrectors_names()
+        self.vcorrectors_names = interface.get_vcorrectors_names()
         self.timestamp = datetime.now()
 
     def write_to_machine(self,interface):
         interface.write_correctors(self.correctors['names'], self.correctors['bdes'])
+
+    def get_sequence(self):
+        return self.sequence
 
     def get_correctors(self, names=None):
         correctors = self.correctors
@@ -26,6 +32,12 @@ class State:
                 "bact": correctors['bact'][corr_indexes]
             }
         return correctors         
+
+    def get_hcorrectors_names(self):
+        return self.hcorrectors_names
+
+    def get_vcorrectors_names(self):
+        return self.vcorrectors_names
 
     def get_bpms(self, names=None):
         bpms = self.bpms
@@ -66,6 +78,7 @@ class State:
     def load(self, filename):
         with open(filename, "r") as json_file:
             data = json.load(json_file)
+        self.sequence = data['sequence']
         self.correctors = {
             "names": np.array(data['correctors']['names']),
             "bdes": np.array(data['correctors']['bdes']),
@@ -81,6 +94,8 @@ class State:
             "names": np.array(data['icts']['names']),
             "charge": np.array(data['icts']['charge']),
         }
+        self.hcorrectors_names = data["hcorrectors_names"],
+        self.vcorrectors_names = data["vcorrectors_names"],
         self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
 
     def save(self, basename=None, filename=None):
@@ -103,9 +118,12 @@ class State:
             'charge': self.icts['charge'].tolist()
         }
         state = {
+            "sequence": self.sequence,
             "correctors": correctors,
             "bpms": bpms,
             "icts": icts,
+            "hcorrectors_names": self.hcorrectors_names,
+            "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
         }
         with open(filename, "w") as json_file:
