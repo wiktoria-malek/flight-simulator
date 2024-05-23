@@ -22,7 +22,7 @@ class InterfaceATF2_Ext:
         ]
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
-        bpm_names = [
+        monitors = [
             "MB1X", "MB2X", "MQF1X", "MQD2X", "MQF3X", "MQF4X", "MQD5X", "MQF6X",
             "MQF7X", "MQD8X", "MQF9X", "MQD10X", "MQF11X", "MQD12X", "MQF13X",
             "MQD14X", "MQF15X", "MQD16X", "MQF17X", "MQD18X", "MQF19X", "MQD20X",
@@ -35,20 +35,20 @@ class InterfaceATF2_Ext:
             "ICT1X", "ICTDUMP", "MW1X", "MW1IP", "MPREIP", "MIPA", "MIPB"
         ]
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
-        bpm_names_from_cfg = [string for string in sequence if not string.lower().startswith('z')]
+        monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
         # Check if the bpms in the config files are known to Epics
-        bpm_ok = all(bpm in bpm_names for bpm in bpm_names_from_cfg)
+        bpm_ok = all(bpm in monitors for bpm in monitors_from_sequence)
         if not bpm_ok:
-            bpms_unknown = [bpm for bpm in bpm_names_from_cfg if bpm not in bpm_names]
+            bpms_unknown = [bpm for bpm in monitors_from_sequence if bpm not in monitors]
             print(f'Unknown bpms {bpms_unknown} removed from list')
         # Only retain BPMs in config file which are known by Epics
-        sequence_filtered = [element for element in sequence if (element in bpm_names) or element.lower().startswith('z')]
+        sequence_filtered = [element for element in sequence if (element in monitors) or element.lower().startswith('z')]
         # Subset of BPMs and correctors from the config file
         self.sequence = sequence_filtered
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         # Index of the selected BPMs in the Epics PV ATF2:monitors
-        self.bpm_indexes = [index for index, string in enumerate(bpm_names) if string in self.bpms]
+        self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
         self.ict_names = [
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
@@ -104,9 +104,12 @@ class InterfaceATF2_Ext:
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
             a = p.get().reshape((-1, 10))
+            status = a[self.bpm_indexes, 0]
+            # Set elements that are not equal to 1 to zero
+            status[status != 1] = 0
             x.append(a[self.bpm_indexes, 1])
             y.append(a[self.bpm_indexes, 2])
-            tmit.append(a[self.bpm_indexes, 3])
+            tmit.append(status * a[self.bpm_indexes, 3])
             time.sleep(1)
         names = np.array(self.bpms)
         x = np.vstack(x) / 1e3 # mm

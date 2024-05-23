@@ -18,29 +18,36 @@ class InterfaceATF2_Linac:
         ]
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
-        bpm_names = [
-            "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L",
-            "ML1L", "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L",
-            "ML8L", "ML9L", "ML10L", "ML11L", "ML12L", "ML13L",
-            "ML14L", "ML15L", "ML1T", "ML2T", "ML101T", "ML102T",
-            "ML103T", "ML3T", "ML104T", "ML4T", "ML105T", "ML5T",
-            "ML6T", "ML106T", "ML7T", "ML8T", "ML9T", "MB10T", "MB11T"
+        monitors = [
+            "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L", "ML1L",
+            "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L", "ML8L", "ML9L",
+            "ML10L", "ML11L", "ML12L", "ML13L", "ML14L", "ML15L", "ML1P", "ML2P",
+            "ML3P", "ML4P", "GUN", "LN0", "LNE", "BTM", "BTE", "C44N16A08",
+            "C44N16A09", "C44N16A10", "C44N16A11", "C44N16A12", "C44N16A13",
+            "C44N16A14", "C44N16A15", "C45N09A00", "C45N09A01", "C45N09A02",
+            "C45N09A03", "C45N09A04", "C45N09A05", "C45N09A06", "C45N09A07",
+            "C45N09A08", "C45N09A09", "C45N09A10", "C45N09A11", "C45N09A12",
+            "C45N09A13", "C45N09A14", "C45N09A15", "ML1T", "ML2T", "ML3T",
+            "ML4T", "ML5T", "ML6T", "ML7T", "ML8T", "ML9T", "MB10T", "MB11T",
+            "MB1T", "ML101T", "ML102T", "ML103T", "ML104T", "ML105T", "ML106T",
+            "C43N16A08", "C43N16A09", "C43N16A10", "C43N16A11", "C43N16A12",
+            "C43N16A13", "C43N16A14", "C43N16A15"
         ]
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
-        bpm_names_from_cfg = [string for string in sequence if not string.lower().startswith('z')]
+        monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
         # Check if the bpms in the config files are known to Epics
-        bpm_ok = all(bpm in bpm_names for bpm in bpm_names_from_cfg)
+        bpm_ok = all(bpm in monitors for bpm in monitors_from_sequence)
         if not bpm_ok:
-            bpms_unknown = [bpm for bpm in bpm_names_from_cfg if bpm not in bpm_names]
+            bpms_unknown = [bpm for bpm in monitors_from_sequence if bpm not in monitors]
             print(f'Unknown bpms {bpms_unknown} removed from list')
         # Only retain BPMs in config file which are known by Epics
-        sequence_filtered = [element for element in sequence if (element in bpm_names) or element.lower().startswith('z')]
+        sequence_filtered = [element for element in sequence if (element in monitors) or element.lower().startswith('z')]
         # Subset of BPMs and correctors from the config file
         self.sequence = sequence_filtered
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         # Index of the selected BPMs in the Epics PV ATF2:monitors
-        self.bpm_indexes = [index for index, string in enumerate(bpm_names) if string in self.bpms]
+        self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
         self.ict_names = [
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
@@ -92,13 +99,15 @@ class InterfaceATF2_Linac:
     
     def read_bpms(self):
         print('Reading bpms...')
-        p = PV('ATF2:monitors')
+        p = PV('LINAC:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
-            a = p.get().reshape((-1, 10))
+            a = p.get().reshape((-1, 20))
+            # Set elements that are not equal to 1 to zero
+            status[status != 1] = 0
             x.append(a[self.bpm_indexes, 1])
             y.append(a[self.bpm_indexes, 2])
-            tmit.append(a[self.bpm_indexes, 3])
+            tmit.append(status * a[self.bpm_indexes, 3])
             time.sleep(1)
         names = np.array(self.bpms)
         x = np.vstack(x) / 1e3 # mm
