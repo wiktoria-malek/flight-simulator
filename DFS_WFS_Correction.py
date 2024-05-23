@@ -126,14 +126,14 @@ for iteration in range(15):
     ax1.plot(range(iteration+1), norm_Orbit_y, label='Y axis')
     ax1.set_title('Trajectory')
     ax1.set_xlabel ('Iteration [#]')
-    ax1.set_ylabel ('|Orbit| [mm]')
+    ax1.set_ylabel ('Orbit [mm]')
     ax1.legend (loc='upper left')
     
     ax2.plot(range(iteration+1), norm_Disp_x, label='X axis')
     ax2.plot(range(iteration+1), norm_Disp_y, label='Y axis')
     ax2.set_title('Dispersion')
     ax2.set_xlabel ('Iteration [#]')
-    ax2.set_ylabel ('|Dispersion| [mm]')
+    ax2.set_ylabel ('Dispersion [mm]')
     ax2.legend (loc='upper left')
 
     ax3.plot(range(iteration+1), norm_Wake_x, label='X axis')
@@ -141,7 +141,7 @@ for iteration in range(15):
     ax3.set_title('Wakefield')
     ax3.set_xlabel ('Iteration [#]')
     ax3.set_ylabel ('norm Wakefield difference [mm]')
-    ax3.set_ylabel ('|Wakefield| [mm]')
+    ax3.set_ylabel ('Wakefield [mm]')
     ax3.legend (loc='upper left')
     
     # Redraw the plot

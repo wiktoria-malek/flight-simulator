@@ -102,14 +102,14 @@ for iteration in range(15):
     ax1.plot(range(iteration+1), norm_Orbit_y, label='Y axis')
     ax1.set_title('Trajectory')
     ax1.set_xlabel ('Iteration [#]')
-    ax1.set_ylabel ('norm Orbit difference [mm]')
+    ax1.set_ylabel ('Orbit [mm]')
     ax1.legend (loc='upper left')
     
     ax2.plot(range(iteration+1), norm_Disp_x, label='X axis')
     ax2.plot(range(iteration+1), norm_Disp_y, label='Y axis')
     ax2.set_title('Dispersion')
     ax2.set_xlabel ('Iteration [#]')
-    ax2.set_ylabel ('norm Dispersion difference [mm]')
+    ax2.set_ylabel ('Dispersion [mm]')
     ax2.legend (loc='upper left')
     
     # Redraw the plot
