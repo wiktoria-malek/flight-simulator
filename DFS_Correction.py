@@ -32,14 +32,14 @@ R1yx, R1yy = R1.submatrix_Ry(B, Cy)
 B0x, B0y = R0.submatrix_B(B)
 
 # DFS parameters
-gain = 0.4
+gain = 0.5
 wgt_orb = 1
 wgt_dfsx = 10
 wgt_dfsy = 10
-rcond = 0.001
+rcond = 0.000001
 
 # Correction!
-I = InterfaceATF2_Linac(nsamples=5)
+I = InterfaceATF2_Linac(nsamples=3)
 S = State ()
 
 norm_Orbit_x = []

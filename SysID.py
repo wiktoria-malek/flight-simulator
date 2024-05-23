@@ -15,8 +15,11 @@ dir_name = f"Data/{project_name}_{time_str}"
 os.makedirs (dir_name)
 os.chdir (dir_name)
 
+# What response matrix
+DFS = False
+
 # Connect to interface ATF2 Linac
-I = InterfaceATF2_Linac (nsamples=5)
+I = InterfaceATF2_Linac (nsamples=3)
 S = State ()
 S.get_machine (I)
 
@@ -37,8 +40,6 @@ def signal_handler(sig, frame, var):
     except:
         pass
     exit(0)
-
-DFS = True
 
 signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F,DFS)))
 
@@ -75,14 +76,14 @@ plt.ion()
 
 # Kick to achieve 1mm max excursion
 kicks = 0.1 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
-max_oscillation = 0.150 # mm
+max_oscillation = 0.50 # mm
 
 if DFS:
     I.change_energy()
 
 # 10 loops to measure the response matrix
 print("Press CTRL-C to interrupt the program.")
-Niter = 10
+Niter = 3
 for iter in range (Niter):
     print(f'Iteration {iter}/{Niter}')
     for icorr, corrector in enumerate(C):
@@ -139,9 +140,12 @@ for iter in range (Niter):
         plt.draw()
         plt.pause(0.1)
 
+if DFS:
+    I.reset_energy()
+
+print('Done!')
+
 plt.ioff()  # Turn off interactive mode
 plt.show()  # Show the final plot                       
 
-if DfS:
-    I.reset_energy()
 
