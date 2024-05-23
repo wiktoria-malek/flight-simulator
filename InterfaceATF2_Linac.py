@@ -17,6 +17,7 @@ class InterfaceATF2_Linac:
             'ZX10T', 'ZX11T', 'ML1T', 'ZV13L'
         ]
         # ATF2' BPMs Epics names
+        # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         bpm_names = [
             "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L",
             "ML1L", "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L",

@@ -63,10 +63,29 @@ for datafile_p in datafiles_p:
         print(f"Data file '{datafile_m}' does not exist, ignoring counterpart '{datafile_p}' for response matrix computation")
 
 # Compute the response matrices
+ones_column_x = np.ones((Cx.shape[0], 1))
+ones_column_y = np.ones((Cy.shape[0], 1))
+
+# Add the column of ones to the matrix
+Cx = np.hstack((Cx, ones_column_x))
+Cy = np.hstack((Cy, ones_column_y))
+
 Rxx = np.linalg.lstsq(Bx, Cx, rcond=None)[0]
 Rxy = np.linalg.lstsq(Bx, Cy, rcond=None)[0]
 Ryx = np.linalg.lstsq(By, Cx, rcond=None)[0]
 Ryy = np.linalg.lstsq(By, Cy, rcond=None)[0]
+
+# Reference trajectory
+Bxx = Rxx[:,-1]
+Bxy = Rxy[:,-1]
+Byx = Ryx[:,-1]
+Byy = Ryy[:,-1]
+
+# Response matrices
+Rxx = Rxx[:,:-1]
+Rxy = Rxy[:,:-1]
+Ryx = Ryx[:,:-1]
+Ryy = Ryy[:,:-1]
 
 # Zero the response of all bpms preceeding the correctors
 for corr in hcorrs:
@@ -88,19 +107,66 @@ R.Rxx = Rxx
 R.Rxy = Rxy
 R.Ryx = Ryx
 R.Ryy = Ryy
+R.Bxx = Bxx
+R.Bxy = Bxy
+R.Byx = Byx
+R.Byy = Byy
 
 R.save('response.json')
 
-# Plot it
-fig = plt.figure(figsize=(9, 9), facecolor="w")
-ax = fig.add_subplot(111, projection="3d")
+# Plots
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+
+# Plot on the first subplot
+ax1.plot(Bxx, label='Bxx')
+ax1.plot(Bxy, label='Bxy')
+ax1.set_xlabel('BPMs [#]')
+ax1.set_ylabel('Bx')
+ax1.set_title('Reference trajectory')
+ax1.legend()
+
+# Plot on the second subplot
+ax2.plot(Byx, label='Byx')
+ax2.plot(Byy, label='Byy')
+ax2.set_xlabel('BPMs [#]')
+ax2.set_ylabel('By')
+ax2.legend()
+
+plt.tight_layout()
+plt.show()
+
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, subplot_kw={'projection': '3d'}, figsize=(12, 10))
 
 x = np.array(range(len(hcorrs)))
 y = np.array(range(len(bpms)))
 X, Y = np.meshgrid(x, y)
 
-surf = ax.plot_surface(X, Y, Rxx)
+ax1.plot_surface(X, Y, Rxx, cmap='viridis')
+ax1.set_title('$R_{xx}$')
+ax1.set_xlabel('Corrector [#]')
+ax1.set_ylabel('BPM [#]')
 
+ax3.plot_surface(X, Y, Ryx, cmap='viridis')
+ax3.set_title('$R_{yx}$')
+ax3.set_xlabel('Corrector [#]')
+ax3.set_ylabel('BPM [#]')
+
+x = np.array(range(len(vcorrs)))
+y = np.array(range(len(bpms)))
+X, Y = np.meshgrid(x, y)
+
+ax2.plot_surface(X, Y, Rxy, cmap='viridis')
+ax2.set_title('$R_{xy}$')
+ax2.set_xlabel('Corrector [#]')
+ax2.set_ylabel('BPM [#]')
+
+ax4.plot_surface(X, Y, Ryy, cmap='viridis')
+ax4.set_title('$R_{yy}$')
+ax4.set_xlabel('Corrector [#]')
+ax4.set_ylabel('BPM [#]')
+
+
+plt.tight_layout()
 plt.show()
 
 
