@@ -60,6 +60,12 @@ class InterfaceATF2_Linac:
     def reset_energy(self):
         pass
 
+    def change_intensity(self):
+        pass
+
+    def reset_intensity(self):
+        pass
+
     def get_sequence(self):
         return self.sequence
 

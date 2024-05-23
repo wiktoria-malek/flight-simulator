@@ -61,6 +61,12 @@ class InterfaceATF2_Ext:
     def reset_energy(self):
         pass
 
+    def change_intensity(self):
+        pass
+
+    def reset_intensity(self):
+        pass
+
     def get_sequence(self):
         return self.sequence
 
