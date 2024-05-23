@@ -165,7 +165,6 @@ ax4.set_title('$R_{yy}$')
 ax4.set_xlabel('Corrector [#]')
 ax4.set_ylabel('BPM [#]')
 
-
 plt.tight_layout()
 plt.show()
 
