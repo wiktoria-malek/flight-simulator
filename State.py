@@ -94,8 +94,8 @@ class State:
             "names": np.array(data['icts']['names']),
             "charge": np.array(data['icts']['charge']),
         }
-        self.hcorrectors_names = data["hcorrectors_names"],
-        self.vcorrectors_names = data["vcorrectors_names"],
+        self.hcorrectors_names = data["hcorrectors_names"]
+        self.vcorrectors_names = data["vcorrectors_names"]
         self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
 
     def save(self, basename=None, filename=None):

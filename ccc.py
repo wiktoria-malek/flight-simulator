@@ -29,10 +29,7 @@ def signal_handler(sig, frame, var):
     S = var[0]
     F = var[1]
     S.load(F)
-    try:
-        S.write_to_machine(I)
-    except:
-        pass
+    #S.write_to_machine(I)
     exit(0)
 
 signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F)))
@@ -85,7 +82,7 @@ for iter in range (Niter):
 
         # '+' excitation 
         print(f"Corrector {corrector} '+' excitation...")
-        I.write_correctors(corrector, corr['bdes'] + kick)
+        #I.write_correctors(corrector, corr['bdes'] + kick)
         S.get_machine (I)
         S.save (filename=f'DATA_{corrector}_p{iter:04d}.json')
         Op = S.get_orbit (B)
@@ -93,21 +90,20 @@ for iter in range (Niter):
         
         # '-' excitation 
         print(f"Corrector {corrector} '-' excitation...")
-        I.write_correctors(corrector, corr['bdes'] - kick)
+        #I.write_correctors(corrector, corr['bdes'] - kick)
         S.get_machine (I)
         S.save (filename=f'DATA_{corrector}_m{iter:04d}.json')
         Om = S.get_orbit (B)
         plot_orbit(Om, 2)
         
         # reset corrector
-        I.write_correctors(corrector, corr['bdes'])
+        #I.write_correctors(corrector, corr['bdes'])
         
         # Orbit difference
         Diff_x = (Op['x'] - Om['x']) / 2.0
         Diff_y = (Op['y'] - Om['y']) / 2.0
-        nsamples = Op['stdx'].size
-        Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
-        Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
+        Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(Op['stdx'].size)
+        Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(Op['stdy'].size)
         
         # Tunes the kickers omplitude
         if corrector in S.get_hcorrectors_names():
@@ -127,7 +123,6 @@ for iter in range (Niter):
         plt.legend (loc='upper left')
         plt.xlabel ('Bpm [#]')
         plt.ylabel ('Orbit [mm]')
-        plt.title (f"Corrector '{corrector}'"}
         plt.draw()
         plt.pause(0.1)
 

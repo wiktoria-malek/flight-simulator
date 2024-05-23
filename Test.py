@@ -9,5 +9,7 @@ I = InterfaceATF2_Linac (nsamples=10)
 S = State ()
 S.get_machine (I)
 
-S.save(filename='machine_status.json')
+f = S.save(filename='machine_status.json')
 
+U = State(f)
+print(U.get_hcorrectors_names())
