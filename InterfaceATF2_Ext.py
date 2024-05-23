@@ -55,6 +55,12 @@ class InterfaceATF2_Ext:
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
 
+    def change_energy(self):
+        pass
+
+    def reset_energy(self):
+        pass
+
     def get_sequence(self):
         return self.sequence
 

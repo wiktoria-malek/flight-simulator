@@ -59,9 +59,9 @@ for iteration in range(15):
     O0 = S.get_orbit(B)
 
     # Dispersive orbit
-    #I.change_energy()
-    #S.get_machine()
-    #I.reset_energy()
+    I.change_energy()
+    S.get_machine()
+    I.reset_energy()
     O1 = S.get_orbit(B)
 
     # Python's transpose.......
