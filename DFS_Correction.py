@@ -32,11 +32,11 @@ R1yx, R1yy = R1.submatrix_Ry(B, Cy)
 B0x, B0y = R0.submatrix_B(B)
 
 # DFS parameters
-gain = 0.5
+gain = 0.4
 wgt_orb = 1
 wgt_dfsx = 10
 wgt_dfsy = 10
-rcond = 0.000001
+rcond = 0.001
 
 # Correction!
 I = InterfaceATF2_Linac(nsamples=3)
@@ -88,6 +88,10 @@ for iteration in range(15):
     corrX = -gain * (np.linalg.pinv(Rxx, rcond=rcond) @ Bx)
     corrY = -gain * (np.linalg.pinv(Ryy, rcond=rcond) @ By)
 
+    # Apply correction
+    I.vary_correctors(np.hstack((Cx,Cy)), np.vstack((corrX,corrY)))
+
+    # Plots
     norm_Orbit_x = np.hstack((norm_Orbit_x, np.linalg.norm(O0x - B0x)))
     norm_Orbit_y = np.hstack((norm_Orbit_y, np.linalg.norm(O0y - B0y)))
     norm_Disp_x = np.hstack((norm_Disp_x, np.linalg.norm(O1x - O0x)))

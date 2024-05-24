@@ -149,7 +149,8 @@ class InterfaceATF2_Ext:
             names = np.array([names])
         if names.size != corr_vals.size:
             print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)') 
-        correctors = self.read_correctors()
-        corr_indexes = [index for index, string in enumerate(correctors['names']) if string in names]
-        old_val = correctors['bdes'][corr_indexes]
-        self.write_correctors(names, old_val + corr_vals)
+        for corrector, corr_val in zip(names, corr_vals):
+            pv_des = PV(f'{corrector}:currentWrite')
+            curr_val = pv_des.get()
+            pv_des.put(curr_val + corr_val)
+        time.sleep(1)

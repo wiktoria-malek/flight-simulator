@@ -70,16 +70,19 @@ ones_column_y = np.ones((Cy.shape[0], 1))
 Cx = np.hstack((Cx, ones_column_x))
 Cy = np.hstack((Cy, ones_column_y))
 
-Rxx = np.linalg.lstsq(Bx, Cx, rcond=None)[0]
-Rxy = np.linalg.lstsq(Bx, Cy, rcond=None)[0]
-Ryx = np.linalg.lstsq(By, Cx, rcond=None)[0]
-Ryy = np.linalg.lstsq(By, Cy, rcond=None)[0]
+Rxx = np.transpose(np.linalg.lstsq(Cx, Bx, rcond=None)[0])
+Rxy = np.transpose(np.linalg.lstsq(Cy, Bx, rcond=None)[0])
+Ryx = np.transpose(np.linalg.lstsq(Cx, By, rcond=None)[0])
+Ryy = np.transpose(np.linalg.lstsq(Cy, By, rcond=None)[0])
 
 # Reference trajectory
+'''
 Bxx = Rxx[:,-1]
-Bxy = Rxy[:,-1]
-Byx = Ryx[:,-1]
 Byy = Ryy[:,-1]
+'''
+
+Bxx = np.mean(Bx,axis=0).reshape(-1,1)
+Byy = np.mean(By,axis=0).reshape(-1,1)
 
 # Response matrices
 Rxx = Rxx[:,:-1]
@@ -108,8 +111,6 @@ R.Rxy = Rxy
 R.Ryx = Ryx
 R.Ryy = Ryy
 R.Bxx = Bxx
-R.Bxy = Bxy
-R.Byx = Byx
 R.Byy = Byy
 
 R.save('response.json')
@@ -120,13 +121,11 @@ fig.suptitle('Reference trajectory')
 
 # Plot on the first subplot
 ax1.plot(Bxx, label='Bxx')
-ax1.plot(Bxy, label='Bxy')
 ax1.set_xlabel('BPMs [#]')
 ax1.set_ylabel('Bx')
 ax1.legend()
 
 # Plot on the second subplot
-ax2.plot(Byx, label='Byx')
 ax2.plot(Byy, label='Byy')
 ax2.set_xlabel('BPMs [#]')
 ax2.set_ylabel('By')

@@ -109,6 +109,10 @@ for iteration in range(15):
     corrX = -gain * (np.linalg.pinv(Rxx, rcond=rcond) @ Bx)
     corrY = -gain * (np.linalg.pinv(Ryy, rcond=rcond) @ By)
 
+    # Apply correction
+    I.vary_correctors(np.hstack((Cx,Cy)), np.vstack((corrX,corrY)))
+
+    # Plots
     norm_Orbit_x = np.hstack((norm_Orbit_x, np.linalg.norm(O0x - B0x)))
     norm_Orbit_y = np.hstack((norm_Orbit_y, np.linalg.norm(O0y - B0y)))
     norm_Disp_x = np.hstack((norm_Disp_x, np.linalg.norm(O1x - O0x)))

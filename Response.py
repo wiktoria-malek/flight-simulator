@@ -14,8 +14,6 @@ class Response():
             self.Ryx = []
             self.Ryy = []
             self.Bxx = []
-            self.Bxy = []
-            self.Byx = []
             self.Byy = []
 
     def submatrix_B(self, bpms):
@@ -50,8 +48,6 @@ class Response():
         self.Ryx = np.array(data['Ryx']).reshape(len(self.bpms), len(self.hcorrs))
         self.Ryy = np.array(data['Ryy']).reshape(len(self.bpms), len(self.vcorrs))
         self.Bxx = np.array(data['Bxx']).reshape(len(self.bpms), 1)
-        self.Bxy = np.array(data['Bxy']).reshape(len(self.bpms), 1)
-        self.Byx = np.array(data['Byx']).reshape(len(self.bpms), 1)
         self.Byy = np.array(data['Byy']).reshape(len(self.bpms), 1)
 
     def save(self, filename):
@@ -64,8 +60,6 @@ class Response():
             "Ryx": self.Ryx.tolist(),
             "Ryy": self.Ryy.tolist(),
             "Bxx": self.Bxx.tolist(),
-            "Bxy": self.Bxy.tolist(),
-            "Byx": self.Byx.tolist(),
             "Byy": self.Byy.tolist()
         }
         with open(filename, "w") as json_file:
