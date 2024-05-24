@@ -13,13 +13,13 @@ class Response():
             self.Rxy = []
             self.Ryx = []
             self.Ryy = []
-            self.Bxx = []
-            self.Byy = []
+            self.Bx = []
+            self.By = []
 
     def submatrix_B(self, bpms):
         bpm_indexes = [index for index, string in enumerate(self.bpms) if string in bpms]
-        return (self.Bxx[bpm_indexes],
-                self.Byy[bpm_indexes])
+        return (self.Bx[bpm_indexes],
+                self.By[bpm_indexes])
 
     def submatrix_Rx(self, bpms, hcorrs):
         bpm_indexes = [index for index, string in enumerate(self.bpms) if string in bpms]
@@ -47,8 +47,8 @@ class Response():
         self.Rxy = np.array(data['Rxy']).reshape(len(self.bpms), len(self.vcorrs))
         self.Ryx = np.array(data['Ryx']).reshape(len(self.bpms), len(self.hcorrs))
         self.Ryy = np.array(data['Ryy']).reshape(len(self.bpms), len(self.vcorrs))
-        self.Bxx = np.array(data['Bxx']).reshape(len(self.bpms), 1)
-        self.Byy = np.array(data['Byy']).reshape(len(self.bpms), 1)
+        self.Bx = np.array(data['Bx']).reshape(len(self.bpms), 1)
+        self.By = np.array(data['By']).reshape(len(self.bpms), 1)
 
     def save(self, filename):
         R = {
@@ -59,8 +59,8 @@ class Response():
             "Rxy": self.Rxy.tolist(),
             "Ryx": self.Ryx.tolist(),
             "Ryy": self.Ryy.tolist(),
-            "Bxx": self.Bxx.tolist(),
-            "Byy": self.Byy.tolist()
+            "Bx": self.Bx.tolist(),
+            "By": self.By.tolist()
         }
         with open(filename, "w") as json_file:
             json.dump(R, json_file, indent=4)

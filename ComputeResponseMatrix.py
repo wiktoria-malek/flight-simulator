@@ -77,12 +77,12 @@ Ryy = np.transpose(np.linalg.lstsq(Cy, By, rcond=None)[0])
 
 # Reference trajectory
 '''
-Bxx = Rxx[:,-1]
-Byy = Ryy[:,-1]
+Bx = Rxx[:,-1]
+By = Ryy[:,-1]
 '''
 
-Bxx = np.mean(Bx,axis=0).reshape(-1,1)
-Byy = np.mean(By,axis=0).reshape(-1,1)
+Bx = np.mean(Bx,axis=0).reshape(-1,1)
+By = np.mean(By,axis=0).reshape(-1,1)
 
 # Response matrices
 Rxx = Rxx[:,:-1]
@@ -110,8 +110,8 @@ R.Rxx = Rxx
 R.Rxy = Rxy
 R.Ryx = Ryx
 R.Ryy = Ryy
-R.Bxx = Bxx
-R.Byy = Byy
+R.Bx = Bx
+R.By = By
 
 R.save('response.json')
 
@@ -120,13 +120,13 @@ fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
 fig.suptitle('Reference trajectory')
 
 # Plot on the first subplot
-ax1.plot(Bxx, label='Bxx')
+ax1.plot(Bx, label='Bx')
 ax1.set_xlabel('BPMs [#]')
 ax1.set_ylabel('Bx')
 ax1.legend()
 
 # Plot on the second subplot
-ax2.plot(Byy, label='Byy')
+ax2.plot(By, label='By')
 ax2.set_xlabel('BPMs [#]')
 ax2.set_ylabel('By')
 ax2.legend()

@@ -17,19 +17,19 @@ R0 = Response('response0.json')
 R1 = Response('response1.json')
 
 # The list of correctors to use 
-Cx = R0.hcorrs
-Cy = R0.vcorrs
+hcorrs = R0.hcorrs
+vcorrs = R0.vcorrs
 
-B = R0.bpms
+bpms = R0.bpms
 
 # Start correction
-R0xx, R0xy = R0.submatrix_Rx(B, Cx)
-R0yx, R0yy = R0.submatrix_Ry(B, Cy)
+R0xx, R0yx = R0.submatrix_Rx(bpms, hcorrs)
+R0xy, R0yy = R0.submatrix_Ry(bpms, vcorrs)
 
-R1xx, R1xy = R1.submatrix_Rx(B, Cx)
-R1yx, R1yy = R1.submatrix_Ry(B, Cy)
+R1xx, R1yx = R1.submatrix_Rx(bpms, hcorrs)
+R1xy, R1yy = R1.submatrix_Ry(bpms, vcorrs)
 
-B0x, B0y = R0.submatrix_B(B)
+B0x, B0y = R0.submatrix_B(bpms)
 
 # DFS parameters
 gain = 0.4
@@ -57,14 +57,14 @@ for iteration in range(15):
     # Nominal orbit
     print('Measuring trajectory...')
     S.get_machine(I)
-    O0 = S.get_orbit(B)
+    O0 = S.get_orbit(bpms)
 
     # Dispersive orbit
     print('Measuring dispersion...')
     I.change_energy()
     S.get_machine(I)
     I.reset_energy()
-    O1 = S.get_orbit(B)
+    O1 = S.get_orbit(bpms)
 
     # Python's transpose.......
     O0x = O0['x'].reshape(-1,1)
@@ -73,23 +73,21 @@ for iteration in range(15):
     O1y = O1['y'].reshape(-1,1)
 
     # DFS system of equations
-    Bx = np.vstack((wgt_orb  * (O0x - B0x),
-                    wgt_dfsx * (O1x - O0x)))
+    B = np.vstack((wgt_orb * (O0x - B0x),
+                   wgt_orb * (O0y - B0y),
+                   wgt_dfsx * (O1x - O0x),
+                   wgt_dfsy * (O1y - O0y)))
 
-    By = np.vstack((wgt_orb  * (O0y - B0y),
-                    wgt_dfsy * (O1y - O0y)))
+    Rx = wgt_orb * np.hstack((R0xx, R0xy))
+    Ry = wgt_orb * np.hstack((R0yx, R0yy))
+    Dx = wgt_dfsx * np.hstack((R1xx - R0xx, R1xy - R0xy))
+    Dy = wgt_dfsy * np.hstack((R1yx - R0yx, R1yy - R0yy))
 
-    Rxx = np.vstack((wgt_orb  *  R0xx,
-                     wgt_dfsx * (R1xx - R0xx)))
-
-    Ryy = np.vstack((wgt_orb  *  R0yy,
-                     wgt_dfsy * (R1yy - R0yy)))
-
-    corrX = -gain * (np.linalg.pinv(Rxx, rcond=rcond) @ Bx)
-    corrY = -gain * (np.linalg.pinv(Ryy, rcond=rcond) @ By)
+    R = np.vstack((Rx,Ry,Dx,Dy))
+    corr = -gain * (np.linalg.pinv(R, rcond=rcond) @ B)
 
     # Apply correction
-    I.vary_correctors(np.hstack((Cx,Cy)), np.vstack((corrX,corrY)))
+    I.vary_correctors(np.hstack((hcorrs,vcorrs)), corr)
 
     # Plots
     norm_Orbit_x = np.hstack((norm_Orbit_x, np.linalg.norm(O0x - B0x)))

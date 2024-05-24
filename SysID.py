@@ -45,16 +45,38 @@ signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F,DFS)))
 
 # The list of correctors to use 
 C = [
-    'ZH1L', 'ZV1L', 'ZV2L', 'ZH2L', 'ZV3L', 'ZH3L', 'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L',
-    'ZH6L', 'ZV6L', 'ZH7L', 'ZV7L', 'ZH8L', 'ZV8L', 'ZH9L', 'ZV9L', 'ZH10L', 'ZV10L',
-    'ZH11L', 'ZV11L'
+    'ZH1L', 'ZV1L', 'ZV2L', 'ZH2L', 'ZV3L', 'ZH3L', 'ZH4L', 'ZV4L', 'ZH5L',
+    'ZV5L', 'ZH6L', 'ZV6L', 'ZH7L', 'ZV7L', 'ZH8L', 'ZV8L', 'ZH9L', 'ZV9L',
+    'ZH10L', 'ZV10L', 'ZH11L', 'ZV11L', 'ZH12L', 'ZV12L',
+    #'ZX10T',
+    #'ZX11T',
+    #'ZV13L',
+    #'ZX12T',
+    #'ZY20T',
+    #'ZY21T',
+    #'ZY22T',
+    #'ZY23T',
+    #'ZX30T',
+    #'ZX31T',
+    #'ZV30T',
+    #'ZH30T',
+    #'ZX32T',
+    #'ZV40T',
+     'ZH40T'
+    #'ZX50T',
+    #'ZX51T',
+    #'ZV50T',
+    #'ZH50T'
+    #'ZV51T'
 ]
 
 # The list of bmps to use
 B = [
-    "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L",
-    "ML1L", "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L",
-    "ML8L", "ML9L", "ML10L", "ML11L", "ML12L"
+    'MB5L', 'MB6L', 'MB7L', 'MB8L', 'MB9L', 'MB10L', 'MB11L', 'ML1L',
+    'ML2L', 'ML3L', 'ML4L', 'ML5L', 'ML6L', 'ML7L', 'ML8L', 'ML9L',
+    'ML10L', 'ML11L', 'ML12L', # 'ML13L', 'ML14L', 'ML15L',
+    'ML1T', 'ML2T', 'ML101T', 'ML102T', 'ML103T', 'ML3T', 'ML104T', 'ML4T', 'ML105T',
+    'ML5T', 'ML6T', 'ML106T', 'ML7T', 'ML8T', 'ML9T', 'MB10T', 'MB11T'
 ]
 
 # Extra functions
@@ -76,14 +98,14 @@ plt.ion()
 
 # Kick to achieve 1mm max excursion
 kicks = 0.1 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
-max_oscillation = 0.50 # mm
+max_oscillation = 1 # mm
 
 if DFS:
     I.change_energy()
 
 # 10 loops to measure the response matrix
 print("Press CTRL-C to interrupt the program.")
-Niter = 3
+Niter = 2
 for iter in range (Niter):
     print(f'Iteration {iter}/{Niter}')
     for icorr, corrector in enumerate(C):
@@ -144,8 +166,4 @@ if DFS:
     I.reset_energy()
 
 print('Done!')
-
-plt.ioff()  # Turn off interactive mode
-plt.show()  # Show the final plot                       
-
 

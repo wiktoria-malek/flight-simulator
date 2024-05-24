@@ -24,14 +24,14 @@ Cy = R0.vcorrs
 B = R0.bpms
 
 # Start correction
-R0xx, R0xy = R0.submatrix_Rx(B, Cx)
-R0yx, R0yy = R0.submatrix_Ry(B, Cy)
+R0xx, R0yx = R0.submatrix_Rx(B, Cx)
+R0xy, R0yy = R0.submatrix_Ry(B, Cy)
 
-R1xx, R1xy = R1.submatrix_Rx(B, Cx)
-R1yx, R1yy = R1.submatrix_Ry(B, Cy)
+R1xx, R1yx = R1.submatrix_Rx(B, Cx)
+R1xy, R1yy = R1.submatrix_Ry(B, Cy)
 
-R2xx, R2xy = R2.submatrix_Rx(B, Cx)
-R2yx, R2yy = R2.submatrix_Ry(B, Cy)
+R2xx, R2yx = R2.submatrix_Rx(B, Cx)
+R2xy, R2yy = R2.submatrix_Ry(B, Cy)
 
 B0x, B0y = R0.submatrix_B(B)
 
