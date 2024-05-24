@@ -17,10 +17,10 @@ R0 = Response('response0.json')
 R1 = Response('response1.json')
 
 # The list of correctors to use 
-hcorrs = R0.hcorrs
-vcorrs = R0.vcorrs
+hcorrs = R0.hcorrs[1:10]
+vcorrs = R0.vcorrs[1:10]
 
-bpms = R0.bpms
+bpms = R0.bpms[1:20]
 
 # Start correction
 R0xx, R0yx = R0.submatrix_Rx(bpms, hcorrs)
@@ -32,11 +32,11 @@ R1xy, R1yy = R1.submatrix_Ry(bpms, vcorrs)
 B0x, B0y = R0.submatrix_B(bpms)
 
 # DFS parameters
-gain = 0.4
+gain = 0.2
 wgt_orb = 1
 wgt_dfsx = 10
 wgt_dfsy = 10
-rcond = 0.001
+rcond = 0.01
 
 # Correction!
 I = InterfaceATF2_Linac(nsamples=3)
@@ -71,6 +71,10 @@ for iteration in range(15):
     O0y = O0['y'].reshape(-1,1)
     O1x = O1['x'].reshape(-1,1)
     O1y = O1['y'].reshape(-1,1)
+
+    if iteration==1:
+        B0x = O0x
+        B0y = O0y
 
     # DFS system of equations
     B = np.vstack((wgt_orb * (O0x - B0x),
