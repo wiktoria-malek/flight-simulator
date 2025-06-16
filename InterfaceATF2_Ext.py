@@ -55,16 +55,16 @@ class InterfaceATF2_Ext:
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
 
-    def change_energy(self):
+    def change_energy(self, *args):
         pass
 
-    def reset_energy(self):
+    def reset_energy(self *args):
         pass
 
-    def change_intensity(self):
+    def change_intensity(self *args):
         pass
 
-    def reset_intensity(self):
+    def reset_intensity(self *args):
         pass
 
     def get_sequence(self):

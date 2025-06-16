@@ -80,16 +80,16 @@ class InterfaceATF2_Linac:
         pv.put(self.phase_kl1)
         time.sleep(1)
         
-    def change_intensity(self):
+    def change_intensity(self, *args):
         pass
 
-    def reset_intensity(self):
+    def reset_intensity(self, *args):
         pass
 
-    def get_sequence(self):
+    def get_sequence(self, *args):
         return self.sequence
 
-    def get_bpms_names(self):
+    def get_bpms_names(self, *args):
         return self.bpms
 
     def get_correctors_names(self):
