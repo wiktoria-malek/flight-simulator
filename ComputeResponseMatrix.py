@@ -6,11 +6,10 @@ from Response import Response
 import matplotlib.pyplot as plt
 import numpy as np
 import glob
-import json
 import os
 
 # Use glob to get the list of DATA files
-datafiles = glob.glob('DATA*.json')
+datafiles = glob.glob('DATA*.pkl')
 
 # Prepare for computation
 S = State(datafiles[0])
@@ -113,7 +112,7 @@ R.Ryy = Ryy
 R.Bx = Bx
 R.By = By
 
-R.save('response.json')
+R.save('response.pkl')
 
 # Plots
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))

@@ -13,8 +13,8 @@ import numpy as np
 import signal
 import os
 
-R0 = Response('response0.json')
-R1 = Response('response1.json')
+R0 = Response('response0.pkl')
+R1 = Response('response1.pkl')
 
 # The list of correctors to use 
 hcorrs = R0.hcorrs[1:10]

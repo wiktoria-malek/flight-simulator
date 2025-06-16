@@ -13,9 +13,9 @@ import numpy as np
 import signal
 import os
 
-R0 = Response('response0.json')
-R1 = Response('response1.json')
-R2 = Response('response2.json')
+R0 = Response('response0.pkl')
+R1 = Response('response1.pkl')
+R2 = Response('response2.pkl')
 
 # The list of correctors to use 
 Cx = R0.hcorrs

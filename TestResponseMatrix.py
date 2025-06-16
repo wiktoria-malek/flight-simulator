@@ -6,13 +6,12 @@ from Response import Response
 import matplotlib.pyplot as plt
 import numpy as np
 import glob
-import json
 import os
 
-R = Response('response.json')
+R = Response('response.pkl')
 
 # Use glob to get the list of DATA files
-datafiles = glob.glob('DATA*.json')
+datafiles = glob.glob('DATA*.pkl')
 
 # Read all orbits
 datafiles_p = [f for f in datafiles if f[-10] == 'p']
