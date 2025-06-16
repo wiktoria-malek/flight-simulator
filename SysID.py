@@ -118,7 +118,7 @@ for iter in range (Niter):
         print(f"Corrector {corrector} '+' excitation...")
         I.write_correctors(corrector, corr['bdes'] + kick)
         S.get_machine (I)
-        S.save (filename=f'DATA_{corrector}_p{iter:04d}.json')
+        S.save (filename=f'DATA_{corrector}_p{iter:04d}.pkl')
         Op = S.get_orbit (B)
         plot_orbit(Op, 1)
         
@@ -126,7 +126,7 @@ for iter in range (Niter):
         print(f"Corrector {corrector} '-' excitation...")
         I.write_correctors(corrector, corr['bdes'] - kick)
         S.get_machine (I)
-        S.save (filename=f'DATA_{corrector}_m{iter:04d}.json')
+        S.save (filename=f'DATA_{corrector}_m{iter:04d}.pkl')
         Om = S.get_orbit (B)
         plot_orbit(Om, 2)
         

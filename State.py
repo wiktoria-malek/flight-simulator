@@ -1,6 +1,6 @@
 from datetime import datetime
 import numpy as np
-import json
+import pickle
 
 class State:
     def __init__(self, filename=None):
@@ -76,23 +76,23 @@ class State:
         return orbit
 
     def load(self, filename):
-        with open(filename, "r") as json_file:
-            data = json.load(json_file)
+        with open(filename, "r") as pickle_file:
+            data = pickle.load(pickle_file)
         self.sequence = data['sequence']
         self.correctors = {
-            "names": np.array(data['correctors']['names']),
-            "bdes": np.array(data['correctors']['bdes']),
-            "bact": np.array(data['correctors']['bact']),
+            "names": data['correctors']['names']
+            "bdes": data['correctors']['bdes']
+            "bact": data['correctors']['bact']
         }
         self.bpms = {
-            "names": np.array(data['bpms']['names']),
-            "x": np.array(data['bpms']['x']),
-            "y": np.array(data['bpms']['y']),
-            "tmit": np.array(data['bpms']['tmit'])
+            "names": data['bpms']['names'],
+            "x": data['bpms']['x'],
+            "y": data['bpms']['y'],
+            "tmit": data['bpms']['tmit']
         }
         self.icts = {
-            "names": np.array(data['icts']['names']),
-            "charge": np.array(data['icts']['charge']),
+            "names": data['icts']['names'],
+            "charge": data['icts']['charge']
         }
         self.hcorrectors_names = data["hcorrectors_names"]
         self.vcorrectors_names = data["vcorrectors_names"]
@@ -101,21 +101,21 @@ class State:
     def save(self, basename=None, filename=None):
         if basename is not None:
             time_str = self.timestamp.strftime("%Y%m%d_%H%M%S")
-            filename = f"{basename}_{time_str}.json"
+            filename = f"{basename}_{time_str}.pkl"
         correctors = {
-            'names': self.correctors['names'].tolist(),
-            'bdes': self.correctors['bdes'].tolist(),
-            'bact': self.correctors['bact'].tolist()
+            'names': self.correctors['names'],
+            'bdes': self.correctors['bdes'],
+            'bact': self.correctors['bact']
         }
         bpms = {
-            'names': self.bpms['names'].tolist(),
-            'x': self.bpms['x'].tolist(),
-            'y': self.bpms['y'].tolist(),
-            'tmit': self.bpms['tmit'].tolist()
+            'names': self.bpms['names'],
+            'x': self.bpms['x'],
+            'y': self.bpms['y'],
+            'tmit': self.bpms['tmit']
         }
         icts = {
-            'names': self.icts['names'].tolist(),
-            'charge': self.icts['charge'].tolist()
+            'names': self.icts['names'],
+            'charge': self.icts['charge']
         }
         state = {
             "sequence": self.sequence,
@@ -126,7 +126,7 @@ class State:
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
         }
-        with open(filename, "w") as json_file:
-            json.dump(state, json_file, indent=4)
+        with open(filename, "w") as pickle_file:
+            pickle.dump(state, pickle_file)
         return filename
             

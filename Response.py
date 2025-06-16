@@ -1,5 +1,5 @@
 import numpy as np
-import json
+import pickle
 
 class Response():
     def __init__(self,filename=None):
@@ -38,29 +38,29 @@ class Response():
                 Ryy[:,vcorrs_indexes])
 
     def load(self,filename):
-        with open(filename, "r") as json_file:
-            data = json.load(json_file)
+        with open(filename, "rb") as pickle_file:
+            data = pickle.load(pickle_file)
         self.bpms = data['bpms']
         self.hcorrs = data['hcorrs']
         self.vcorrs = data['vcorrs']
-        self.Rxx = np.array(data['Rxx']).reshape(len(self.bpms), len(self.hcorrs))
-        self.Rxy = np.array(data['Rxy']).reshape(len(self.bpms), len(self.vcorrs))
-        self.Ryx = np.array(data['Ryx']).reshape(len(self.bpms), len(self.hcorrs))
-        self.Ryy = np.array(data['Ryy']).reshape(len(self.bpms), len(self.vcorrs))
-        self.Bx = np.array(data['Bx']).reshape(len(self.bpms), 1)
-        self.By = np.array(data['By']).reshape(len(self.bpms), 1)
+        self.Rxx = data['Rxx']
+        self.Rxy = data['Rxy']
+        self.Ryx = data['Ryx']
+        self.Ryy = data['Ryy']
+        self.Bx = data['Bx']
+        self.By = data['By']
 
     def save(self, filename):
         R = {
             "bpms": self.bpms,
             "hcorrs": self.hcorrs,
             "vcorrs": self.vcorrs,
-            "Rxx": self.Rxx.tolist(),
-            "Rxy": self.Rxy.tolist(),
-            "Ryx": self.Ryx.tolist(),
-            "Ryy": self.Ryy.tolist(),
-            "Bx": self.Bx.tolist(),
-            "By": self.By.tolist()
+            "Rxx": self.Rxx,
+            "Rxy": self.Rxy,
+            "Ryx": self.Ryx,
+            "Ryy": self.Ryy,
+            "Bx": self.Bx,
+            "By": self.By
         }
-        with open(filename, "w") as json_file:
-            json.dump(R, json_file, indent=4)
+        with open(filename, "wb") as pickle_file:
+            pickle.dump(R, pickle_file)
