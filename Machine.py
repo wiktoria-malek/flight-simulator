@@ -2,22 +2,22 @@ from datetime import datetime
 import numpy as np
 import pickle
 
-class State:
-    def __init__(self, filename=None):
-        if filename is not None:
-            self.load(filename)
+class Machine:
+    def __init__(self, interface):
+        self.interface = interface
+        self.get_machine()
 
-    def get_machine (self, interface):
-        self.correctors = interface.read_correctors()
-        self.bpms = interface.read_bpms()
-        self.icts = interface.read_icts()
-        self.sequence = interface.get_sequence()
-        self.hcorrectors_names = interface.get_hcorrectors_names()
-        self.vcorrectors_names = interface.get_vcorrectors_names()
+    def get_machine (self):
+        self.correctors = self.interface.read_correctors()
+        self.bpms = self.interface.read_bpms()
+        self.icts = self.interface.read_icts()
+        self.sequence = self.interface.get_sequence()
+        self.hcorrectors_names = self.interface.get_hcorrectors_names()
+        self.vcorrectors_names = self.interface.get_vcorrectors_names()
         self.timestamp = datetime.now()
 
-    def write_to_machine(self,interface):
-        interface.write_correctors(self.correctors['names'], self.correctors['bdes'])
+    def restore_state(self):
+        self.interface.write_correctors(self.correctors['names'], self.correctors['bdes'])
 
     def get_sequence(self):
         return self.sequence
@@ -75,10 +75,36 @@ class State:
         orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(x) }
         return orbit
 
+    def change_energy(self, *args):
+        self.interface.change_energy(*args)
+        pass
+
+    def reset_energy(self, *args):
+        self.interface.reset_energy(*args)
+        pass
+
+    def change_intensity(self, *args):
+        self.interface.change_intensity(*args)
+        pass
+
+    def reset_intensity(self, *args):
+        self.interface.reset_intensity(*args)
+        pass
+    
+    def write_correctors(self, names, corr_vals):
+        self.interface(names, corr_vals)
+    
+    def vary_correctors(self, names, corr_vals):
+        self.vary_correctors(names, corr_vals)
+    
     def load(self, filename):
         with open(filename, "rb") as pickle_file:
             data = pickle.load(pickle_file)
         self.sequence = data['sequence']
+        self.correctors = data['correctors']
+        self.bpms = data['bpms']
+        self.icts = data['icts']
+        """
         self.correctors = {
             "names": data['correctors']['names']
             "bdes": data['correctors']['bdes']
@@ -94,8 +120,9 @@ class State:
             "names": data['icts']['names'],
             "charge": data['icts']['charge']
         }
-        self.hcorrectors_names = data["hcorrectors_names"]
-        self.vcorrectors_names = data["vcorrectors_names"]
+        """
+        self.hcorrectors_names = data['hcorrectors_names']
+        self.vcorrectors_names = data['vcorrectors_names']
         self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
 
     def save(self, basename=None, filename=None):
@@ -126,7 +153,7 @@ class State:
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
         }
-        with open(filename, "wb") as pickle_file:
-            pickle.dump(state, pickle_file)
+        with open(filename, "wb") as file:
+            pickle.dump(state, file)
         return filename
             

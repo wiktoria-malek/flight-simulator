@@ -1,5 +1,6 @@
-from InterfaceATF2_Linac import InterfaceATF2_Linac
-from State import State
+# from InterfaceATF2_Linac import InterfaceATF2_Linac
+from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
+from Machine import Machine
 from datetime import datetime
 from functools import partial
 
@@ -7,6 +8,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import signal
 import os
+
+
+
+
+
+
 
 # Create the working environment
 project_name = 'new_SYSID'
@@ -19,9 +26,10 @@ os.chdir (dir_name)
 DFS = False
 
 # Connect to interface ATF2 Linac
-I = InterfaceATF2_Linac (nsamples=3)
-S = State ()
-S.get_machine (I)
+# I = InterfaceATF2_Linac (nsamples=3)
+I = InterfaceATF2_Ext_RFTrack (jitter=0.05,bpm_resolution=0.1)
+S = Machine (I)
+S.get_machine ()
 
 # Save the reference file
 F = S.save (basename='machine_status')
