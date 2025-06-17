@@ -7,7 +7,7 @@ class State:
         if filename is not None:
             self.load(filename)
 
-    def get_machine (self, interface):
+    def read_machine (self, interface):
         self.correctors = interface.read_correctors()
         self.bpms = interface.read_bpms()
         self.icts = interface.read_icts()

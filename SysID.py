@@ -12,9 +12,6 @@ import os
 
 
 
-
-
-
 # Create the working environment
 project_name = 'new_SYSID'
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -29,10 +26,13 @@ DFS = False
 # I = InterfaceATF2_Linac (nsamples=3)
 I = InterfaceATF2_Ext_RFTrack (jitter=0.05,bpm_resolution=0.1)
 S = Machine (I)
-S.get_machine ()
+S.read_machine ()
 
 # Save the reference file
 F = S.save (basename='machine_status')
+
+exit()
+
 
 # Install CTRL-C signal handler
 def signal_handler(sig, frame, var):
@@ -125,7 +125,7 @@ for iter in range (Niter):
         # '+' excitation 
         print(f"Corrector {corrector} '+' excitation...")
         I.write_correctors(corrector, corr['bdes'] + kick)
-        S.get_machine (I)
+        S.read_machine (I)
         S.save (filename=f'DATA_{corrector}_p{iter:04d}.pkl')
         Op = S.get_orbit (B)
         plot_orbit(Op, 1)
@@ -133,7 +133,7 @@ for iter in range (Niter):
         # '-' excitation 
         print(f"Corrector {corrector} '-' excitation...")
         I.write_correctors(corrector, corr['bdes'] - kick)
-        S.get_machine (I)
+        S.read_machine (I)
         S.save (filename=f'DATA_{corrector}_m{iter:04d}.pkl')
         Om = S.get_orbit (B)
         plot_orbit(Om, 2)

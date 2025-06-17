@@ -18,7 +18,7 @@ I = InterfaceATF2(nsamples=1)
 
 # Prepare for data taking
 S = State(I)
-S.get_machine()
+S.read_machine()
 
 names = [
     "MB2X",

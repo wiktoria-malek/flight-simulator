@@ -5,9 +5,9 @@ import pickle
 class Machine:
     def __init__(self, interface):
         self.interface = interface
-        self.get_machine()
+        self.read_machine()
 
-    def get_machine (self):
+    def read_machine (self):
         self.correctors = self.interface.read_correctors()
         self.bpms = self.interface.read_bpms()
         self.icts = self.interface.read_icts()
