@@ -21,7 +21,7 @@ os.makedirs (dir_name)
 os.chdir (dir_name)
 
 # What response matrix
-DFS = True
+DFS = False
 
 # Create a machine
 S = State (interface=I)
