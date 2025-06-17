@@ -3,7 +3,7 @@ import numpy as np
 import time
 
 class InterfaceATF2_Ext_RFTrack:
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0):
+    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0,nsamples=1):
         self.lattice = rft.Lattice('Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
         self.lattice.set_bpm_resolution(bpm_resolution)
         self.sequence = [ e.get_name() for e in self.lattice['*'] ]
@@ -23,6 +23,7 @@ class InterfaceATF2_Ext_RFTrack:
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, Pref, T, Nparticles)
         self.I0 = self.B0.get_info()
         self.jitter = jitter
+        self.nsamples = nsamples
         self.__track_bunch()
 
     def __track_bunch(self):
@@ -75,41 +76,48 @@ class InterfaceATF2_Ext_RFTrack:
 
     def read_correctors(self):
         print("Reading correctors' strengths...")
-        bdes = []
-        for corrector in self.corrs:
+        bdes = np.zeros(len(self.corrs))
+        for i,corrector in enumerate(self.corrs):
             if corrector[:2] == "ZH":
-                bdes.append(self.lattice[corrector].get_strength()[0])
+                bdes[i] = (self.lattice[corrector].get_strength()[0])
             elif corrector[:2] == "ZV":
-                bdes.append(self.lattice[corrector].get_strength()[1])
+                bdes[i] = (self.lattice[corrector].get_strength()[1])
         correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
         return correctors
     
     def read_bpms(self):
         print('Reading bpms...')
-        x, y, tmit = [], [], []
-        for bpm in self.bpms:
-            b = self.lattice[bpm]
-            reading = b.get_reading()
-            x.append(b.get_reading()[0])
-            y.append(b.get_reading()[1])
-            tmis.append(b.get_total_charge())
+        x = np.zeros((self.nsamples, len(self.bpms)))
+        y = np.zeros(x.shape)
+        tmit = np.zeros(x.shape)
+        for i in range(self.nsamples):
+            for j,bpm in enumerate(self.bpms):
+                b = self.lattice[bpm]
+                reading = b.get_reading()
+                x[i,j] = reading[0]
+                y[i,j] = reading[1]
+                tmit[i,j] = b.get_total_charge()
         bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
         return bpms
 
 
     # TO DO
-    def write_correctors(self, names, corr_vals):
-        for corr, val in zip(naems, corr_vals):
+    def push(self, names, corr_vals):
+        if not isinstance(names, list):
+            names = [ names ] # makes it a list
+        for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH":
                 self.lattice[corr].set_strength(val, 0.0)
-            elif corrector[:2] == "ZV":
+            elif corr[:2] == "ZV":
                 self.lattice[corr].set_strength(0.0, val)
         self.__track_bunch()
     
     def vary_correctors(self, names, corr_vals):
-        for corr, val in zip(naems, corr_vals):
+        if not isinstance(names, list):
+            names = [ names ] # makes it a list
+        for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH":
                 self.lattice[corr].vary_strength(val, 0.0)
-            elif corrector[:2] == "ZV":
+            elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val)
         self.__track_bunch()

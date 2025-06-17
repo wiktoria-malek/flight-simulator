@@ -1,6 +1,6 @@
 # from InterfaceATF2_Linac import InterfaceATF2_Linac
 from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
-from Machine import Machine
+from State import State
 from datetime import datetime
 from functools import partial
 
@@ -9,8 +9,9 @@ import numpy as np
 import signal
 import os
 
-
-
+# Connect to interface ATF2 Linac
+# I = InterfaceATF2_Linac(nsamples=3)
+I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0)
 
 # Create the working environment
 project_name = 'new_SYSID'
@@ -22,17 +23,11 @@ os.chdir (dir_name)
 # What response matrix
 DFS = False
 
-# Connect to interface ATF2 Linac
-# I = InterfaceATF2_Linac (nsamples=3)
-I = InterfaceATF2_Ext_RFTrack (jitter=0.05,bpm_resolution=0.1)
-S = Machine (I)
-S.read_machine ()
+# Create a machine
+S = State (interface=I)
 
 # Save the reference file
-F = S.save (basename='machine_status')
-
-exit()
-
+S.save (basename='machine_status')
 
 # Install CTRL-C signal handler
 def signal_handler(sig, frame, var):
@@ -42,9 +37,9 @@ def signal_handler(sig, frame, var):
     DFS = var[2]
     S.load(F)
     try:
-        S.write_to_machine(I)
+        S.push(I)
         if DFS:
-            I.reset_energy()
+            S.reset_energy(I)
     except:
         pass
     exit(0)
@@ -78,6 +73,9 @@ C = [
     #'ZV51T'
 ]
 
+C = S.get_correctors()['names']
+print(C)
+
 # The list of bmps to use
 B = [
     'MB5L', 'MB6L', 'MB7L', 'MB8L', 'MB9L', 'MB10L', 'MB11L', 'ML1L',
@@ -86,6 +84,8 @@ B = [
     'ML1T', 'ML2T', 'ML101T', 'ML102T', 'ML103T', 'ML3T', 'ML104T', 'ML4T', 'ML105T',
     'ML5T', 'ML6T', 'ML106T', 'ML7T', 'ML8T', 'ML9T', 'MB10T', 'MB11T'
 ]
+
+B = S.get_bpms()['names']
 
 # Extra functions
 def plot_orbit(orbit, figure):
@@ -109,7 +109,7 @@ kicks = 0.1 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
 max_oscillation = 1 # mm
 
 if DFS:
-    I.change_energy()
+    S.change_energy(I)
 
 # 10 loops to measure the response matrix
 print("Press CTRL-C to interrupt the program.")
@@ -118,28 +118,30 @@ for iter in range (Niter):
     print(f'Iteration {iter}/{Niter}')
     for icorr, corrector in enumerate(C):
 
+        print('corrector = ', corrector)
+        
         # initial value
         corr = S.get_correctors (corrector)
         kick = kicks[icorr]
 
         # '+' excitation 
         print(f"Corrector {corrector} '+' excitation...")
-        I.write_correctors(corrector, corr['bdes'] + kick)
-        S.read_machine (I)
-        S.save (filename=f'DATA_{corrector}_p{iter:04d}.pkl')
-        Op = S.get_orbit (B)
+        S.push(I, corrector, corr['bdes'] + kick)
+        S.pull(I)
+        S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
+        Op = S.get_orbit(B)
         plot_orbit(Op, 1)
         
         # '-' excitation 
         print(f"Corrector {corrector} '-' excitation...")
-        I.write_correctors(corrector, corr['bdes'] - kick)
-        S.read_machine (I)
-        S.save (filename=f'DATA_{corrector}_m{iter:04d}.pkl')
+        S.push(I, corrector, corr['bdes'] - kick)
+        S.pull(I)
+        S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
         Om = S.get_orbit (B)
         plot_orbit(Om, 2)
         
         # reset corrector
-        I.write_correctors(corrector, corr['bdes'])
+        S.push(I, corrector, corr['bdes'])
         
         # Orbit difference
         Diff_x = (Op['x'] - Om['x']) / 2.0
@@ -171,7 +173,7 @@ for iter in range (Niter):
         plt.pause(0.1)
 
 if DFS:
-    I.reset_energy()
+    S.reset_energy(I)
 
 print('Done!')
 

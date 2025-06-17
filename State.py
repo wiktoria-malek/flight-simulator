@@ -3,11 +3,13 @@ import numpy as np
 import pickle
 
 class State:
-    def __init__(self, filename=None):
+    def __init__(self, interface=None, filename=None):
         if filename is not None:
             self.load(filename)
+        elif interface is not None:
+            self.pull(interface)
 
-    def read_machine (self, interface):
+    def pull (self, interface):
         self.correctors = interface.read_correctors()
         self.bpms = interface.read_bpms()
         self.icts = interface.read_icts()
@@ -16,22 +18,23 @@ class State:
         self.vcorrectors_names = interface.get_vcorrectors_names()
         self.timestamp = datetime.now()
 
-    def write_to_machine(self,interface):
-        interface.write_correctors(self.correctors['names'], self.correctors['bdes'])
+    def push(self, interface):
+        interface.push(self.correctors['names'], self.correctors['bdes'])
 
     def get_sequence(self):
         return self.sequence
 
     def get_correctors(self, names=None):
-        correctors = self.correctors
         if names is not None:
-            corr_indexes = np.array([index for index, string in enumerate(correctors['names']) if string in names])
+            corr_indexes = np.array([index for index, string in enumerate(self.correctors['names']) if string in names])
             correctors = {
-                "names": correctors['names'][corr_indexes],
-                "bdes": correctors['bdes'][corr_indexes],
-                "bact": correctors['bact'][corr_indexes]
+                "names": np.array(self.correctors['names'])[corr_indexes],
+                "bdes": np.array(self.correctors['bdes'])[corr_indexes],
+                "bact": np.array(self.correctors['bact'])[corr_indexes]
             }
-        return correctors         
+        else:
+            correctors = self.correctors
+        return correctors
 
     def get_hcorrectors_names(self):
         return self.hcorrectors_names
@@ -40,25 +43,25 @@ class State:
         return self.vcorrectors_names
 
     def get_bpms(self, names=None):
-        bpms = self.bpms
         if names is not None:
-            bpm_indexes = np.array([index for index, string in enumerate(bpms['names']) if string in names])
+            bpm_indexes = np.array([index for index, string in enumerate(self.bpms['names']) if string in names])
             bpms = {
-                "names": bpms['names'][bpm_indexes],
-                "x": bpms['x'][:,bpm_indexes],
-                "y": bpms['y'][:,bpm_indexes],
-                "tmit": bpms['tmit'][:,bpm_indexes],
+                "names": np.array(self.bpms['names'])[bpm_indexes],
+                "x": np.array(self.bpms['x'])[:,bpm_indexes],
+                "y": np.array(self.bpms['y'])[:,bpm_indexes],
+                "tmit": np.array(self.bpms['tmit'])[:,bpm_indexes],
             }
+        else:
+            bpms = self.bpms
         return bpms         
 
     def get_icts(self, names=None):
         icts = self.icts
         if names is not None:
             ict_indexes = np.array([index for index, string in enumerate(icts['names']) if string in names])
-            print('sei', type(icts['charge']))
             icts = {
-                "names": self.icts['names'][ict_indexes],
-                "charge": self.icts['charge'][ict_indexes]
+                "names": np.array(self.icts['names'])[ict_indexes],
+                "charge": np.array(self.icts['charge'])[ict_indexes]
             }
         return icts         
 
@@ -70,15 +73,41 @@ class State:
         stdy = np.std(bpms['y'],axis=0) # mm
         tmit = np.mean(bpms['tmit'],axis=0)
         faulty = (x == 0.0) & (y == 0.0)
-        x[faulty] = np.NaN
-        y[faulty] = np.NaN
-        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(x) }
+        x[faulty] = np.nan
+        y[faulty] = np.nan
+        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names) }
         return orbit
 
+    def change_energy(self, interface, *args):
+        interface.change_energy(*args)
+        pass
+
+    def reset_energy(self, interface, *args):
+        interface.reset_energy(*args)
+        pass
+
+    def change_intensity(self, interface, *args):
+        interface.change_intensity(*args)
+        pass
+
+    def reset_intensity(self, interface, *args):
+        interface.reset_intensity(*args)
+        pass
+    
+    def push(self, interface, names, corr_vals):
+        interface.push(names, corr_vals)
+    
+    def vary_correctors(self, interface, names, corr_vals):
+        interface.vary_correctors(names, corr_vals)
+    
     def load(self, filename):
         with open(filename, "rb") as pickle_file:
             data = pickle.load(pickle_file)
         self.sequence = data['sequence']
+        self.correctors = data['correctors']
+        self.bpms = data['bpms']
+        self.icts = data['icts']
+        """
         self.correctors = {
             "names": data['correctors']['names']
             "bdes": data['correctors']['bdes']
@@ -94,8 +123,9 @@ class State:
             "names": data['icts']['names'],
             "charge": data['icts']['charge']
         }
-        self.hcorrectors_names = data["hcorrectors_names"]
-        self.vcorrectors_names = data["vcorrectors_names"]
+        """
+        self.hcorrectors_names = data['hcorrectors_names']
+        self.vcorrectors_names = data['vcorrectors_names']
         self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
 
     def save(self, basename=None, filename=None):
@@ -126,7 +156,7 @@ class State:
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
         }
-        with open(filename, "wb") as pickle_file:
-            pickle.dump(state, pickle_file)
+        with open(filename, "wb") as file:
+            pickle.dump(state, file)
         return filename
             

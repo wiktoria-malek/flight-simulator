@@ -149,7 +149,7 @@ class InterfaceATF2_Linac:
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
 
-    def write_correctors(self, names, corr_vals):
+    def push(self, names, corr_vals):
         if type(corr_vals) == float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:

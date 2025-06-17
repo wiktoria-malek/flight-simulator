@@ -64,20 +64,20 @@ for iteration in range(15):
 
     # Nominal orbit
     print('Measuring trajectory...')
-    S.read_machine(I)
+    S.pull(I)
     O0 = S.get_orbit(B)
 
     # Dispersive orbit
     print('Measuring dispersion...')
     I.change_energy()
-    S.read_machine(I)
+    S.pull(I)
     I.reset_energy()
     O1 = S.get_orbit(B)
 
     # Wakefield orbit
     print('Measuring wakefield...')
     I.change_intensity()
-    S.read_machine(I)
+    S.pull(I)
     I.reset_intensity()
     O2 = S.get_orbit(B)
 

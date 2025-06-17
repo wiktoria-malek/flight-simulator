@@ -12,7 +12,9 @@ import os
 datafiles = glob.glob('DATA*.pkl')
 
 # Prepare for computation
-S = State(datafiles[0])
+S = State (filename=datafiles[0])
+
+# Init
 sequence = S.get_sequence()
 correctors = S.get_correctors()['names']
 
@@ -28,12 +30,12 @@ Bx = np.empty((0,len(bpms)))
 By = np.empty((0,len(bpms)))
 Cx = np.empty((0,len(hcorrs)))
 Cy = np.empty((0,len(vcorrs)))
-datafiles_p = [f for f in datafiles if f[-10] == 'p']
+datafiles_p = [f for f in datafiles if f[-9] == 'p']
 for datafile_p in datafiles_p:
-    datafile_m = datafile_p[:-10] + 'm' + datafile_p[-9:]
+    datafile_m = datafile_p[:-9] + 'm' + datafile_p[-8:]
     if os.path.exists(datafile_m):
-        Sp = State(datafile_p)
-        Sm = State(datafile_m)
+        Sp = State(filename=datafile_p)
+        Sm = State(filename=datafile_m)
         Op = Sp.get_orbit (bpms)
         Om = Sm.get_orbit (bpms)
         Cx_p = Sp.get_correctors(hcorrs)['bact']
@@ -49,6 +51,7 @@ for datafile_p in datafiles_p:
             By = np.vstack((By, O_y))
             Cx = np.vstack((Cx, C_x))
             Cy = np.vstack((Cy, C_y))
+            print(Cx, Bx)
         else:
             Bx = np.vstack((Bx, Op['x']))
             Bx = np.vstack((Bx, Om['x']))

@@ -56,13 +56,13 @@ for iteration in range(15):
 
     # Nominal orbit
     print('Measuring trajectory...')
-    S.read_machine(I)
+    S.pull(I)
     O0 = S.get_orbit(bpms)
 
     # Dispersive orbit
     print('Measuring dispersion...')
     I.change_energy()
-    S.read_machine(I)
+    S.pull(I)
     I.reset_energy()
     O1 = S.get_orbit(bpms)
 

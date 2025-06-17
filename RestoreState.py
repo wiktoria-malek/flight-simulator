@@ -11,6 +11,6 @@ print(f'Resetting the machine to file {filename}...')
 I = InterfaceATF2_Linac()
 S = State()
 S.load(files[0])
-S.write_to_machine(I)
+S.push(I)
 
 print('Done!')
