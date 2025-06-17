@@ -10,9 +10,9 @@ class State:
             self.pull(interface)
 
     def pull (self, interface):
-        self.correctors = interface.read_correctors()
-        self.bpms = interface.read_bpms()
-        self.icts = interface.read_icts()
+        self.correctors = interface.get_correctors()
+        self.bpms = interface.get_bpms()
+        self.icts = interface.get_icts()
         self.sequence = interface.get_sequence()
         self.hcorrectors_names = interface.get_hcorrectors_names()
         self.vcorrectors_names = interface.get_vcorrectors_names()
@@ -78,6 +78,7 @@ class State:
         orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names) }
         return orbit
 
+    """"
     def change_energy(self, interface, *args):
         interface.change_energy(*args)
         pass
@@ -93,13 +94,15 @@ class State:
     def reset_intensity(self, interface, *args):
         interface.reset_intensity(*args)
         pass
-    
+
     def push(self, interface, names, corr_vals):
         interface.push(names, corr_vals)
     
     def vary_correctors(self, interface, names, corr_vals):
         interface.vary_correctors(names, corr_vals)
     
+    """
+
     def load(self, filename):
         with open(filename, "rb") as pickle_file:
             data = pickle.load(pickle_file)
@@ -160,3 +163,5 @@ class State:
             pickle.dump(state, file)
         return filename
             
+    def push(self, interface):
+        interface.push(self.correctors['names'], self.correctors['bdes'])

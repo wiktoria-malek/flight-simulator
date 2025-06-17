@@ -1,7 +1,8 @@
 import sys
 sys.path.append('/userhome/alatina/flight-simulator')
 
-from InterfaceATF2_Linac import InterfaceATF2_Linac
+# from InterfaceATF2_Linac import InterfaceATF2_Linac
+from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 from Response import Response
 from State import State
 
@@ -39,8 +40,9 @@ wgt_dfsy = 10
 rcond = 0.01
 
 # Correction!
-I = InterfaceATF2_Linac(nsamples=3)
-S = State ()
+# I = InterfaceATF2_Linac(nsamples=3)
+I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0, nsamples=1)
+S = State (interface=I)
 
 norm_Orbit_x = []
 norm_Orbit_y = []

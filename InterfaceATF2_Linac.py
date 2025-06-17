@@ -104,7 +104,7 @@ class InterfaceATF2_Linac:
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
-    def read_icts(self):
+    def get_icts(self):
         print("Reading ict's...")
         charge = []
         for ict in self.ict_names:
@@ -115,7 +115,7 @@ class InterfaceATF2_Linac:
         icts = { "names": names, "charge": charge }
         return icts
 
-    def read_correctors(self):
+    def get_correctors(self):
         print("Reading correctors' strengths...")
         bdes, bact = [], []
         for corrector in self.corrs:
@@ -129,7 +129,7 @@ class InterfaceATF2_Linac:
         correctors = { "names": names, "bdes": bdes, "bact": bact }
         return correctors
     
-    def read_bpms(self):
+    def get_bpms(self):
         print('Reading bpms...')
         p = PV('LINAC:monitors')
         x, y, tmit = [], [], []
@@ -155,7 +155,7 @@ class InterfaceATF2_Linac:
         if type(names) == str:
             names = np.array([names])
         if names.size != corr_vals.size:
-            print('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)') 
+            print('Error: len(names) != len(corr_vals) in push(names, corr_vals)') 
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)

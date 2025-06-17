@@ -9,6 +9,42 @@ class InterfaceATF2_Ext_RFTrack:
         self.sequence = [ e.get_name() for e in self.lattice['*'] ]
         self.bpms = [ e.get_name() for e in self.lattice.get_bpms() ]
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors() ]
+        self.population = population
+        self.jitter = jitter
+        self.nsamples = nsamples
+        self.__setup_beam0()
+        self.__track_bunch()
+
+    def __setup_beam0(self):
+        Pref = 1.2999999e3 # 1.3 GeV/c
+        T = rft.Bunch6d_twiss()
+        T.emitt_x = 2e-3 # mm.mrad normalised emittance
+        T.emitt_y = 1.179228346e-5 # mm.mrad
+        T.beta_x = 6.848560987 # m
+        T.beta_y = 2.935758992 # m
+        T.alpha_x = 1.108024744
+        T.alpha_y = -1.907222942
+        T.sigma_t = 8 # mm/c
+        T.sigma_pt = 0.8 # permille
+        Nparticles = 10000 # number of macroparticles
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
+        
+    def __setup_beam1(self):
+        Pref = 0.98 * 1.2999999e3 # 98% of 1.3 GeV/c
+        T = rft.Bunch6d_twiss()
+        T.emitt_x = 2e-3 # mm.mrad normalised emittance
+        T.emitt_y = 1.179228346e-5 # mm.mrad
+        T.beta_x = 6.848560987 # m
+        T.beta_y = 2.935758992 # m
+        T.alpha_x = 1.108024744
+        T.alpha_y = -1.907222942
+        T.sigma_t = 8 # mm/c
+        T.sigma_pt = 0.8 # permille
+        Nparticles = 10000 # number of macroparticles
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
+
+    def __setup_beam2(self):
+        population = 0.90 * self.population
         Pref = 1.2999999e3 # 1.3 GeV/c
         T = rft.Bunch6d_twiss()
         T.emitt_x = 2e-3 # mm.mrad normalised emittance
@@ -21,25 +57,22 @@ class InterfaceATF2_Ext_RFTrack:
         T.sigma_pt = 0.8 # permille
         Nparticles = 10000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, Pref, T, Nparticles)
-        self.I0 = self.B0.get_info()
-        self.jitter = jitter
-        self.nsamples = nsamples
-        self.__track_bunch()
 
     def __track_bunch(self):
-        dx = self.jitter*self.I0.sigma_x
-        dy = self.jitter*self.I0.sigma_y
+        I0 = self.B0.get_info()
+        dx = self.jitter*I0.sigma_x
+        dy = self.jitter*I0.sigma_y
         dz, roll = 0.0, 0.0
-        pitch = self.jitter*self.I0.sigma_py
-        yaw   = self.jitter*self.I0.sigma_px
+        pitch = self.jitter*I0.sigma_py
+        yaw   = self.jitter*I0.sigma_px
         B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
         self.lattice.track(B0_offset)
 
     def change_energy(self, *args):
-        pass
+        self.__setup_beam1()
 
     def reset_energy(self, *args):
-        pass
+        self.__setup_beam0()
 
     def change_intensity(self, *args):
         pass
@@ -65,7 +98,7 @@ class InterfaceATF2_Ext_RFTrack:
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
-    def read_icts(self):
+    def get_icts(self):
         print("Reading ict's...")
         charge = [ bpm.get_total_charge() for bpm in self.lattice.get_bpms() ]
         icts = {
@@ -74,7 +107,7 @@ class InterfaceATF2_Ext_RFTrack:
         }        
         return icts
 
-    def read_correctors(self):
+    def get_correctors(self):
         print("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
@@ -85,7 +118,7 @@ class InterfaceATF2_Ext_RFTrack:
         correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
         return correctors
     
-    def read_bpms(self):
+    def get_bpms(self):
         print('Reading bpms...')
         x = np.zeros((self.nsamples, len(self.bpms)))
         y = np.zeros(x.shape)

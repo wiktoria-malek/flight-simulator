@@ -11,7 +11,7 @@ import os
 
 # Connect to interface ATF2 Linac
 # I = InterfaceATF2_Linac(nsamples=3)
-I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0)
+I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0, nsamples=1)
 
 # Create the working environment
 project_name = 'new_SYSID'
@@ -21,13 +21,13 @@ os.makedirs (dir_name)
 os.chdir (dir_name)
 
 # What response matrix
-DFS = False
+DFS = True
 
 # Create a machine
 S = State (interface=I)
 
 # Save the reference file
-S.save (basename='machine_status')
+F = S.save (basename='machine_status')
 
 # Install CTRL-C signal handler
 def signal_handler(sig, frame, var):
@@ -39,7 +39,7 @@ def signal_handler(sig, frame, var):
     try:
         S.push(I)
         if DFS:
-            S.reset_energy(I)
+            I.reset_energy()
     except:
         pass
     exit(0)
@@ -109,7 +109,7 @@ kicks = 0.1 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
 max_oscillation = 1 # mm
 
 if DFS:
-    S.change_energy(I)
+    I.change_energy()
 
 # 10 loops to measure the response matrix
 print("Press CTRL-C to interrupt the program.")
@@ -126,7 +126,7 @@ for iter in range (Niter):
 
         # '+' excitation 
         print(f"Corrector {corrector} '+' excitation...")
-        S.push(I, corrector, corr['bdes'] + kick)
+        I.push(corrector, corr['bdes'] + kick)
         S.pull(I)
         S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
         Op = S.get_orbit(B)
@@ -134,14 +134,14 @@ for iter in range (Niter):
         
         # '-' excitation 
         print(f"Corrector {corrector} '-' excitation...")
-        S.push(I, corrector, corr['bdes'] - kick)
+        I.push(corrector, corr['bdes'] - kick)
         S.pull(I)
         S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
         Om = S.get_orbit (B)
         plot_orbit(Om, 2)
         
         # reset corrector
-        S.push(I, corrector, corr['bdes'])
+        I.push(corrector, corr['bdes'])
         
         # Orbit difference
         Diff_x = (Op['x'] - Om['x']) / 2.0
@@ -173,7 +173,7 @@ for iter in range (Niter):
         plt.pause(0.1)
 
 if DFS:
-    S.reset_energy(I)
+    I.reset_energy()
 
 print('Done!')
 
