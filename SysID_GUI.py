@@ -12,7 +12,7 @@ import os
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox, QDoubleSpinBox,
-    QComboBox, QCheckBox, QAbstractItemView, QFileDialog
+    QComboBox, QCheckBox, QAbstractItemView, QFileDialog, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 
@@ -44,7 +44,9 @@ class MainWindow(QMainWindow):
     def __init__(self, interface, dir_name):
         super().__init__()
 
+        self.cwd = os.getcwd()
         self.interface = interface
+        bpms_list = interface.get_bpms()['names']
         correctors_list = interface.get_correctors()['names']
         
         self.setWindowTitle("CERN SYSID")
@@ -61,36 +63,65 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout()
         top_layout.addLayout(left_layout)
 
-        # Pattern input and correctors list
-        pattern_layout = QHBoxLayout()
-        left_layout.addLayout(pattern_layout)
+        # Correctors list
+        correctors_layout = QHBoxLayout()
+        left_layout.addLayout(correctors_layout)
 
-        pattern_label = QLabel("Correctors:")
-        pattern_layout.addWidget(pattern_label)
+        correctors_label = QLabel("Correctors:")
+        correctors_layout.addWidget(correctors_label)
 
         self.correctors_list = QListWidget()
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         self.correctors_list.insertItems(0, correctors_list)
         left_layout.addWidget(self.correctors_list)
 
-        # Add and remove buttons
+        # Save / Load / Clear correctors buttons
         button_layout = QHBoxLayout()
         left_layout.addLayout(button_layout)
 
-        self.save_button = QPushButton("Save As..")
-        self.save_button.clicked.connect(self.__save_button_clicked)
-        button_layout.addWidget(self.save_button)
+        self.save_correctors_button = QPushButton("Save As..")
+        self.save_correctors_button.clicked.connect(self.__save_correctors_button_clicked)
+        button_layout.addWidget(self.save_correctors_button)
 
-        self.load_button = QPushButton("Load..")
-        self.load_button.clicked.connect(self.__load_button_clicked)
-        button_layout.addWidget(self.load_button)
+        self.load_correctors_button = QPushButton("Load..")
+        self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
+        button_layout.addWidget(self.load_correctors_button)
 
-        self.clear_button = QPushButton("Clear")
-        self.clear_button.clicked.connect(self.__clear_button_clicked)
-        button_layout.addWidget(self.clear_button)
+        self.clear_correctors_button = QPushButton("Clear")
+        self.clear_correctors_button.clicked.connect(self.__clear_correctors_button_clicked)
+        button_layout.addWidget(self.clear_correctors_button)
         
-        #self.add_from_button = QPushButton("Add from...")
-        #left_layout.addWidget(self.add_from_button)
+        # Middle layout
+        middle_layout = QVBoxLayout()
+        top_layout.addLayout(middle_layout)
+
+        # BPMs list
+        bpms_layout = QHBoxLayout()
+        left_layout.addLayout(bpms_layout)
+
+        bpms_label = QLabel("BPMs:")
+        bpms_layout.addWidget(bpms_label)
+
+        self.bpms_list = QListWidget()
+        self.bpms_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self.bpms_list.insertItems(0, bpms_list)
+        left_layout.addWidget(self.bpms_list)
+
+        # Save / Load / Clear bpms buttons
+        button_layout = QHBoxLayout()
+        left_layout.addLayout(button_layout)
+
+        self.save_bpms_button = QPushButton("Save As..")
+        self.save_bpms_button.clicked.connect(self.__save_bpms_button_clicked)
+        button_layout.addWidget(self.save_bpms_button)
+
+        self.load_bpms_button = QPushButton("Load..")
+        self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
+        button_layout.addWidget(self.load_bpms_button)
+
+        self.clear_bpms_button = QPushButton("Clear")
+        self.clear_bpms_button.clicked.connect(self.__clear_bpms_button_clicked)
+        button_layout.addWidget(self.clear_bpms_button)
 
         # Right side layout
         right_layout = QVBoxLayout()
@@ -100,7 +131,8 @@ class MainWindow(QMainWindow):
         info_layout = QVBoxLayout()
         right_layout.addLayout(info_layout)
 
-        self.info_label = QLabel("Data storage:")
+        self.info_label = QLabel("Data Storage:")
+        self.info_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         info_layout.addWidget(self.info_label)
 
         self.working_directory_input = QLineEdit("Working directory:")
@@ -112,6 +144,7 @@ class MainWindow(QMainWindow):
         right_layout.addLayout(options_layout)
 
         self.options_label = QLabel("Options")
+        self.options_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         options_layout.addWidget(self.options_label)
 
         samples_layout = QHBoxLayout()
@@ -137,7 +170,7 @@ class MainWindow(QMainWindow):
         excitation_layout = QHBoxLayout()
         options_layout.addLayout(excitation_layout)
 
-        self.horizontal_excitation_label = QLabel("Excitation:    H:")
+        self.horizontal_excitation_label = QLabel("Target orbit excursion, H:")
         excitation_layout.addWidget(self.horizontal_excitation_label)
 
         self.horizontal_excitation_spinbox = QDoubleSpinBox()
@@ -172,23 +205,21 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self.__stop_button_clicked)
         buttons_layout.addWidget(self.stop_button)
 
-    def __save_button_clicked(self):
-        dir_name = self.working_directory_input.text()
+    def __save_correctorscorrectors_list_button_clicked(self):
+        dir_name = self.cwd + '/' + self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
         selected_correctors = self.correctors_list.selectedItems()
-        dir_name = self.working_directory_input.text() + '/correctors.txt'
+        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
-        
         if filename:
             with open(filename, 'w') as f:
                 for item in selected_correctors:
                     f.write(f"{item.text()}\n")
 
-    def __load_button_clicked(self):
-        dir_name = self.working_directory_input.text() + '/correctors.txt'
+    def __load_correctors_button_clicked(self):
+        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
-
         if filename:
             with open(filename, 'r') as f:
                 selected_correctors = [line.strip() for line in f]
@@ -201,22 +232,60 @@ class MainWindow(QMainWindow):
             for item in items:
                 item.setSelected(True)
 
-    def __clear_button_clicked(self):
+    def __clear_correctors_button_clicked(self):
         self.correctors_list.clearSelection()
+
+    def __save_bpms_button_clicked(self):
+        dir_name = self.cwd + '/' + self.working_directory_input.text()
+        os.makedirs (dir_name, exist_ok=True)
+        os.chdir (dir_name)
+        selected_bpms = self.bpms_list.selectedItems()
+        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/bpms.txt'
+        filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
+        if filename:
+            with open(filename, 'w') as f:
+                for item in selected_bpms:
+                    f.write(f"{item.text()}\n")
+
+    def __load_bpms_button_clicked(self):
+        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/bpms.txt'
+        filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
+        if filename:
+            with open(filename, 'r') as f:
+                selected_bpms = [line.strip() for line in f]
+        else:
+            selected_bpms = self.interface.get_bpms()['names']
+
+        self.bpms_list.clearSelection()
+        for item in selected_bpms:
+            items = self.bpms_list.findItems(item, Qt.MatchFlag.MatchExactly)
+            for item in items:
+                item.setSelected(True)
+
+    def __clear_bpms_button_clicked(self):
+        self.bpms_list.clearSelection()
+
             
     def __start_button_clicked(self):
-        dir_name = self.working_directory_input.text()
+        dir_name = self.cwd + '/' + self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
         
         print('Starting measurement...')
         
-        selected_correctors = self.correctors_list.selectedItems()
+        selected_correctors = [ item.text() for item in self.correctors_list.selectedItems() ]
         if len(selected_correctors) == 0:
             for i in range(self.correctors_list.count()):
                 self.correctors_list.item(i).setSelected(True)
             self.correctors_list.repaint()
             selected_correctors = self.interface.get_correctors()['names']
+
+        selected_bpms = [ item.text() for item in self.bpms_list.selectedItems() ]
+        if len(selected_bpms) == 0:
+            for i in range(self.bpms_list.count()):
+                self.bpms_list.item(i).setSelected(True)
+            self.bpms_list.repaint()
+            selected_bpms = self.interface.get_bpms()['names']
        
         # Create a machine
         S = State (interface=self.interface)
@@ -228,8 +297,6 @@ class MainWindow(QMainWindow):
         max_oscillation_h = self.horizontal_excitation_spinbox.value() # mm
         max_oscillation_v = self.vertical_excitation_spinbox.value() # mm
 
-        selected_bpms = S.get_bpms()['names']
-       
         Niter = 3
         for iter in range (Niter):
             print(f'Iteration {iter}/{Niter}')
