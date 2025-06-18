@@ -5,6 +5,7 @@ from datetime import datetime
 from functools import partial
 
 import numpy as np
+import threading
 import signal
 import sys
 import os
@@ -14,7 +15,7 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox, QDoubleSpinBox,
     QComboBox, QCheckBox, QAbstractItemView, QFileDialog, QSizePolicy
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal
 
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -40,7 +41,72 @@ class MatplotlibWidget(FigureCanvas):
         self.plot.axes.xlabel ('Bpm [#]')
         self.plot.axes.ylabel ('Position [mm]')
 
+class Worker(QObject):
+    plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
+    finished = pyqtSignal()
+    
+    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, Niter, running_flag):
+        super().__init__()
+        self.interface = interface
+        self.S = state
+        self.correctors = correctors
+        self.bpms = bpms
+        self.kicks = kicks
+        self.max_osc_h = max_osc_h
+        self.max_osc_v = max_osc_v
+        self.Niter = Niter
+        self.running = running_flag
+
+    def run(self):
+        I = self.interface
+        S = self.S
+        kicks = self.kicks
+
+        for iter in range(self.Niter):
+            if not self.running.is_set():
+                break
+            for icorr, corrector in enumerate(self.correctors):
+                if not self.running.is_set():
+                    break
+
+                corr = S.get_correctors(corrector)
+                kick = kicks[icorr]
+
+                print(f"Corrector {corrector} '+' excitation...")
+                I.push(corrector, corr['bdes'] + kick)
+                S.pull(I)
+                S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
+                Op = S.get_orbit(self.bpms)
+
+                print(f"Corrector {corrector} '-' excitation...")
+                I.push(corrector, corr['bdes'] - kick)
+                S.pull(I)
+                S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
+                Om = S.get_orbit(self.bpms)
+
+                I.push(corrector, corr['bdes'])
+
+                Diff_x = (Op['x'] - Om['x']) / 2.0
+                Diff_y = (Op['y'] - Om['y']) / 2.0
+                nsamples = Op['stdx'].size
+                Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
+                Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
+
+                if corrector in S.get_hcorrectors_names():
+                    kicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x))
+                else:
+                    kicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y))
+                kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
+                np.savetxt('kicks.txt', kicks, delimiter='\n')
+
+                self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
+
+        self.finished.emit()
+
 class MainWindow(QMainWindow):
+    def __set_status_in_title(self, status):
+        self.setWindowTitle("SYSID - " + self.interface.__class__.__name__ + " " + status)
+
     def __init__(self, interface, dir_name):
         super().__init__()
 
@@ -48,8 +114,11 @@ class MainWindow(QMainWindow):
         self.interface = interface
         bpms_list = interface.get_bpms()['names']
         correctors_list = interface.get_correctors()['names']
+
+        self.running = threading.Event()
+        self.worker_thread = None
         
-        self.setWindowTitle("CERN SYSID")
+        self.__set_status_in_title("[Idle]")
         self.setGeometry(100, 100, 600, 700)
 
         main_widget = QWidget()
@@ -205,7 +274,7 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self.__stop_button_clicked)
         buttons_layout.addWidget(self.stop_button)
 
-    def __save_correctorscorrectors_list_button_clicked(self):
+    def __save_correctors_button_clicked(self):
         dir_name = self.cwd + '/' + self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
@@ -265,95 +334,67 @@ class MainWindow(QMainWindow):
     def __clear_bpms_button_clicked(self):
         self.bpms_list.clearSelection()
 
-            
     def __start_button_clicked(self):
+        if self.worker_thread and self.worker_thread.isRunning():
+            return  # already running
+
+        self.__set_status_in_title("[Running...]")
+        self.running.set()
+
         dir_name = self.cwd + '/' + self.working_directory_input.text()
-        os.makedirs (dir_name, exist_ok=True)
-        os.chdir (dir_name)
-        
-        print('Starting measurement...')
-        
-        selected_correctors = [ item.text() for item in self.correctors_list.selectedItems() ]
-        if len(selected_correctors) == 0:
+        os.makedirs(dir_name, exist_ok=True)
+        os.chdir(dir_name)
+
+        selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        if not selected_correctors:
             for i in range(self.correctors_list.count()):
                 self.correctors_list.item(i).setSelected(True)
-            self.correctors_list.repaint()
             selected_correctors = self.interface.get_correctors()['names']
 
-        selected_bpms = [ item.text() for item in self.bpms_list.selectedItems() ]
-        if len(selected_bpms) == 0:
+        selected_bpms = [item.text() for item in self.bpms_list.selectedItems()]
+        if not selected_bpms:
             for i in range(self.bpms_list.count()):
                 self.bpms_list.item(i).setSelected(True)
-            self.bpms_list.repaint()
             selected_bpms = self.interface.get_bpms()['names']
-       
-        # Create a machine
-        S = State (interface=self.interface)
 
-        # Save the reference file
-        F = S.save (basename='machine_status')
+        S = State(interface=self.interface)
+        S.save(basename='machine_status')
 
-        kicks = 0.1 * np.ones(len(selected_correctors), dtype=float) # kicks to excite 1mm oscillation
-        max_oscillation_h = self.horizontal_excitation_spinbox.value() # mm
-        max_oscillation_v = self.vertical_excitation_spinbox.value() # mm
-
+        kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
+        max_osc_h = self.horizontal_excitation_spinbox.value()
+        max_osc_v = self.vertical_excitation_spinbox.value()
         Niter = 3
-        for iter in range (Niter):
-            print(f'Iteration {iter}/{Niter}')
-            for icorr, corrector in enumerate(selected_correctors):
 
-                # initial value
-                corr = S.get_correctors (corrector)
-                kick = kicks[icorr]
+        self.worker_thread = QThread()
+        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, Niter, self.running)
+        self.worker.moveToThread(self.worker_thread)
 
-                # '+' excitation 
-                print(f"Corrector {corrector} '+' excitation...")
-                I.push(corrector, corr['bdes'] + kick)
-                S.pull(I)
-                S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
-                Op = S.get_orbit(selected_bpms)
-                
-                # '-' excitation 
-                print(f"Corrector {corrector} '-' excitation...")
-                I.push(corrector, corr['bdes'] - kick)
-                S.pull(I)
-                S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
-                Om = S.get_orbit (selected_bpms)
-                
-                # reset corrector
-                I.push(corrector, corr['bdes'])
-                
-                # Orbit difference
-                Diff_x = (Op['x'] - Om['x']) / 2.0
-                Diff_y = (Op['y'] - Om['y']) / 2.0
-                nsamples = Op['stdx'].size
-                Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
-                Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
-                
-                # Tunes the kickers omplitude
-                if corrector in S.get_hcorrectors_names():
-                    kicks[icorr] *= max_oscillation_h / np.max(np.absolute(Diff_x))
-                else:
-                    kicks[icorr] *= max_oscillation_v / np.max(np.absolute(Diff_y))
+        self.worker_thread.started.connect(self.worker.run)
+        self.worker.plot_data.connect(self.__update_plot)
+        self.worker.finished.connect(self.worker_thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
+        self.worker.finished.connect(lambda: self.__set_status_in_title("[Idle]"))
 
-                # weighted average
-                kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
-                np.savetxt('kicks.txt', kicks, delimiter='\n')
+        self.worker_thread.start()
 
-                # Plot orbit    
-                self.plot.axes.clear()
-                self.plot.axes.errorbar (range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
-                self.plot.axes.errorbar (range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
-                self.plot.axes.legend (loc='upper left')
-                self.plot.axes.set_xlabel ('Bpm [#]')
-                self.plot.axes.set_ylabel ('Orbit [mm]')
-                self.plot.axes.set_title (f"Corrector '{corrector}'")
-                self.plot.draw()
-                self.plot.flush_events()
-                self.plot.repaint()
+    def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
+        self.plot.axes.clear()
+        self.plot.axes.errorbar(range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
+        self.plot.axes.errorbar(range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
+        self.plot.axes.legend(loc='upper left')
+        self.plot.axes.set_xlabel('Bpm [#]')
+        self.plot.axes.set_ylabel('Orbit [mm]')
+        self.plot.axes.set_title(f"Corrector '{corrector}'")
+        self.plot.draw_idle()
+        self.plot.flush_events()
+        self.plot.repaint()
+
                 
     def __stop_button_clicked(self):
-        pass
+        if self.worker_thread and self.worker_thread.isRunning():
+            self.__set_status_in_title("[Stopping...]")
+            self.running.clear()
 
 ## Connect to interface ATF2 Linac
 # I = InterfaceATF2_Linac(nsamples=3)
