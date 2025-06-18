@@ -403,7 +403,7 @@ class MainWindow(QMainWindow):
             
 ## Connect to interface ATF2 Linac
 # I = InterfaceATF2_Linac(nsamples=3)
-I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0, nsamples=1)
+I = InterfaceATF2_Ext_RFTrack(jitter=0.05, bpm_resolution=0.02, nsamples=1)
 
 ## Prepare interface
 project_name = 'new_SYSID'
