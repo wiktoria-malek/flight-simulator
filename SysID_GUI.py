@@ -3,6 +3,7 @@ from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 from State import State
 from datetime import datetime
 from functools import partial
+from collections import deque
 
 import numpy as np
 import threading
@@ -18,7 +19,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal
 
 import matplotlib
-matplotlib.use('Qt5Agg')
+matplotlib.use('QtAgg')
 
 import matplotlib.pyplot as plt
 
@@ -27,19 +28,10 @@ from matplotlib.figure import Figure
 
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
-        self.fig = Figure()
-        super().__init__(self.fig)
-        self.axes = self.fig.add_subplot(111)
-        # self.plot_orbit(orbit)
-        
-    def plot_orbit(self,orbit):
-        errx = orbit['stdx'] / np.sqrt(orbit['stdx'].size)
-        erry = orbit['stdy'] / np.sqrt(orbit['stdy'].size)
-        self.plot.axes.errorbar (range(orbit['nbpms']), np.transpose(orbit['x']), yerr=errx, lw=2, capsize=5, capthick=2, label="X")
-        self.plot.axes.errorbar (range(orbit['nbpms']), np.transpose(orbit['y']), yerr=erry, lw=2, capsize=5, capthick=2, label="Y")
-        self.plot.axes.legend (loc='upper left')
-        self.plot.axes.xlabel ('Bpm [#]')
-        self.plot.axes.ylabel ('Position [mm]')
+        fig = Figure(tight_layout=True)
+        super().__init__(fig)
+        self.setParent(parent)
+        self.axes = fig.add_subplot(111)
 
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
@@ -140,7 +132,7 @@ class MainWindow(QMainWindow):
         correctors_layout.addWidget(correctors_label)
 
         self.correctors_list = QListWidget()
-        self.correctors_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
         left_layout.addWidget(self.correctors_list)
 
@@ -172,7 +164,7 @@ class MainWindow(QMainWindow):
         bpms_layout.addWidget(bpms_label)
 
         self.bpms_list = QListWidget()
-        self.bpms_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.bpms_list.insertItems(0, bpms_list)
         left_layout.addWidget(self.bpms_list)
 
@@ -259,6 +251,12 @@ class MainWindow(QMainWindow):
 
         self.plot = MatplotlibWidget(self)
         options_layout.addWidget(self.plot)
+
+        # Plot queue and timer for smoother updates
+        self._plot_queue = deque()
+        self._plot_timer = QTimer()
+        self._plot_timer.timeout.connect(self.__flush_plot_queue)
+        self._plot_timer.start(200)  # Adjust this interval as needed
 
         # Start and Stop buttons
         buttons_layout = QHBoxLayout()
@@ -379,6 +377,13 @@ class MainWindow(QMainWindow):
         self.worker_thread.start()
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
+        self._plot_queue.append((Op, Diff_x, Err_x, Diff_y, Err_y, corrector))
+
+    def __flush_plot_queue(self):
+        if not self._plot_queue:
+            return
+        Op, Diff_x, Err_x, Diff_y, Err_y, corrector = self._plot_queue.popleft()
+
         self.plot.axes.clear()
         self.plot.axes.errorbar(range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
         self.plot.axes.errorbar(range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
@@ -386,16 +391,16 @@ class MainWindow(QMainWindow):
         self.plot.axes.set_xlabel('Bpm [#]')
         self.plot.axes.set_ylabel('Orbit [mm]')
         self.plot.axes.set_title(f"Corrector '{corrector}'")
-        self.plot.draw_idle()
+        self.plot.draw()
         self.plot.flush_events()
+        self.plot.update()
         self.plot.repaint()
-
-                
+                        
     def __stop_button_clicked(self):
         if self.worker_thread and self.worker_thread.isRunning():
             self.__set_status_in_title("[Stopping...]")
             self.running.clear()
-
+            
 ## Connect to interface ATF2 Linac
 # I = InterfaceATF2_Linac(nsamples=3)
 I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0, nsamples=1)
