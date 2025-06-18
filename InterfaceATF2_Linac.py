@@ -1,5 +1,8 @@
+import sys
 import numpy as np
 import time
+
+sys.path.append('/userhome/atfop1/.local/lib/python3.12/site-packages')
 
 from epics import PV, ca
 
@@ -134,6 +137,7 @@ class InterfaceATF2_Linac:
         p = PV('LINAC:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
+            print(f'Sample = {sample}')
             a = p.get().reshape((-1, 20))
             status = a[self.bpm_indexes, 0]
             # Set elements that are not equal to 1 to zero
