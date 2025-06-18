@@ -1,5 +1,8 @@
+import sys
 import numpy as np
 import time
+
+sys.path.append('/userhome/atfop1/.local/lib/python3.12/site-packages')
 
 from epics import PV, ca
 
