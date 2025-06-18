@@ -18,8 +18,8 @@ class InterfaceATF2_Ext_RFTrack:
     def __setup_beam0(self):
         Pref = 1.2999999e3 # 1.3 GeV/c
         T = rft.Bunch6d_twiss()
-        T.emitt_x = 2e-3 # mm.mrad normalised emittance
-        T.emitt_y = 1.179228346e-5 # mm.mrad
+        T.emitt_x = 5.2 # mm.mrad normalised emittance
+        T.emitt_y = 0.03 # mm.mrad
         T.beta_x = 6.848560987 # m
         T.beta_y = 2.935758992 # m
         T.alpha_x = 1.108024744
