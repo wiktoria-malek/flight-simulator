@@ -61,13 +61,13 @@ class InterfaceATF2_Ext:
     def change_energy(self, *args):
         pass
 
-    def reset_energy(self *args):
+    def reset_energy(self, *args):
         pass
 
-    def change_intensity(self *args):
+    def change_intensity(self, *args):
         pass
 
-    def reset_intensity(self *args):
+    def reset_intensity(self, *args):
         pass
 
     def get_sequence(self):
