@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         correctors_list = interface.get_correctors()['names']
         
         self.setWindowTitle("CERN SYSID")
-        self.setGeometry(100, 100, 400, 700)
+        self.setGeometry(100, 100, 600, 700)
 
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
@@ -106,9 +106,6 @@ class MainWindow(QMainWindow):
         self.working_directory_input = QLineEdit("Working directory:")
         self.working_directory_input.setText(dir_name)
         info_layout.addWidget(self.working_directory_input)
-
-        self.current_corr_label = QLabel("Current corr: N/A")
-        info_layout.addWidget(self.current_corr_label)
 
         # Options sectionQFileDialog
         options_layout = QVBoxLayout()
@@ -218,6 +215,7 @@ class MainWindow(QMainWindow):
         if len(selected_correctors) == 0:
             for i in range(self.correctors_list.count()):
                 self.correctors_list.item(i).setSelected(True)
+            self.correctors_list.repaint()
             selected_correctors = self.interface.get_correctors()['names']
        
         # Create a machine
@@ -237,8 +235,6 @@ class MainWindow(QMainWindow):
             print(f'Iteration {iter}/{Niter}')
             for icorr, corrector in enumerate(selected_correctors):
 
-                self.current_corr_label.setText('Current corr: ' + corrector)
-                
                 # initial value
                 corr = S.get_correctors (corrector)
                 kick = kicks[icorr]
@@ -284,7 +280,10 @@ class MainWindow(QMainWindow):
                 self.plot.axes.legend (loc='upper left')
                 self.plot.axes.set_xlabel ('Bpm [#]')
                 self.plot.axes.set_ylabel ('Orbit [mm]')
+                self.plot.axes.set_title (f"Corrector '{corrector}'")
                 self.plot.draw()
+                self.plot.flush_events()
+                self.plot.repaint()
                 
     def __stop_button_clicked(self):
         pass
