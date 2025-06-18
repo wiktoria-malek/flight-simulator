@@ -370,9 +370,9 @@ class MainWindow(QMainWindow):
         self.worker_thread.started.connect(self.worker.run)
         self.worker.plot_data.connect(self.__update_plot)
         self.worker.finished.connect(self.worker_thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
         self.worker_thread.finished.connect(self.worker_thread.deleteLater)
         self.worker.finished.connect(lambda: self.__set_status_in_title("[Idle]"))
+        self.worker_thread.finished.connect(lambda: setattr(self, 'worker_thread', None))
 
         self.worker_thread.start()
 
