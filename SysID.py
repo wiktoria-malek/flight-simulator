@@ -1,5 +1,6 @@
 # from InterfaceATF2_Linac import InterfaceATF2_Linac
-from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
+from InterfaceATF2_DR import InterfaceATF2_DR
+# from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 from State import State
 from datetime import datetime
 from functools import partial
@@ -9,9 +10,11 @@ import numpy as np
 import signal
 import os
 
-# Connect to interface ATF2 Linac
+# Connect to interface ATF LINAC, DR or ATF2 beamline
 # I = InterfaceATF2_Linac(nsamples=3)
-I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0, nsamples=1)
+I = InterfaceATF2_DR(nsamples=3)
+# I = InterfaceATF2_Ext(nsamples=3)
+# I = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.0, nsamples=1)
 
 # Create the working environment
 project_name = 'new_SYSID'
@@ -48,29 +51,31 @@ signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F,DFS)))
 
 # The list of correctors to use 
 C = [
-    'ZH1L', 'ZV1L', 'ZV2L', 'ZH2L', 'ZV3L', 'ZH3L', 'ZH4L', 'ZV4L', 'ZH5L',
-    'ZV5L', 'ZH6L', 'ZV6L', 'ZH7L', 'ZV7L', 'ZH8L', 'ZV8L', 'ZH9L', 'ZV9L',
-    'ZH10L', 'ZV10L', 'ZH11L', 'ZV11L', 'ZH12L', 'ZV12L',
-    #'ZX10T',
-    #'ZX11T',
-    #'ZV13L',
-    #'ZX12T',
-    #'ZY20T',
-    #'ZY21T',
-    #'ZY22T',
-    #'ZY23T',
-    #'ZX30T',
-    #'ZX31T',
-    #'ZV30T',
-    #'ZH30T',
-    #'ZX32T',
-    #'ZV40T',
-     'ZH40T'
-    #'ZX50T',
-    #'ZX51T',
-    #'ZV50T',
-    #'ZH50T'
-    #'ZV51T'
+'ZV1R', 'ZH1R', 'ZV2R', 'ZH2R',
+# 'ZV3R', 'ZH3R', 'ZV4R', 'ZH4R',
+# 'ZV5R', 'ZH5R', 'ZV6R', 'ZH6R',
+# 'ZV7R', 'ZH7R', 'ZV8R', 'ZH8R',
+# 'ZV9R', 'ZH9R', 'ZH10R', 'ZV10R',
+# 'ZH11R', 'ZV11R', 'ZH12R', 'ZV12R',  
+# 'ZV13R', 'ZH13R', 'ZV14R', 'ZH14R', 
+# 'ZV15R', 'ZV16R', 'ZH15R', 'ZV17R', 
+# 'ZH16R', 'ZV18R', 'ZH17R', 'ZV19R', 
+# 'ZH18R', 'ZV20R', 'ZH19R', 'ZV21R', 
+# 'ZH20R', 'ZV22R', 'ZH21R', 'ZV23R', 
+# 'ZH22R', 'ZV24R', 'ZH23R', 'ZV25R', 
+# 'ZH24R', 'ZV26R', 'ZH25R', 'ZV27R', 
+# 'ZH26R', 'ZV28R', 'ZH27R', 'ZV29R', 
+# 'ZH28R', 'ZV30R', 'ZH29R', 'ZV31R', 
+# 'ZH30R', 'ZV32R', 'ZH31R', 'ZH32R', 
+# 'ZV33R', 'ZV34R', 'ZH33R', 'ZH34R', 
+# 'ZV35R', 'ZV36R', 'ZH35R', 'ZV37R',
+# 'ZH36R', 'ZV38R', 'ZH37R', 'ZV39R', 
+# 'ZV40R', 'ZH38R', 'ZH41R', 'ZV39R', 
+# 'ZH42R', 'ZV43R', 'ZH40R', 'ZV44R', 
+# 'ZH41R', 'ZV45R', 'ZH42R', 'ZV46R', 
+# 'ZH43R', 'ZV47R', 'ZH44R', 'ZV48R', 
+# 'ZH45R', 'ZV49R', 'ZH46R', 'ZV50R', 
+# 'ZH47R', 'ZV51R', 'ZH48R'
 ]
 
 C = S.get_correctors()['names']
@@ -78,11 +83,11 @@ print(C)
 
 # The list of bmps to use
 B = [
-    'MB5L', 'MB6L', 'MB7L', 'MB8L', 'MB9L', 'MB10L', 'MB11L', 'ML1L',
-    'ML2L', 'ML3L', 'ML4L', 'ML5L', 'ML6L', 'ML7L', 'ML8L', 'ML9L',
-    'ML10L', 'ML11L', 'ML12L', # 'ML13L', 'ML14L', 'ML15L',
-    'ML1T', 'ML2T', 'ML101T', 'ML102T', 'ML103T', 'ML3T', 'ML104T', 'ML4T', 'ML105T',
-    'ML5T', 'ML6T', 'ML106T', 'ML7T', 'ML8T', 'ML9T', 'MB10T', 'MB11T'
+'MB1R', 'MB2R', 'MB3R', 'MB4R','MB5R', 'MB6R', 'MB7R', 'MB8R',
+'MB9R', 'MB10R', 'MB11R', 'MB12R','MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R', 'MBX1', 'MBX2', 'MB21R', 'MB22R',
+'MB23R', 'MB24R','MB25R', 'MB26R',  'MB27R', 'MB28R', 'MB29R', 'MB30R', 'MB31R', 'MB32R', 'MB33R',
+'MB34R', 'MB35R', 'MB36R', 'MB37R','MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 
+# 'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R','MB54R', 'MB55R', 'MB56R', 'MB57R', 'MB58R', 'MB59R', 'MB60R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB70R', 'MB71R', 'MB72R', 'MB73R', 'MB74R', 'MB76R', 'MB77R', 'MB78R', 'MB79R', 'MB80R', 'MB81R','MB82R', 'MB83R', 'MB84R', 'MB85R', 'MB86R', 'MB87R', 'MB88R', 'MB89R', 'MB90R','MB91R', 'MB92R', 'MB93R', 'MB94R','MB95R', 'MB96R', 'MB97R', 'MB98R'
 ]
 
 B = S.get_bpms()['names']
