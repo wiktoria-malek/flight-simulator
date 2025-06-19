@@ -34,8 +34,8 @@ class MatplotlibWidget(FigureCanvas):
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
     finished = pyqtSignal()
-    
-    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, Niter, running_flag):
+
+    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, running_flag):
         super().__init__()
         self.interface = interface
         self.S = state
@@ -44,6 +44,8 @@ class Worker(QObject):
         self.kicks = kicks
         self.max_osc_h = max_osc_h
         self.max_osc_v = max_osc_v
+        self.max_curr_h = max_curr_h
+        self.max_curr_v = max_curr_v
         self.Niter = Niter
         self.running = running_flag
 
@@ -51,6 +53,11 @@ class Worker(QObject):
         I = self.interface
         S = self.S
         kicks = self.kicks
+
+        def clamp(val, max_val):
+            if max_val == 0.0:
+                return val
+            return max(-max_val, min(val, max_val))
 
         for iter in range(self.Niter):
             if not self.running.is_set():
@@ -63,13 +70,22 @@ class Worker(QObject):
                 kick = kicks[icorr]
 
                 print(f"Corrector {corrector} '+' excitation...")
-                I.push(corrector, corr['bdes'] + kick)
+                curr_p = corr['bdes'] + kick
+                if corrector in S.get_hcorrectors_names():
+                    curr_p = clamp(curr_p, self.max_curr_h)
+                else:
+                    curr_p = clamp(curr_p, self.max_curr_v)
+                I.push(corrector, curr_p)
                 S.pull(I)
                 S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
                 Op = S.get_orbit(self.bpms)
 
                 print(f"Corrector {corrector} '-' excitation...")
-                I.push(corrector, corr['bdes'] - kick)
+                curr_m = corr['bdes'] - kick
+                if corrector in S.get_hcorrectors_names():
+                    curr_m = clamp(curr_m, self.max_curr_h)
+                else:
+                    curr_m = clamp(curr_m, self.max_curr_v)
                 S.pull(I)
                 S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
                 Om = S.get_orbit(self.bpms)
@@ -83,9 +99,12 @@ class Worker(QObject):
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
 
                 if corrector in S.get_hcorrectors_names():
-                    kicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x))
+                    Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
+                    kicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
                 else:
-                    kicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y))
+                    Diff_y_clean = Diff_y[~np.isnan(Diff_y)]
+                    kicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
+
                 kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
                 np.savetxt('kicks.txt', kicks, delimiter='\n')
 
@@ -103,11 +122,20 @@ class MainWindow(QMainWindow):
         self.cwd = os.getcwd()
         self.interface = interface
         bpms_list = interface.get_bpms()['names']
-        correctors_list = interface.get_correctors()['names']
+        correctors = I.get_correctors()
+        correctors_list = correctors['names']
+
+        if correctors_list is not None:
+            hcorrs = I.get_hcorrectors_names()
+            vcorrs = I.get_vcorrectors_names()
+            hcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in hcorrs])
+            vcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in vcorrs])
+            max_curr_h = 1.15 * np.max(np.abs(np.array(correctors['bdes'])[hcorr_indexes]))
+            max_curr_v = 1.15 * np.max(np.abs(np.array(correctors['bdes'])[vcorr_indexes]))
 
         self.running = threading.Event()
         self.worker_thread = None
-        
+
         self.__set_status_in_title("[Idle]")
         self.setGeometry(100, 100, 600, 700)
 
@@ -120,7 +148,7 @@ class MainWindow(QMainWindow):
 
         # Left side layout
         left_layout = QVBoxLayout()
-        top_layout.addLayout(left_layout)
+        top_layout.addLayout(left_layout,1)
 
         # Correctors list
         correctors_layout = QHBoxLayout()
@@ -149,7 +177,7 @@ class MainWindow(QMainWindow):
         self.clear_correctors_button = QPushButton("Clear")
         self.clear_correctors_button.clicked.connect(self.__clear_correctors_button_clicked)
         button_layout.addWidget(self.clear_correctors_button)
-        
+
         # Middle layout
         middle_layout = QVBoxLayout()
         top_layout.addLayout(middle_layout)
@@ -184,7 +212,7 @@ class MainWindow(QMainWindow):
 
         # Right side layout
         right_layout = QVBoxLayout()
-        top_layout.addLayout(right_layout)
+        top_layout.addLayout(right_layout,2)
 
         # Info section
         info_layout = QVBoxLayout()
@@ -206,16 +234,6 @@ class MainWindow(QMainWindow):
         self.options_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         options_layout.addWidget(self.options_label)
 
-        samples_layout = QHBoxLayout()
-        options_layout.addLayout(samples_layout)
-
-        self.samples_label = QLabel("N. of samples:")
-        samples_layout.addWidget(self.samples_label)
-
-        self.samples_spinbox = QSpinBox()
-        self.samples_spinbox.setValue(3)
-        samples_layout.addWidget(self.samples_spinbox)
-
         cycle_mode_layout = QHBoxLayout()
         options_layout.addLayout(cycle_mode_layout)
 
@@ -226,27 +244,59 @@ class MainWindow(QMainWindow):
         self.cycle_mode_combobox.addItems(["Repeat all"])
         cycle_mode_layout.addWidget(self.cycle_mode_combobox)
 
-        excitation_layout = QHBoxLayout()
-        options_layout.addLayout(excitation_layout)
+        # Correctors Current
+        current_layout = QHBoxLayout()
+        options_layout.addLayout(current_layout)
 
-        self.horizontal_excitation_label = QLabel("Target orbit excursion, H:")
-        excitation_layout.addWidget(self.horizontal_excitation_label)
+        self.current_label = QLabel("Max current:")
+        current_layout.addWidget(self.current_label)
+        current_layout.addStretch()  # This stretch  expands to fill space
 
-        self.horizontal_excitation_spinbox = QDoubleSpinBox()
-        self.horizontal_excitation_spinbox.setValue(1.0)
-        self.horizontal_excitation_spinbox.setSingleStep(0.1)
-        self.horizontal_excitation_spinbox.setSuffix(" mm")
-        excitation_layout.addWidget(self.horizontal_excitation_spinbox)
+        self.horizontal_current_label = QLabel("H:")
+        current_layout.addWidget(self.horizontal_current_label)
 
-        self.vertical_excitation_label = QLabel("V:")
-        excitation_layout.addWidget(self.vertical_excitation_label)
+        self.max_horizontal_current_spinbox = QDoubleSpinBox()
+        self.max_horizontal_current_spinbox.setValue(max_curr_h)
+        self.max_horizontal_current_spinbox.setSingleStep(0.01)
+        self.max_horizontal_current_spinbox.setSuffix(" A")
+        current_layout.addWidget(self.max_horizontal_current_spinbox)
 
-        self.vertical_excitation_spinbox = QDoubleSpinBox()
-        self.vertical_excitation_spinbox.setValue(1.0)
-        self.vertical_excitation_spinbox.setSingleStep(0.1)
-        self.vertical_excitation_spinbox.setSuffix(" mm")
-        excitation_layout.addWidget(self.vertical_excitation_spinbox)
+        self.vertical_current_label = QLabel("V:")
+        current_layout.addWidget(self.vertical_current_label)
 
+        self.max_vertical_current_spinbox = QDoubleSpinBox()
+        self.max_vertical_current_spinbox.setValue(max_curr_v)
+        self.max_vertical_current_spinbox.setSingleStep(0.01)
+        self.max_vertical_current_spinbox.setSuffix(" A")
+        current_layout.addWidget(self.max_vertical_current_spinbox)
+
+        # Orbit Excursion
+        excursion_layout = QHBoxLayout()
+        options_layout.addLayout(excursion_layout)
+
+        self.excursion_label = QLabel("Orbit excursion:")
+        excursion_layout.addWidget(self.excursion_label)
+        excursion_layout.addStretch()  # This stretch  expands to fill space
+
+        self.horizontal_excursion_label = QLabel("H:")
+        excursion_layout.addWidget(self.horizontal_excursion_label)
+
+        self.horizontal_excursion_spinbox = QDoubleSpinBox()
+        self.horizontal_excursion_spinbox.setValue(1.0)
+        self.horizontal_excursion_spinbox.setSingleStep(0.1)
+        self.horizontal_excursion_spinbox.setSuffix(" mm")
+        excursion_layout.addWidget(self.horizontal_excursion_spinbox)
+
+        self.vertical_excursion_label = QLabel("V:")
+        excursion_layout.addWidget(self.vertical_excursion_label)
+
+        self.vertical_excursion_spinbox = QDoubleSpinBox()
+        self.vertical_excursion_spinbox.setValue(1.0)
+        self.vertical_excursion_spinbox.setSingleStep(0.1)
+        self.vertical_excursion_spinbox.setSuffix(" mm")
+        excursion_layout.addWidget(self.vertical_excursion_spinbox)
+
+        # Plot
         self.plot = MatplotlibWidget(self)
         options_layout.addWidget(self.plot)
 
@@ -357,12 +407,14 @@ class MainWindow(QMainWindow):
         S.save(basename='machine_status')
 
         kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
-        max_osc_h = self.horizontal_excitation_spinbox.value()
-        max_osc_v = self.vertical_excitation_spinbox.value()
+        max_osc_h = self.horizontal_excursion_spinbox.value()
+        max_osc_v = self.vertical_excursion_spinbox.value()
+        max_curr_h = self.max_horizontal_current_spinbox.value()
+        max_curr_v = self.max_vertical_current_spinbox.value()
         Niter = 3
 
         self.worker_thread = QThread()
-        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, Niter, self.running)
+        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, self.running)
         self.worker.moveToThread(self.worker_thread)
 
         self.worker_thread.started.connect(self.worker.run)
@@ -393,7 +445,7 @@ class MainWindow(QMainWindow):
         self.plot.flush_events()
         self.plot.update()
         self.plot.repaint()
-                        
+
     def __stop_button_clicked(self):
         if self.worker_thread and self.worker_thread.isRunning():
             self.__set_status_in_title("[Stopping...]")
@@ -406,7 +458,7 @@ app = QApplication(sys.argv)
 from SelectInterface import InterfaceSelectionDialog
 dialog = InterfaceSelectionDialog()
 if dialog.exec():
-    print(f"Selected interface: {dialog.selected_interface}")
+    print(f"Selected interface: {dialog.selected_interface_name}")
     I = dialog.selected_interface
 else:
     print("Selection cancelled.")
@@ -421,4 +473,3 @@ dir_name = f"Data/{project_name}_{time_str}"
 window = MainWindow(I, dir_name)
 window.show()
 sys.exit(app.exec())
-

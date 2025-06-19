@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt
 class InterfaceSelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Select an Interface File")
+        self.setWindowTitle("Select an Interface")
         self.selected_interface = None
 
         layout = QVBoxLayout(self)
@@ -43,7 +43,7 @@ class InterfaceSelectionDialog(QDialog):
     def accept(self):
         for rb in self.radio_buttons:
             if rb.isChecked():
-                print('cheched = ', rb.text())
+                self.selected_interface_name = rb.text()
                 match rb.text():
                     case 'InterfaceATF2_DR':
                         self.selected_interface = InterfaceATF2_DR(nsamples=3)
