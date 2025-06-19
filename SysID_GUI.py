@@ -120,9 +120,9 @@ class Worker(QObject):
 class MainWindow(QMainWindow):
     def __set_status_in_title(self, status):
         self.setWindowTitle("SYSID - " + self.interface.__class__.__name__ + " " + status)
-        self.setWindowIcon(QIcon('../CERN_logo.png'))
+        self.setWindowIcon(QIcon('SysID_GUI/CERN_logo.png'))
         
-        self.logo = QPixmap('../CERN_logo.png')
+        self.logo = QPixmap('SysID_GUI/CERN_logo.png')
         self.logo = self.logo.scaled(75, 75, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.show()
 
