@@ -484,7 +484,7 @@ else:
     sys.exit(1)
 
 ## Prepare project space
-project_name = 'new_SYSID'
+project_name = dialog.selected_interface_name
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 dir_name = f"Data/{project_name}_{time_str}"
 

@@ -3,6 +3,9 @@ import numpy as np
 import time
 
 class InterfaceATF2_Ext_RFTrack:
+    def get_name(self):
+        return 'ATF2_Ext_RFT'
+
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.lattice = rft.Lattice('Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
         self.lattice.set_bpm_resolution(bpm_resolution)

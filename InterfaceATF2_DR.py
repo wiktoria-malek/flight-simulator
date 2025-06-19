@@ -4,6 +4,9 @@ import time
 from epics import PV, ca
 
 class InterfaceATF2_DR:
+    def get_name(self):
+        return 'ATF2_DR'
+
     def __init__(self, nsamples=1):
         self.nsamples = nsamples
         # Bpms and correctors in beamline order

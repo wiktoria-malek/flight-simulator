@@ -43,7 +43,6 @@ class InterfaceSelectionDialog(QDialog):
     def accept(self):
         for rb in self.radio_buttons:
             if rb.isChecked():
-                self.selected_interface_name = rb.text()
                 match rb.text():
                     case 'InterfaceATF2_DR':
                         self.selected_interface = InterfaceATF2_DR(nsamples=3)
@@ -56,6 +55,7 @@ class InterfaceSelectionDialog(QDialog):
 
                     case 'InterfaceATF2_Ext_RFTrack':
                         self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.05, bpm_resolution=0.02, nsamples=1)
+                self.selected_interface_name = self.selected_interface.get_name()
                 break
         super().accept()
 
