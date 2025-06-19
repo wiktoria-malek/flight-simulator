@@ -1,3 +1,4 @@
+# from InterfaceATF2_DR import InterfaceATF2_DR
 # from InterfaceATF2_Ext import InterfaceATF2_Ext
 # from InterfaceATF2_Linac import InterfaceATF2_Linac
 from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
@@ -403,6 +404,7 @@ class MainWindow(QMainWindow):
             self.running.clear()
             
 ## Connect to interface ATF2
+# I = InterfaceATF2_DR(nsamples=3)
 # I = InterfaceATF2_Ext(nsamples=3)
 # I = InterfaceATF2_Linac(nsamples=3)
 I = InterfaceATF2_Ext_RFTrack(jitter=0.05, bpm_resolution=0.02, nsamples=1)

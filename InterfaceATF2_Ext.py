@@ -92,7 +92,7 @@ class InterfaceATF2_Ext:
         for ict in self.ict_names:
             pv = PV(f'{ict}')
             charge.append(pv.get())
-        names = array(self.ict_names)
+        names = [ self.ict_names ] if type(self.ict_names) == str else self.ict_names
         charge = np.array(charge)
         icts = { "names": names, "charge": charge }
         return icts
@@ -105,7 +105,7 @@ class InterfaceATF2_Ext:
             pv_act = PV(f'{corrector}:currentRead')
             bdes.append(pv_des.get())
             bact.append(pv_act.get())
-        names = array(self.corrs)
+        names = [ self.corrs ] if type(self.corrs) == str else self.corrs
         bdes = np.array(bdes)
         bact = np.array(bact)
         correctors = { "names": names, "bdes": bdes, "bact": bact }
@@ -113,10 +113,11 @@ class InterfaceATF2_Ext:
     
     def get_bpms(self):
         print('Reading bpms...')
-        p = PV('ATF2:monitors')
+        p = PV('LINAC:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
-            a = p.get().reshape((-1, 10))
+            print(f'Sample = {sample}')
+            a = p.get().reshape((-1, 20))
             status = a[self.bpm_indexes, 0]
             # Set elements that are not equal to 1 to zero
             status[status != 1] = 0
@@ -124,7 +125,7 @@ class InterfaceATF2_Ext:
             y.append(a[self.bpm_indexes, 2])
             tmit.append(status * a[self.bpm_indexes, 3])
             time.sleep(1)
-        names = array(self.bpms)
+        names = [ self.bpms ] if type(self.bpms) == str else self.bpms
         x = np.vstack(x) / 1e3 # mm
         y = np.vstack(y) / 1e3 # mm
         tmit = np.vstack(tmit)
@@ -135,8 +136,8 @@ class InterfaceATF2_Ext:
         if type(corr_vals) == float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:
-            names = array([names])
-        if names.size != corr_vals.size:
+            names = [names]
+        if len(names) != corr_vals.size:
             print('Error: len(names) != len(corr_vals) in push(names, corr_vals)') 
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
@@ -147,8 +148,8 @@ class InterfaceATF2_Ext:
         if type(corr_vals) is float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:
-            names = array([names])
-        if names.size != corr_vals.size:
+            names = [names]
+        if len(names) != corr_vals.size:
             print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)') 
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
