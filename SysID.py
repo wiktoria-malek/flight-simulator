@@ -52,8 +52,8 @@ signal.signal(signal.SIGINT, partial(signal_handler, var=(S,F,DFS)))
 # The list of correctors to use 
 C = [
 'ZV1R', 'ZH1R', 'ZV2R', 'ZH2R',
-# 'ZV3R', 'ZH3R', 'ZV4R', 'ZH4R',
-# 'ZV5R', 'ZH5R', 'ZV6R', 'ZH6R',
+ 'ZV3R', 'ZH3R', 'ZV4R', 'ZH4R',
+ 'ZV5R', 'ZH5R', 'ZV6R', 'ZH6R',
 # 'ZV7R', 'ZH7R', 'ZV8R', 'ZH8R',
 # 'ZV9R', 'ZH9R', 'ZH10R', 'ZV10R',
 # 'ZH11R', 'ZV11R', 'ZH12R', 'ZV12R',  
@@ -110,8 +110,8 @@ def plot_orbit(orbit, figure):
 plt.ion()
 
 # Kick to achieve 1mm max excursion
-kicks = 0.1 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
-max_oscillation = 1 # mm
+kicks = 0.2 * np.ones(len(C), dtype=float) # kicks to excite 1mm oscillation
+max_oscillation = 0.1 # mm
 
 if DFS:
     I.change_energy()

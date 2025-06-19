@@ -1,7 +1,3 @@
-# from InterfaceATF2_DR import InterfaceATF2_DR
-# from InterfaceATF2_Ext import InterfaceATF2_Ext
-# from InterfaceATF2_Linac import InterfaceATF2_Linac
-from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 from State import State
 from datetime import datetime
 from functools import partial
@@ -402,20 +398,26 @@ class MainWindow(QMainWindow):
         if self.worker_thread and self.worker_thread.isRunning():
             self.__set_status_in_title("[Stopping...]")
             self.running.clear()
-            
-## Connect to interface ATF2
-# I = InterfaceATF2_DR(nsamples=3)
-# I = InterfaceATF2_Ext(nsamples=3)
-# I = InterfaceATF2_Linac(nsamples=3)
-I = InterfaceATF2_Ext_RFTrack(jitter=0.05, bpm_resolution=0.02, nsamples=1)
 
-## Prepare interface
+## MAIN
+app = QApplication(sys.argv)
+
+## Select interface
+from SelectInterface import InterfaceSelectionDialog
+dialog = InterfaceSelectionDialog()
+if dialog.exec():
+    print(f"Selected interface: {dialog.selected_interface}")
+    I = dialog.selected_interface
+else:
+    print("Selection cancelled.")
+    sys.exit(1)
+
+## Prepare project space
 project_name = 'new_SYSID'
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 dir_name = f"Data/{project_name}_{time_str}"
 
-## MAIN
-app = QApplication(sys.argv)
+## Main Window
 window = MainWindow(I, dir_name)
 window.show()
 sys.exit(app.exec())
