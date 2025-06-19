@@ -130,8 +130,12 @@ class MainWindow(QMainWindow):
             vcorrs = I.get_vcorrectors_names()
             hcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in hcorrs])
             vcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in vcorrs])
-            max_curr_h = 1.15 * np.max(np.abs(np.array(correctors['bdes'])[hcorr_indexes]))
-            max_curr_v = 1.15 * np.max(np.abs(np.array(correctors['bdes'])[vcorr_indexes]))
+            def clean_array(a):
+                a = np.array([0 if x is None else x for x in a], dtype=float)
+                a[np.isnan(a)] = 0
+                return a
+            max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
+            max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
 
         self.running = threading.Event()
         self.worker_thread = None
@@ -282,7 +286,7 @@ class MainWindow(QMainWindow):
         excursion_layout.addWidget(self.horizontal_excursion_label)
 
         self.horizontal_excursion_spinbox = QDoubleSpinBox()
-        self.horizontal_excursion_spinbox.setValue(1.0)
+        self.horizontal_excursion_spinbox.setValue(0.5)
         self.horizontal_excursion_spinbox.setSingleStep(0.1)
         self.horizontal_excursion_spinbox.setSuffix(" mm")
         excursion_layout.addWidget(self.horizontal_excursion_spinbox)
@@ -291,7 +295,7 @@ class MainWindow(QMainWindow):
         excursion_layout.addWidget(self.vertical_excursion_label)
 
         self.vertical_excursion_spinbox = QDoubleSpinBox()
-        self.vertical_excursion_spinbox.setValue(1.0)
+        self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
         self.vertical_excursion_spinbox.setSuffix(" mm")
         excursion_layout.addWidget(self.vertical_excursion_spinbox)
