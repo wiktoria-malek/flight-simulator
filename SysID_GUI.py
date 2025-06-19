@@ -315,12 +315,12 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(buttons_layout)
 
         self.start_button = QPushButton("START")
-        self.start_button.setStyleSheet("background-color: green; color: white;")
+        self.start_button.setStyleSheet("background-color: red; color: white;")
         self.start_button.clicked.connect(self.__start_button_clicked)
         buttons_layout.addWidget(self.start_button)
 
         self.stop_button = QPushButton("STOP")
-        self.stop_button.setStyleSheet("background-color: red; color: white;")
+        self.stop_button.setStyleSheet("background-color: green; color: white;")
         self.stop_button.clicked.connect(self.__stop_button_clicked)
         buttons_layout.addWidget(self.stop_button)
 
