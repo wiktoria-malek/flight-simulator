@@ -160,7 +160,7 @@ class MainWindow(QMainWindow):
         self.worker_thread = None
 
         self.__set_status_in_title("[Idle]")
-        self.setGeometry(100, 100, 600, 700)
+        self.setGeometry(100, 100, 800, 800)
 
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
