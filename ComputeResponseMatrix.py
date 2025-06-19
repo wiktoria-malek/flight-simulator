@@ -1,6 +1,3 @@
-import sys
-sys.path.append('/userhome/alatina/flight-simulator')
-
 from State import State
 from Response import Response
 import matplotlib.pyplot as plt

@@ -14,7 +14,9 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox, QDoubleSpinBox,
     QComboBox, QCheckBox, QAbstractItemView, QFileDialog, QSizePolicy
 )
+from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal
+from PyQt6.QtGui import QPainter, QPixmap, QBrush, QPainterPath, QImage, QPalette
 
 import matplotlib
 matplotlib.use('QtAgg')
@@ -86,6 +88,7 @@ class Worker(QObject):
                     curr_m = clamp(curr_m, self.max_curr_h)
                 else:
                     curr_m = clamp(curr_m, self.max_curr_v)
+                I.push(corrector, curr_m)
                 S.pull(I)
                 S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
                 Om = S.get_orbit(self.bpms)
@@ -100,10 +103,12 @@ class Worker(QObject):
 
                 if corrector in S.get_hcorrectors_names():
                     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
-                    kicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
+                    if np.max(np.abs(Diff_x_clean)) != 0.0:
+                        kicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
                 else:
                     Diff_y_clean = Diff_y[~np.isnan(Diff_y)]
-                    kicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
+                    if np.max(np.abs(Diff_y_clean)) != 0.0:
+                        kicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
 
                 kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
                 np.savetxt('kicks.txt', kicks, delimiter='\n')
@@ -115,6 +120,20 @@ class Worker(QObject):
 class MainWindow(QMainWindow):
     def __set_status_in_title(self, status):
         self.setWindowTitle("SYSID - " + self.interface.__class__.__name__ + " " + status)
+        self.setWindowIcon(QIcon('../CERN_logo.png'))
+        
+        self.logo = QPixmap('../CERN_logo.png')
+        self.logo = self.logo.scaled(75, 75, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.show()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setOpacity(0.5)
+
+        x = self.width() - self.logo.width() - 2
+        y = 2
+        
+        painter.drawPixmap(x, y, self.logo)
 
     def __init__(self, interface, dir_name):
         super().__init__()
