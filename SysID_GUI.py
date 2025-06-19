@@ -260,7 +260,7 @@ class MainWindow(QMainWindow):
         cycle_mode_layout = QHBoxLayout()
         options_layout.addLayout(cycle_mode_layout)
 
-        self.cycle_mode_label = QLabel("Cycle mode:")
+        self.cycle_mode_label = QLabel("Cycle mode")
         cycle_mode_layout.addWidget(self.cycle_mode_label)
 
         self.cycle_mode_combobox = QComboBox()
@@ -271,7 +271,7 @@ class MainWindow(QMainWindow):
         current_layout = QHBoxLayout()
         options_layout.addLayout(current_layout)
 
-        self.current_label = QLabel("Max current:")
+        self.current_label = QLabel("Max strength (gauss*m)")
         current_layout.addWidget(self.current_label)
         current_layout.addStretch()  # This stretch  expands to fill space
 
@@ -281,23 +281,21 @@ class MainWindow(QMainWindow):
         self.max_horizontal_current_spinbox = QDoubleSpinBox()
         self.max_horizontal_current_spinbox.setValue(max_curr_h)
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
-        self.max_horizontal_current_spinbox.setSuffix(" A")
         current_layout.addWidget(self.max_horizontal_current_spinbox)
 
-        self.vertical_current_label = QLabel("V:")
+        self.vertical_current_label = QLabel(" V:")
         current_layout.addWidget(self.vertical_current_label)
 
         self.max_vertical_current_spinbox = QDoubleSpinBox()
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
-        self.max_vertical_current_spinbox.setSuffix(" A")
         current_layout.addWidget(self.max_vertical_current_spinbox)
 
         # Orbit Excursion
         excursion_layout = QHBoxLayout()
         options_layout.addLayout(excursion_layout)
 
-        self.excursion_label = QLabel("Orbit excursion:")
+        self.excursion_label = QLabel("Orbit excursion (mm)")
         excursion_layout.addWidget(self.excursion_label)
         excursion_layout.addStretch()  # This stretch  expands to fill space
 
@@ -307,7 +305,6 @@ class MainWindow(QMainWindow):
         self.horizontal_excursion_spinbox = QDoubleSpinBox()
         self.horizontal_excursion_spinbox.setValue(0.5)
         self.horizontal_excursion_spinbox.setSingleStep(0.1)
-        self.horizontal_excursion_spinbox.setSuffix(" mm")
         excursion_layout.addWidget(self.horizontal_excursion_spinbox)
 
         self.vertical_excursion_label = QLabel("V:")
@@ -316,7 +313,6 @@ class MainWindow(QMainWindow):
         self.vertical_excursion_spinbox = QDoubleSpinBox()
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
-        self.vertical_excursion_spinbox.setSuffix(" mm")
         excursion_layout.addWidget(self.vertical_excursion_spinbox)
 
         # Plot

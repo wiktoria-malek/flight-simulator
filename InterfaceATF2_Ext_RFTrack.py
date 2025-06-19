@@ -9,6 +9,7 @@ class InterfaceATF2_Ext_RFTrack:
         self.sequence = [ e.get_name() for e in self.lattice['*'] ]
         self.bpms = [ e.get_name() for e in self.lattice.get_bpms() ]
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors() ]
+        self.Pref = 1.2999999e3 # 1.3 GeV/c
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples
@@ -16,7 +17,6 @@ class InterfaceATF2_Ext_RFTrack:
         self.__track_bunch()
 
     def __setup_beam0(self):
-        Pref = 1.2999999e3 # 1.3 GeV/c
         T = rft.Bunch6d_twiss()
         T.emitt_x = 5.2 # mm.mrad normalised emittance
         T.emitt_y = 0.03 # mm.mrad
@@ -27,10 +27,11 @@ class InterfaceATF2_Ext_RFTrack:
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 10000 # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, Nparticles)
         
     def __setup_beam1(self):
-        Pref = 0.98 * 1.2999999e3 # 98% of 1.3 GeV/c
+        # Beam for DFS - Reduced energy
+        Pref = 0.98 * self.Pref # 98% of nominal energy
         T = rft.Bunch6d_twiss()
         T.emitt_x = 2e-3 # mm.mrad normalised emittance
         T.emitt_y = 1.179228346e-5 # mm.mrad
@@ -44,8 +45,8 @@ class InterfaceATF2_Ext_RFTrack:
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
 
     def __setup_beam2(self):
-        population = 0.90 * self.population
-        Pref = 1.2999999e3 # 1.3 GeV/c
+        # Beam for WFS - Reduced bunch charge
+        population = 0.90 * self.population # 90% of nominal charge
         T = rft.Bunch6d_twiss()
         T.emitt_x = 2e-3 # mm.mrad normalised emittance
         T.emitt_y = 1.179228346e-5 # mm.mrad
@@ -56,7 +57,7 @@ class InterfaceATF2_Ext_RFTrack:
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 10000 # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, Pref, T, Nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, Nparticles)
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
@@ -112,9 +113,9 @@ class InterfaceATF2_Ext_RFTrack:
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
             if corrector[:2] == "ZH":
-                bdes[i] = (self.lattice[corrector].get_strength()[0])
+                bdes[i] = (self.lattice[corrector].get_strength()[0]*10)  # gauss*m
             elif corrector[:2] == "ZV":
-                bdes[i] = (self.lattice[corrector].get_strength()[1])
+                bdes[i] = (self.lattice[corrector].get_strength()[1]*10)  # gauss*m
         correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
         return correctors
     
@@ -140,9 +141,9 @@ class InterfaceATF2_Ext_RFTrack:
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH":
-                self.lattice[corr].set_strength(val, 0.0)
+                self.lattice[corr].set_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
-                self.lattice[corr].set_strength(0.0, val)
+                self.lattice[corr].set_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
     
     def vary_correctors(self, names, corr_vals):
@@ -150,7 +151,7 @@ class InterfaceATF2_Ext_RFTrack:
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH":
-                self.lattice[corr].vary_strength(val, 0.0)
+                self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
-                self.lattice[corr].vary_strength(0.0, val)
+                self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
         self.__track_bunch()

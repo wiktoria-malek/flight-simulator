@@ -67,14 +67,10 @@ class InterfaceATF2_DR:
         self.phase_kl1 = pv.get()
 
     def change_energy(self,rel_phase=5):
-        pv = PV('CM1L:phaseWrite')
-        pv.put(self.phase_kl1+rel_phase)
-        time.sleep(1)
+        pass
         
     def reset_energy(self):
-        pv = PV('CM1L:phaseWrite')
-        pv.put(self.phase_kl1)
-        time.sleep(1)
+        pass
         
     def change_intensity(self, *args):
         pass
