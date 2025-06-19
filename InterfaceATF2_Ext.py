@@ -92,7 +92,7 @@ class InterfaceATF2_Ext:
         for ict in self.ict_names:
             pv = PV(f'{ict}')
             charge.append(pv.get())
-        names = np.array(self.ict_names)
+        names = array(self.ict_names)
         charge = np.array(charge)
         icts = { "names": names, "charge": charge }
         return icts
@@ -105,7 +105,7 @@ class InterfaceATF2_Ext:
             pv_act = PV(f'{corrector}:currentRead')
             bdes.append(pv_des.get())
             bact.append(pv_act.get())
-        names = np.array(self.corrs)
+        names = array(self.corrs)
         bdes = np.array(bdes)
         bact = np.array(bact)
         correctors = { "names": names, "bdes": bdes, "bact": bact }
@@ -124,7 +124,7 @@ class InterfaceATF2_Ext:
             y.append(a[self.bpm_indexes, 2])
             tmit.append(status * a[self.bpm_indexes, 3])
             time.sleep(1)
-        names = np.array(self.bpms)
+        names = array(self.bpms)
         x = np.vstack(x) / 1e3 # mm
         y = np.vstack(y) / 1e3 # mm
         tmit = np.vstack(tmit)
@@ -135,7 +135,7 @@ class InterfaceATF2_Ext:
         if type(corr_vals) == float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:
-            names = np.array([names])
+            names = array([names])
         if names.size != corr_vals.size:
             print('Error: len(names) != len(corr_vals) in push(names, corr_vals)') 
         for corrector, corr_val in zip(names, corr_vals):
@@ -147,7 +147,7 @@ class InterfaceATF2_Ext:
         if type(corr_vals) is float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:
-            names = np.array([names])
+            names = array([names])
         if names.size != corr_vals.size:
             print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)') 
         for corrector, corr_val in zip(names, corr_vals):
