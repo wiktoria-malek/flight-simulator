@@ -137,8 +137,6 @@ class InterfaceATF2_Ext_RFTrack:
         bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
         return bpms
 
-
-    # TO DO
     def push(self, names, corr_vals):
         if not isinstance(names, list):
             names = [ names ] # makes it a list
