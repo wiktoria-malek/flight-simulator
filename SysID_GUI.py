@@ -6,6 +6,7 @@ from collections import deque
 import numpy as np
 import threading
 import signal
+import time
 import sys
 import os
 
@@ -15,7 +16,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QCheckBox, QAbstractItemView, QFileDialog, QSizePolicy
 )
 from PyQt6.QtGui import QPixmap, QIcon
-from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QPainter, QPixmap, QBrush, QPainterPath, QImage, QPalette
 
 import matplotlib
@@ -37,7 +38,7 @@ class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
     finished = pyqtSignal()
 
-    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, running_flag):
+    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter):
         super().__init__()
         self.interface = interface
         self.S = state
@@ -49,9 +50,12 @@ class Worker(QObject):
         self.max_curr_h = max_curr_h
         self.max_curr_v = max_curr_v
         self.Niter = Niter
-        self.running = running_flag
+        self.running = False
 
+    @pyqtSlot()
     def run(self):
+        self.running = True
+
         I = self.interface
         S = self.S
         kicks = self.kicks
@@ -62,10 +66,10 @@ class Worker(QObject):
             return max(-max_val, min(val, max_val))
 
         for iter in range(self.Niter):
-            if not self.running.is_set():
+            if self.running == False:
                 break
             for icorr, corrector in enumerate(self.correctors):
-                if not self.running.is_set():
+                if self.running == False:
                     break
 
                 corr = S.get_correctors(corrector)
@@ -114,8 +118,12 @@ class Worker(QObject):
                 np.savetxt('kicks.txt', kicks, delimiter='\n')
 
                 self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
+                time.sleep(1)
 
         self.finished.emit()
+
+    def stop(self):
+        self.running = False
 
 class MainWindow(QMainWindow):
     def __set_status_in_title(self, status):
@@ -138,6 +146,9 @@ class MainWindow(QMainWindow):
     def __init__(self, interface, dir_name):
         super().__init__()
 
+        self.worker = None
+        self.thread = None
+
         self.cwd = os.getcwd()
         self.interface = interface
         bpms_list = interface.get_bpms()['names']
@@ -155,9 +166,6 @@ class MainWindow(QMainWindow):
                 return a
             max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
             max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
-
-        self.running = threading.Event()
-        self.worker_thread = None
 
         self.__set_status_in_title("[Idle]")
         self.setGeometry(100, 100, 800, 800)
@@ -319,12 +327,6 @@ class MainWindow(QMainWindow):
         self.plot = MatplotlibWidget(self)
         options_layout.addWidget(self.plot)
 
-        # Plot queue and timer for smoother updates
-        self._plot_queue = deque()
-        self._plot_timer = QTimer()
-        self._plot_timer.timeout.connect(self.__flush_plot_queue)
-        self._plot_timer.start(200)  # Adjust this interval as needed
-
         # Start and Stop buttons
         buttons_layout = QHBoxLayout()
         main_layout.addLayout(buttons_layout)
@@ -400,11 +402,10 @@ class MainWindow(QMainWindow):
         self.bpms_list.clearSelection()
 
     def __start_button_clicked(self):
-        if self.worker_thread and self.worker_thread.isRunning():
+        if self.thread and self.thread.isRunning():
             return  # already running
 
         self.__set_status_in_title("[Running...]")
-        self.running.set()
 
         dir_name = self.cwd + '/' + self.working_directory_input.text()
         os.makedirs(dir_name, exist_ok=True)
@@ -432,27 +433,32 @@ class MainWindow(QMainWindow):
         max_curr_v = self.max_vertical_current_spinbox.value()
         Niter = 3
 
-        self.worker_thread = QThread()
-        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, self.running)
-        self.worker.moveToThread(self.worker_thread)
+        self.thread = QThread()
+        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
+        self.worker.moveToThread(self.thread)
 
-        self.worker_thread.started.connect(self.worker.run)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        # Cleanup after thread is done
+        def clear_thread():
+            self.thread = None
+            self.worker = None
+
+        self.thread.finished.connect(clear_thread)
         self.worker.plot_data.connect(self.__update_plot)
-        self.worker.finished.connect(self.worker_thread.quit)
-        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-        self.worker.finished.connect(lambda: self.__set_status_in_title("[Idle]"))
-        self.worker_thread.finished.connect(lambda: setattr(self, 'worker_thread', None))
 
-        self.worker_thread.start()
+        self.thread.start()
+
+    def __stop_button_clicked(self):
+        if self.worker:
+            self.__set_status_in_title("[Stopping...]")
+            self.worker.stop()
+        self.__set_status_in_title("[Idle]")
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
-        self._plot_queue.append((Op, Diff_x, Err_x, Diff_y, Err_y, corrector))
-
-    def __flush_plot_queue(self):
-        if not self._plot_queue:
-            return
-        Op, Diff_x, Err_x, Diff_y, Err_y, corrector = self._plot_queue.popleft()
-
         self.plot.axes.clear()
         self.plot.axes.errorbar(range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
         self.plot.axes.errorbar(range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
@@ -460,15 +466,9 @@ class MainWindow(QMainWindow):
         self.plot.axes.set_xlabel('Bpm [#]')
         self.plot.axes.set_ylabel('Orbit [mm]')
         self.plot.axes.set_title(f"Corrector '{corrector}'")
+        self.plot.axes.grid()
         self.plot.draw()
-        self.plot.flush_events()
-        self.plot.update()
         self.plot.repaint()
-
-    def __stop_button_clicked(self):
-        if self.worker_thread and self.worker_thread.isRunning():
-            self.__set_status_in_title("[Stopping...]")
-            self.running.clear()
 
 ## MAIN
 app = QApplication(sys.argv)
