@@ -28,7 +28,7 @@
         <property name="currentIndex">
          <number>0</number>
         </property>
-        <widget class="QWidget" name="tab">
+        <widget class="QWidget" name="tab_corrbpms">
          <attribute name="title">
           <string>Correctors &amp;&amp; BPMs</string>
          </attribute>
@@ -125,7 +125,7 @@
           </item>
          </layout>
         </widget>
-        <widget class="QWidget" name="tab_3">
+        <widget class="QWidget" name="tab_response">
          <attribute name="title">
           <string>Response Matrices</string>
          </attribute>
@@ -347,7 +347,7 @@
           </item>
          </layout>
         </widget>
-        <widget class="QWidget" name="tab_4">
+        <widget class="QWidget" name="tab_correction">
          <attribute name="title">
           <string>Correction</string>
          </attribute>
