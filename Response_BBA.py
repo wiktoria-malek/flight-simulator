@@ -59,9 +59,3 @@ def load_wfs_npz(path, gui_bpms, gui_corrs):
     Rw = Rh - Rl
     return reorder_matrix_to_gui(Rw, bpms, corrs, gui_bpms, gui_corrs)
 
-def svd_info(M):
-    s = np.linalg.svd(M, compute_uv=False)
-    mn, mx = float(s.min()), float(s.max())
-    cond = (mx / mn) if mn > 0 else float("inf")
-    rank = int(np.linalg.matrix_rank(M))
-    return {"min_sigma": mn, "max_sigma": mx, "cond": cond, "rank": rank}

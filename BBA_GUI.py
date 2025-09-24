@@ -15,7 +15,7 @@ except Exception:
     FigureCanvas = Figure = None
 
 from DFS_WFS_Correction_BBA import CorrectionEngine
-from Response_BBA import load_dfs_npz, load_wfs_npz, svd_info
+from Response_BBA import load_dfs_npz, load_wfs_npz
 
 
 class ChiSquaredWindow(QDialog):
@@ -280,11 +280,7 @@ class MainWindow(QMainWindow):
         try:
             default_dir = os.path.join(self.cwd, "Data")
             os.makedirs(default_dir, exist_ok=True)
-            fn, _ = QFileDialog.getSaveFileName(
-                self, "Save DFS response (R & R')",
-                os.path.join(default_dir, "dfs_response.npz"),
-                "NumPy archive (*.npz)",
-            )
+            fn, _ = QFileDialog.getSaveFileName(self, "Save DFS response (R & R')",os.path.join(default_dir, "dfs_response.npz"),"NumPy archive (*.npz)")
             if not fn:
                 return
 
@@ -321,11 +317,7 @@ class MainWindow(QMainWindow):
         try:
             default_dir = os.path.join(self.cwd, "Data")
             os.makedirs(default_dir, exist_ok=True)
-            fn, _ = QFileDialog.getSaveFileName(
-                self, "Save WFS response (R_low & R_high)",
-                os.path.join(default_dir, "wfs_response.npz"),
-                "NumPy archive (*.npz)",
-            )
+            fn, _ = QFileDialog.getSaveFileName(self, "Save WFS response (R_low & R_high)",os.path.join(default_dir, "wfs_response.npz"),"NumPy archive (*.npz)" )
             if not fn:
                 return
 
@@ -334,15 +326,13 @@ class MainWindow(QMainWindow):
             self.engine.set_highintensity_flag(False)
             self.interface.reset_intensity()
             prog, cb = self._with_progress(len(corrs), "Measuring response (low intensity)…")
-            R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,
-                                                        triangular=self._force_triangular(), progress_cb=cb)
+            R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
             prog.close()
 
             self.engine.set_highintensity_flag(True)
             self.interface.change_intensity()
             prog, cb = self._with_progress(len(corrs), "Measuring response (high intensity)…")
-            R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,
-                                                         triangular=self._force_triangular(), progress_cb=cb)
+            R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
             prog.close()
             self.interface.reset_intensity()
             self.engine.set_highintensity_flag(False)
@@ -457,8 +447,8 @@ class MainWindow(QMainWindow):
         orbit_w = getf("lineEdit", 1.0)
         disp_w  = getf("lineEdit_2", 10.0)
         wake_w  = getf("lineEdit_3", 10.0)
-        rcond   = getf("lineEdit_4", 0.01)
-        iters   = geti("lineEdit_5", 1)
+        rcond   = getf("lineEdit_4", 0.001)
+        iters   = geti("lineEdit_5", 10)
         return orbit_w, disp_w, wake_w, rcond, iters
 
     def _start_correction(self):
