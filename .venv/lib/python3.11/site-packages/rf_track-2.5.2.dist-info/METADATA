@@ -1,0 +1,221 @@
+Metadata-Version: 2.4
+Name: RF-Track
+Version: 2.5.2
+Summary: The CERN tracking code RF-Track
+Home-page: https://gitlab.cern.ch/rf-track
+Author: Andrea Latina
+Author-email: Andrea Latina <andrea.latina@cern.ch>
+License: Proprietary
+Project-URL: Homepage, https://gitlab.cern.ch/rf-track
+Project-URL: Documentation, https://gitlab.cern.ch/rf-track/rf-track-reference-manual/-/raw/master/RF_Track_reference_manual.pdf?ref_type=heads
+Project-URL: Tracker, https://gitlab.cern.ch/groups/rf-track/-/issues
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Programming Language :: C++
+Classifier: License :: Other/Proprietary License
+Classifier: Intended Audience :: Science/Research
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: MacOS :: MacOS X
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE.md
+Requires-Dist: numpy
+Requires-Dist: nlohmann-json
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+
+RF-Track is a tracking code developed at CERN for the design and optimisation of particle accelerators, offering outstanding flexibility and rapid simulation speed.
+
+RF-Track can simulate beams of particles of any energy, mass and charge, even mixed, solving fully relativistic equations of motion.  It can simulate the effects of space-charge forces in both bunched and continuous-wave beams, synchrotron radiation emission, wakefield and beam-loading effects, multiple Coulomb scattering, inverse Compton scattering, and the list is still growing. It can transport beams through both conventional and special elements: 1D, 2D and 3D static or oscillating radio-frequency electromagnetic field maps (standing wave and traveling wave), flux concentrators and electron coolers. It allows element overlap and direct and indirect space charge calculations using fast parallel algorithms.
+
+RF-Track is written in optimised and parallel C++ and comes with two distinct and independent user interfaces: one in Octave and one in Python. General knowledge of Octave or Python is recommended to get the most out of RF-Track.
+
+
+## Changelog
+
+### What is new in version 2.5.2
+* Bug fixes and improvements
+
+### What was new in version 2.5.1
+* Fixed a bug introduced in version 2.5.0
+* Added automatic check for available updates
+
+### What was new in version 2.5.0
+* `UserElement` – Custom accelerator elements and transfer maps in Python or Octave.
+* `UserField` – User‑defined electromagnetic field equations in Python or Octave.
+* `UserEffect` – Prototype collective effects in Python or Octave.
+* `UserVisitor` – Traverse lattices/volumes with custom Python functions.
+* **Secondary particle generation** – Collective effects can now emit and track new particles (e.g., synchrotron‑radiation photons, BDSIM secondaries).
+* **Cathode emission** – Improved accuracy in Volume‑based emission simulations.
+*  Minor improvements and bug fixes.
+
+### What was new in version 2.4.2
+* Added BPM element to `Volume`
+* Improved `Volume`–`Lattice` integration for Beam-Based Alignment in `Volume`
+* Enabled partial polarization of individual macroparticles
+* Bug fixes:
+  * Fixed issue in PillBox cavity
+  * Resolved problem with beam losses when all particles are lost
+  * Corrected RF phase of structures imported from MAD-X
+
+### What was new in version 2.4.1
+* Added spin polarization support to both `Lattice` and `Volume` tracking
+
+### What was new in version 2.4.0
+* Improved speed and memory management in `TW_Field`
+* Introduced new collective effect: `IntraBeamScattering` (developed by Paula Desiré Valdor)
+* Updated `Lattice` transverse emittance definitions to use *(x, x')* and *(y, y')* instead of *(x, px)* and *(y, py)*
+* Enabled arbitrary misalignment of cathodes in `Volume`, including mirror charge effects
+
+### What was new in version 2.3.4
+* Fixed a memory problem in Python's numpy interface
+
+### What was new in version 2.3.3
+* Added `TW_Field` element to create RF structures from shunt impedance, group velocity,
+  and quality factor
+* The new `TW_Field` element can account for steady input power,  or
+  time-dependent RF pulses
+* Long-range wakefields can now have arbitrary linear polarization
+* Improved speed of `SW_Structure` and `TW_Structure` elements
+* `Beam` and `BeamT` can now be saved and loaded in binary format
+* Elements can now be removed from and inserted into an existing  `Lattice`
+* `Lattice` and `Volume` transport tables now return transmission in number of particles
+  (no longer in number of macroparticles)
+* Improved error message handling to avoid redundant repetitions
+* Various minor bug fixes
+
+### What was new in version 2.3.2
+* Fixed a potential beam-laser synchronisation issue in the LaserBeam element
+* Added multi-pulse laser trains in LaserBeam
+* Fixed minor bug in Python interface
+
+### What was new in version 2.3.1
+* ShortRangeWakefield allows the simulation of tapered irises and cell-to-cell misalignment
+* Sped up Solenoid field calculation
+* Now Screens can have a width, a height, and a time window
+* Now SpaceCharge_Field() uses a fast Cartesian Multipole Expansion
+* Added Undulator element to simulate planar undulators
+* Minor bug fixes and improvements
+
+### What was new in version 2.3.0
+* Introduced new Beam and BeamT models for multi-bunch simulations
+* Optimized multi-bunch effects for multi-bunch beam simulations
+* Modified the transport table to support multi-bunch beams
+* Added the RF_TRACK_NOSPLASH environment variable
+* Implemented element misalignment handling in Volume
+* Added scaling error support to the Bpm element
+* Enhanced Lattice::autophase() to automatically set the magnetic strength of magnets
+* Improved detection of the solenoid fringe field extension in Volume
+* Enhanced the 3d solenoid field modelling using multiple thin sheets of current
+* Introduced a new on-the-fly BeamLoading implementation compatible with Beam (thanks to Javier Olivares Herrador)
+* Enhanced long-range wakefields to accept tapered modes along the structure
+* Added generalized Gaussian distribution to Generator
+* Added the displaced() method to Bunch6d and Bunch6dT
+* Added Screen element support to Lattice and Volume
+* Implemented the fast multipole method to significantly speed up the SpaceCharge_Field() element
+* Minor bug fixes and improvements
+	
+### What was new in version 2.2.4
+* Ensured compatibility with numpy v2.0.0
+
+### What was new in version 2.2.3
+* Minor bugfixes and improvements
+* Improved python packaging
+
+### What was new in version 2.2.2
+* Lost particles are now stored in the Lattice or Volume in the laboratory reference frame
+* Bug fixes and improvements in the Python interface
+* Bug fix when appending a Volume into a Lattice
+* Renamed some Lattice's methods ( vary_corrector_strengths -> vary_correctors_strengths )
+* Added methods to facilitate beam-based alignment in Lattice
+* Fixed problem with backtracking on screens in Volume
+* Improved backtracking on screens in Volume
+
+### What was new in version 2.2.1
+* Added particle ID
+* Added name to elements
+* Improved element accessibility in Lattice and Volume
+* Exposed mean_Px and mean_Py in Bunch6d_info and Lattice transport table
+* Volume::set_length() allows setting an arbitrary length
+* Added element Pillbox_Cavity as generic TM_m1p cavity
+* Bug fixes and improvements in Lattice and Volume
+
+### What was new in version 2.2.0
+* Volume is fully integrated as an Element within Lattice
+* Volume::s0 and Volume::s1 are now 3d reference frames that can connect Lattice beamlines with arbitrary orientations
+* Renamed ParticleT.S as ParticleT.Z to avoid confusion
+* Removed automatic projections from Bunch6dT to Bunch6d in get_phase_space()
+* Lattice can now import MAD-X Twiss files directly
+* Self-consistent BeamLoading effects in TW structures (many thanks to Javier Olivares Herrador)
+* Added Energy Straggling effect in Absorber element (many thanks to Bernd Michael Stechauner)
+* Volume::set_tt_nsteps(N) works in Lattice(), distributing N screens in Volume along the reference trajectory
+* Added Bunch6d_QR, Quasi-Random bunch creation from Twiss parameters
+* New hard-scattering model (many thanks to Bernd Michael Stechauner)
+* Improved 'analytic' integration in Lattice
+* Added Yoshida integrator 4th order (beware, rk2 is better)
+* Improved beam <-> screens intersection in Volume tracking
+
+### What was new in version 2.1.6
+* Implemented 'circular' and 'rectangular' shapes in the element Absorber
+* Improved the way longitudinal emittance is handled in both Bunch6d and Bunch6dT
+* Now Volume can track directly Bunch6d
+* Now, Transport Table in Volume can also include future particles by default
+* Implemented Response matrix calculation and Automatic Orbit correction
+* Improved transport table in Volume to optionally ignore particles outside volume
+* Updated autophase to ignore elements whose t0 is already set
+* Added Multiple Coulomb Scattering and energy loss
+* Introduced ASTRA-like Generator (many thanks to Avni Aksoy)
+* Introduced quasi-random sequences generator
+* Added to transport table rmax99 and rmax90, the envelope at 90% and 99% of rmax
+* Fixed a bug in thin-lens Sbend
+* Added disp_z to BunchInfo
+
+### What was new in version 2.1.5
+* Added element Solenoid to both Volume and Lattice
+* Added particle lifetime for muons simulation
+* Added Incoherent synchrotron radiation in two versions: quantum and average
+* Added new element SpaceCharge_Field()
+* Fixed SWIG problems with typemaps
+* Bug fix in Multipole element (many thanks to Ewa Oponowicz)
+
+### What was new in version 2.1.4
+* Added dispersion information to bunch get_info() and transport_table
+* Now Element::get_field() accepts vectors for X, Y, Z, and T
+* Added velocity slicing in Space-charge PIC calculation
+* Added Toroidal Harmonics element
+
+### What was new in version 2.1.3
+* Added polarisation to Thomson scattering
+* Implemented end fields in GenericFieldMap
+* Implemented asymmetric laser beam in Compton Scattering module
+* Added new element Multipole and new CollectiveEffect MultipoleKick
+
+### What was new in version 2.1.2
+* Added autophasing of RF elements
+* Added back-tracking
+* Added Long-range wakefields
+
+### What was new in version 2.1
+* Added the possibility to have collective effects in both Lattice() and Volume()
+* Added short-range wakefield effects
+* Added new element RF_FieldMap_2d() optimized for cylindrically symmetric fields
+* Added new element LaserBeam() for the simulation of Compton backscattering
+
+### What was new in version 2.0.4
+* Changed the way TrackingOptions.t_max_mm works, now indefinite tracking is achieved with t_max_mm = Inf, and no longer t_max_mm = 0
+* Added element Static_Magnetic_FieldMap_2d for cylindrically symmetric fields
+* Improved default field's Jacobian for Elements
+* Added support for SDDS files (writing)
+* Added element SBend for dS tracking
+* Added external elements
+* Added Python interface
+* Reimplemented misalignments in Bunch6d tracking, full 3d rotations
+* Added element Volume
+* Added element Coil
+
+### What was new in version 2.0
+* Reorganization of classes and files
+* New FieldMap elements with extension _LINT and _CINT for linear and cubic interpolation
+* Added element RF_Field_1d with a reconstruction of the 3d E and B fields from the on-axis electric field
+* Added magnetic element Adiabatic Matching Device
+* Bunch6d::get_phase_space and Bunch6dT::get_phase_space now use the first particle as the reference particle

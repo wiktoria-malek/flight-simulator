@@ -17,7 +17,7 @@ import os
 R0 = Response('response0.pkl')
 R1 = Response('response1.pkl')
 
-# The list of correctors to use 
+# The list of correctors to use
 hcorrs = R0.hcorrs[1:10]
 vcorrs = R0.vcorrs[1:10]
 
@@ -112,14 +112,14 @@ for iteration in range(15):
     ax1.set_xlabel ('Iteration [#]')
     ax1.set_ylabel ('Orbit [mm]')
     ax1.legend (loc='upper left')
-    
+
     ax2.plot(range(iteration+1), norm_Disp_x, label='X axis')
     ax2.plot(range(iteration+1), norm_Disp_y, label='Y axis')
     ax2.set_title('Dispersion')
     ax2.set_xlabel ('Iteration [#]')
     ax2.set_ylabel ('Dispersion [mm]')
     ax2.legend (loc='upper left')
-    
+
     # Redraw the plot
     plt.tight_layout()
     plt.show()

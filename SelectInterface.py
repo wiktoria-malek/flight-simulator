@@ -57,7 +57,7 @@ class InterfaceSelectionDialog(QDialog):
                     case 'InterfaceATF2_Ext_RFTrack':
                         from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
                         globals()['InterfaceATF2_Ext_RFTrack'] = InterfaceATF2_Ext_RFTrack
-                        self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.05, bpm_resolution=0.02, nsamples=1)
+                        self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.02, nsamples=1)
 
                 self.selected_interface_name = self.selected_interface.get_name()
                 break
