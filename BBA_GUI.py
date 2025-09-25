@@ -416,14 +416,10 @@ class MainWindow(QMainWindow):
                 }
                 if hasattr(self, "trajectory_response_3"):
                     self.trajectory_response_3.setText(npz_file)
-                QMessageBox.information(self, "Response loaded (NPZ)",
-                                        f"Loaded DFS response from '{os.path.basename(folder)}'.")
+                QMessageBox.information(self, "Response loaded (NPZ)",f"Loaded DFS response from '{os.path.basename(folder)}'.")
                 return
 
-            raise FileNotFoundError(
-                "This folder doesn’t contain a trajectory response.\n"
-                "Expected either 'response.pkl' (SysID) or 'dfs_response.npz' (DFS)."
-            )
+            raise FileNotFoundError("This folder doesn’t contain a trajectory response.\n Expected either 'response.pkl' (SysID) or 'dfs_response.npz' (DFS).")
 
         except Exception as e:
             QMessageBox.critical(self, "Load error", str(e))

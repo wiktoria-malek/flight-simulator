@@ -72,13 +72,13 @@ class CorrectionEngine:
             if progress_cb and not progress_cb(j, len(corrs), f"Exciting {c} (+/-{delta:g})"):
                 break
 
-            self.interface.vary_correctors([c], [ delta])
+            self.interface.vary_correctors([c], [delta])
             xp, yp = self._measure_orbit_xy(bpms, apply_synthetic=False) #plus
 
             self.interface.vary_correctors([c], [-2*delta])
             xm, ym = self._measure_orbit_xy(bpms, apply_synthetic=False) #minus
 
-            self.interface.vary_correctors([c], [ delta])
+            self.interface.vary_correctors([c], [delta])
 
             Rx[:, j] = (xp - xm) / (2.0 * delta)
             Ry[:, j] = (yp - ym) / (2.0 * delta)
@@ -153,11 +153,12 @@ class CorrectionEngine:
             A = np.vstack(A_terms)
             B = np.concatenate(B_terms, axis=0)
 
-            dtheta, *_ = np.linalg.lstsq(A, -B, rcond=float(rcond))
+            dtheta, *_ = np.linalg.lstsq(A, -B, rcond=float(rcond)) #least squares method
+                    #residuals,rank,singular values of A
 
-            def orbit_norm():
-                return float(np.linalg.norm(self._y_nom(bpms)))
-            base = orbit_norm()
+            def orbit_norm(): #how big the orbit error is
+                return float(np.linalg.norm(self._y_nom(bpms))) #root sum of squares
+            base = orbit_norm() #orbit error before correction
             alpha = 4.0
             while alpha > 1e-3:
                 self.interface.vary_correctors(corrs, (alpha * dtheta).tolist())
@@ -167,12 +168,13 @@ class CorrectionEngine:
                     break
                 alpha *= 0.5
 
-            self.interface.vary_correctors(corrs, (alpha * dtheta).tolist())
+            self.interface.vary_correctors(corrs, (alpha * dtheta).tolist()) #apply the accepted step
             for i, c in enumerate(corrs):
-                self.accumulated[c] += alpha * dtheta[i]
+                self.accumulated[c] += alpha * dtheta[i] #scaling the correction
 
             y_nom_after = self._y_nom(bpms)
 
+                    #numpy array with floats        #flatten into 1D vector
             y_i=np.asarray(y_nom_after, float).ravel()
             chi_orbit=np.sum(y_i*y_i)
 
@@ -186,6 +188,7 @@ class CorrectionEngine:
                 self.set_offenergy_flag(False)
                 disp_vec_after = y_off_after - y_nom_after
                 disp_rms = float(np.linalg.norm(disp_vec_after) / np.sqrt(len(disp_vec_after)))
+                                                                         #y nom has a length of 2N
 
             wake_rms = None
             if wake_w > 0 and R_wake is not None:
