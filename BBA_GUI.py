@@ -435,16 +435,26 @@ class MainWindow(QMainWindow):
         iters   = geti("lineEdit_5", 10)
         return orbit_w, disp_w, wake_w, rcond, iters
 
-    def _read_change_intensity(self):
-        pass
-
-
+    def _read_reset_intensity(self):
+        #
+        # if hasattr(self, "wfs_reset_3"):
+        #     reset_function = (self.wfs_reset_3.text() or "").strip()
+        #
+        #
+        # def getf(name, default):
+        # w = getattr(self, name, None)
+        #
+        #
+        #
+        # change_intensity_number = getf("wfs_reset_3", 0.98)
+        #
+        # return change_intensity_number
 
     def _read_change_energy(self):
         pass
     def _read_reset_energy(self):
         pass
-    def _read_reset_intensity(self):
+    def _read_change_intensity(self):
         pass
 
 
