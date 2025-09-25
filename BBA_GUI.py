@@ -70,13 +70,6 @@ class ChiSquaredWindow(QDialog):
         D_beg=float(disp_rms)
         W_beg=float(wake_rms)
 
-        # if self._O0 is None:
-        #     self._O0 = O_beg if O_beg != 0 else 1e-12
-        # if self._D0 is None:
-        #     self._D0 = D_beg if D_beg != 0 else 1e-12
-        # if self._W0 is None:
-        #     self._W0 = W_beg if W_beg != 0 else 1e-12
-
         O = (O_beg/self._O0)*(O_beg/self._O0)
         D = (D_beg/self._D0)*(D_beg/self._D0)
         W = (W_beg/self._W0)*(W_beg/self._W0)
@@ -107,11 +100,6 @@ class ChiSquaredWindow(QDialog):
         O=list(map(float, O))
         D=list(map(float, D))
         W=list(map(float, W))
-
-        # if O:
-        #     self._O0=O[0] if O[0] != 0 else 1e-12
-        #     self._D0=D[0] if D[0] != 0 else 1e-12
-        #     self._W0=W[0] if W[0] != 0 else 1e-12
 
         self._O = [(value/self._O0) * (value/self._O0) for value in O]
         self._D = [(value/self._D0) * (value/self._D0) for value in D]

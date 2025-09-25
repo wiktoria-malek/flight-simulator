@@ -75,19 +75,23 @@ class InterfaceATF2_Ext_RFTrack:
     def change_energy(self, *args):
         self.__setup_beam1()
         self.__track_bunch()
+        #TO DO!!
+
 
     def reset_energy(self, *args):
         self.__setup_beam0()
         self.__track_bunch()
-
+        #TO DO!!
     def change_intensity(self, *args):
         self.__setup_beam0()
         self.__track_bunch()
+        #TO DO!!
+
 
     def reset_intensity(self, *args):
         self.__setup_beam2()
         self.__track_bunch()
-
+        #TO DO!!
     def get_sequence(self):
         return self.sequence
 
