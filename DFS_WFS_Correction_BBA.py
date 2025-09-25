@@ -85,7 +85,7 @@ class CorrectionEngine:
 
         self._has_real_scatter = orig
 
-        if triangular:
+        if triangular: #zeroes everything above the diagonal, corr j only affects bpm j
             Rx = np.tril(Rx)
             Ry = np.tril(Ry)
 

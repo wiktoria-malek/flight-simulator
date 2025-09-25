@@ -1,4 +1,3 @@
-import os
 import numpy as np
 
 def reorder_matrix_to_gui(R, file_bpms, file_corrs, gui_bpms, gui_corrs):

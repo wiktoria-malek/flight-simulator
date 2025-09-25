@@ -71,8 +71,11 @@ class ChiSquaredWindow(QDialog):
         W_beg=float(wake_rms)
 
         # if self._O0 is None:
-        #     self._O0=O_beg if O_beg !=0 else 1e-12
-        #     self._D0=D_beg
+        #     self._O0 = O_beg if O_beg != 0 else 1e-12
+        # if self._D0 is None:
+        #     self._D0 = D_beg if D_beg != 0 else 1e-12
+        # if self._W0 is None:
+        #     self._W0 = W_beg if W_beg != 0 else 1e-12
 
         O = (O_beg/self._O0)*(O_beg/self._O0)
         D = (D_beg/self._D0)*(D_beg/self._D0)
@@ -100,15 +103,15 @@ class ChiSquaredWindow(QDialog):
             p._chi_dlg = None
         super().closeEvent(e)
 
-    def seed_with_history(self, O, D, W):
+    def calculating_chi(self, O, D, W):
         O=list(map(float, O))
         D=list(map(float, D))
         W=list(map(float, W))
 
-        if O:
-            self._O0=O[0] if O[0] != 0 else 1e-12
-            self._D0=D[0] if D[0] != 0 else 1e-12
-            self._W0=W[0] if W[0] != 0 else 1e-12
+        # if O:
+        #     self._O0=O[0] if O[0] != 0 else 1e-12
+        #     self._D0=D[0] if D[0] != 0 else 1e-12
+        #     self._W0=W[0] if W[0] != 0 else 1e-12
 
         self._O = [(value/self._O0) * (value/self._O0) for value in O]
         self._D = [(value/self._D0) * (value/self._D0) for value in D]
@@ -199,11 +202,11 @@ class MainWindow(QMainWindow):
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, corrs)
-        self.bpms_list.insertItems(0, bpms)
+        self.bpms_list.insertItems(0, bpms) #at the top of the list
 
     def _selected_or_all(self, widget, full):
-        sel = [it.text() for it in widget.selectedItems()]
-        return sel if sel else list(full)
+        sel = [it.text() for it in widget.selectedItems()] #selected items
+        return sel if sel else list(full) #if not,then full
 
     def _get_selection(self):
         corrs_all = self.interface.get_correctors()["names"]
@@ -254,7 +257,7 @@ class MainWindow(QMainWindow):
         selected = []
         if fn:
             with open(fn, "r") as f:
-                selected = [ln.strip() for ln in f]
+                selected = [ln.strip() for ln in f] #makes a list
         else:
             selected = self.interface.get_bpms()["names"]
         self.bpms_list.clearSelection()
@@ -264,7 +267,7 @@ class MainWindow(QMainWindow):
 
     def _with_progress(self, total, title):
         prog = QProgressDialog(title, "Cancel", 0, total, self)
-        prog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        prog.setWindowModality(Qt.WindowModality.ApplicationModal) #user cant interact with the main window
         prog.setMinimumDuration(0)
 
         def cb(i, n, text):
@@ -293,20 +296,19 @@ class MainWindow(QMainWindow):
             self.engine.set_offenergy_flag(True)
             self.interface.change_energy()
             prog, cb = self._with_progress(len(corrs), "Measuring response (off-energy)…")
-            R_test = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,
-                                                         triangular=self._force_triangular(), progress_cb=cb)
+            R_test = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
             prog.close()
             self.interface.reset_energy()
             self.engine.set_offenergy_flag(False)
 
-            np.savez(
-                fn,
+            np.savez( #npz is a zip of numpy arrays
+                fn, #file that user selected
                 bpms=np.array(bpms, dtype=object),
                 correctors=np.array(corrs, dtype=object),
                 delta_nom=R_nom["delta"], Rx_nom=R_nom["Rx"], Ry_nom=R_nom["Ry"],
                 delta_test=R_test["delta"], Rx_test=R_test["Rx"], Ry_test=R_test["Ry"],
                 note="DFS: response at nominal (R) and changed energy (R').",
-            )
+            )               #delta is a step size used for varying correctors
             if hasattr(self, "dfs_response_3"):
                 self.dfs_response_3.setText(fn)
             QMessageBox.information(self, "DFS", f"Saved DFS responses to:\n{fn}")
@@ -382,15 +384,14 @@ class MainWindow(QMainWindow):
                 }
                 if hasattr(self, "trajectory_response_3"):
                     self.trajectory_response_3.setText(pkl_file)
-                QMessageBox.information(self, "Response loaded (PKL)",
-                                        f"Loaded SysID response from '{os.path.basename(folder)}'.")
+                QMessageBox.information(self, "Response loaded (PKL)",f"Loaded SysID response from '{os.path.basename(folder)}'.")
                 return
 
             # for dfs
             if os.path.isfile(npz_file):
                 D = np.load(npz_file, allow_pickle=True)
                 files = set(D.files)
-
+                                        #is subset of
                 if {"Rx_nom", "Ry_nom"} <= files:
                     Rx = np.asarray(D["Rx_nom"], float)
                     Ry = np.asarray(D["Ry_nom"], float)
@@ -399,8 +400,7 @@ class MainWindow(QMainWindow):
                     Ry = np.asarray(D["Ry"], float)
                 else:
                     raise KeyError(
-                        "dfs_response.npz must contain Rx_nom/Ry_nom (or legacy Rx/Ry). "
-                        f"Found keys: {sorted(files)}"
+                        f"dfs_response.npz must contain Rx_nom/Ry_nom (or Rx/Ry).Found keys: {sorted(files)}"
                     )
 
                 bpms = list(map(str, D["bpms"])) if "bpms" in files else []
@@ -425,14 +425,14 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Load error", str(e))
 
     def _read_params(self):
-        def getf(name, default):
+        def getf(name, default): #gets the text value and turns it into a float
             w = getattr(self, name, None)
             try:
                 t = (w.text() or "").strip()
                 return float(t) if t else float(default)
             except Exception:
                 return float(default)
-        def geti(name, default):
+        def geti(name, default): #the same, but to an int
             w = getattr(self, name, None)
             try:
                 t = (w.text() or "").strip()
@@ -488,7 +488,7 @@ class MainWindow(QMainWindow):
                 if getattr(self, "_chi_dlg", None):
                     self._chi_dlg.append_point(orbit_rms or 0.0, disp_rms or 0.0, wake_rms or 0.0)
 
-                QApplication.processEvents()
+                QApplication.processEvents() #so the GUI doesnt freeze with long operations
                 return not self._cancel
 
             self.setWindowTitle("BBA - [Correction running]")
@@ -517,15 +517,15 @@ class MainWindow(QMainWindow):
         w1, w2, w3, *_ = self._read_params()
         self._chi_dlg.set_weights(w1, w2, w3)
 
-        self._chi_dlg.seed_with_history(self._hist_orbit, self._hist_disp, self._hist_wake)
+        self._chi_dlg.calculating_chi(self._hist_orbit, self._hist_disp, self._hist_wake)
 
         self._chi_dlg.show()
-        self._chi_dlg.raise_()
-        self._chi_dlg.activateWindow()
+        self._chi_dlg.raise_() #top of the stacking order
+        self._chi_dlg.activateWindow() #giving it a keyboard focus
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = QApplication([])
 
     from SelectInterface import InterfaceSelectionDialog
     dialog = InterfaceSelectionDialog()
