@@ -17,7 +17,7 @@ class CorrectionEngine:
                 self.interface.scatter_elements("bpm", sigma_mm, sigma_mm, 0, 0, 0, 0, "center")
                 self._has_real_scatter = True
                 self._bpm_bias_x = self._bpm_bias_y = None
-                self._disp_y_vec = self._wake_y_vec = None
+                self._disp_y_vec = self._wake_y_vec = None #on top of each other
                 return
         except Exception:
             pass

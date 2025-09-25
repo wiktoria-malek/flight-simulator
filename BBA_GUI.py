@@ -435,9 +435,25 @@ class MainWindow(QMainWindow):
         iters   = geti("lineEdit_5", 10)
         return orbit_w, disp_w, wake_w, rcond, iters
 
+    def _read_change_intensity(self):
+        pass
+
+
+
+    def _read_change_energy(self):
+        pass
+    def _read_reset_energy(self):
+        pass
+    def _read_reset_intensity(self):
+        pass
+
+
+
+
     def _start_correction(self):
         try:
             self._cancel = False
+
 
             w1, w2, w3, rcond, iters = self._read_params()
             orbit_w, disp_w, wake_w = w1, w2, w3
