@@ -4,3 +4,10 @@ __pycache__/
 *.pyd
 .venv/
 .idea/
+Data/**
+!Data/.gitkeep
+*.npz
+*.npy
+*.pkl
+*.csv
+*.h5
