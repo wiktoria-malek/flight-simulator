@@ -15,7 +15,7 @@ except Exception:
     FigureCanvas = Figure = None
 
 from DFS_WFS_Correction_BBA import CorrectionEngine
-from Response_BBA import load_dfs_npz, load_wfs_npz
+from Response_BBA import load_dfs_npz, load_wfs_npz, reorder_matrix_to_gui
 
 
 class ChiSquaredWindow(QDialog):
@@ -359,21 +359,28 @@ class MainWindow(QMainWindow):
                 with open(pkl_file, "rb") as f:
                     obj = pickle.load(f)
 
+                def _g(o, key):
+                    return o[key] if isinstance(o, dict) else getattr(o, key, [])
+
                 self.traj_response = {
                     "file": pkl_file,
-                    "bpms": list(map(str, getattr(obj, "bpms", []))),
-                    "hcorrs": list(map(str, getattr(obj, "hcorrs", []))),
-                    "vcorrs": list(map(str, getattr(obj, "vcorrs", []))),
-                    "Rxx": np.asarray(getattr(obj, "Rxx"), float),
-                    "Ryy": np.asarray(getattr(obj, "Ryy"), float),
-                    "Bx": np.asarray(getattr(obj, "Bx"), float),
-                    "By": np.asarray(getattr(obj, "By"), float),
+                    "bpms": list(map(str, _g(obj, "bpms"))),
+                    "hcorrs": list(map(str, _g(obj, "hcorrs"))),
+                    "vcorrs": list(map(str, _g(obj, "vcorrs"))),
+                    "Rxx": np.asarray(_g(obj, "Rxx"), float),
+                    "Ryy": np.asarray(_g(obj, "Ryy"), float),
+                    "Bx": np.asarray(_g(obj, "Bx"), float),
+                    "By": np.asarray(_g(obj, "By"), float),
                     "source": "pkl",
                 }
+                self.traj_file=pkl_file
+
                 if hasattr(self, "trajectory_response_3"):
                     self.trajectory_response_3.setText(pkl_file)
                 QMessageBox.information(self, "Response loaded (PKL)",f"Loaded SysID response from '{os.path.basename(folder)}'.")
+
                 return
+
 
             # for dfs
             if os.path.isfile(npz_file):
@@ -402,6 +409,7 @@ class MainWindow(QMainWindow):
                     "Ry": Ry,
                     "source": "npz",
                 }
+                self.traj_file=npz_file
                 if hasattr(self, "trajectory_response_3"):
                     self.trajectory_response_3.setText(npz_file)
                 QMessageBox.information(self, "Response loaded (NPZ)",f"Loaded DFS response from '{os.path.basename(folder)}'.")
@@ -415,19 +423,30 @@ class MainWindow(QMainWindow):
     def _read_params(self):
         def getf(name, default): #gets the text value and turns it into a float
             w = getattr(self, name, None)
-            try:
-                t = (w.text() or "").strip()
-                return float(t) if t else float(default)
-            except Exception:
+            if w is None:
                 return float(default)
+
+            txt=(w.text() or "").strip()
+            if txt:
+                try:
+                    return float(txt)
+                except ValueError:
+                    pass
+            w.setText(f"{default:g}")
+            return float(default)
         def geti(name, default): #the same, but to an int
             w = getattr(self, name, None)
-            try:
-                t = (w.text() or "").strip()
-                return int(float(t)) if t else int(default)
-            except Exception:
+            if w is None:
                 return int(default)
 
+            txt=(w.text() or "").strip()
+            if txt:
+                try:
+                    return int(float(txt))
+                except ValueError:
+                    pass
+            w.setText(str(int(default)))
+            return int(default)
         orbit_w = getf("lineEdit", 1.0)
         disp_w  = getf("lineEdit_2", 10.0)
         wake_w  = getf("lineEdit_3", 10.0)
@@ -436,6 +455,7 @@ class MainWindow(QMainWindow):
         return orbit_w, disp_w, wake_w, rcond, iters
 
     def _read_reset_intensity(self):
+        pass
         #
         # if hasattr(self, "wfs_reset_3"):
         #     reset_function = (self.wfs_reset_3.text() or "").strip()
@@ -461,6 +481,9 @@ class MainWindow(QMainWindow):
 
 
     def _start_correction(self):
+
+        R_nom, R_disp, R_wake = None, None, None
+
         try:
             self._cancel = False
 
@@ -477,8 +500,42 @@ class MainWindow(QMainWindow):
                 self._chi_dlg.clear()
 
             corrs, bpms = self._get_selection()
+            print("Selected corrs: ")
+            print(corrs)
+            if getattr(self, "traj_file", None):
+                tr=self.traj_response
+                print("Selected corrs from the file:")
+                print(tr["hcorrs"]), print(tr["vcorrs"])
 
-            R_nom, R_disp, R_wake = None, None, None
+                Rx_file=np.asarray(tr["Rxx"], float)
+                Ry_file=np.asarray(tr["Ryy"], float)
+                R2_file=np.hstack((Rx_file, Ry_file))
+
+                h_file=list(map(str, tr["hcorrs"]))
+                v_file=list(map(str, tr["vcorrs"]))
+
+                file_cols=h_file+v_file
+
+                h_gui=[c for c in corrs if c in h_file]
+                v_gui=[c for c in corrs if c in v_file]
+                dropped=[c for c in corrs if c not in file_cols]
+
+                if dropped:
+                    print("ignored (not in response.pkl): ", ", ", ".join(dropped))")
+                    corrs=h_gui+v_gui
+
+                R2=np.vstack([R2_file, np.zeros_like(R2_file)])
+                N=len(bpms)
+                R2[N:,:Rx_file.shape[1]]=0
+                R2[N:, Rx_file.shape[1]:] = Ry_file
+                # Rx=reorder_matrix_to_gui(Rx, tr["bpms"], tr["hcorrs"], bpms, corrs)
+                # Ry=reorder_matrix_to_gui(Ry, tr["bpms"], tr["vcorrs"], bpms, corrs)
+                #
+                # R_nom=np.vstack((Rx, Ry))
+                R2 = reorder_matrix_to_gui(R2, tr["bpms"], file_cols, bpms, corrs)
+
+                R_nom=R2
+
             if hasattr(self, "dfs_response_3"):
                 dfs_path = (self.dfs_response_3.text() or "").strip()
                 if dfs_path and os.path.isfile(dfs_path):

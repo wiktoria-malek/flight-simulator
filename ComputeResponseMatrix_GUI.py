@@ -232,6 +232,8 @@ class MainWindow(QMainWindow):
                 self.bpms_list.item(i).setSelected(True)
             bpms = self.bpms
 
+
+        #if corr doesnt start with zh or zv, it is removed?? so all zx..., ipkick etc
         hcorrs = [string for string in correctors if string.lower().startswith('zh')]
         vcorrs = [string for string in correctors if string.lower().startswith('zv')]
 
