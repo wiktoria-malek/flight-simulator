@@ -16,8 +16,11 @@ def reorder_matrix_to_gui(R, file_bpms, file_corrs, gui_bpms, gui_corrs):
 
     fb = {b: i for i, b in enumerate(file_bpms)}
     row_x = [fb[b] for b in gui_bpms]
-    row_y = [i + len(file_bpms) for i in row_x]
-    row_order = row_x + row_y
+    if R.shape[0] == len(file_bpms):
+        row_order=row_x
+    else:
+        row_y = [i + len(file_bpms) for i in row_x]
+        row_order = row_x + row_y
 
     fc = {c: j for j, c in enumerate(file_corrs)}
     col_order = [fc[c] for c in gui_corrs]

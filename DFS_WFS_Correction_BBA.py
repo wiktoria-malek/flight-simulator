@@ -60,6 +60,7 @@ class CorrectionEngine:
         return np.concatenate([x, y], axis=0)
 
     def compute_response_matrix(self, corrs, bpms, delta=0.01, triangular=False, progress_cb=None):
+        print("Measuring on the fly, not from the file!")
         nb, nc = len(bpms), len(corrs)
         Rx = np.zeros((nb, nc), float)
         Ry = np.zeros((nb, nc), float)

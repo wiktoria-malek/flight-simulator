@@ -66,13 +66,21 @@ class ChiSquaredWindow(QDialog):
 
     def append_point(self, orbit_rms, disp_rms, wake_rms):
 
-        O_beg=float(orbit_rms)
-        D_beg=float(disp_rms)
-        W_beg=float(wake_rms)
+        O_beg=float(orbit_rms) if orbit_rms is not None else np.nan
+        D_beg=float(disp_rms) if disp_rms is not None else np.nan
+        W_beg=float(wake_rms) if wake_rms is not None else np.nan
 
-        O = (O_beg/self._O0)*(O_beg/self._O0)
-        D = (D_beg/self._D0)*(D_beg/self._D0)
-        W = (W_beg/self._W0)*(W_beg/self._W0)
+        if self._O0 is None:
+        #self._O0,self._D0,self._W0=O_beg,D_beg,W_beg
+            eps=np.finfo(float).eps
+
+            self._O0=O_beg if np.isfinite(O_beg) and O_beg !=0 else eps
+            self._D0=D_beg if np.isfinite(D_beg) and D_beg !=0 else eps
+            self._W0=W_beg if np.isfinite(W_beg) and W_beg !=0 else eps
+
+        O = (O_beg/self._O0)**2 if np.isfinite(O_beg) else np.nan
+        D = (D_beg/self._D0)**2 if np.isfinite(D_beg) else np.nan
+        W = (W_beg/self._W0)**2 if np.isfinite(W_beg) else np.nan
 
         self._O.append(O); self._D.append(D); self._W.append(W)
         self._redraw()
@@ -97,13 +105,21 @@ class ChiSquaredWindow(QDialog):
         super().closeEvent(e)
 
     def calculating_chi(self, O, D, W):
-        O=list(map(float, O))
-        D=list(map(float, D))
-        W=list(map(float, W))
 
-        self._O = [(value/self._O0) * (value/self._O0) for value in O]
-        self._D = [(value/self._D0) * (value/self._D0) for value in D]
-        self._W = [(value/self._W0) * (value/self._W0) for value in W]
+        if not O:
+            return
+
+        if self._O0 is None:
+            self._O0=next((value for value in O if value), 1)
+            self._D0=next((value for value in D if value), 1)
+            self._W0=next((value for value in W if value),1)
+        # O=list(map(float, O))
+        # D=list(map(float, D))
+        # W=list(map(float, W))
+
+        self._O = [(value/self._O0)**2 for value in O]
+        self._D = [(value/self._D0)**2 for value in D]
+        self._W = [(value/self._W0)**2 for value in W]
         self._redraw()
 
 class MainWindow(QMainWindow):
@@ -148,6 +164,12 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self._stop_correction)
 
         self.setWindowTitle("BBA")
+
+        self.lineEdit.setText("1")
+        self.lineEdit_2.setText("10")
+        self.lineEdit_3.setText("10")
+        self.lineEdit_4.setText("0.001")
+        self.lineEdit_5.setText("10")
 
     #def button_clicked(self):
         #print("clicked")
@@ -276,6 +298,9 @@ class MainWindow(QMainWindow):
                 return
 
             corrs, bpms = self._get_selection()
+            # print(f"{len(corrs)} corretors selected"
+            #       f" {len(bpms)} bpms selected")
+
 
             prog, cb = self._with_progress(len(corrs), "Measuring response (nominal)…")
             R_nom = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
@@ -524,17 +549,24 @@ class MainWindow(QMainWindow):
                     print("ignored (not in response.pkl): ", ", ", ".join(dropped))")
                     corrs=h_gui+v_gui
 
-                R2=np.vstack([R2_file, np.zeros_like(R2_file)])
-                N=len(bpms)
-                R2[N:,:Rx_file.shape[1]]=0
-                R2[N:, Rx_file.shape[1]:] = Ry_file
-                # Rx=reorder_matrix_to_gui(Rx, tr["bpms"], tr["hcorrs"], bpms, corrs)
-                # Ry=reorder_matrix_to_gui(Ry, tr["bpms"], tr["vcorrs"], bpms, corrs)
-                #
-                # R_nom=np.vstack((Rx, Ry))
-                R2 = reorder_matrix_to_gui(R2, tr["bpms"], file_cols, bpms, corrs)
+                # R2=np.vstack([R2_file, np.zeros_like(R2_file)])
+                # N=len(bpms)
+                # R2[N:,:Rx_file.shape[1]]=0
+                # R2[N:, Rx_file.shape[1]:] = Ry_file
+                Rx=reorder_matrix_to_gui(Rx_file, tr["bpms"], h_file, bpms, h_gui)
+                Ry=reorder_matrix_to_gui(Ry_file, tr["bpms"], v_file, bpms, v_gui)
 
-                R_nom=R2
+                nh = len(h_gui)
+                nv = len(v_gui)
+                nb = len(bpms)
+
+                Rx_full = np.zeros((nb, nh + nv))
+                Ry_full = np.zeros((nb, nh + nv))
+                Rx_full[:, :nh]= Rx
+                Ry_full[:, nh:] = Ry
+                R_nom = np.vstack((Rx_full, Ry_full))
+                corrs=h_gui+v_gui
+                #R_nom=R2
 
             if hasattr(self, "dfs_response_3"):
                 dfs_path = (self.dfs_response_3.text() or "").strip()
