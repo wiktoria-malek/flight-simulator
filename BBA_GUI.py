@@ -171,8 +171,6 @@ class MainWindow(QMainWindow):
         self.lineEdit_4.setText("0.001")
         self.lineEdit_5.setText("10")
 
-    #def button_clicked(self):
-        #print("clicked")
     def _setup_canvases(self):
         if FigureCanvas is None:
             self.traj_canvas = self.disp_canvas = self.wake_canvas = None
@@ -481,22 +479,13 @@ class MainWindow(QMainWindow):
 
     def _read_reset_intensity(self):
         pass
-        #
-        # if hasattr(self, "wfs_reset_3"):
-        #     reset_function = (self.wfs_reset_3.text() or "").strip()
-        #
-        #
-        # def getf(name, default):
-        # w = getattr(self, name, None)
-        #
-        #
-        #
-        # change_intensity_number = getf("wfs_reset_3", 0.98)
-        #
-        # return change_intensity_number
+
 
     def _read_change_energy(self):
-        pass
+        txt=(self.change_energy_3.text() or "").strip()
+        return float(txt) if txt else 0.98
+
+
     def _read_reset_energy(self):
         pass
     def _read_change_intensity(self):
