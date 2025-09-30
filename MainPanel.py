@@ -23,8 +23,8 @@ class MainWindow(QMainWindow):
         self._procs=[]
         self.setWindowTitle("Choose the application")
 
-    def handle_sysid_click(self):
-        sysid_path = os.path.join(os.path.dirname(__file__), "SysID_GUI.py")
+    def handling(self, app_name):
+        path = os.path.join(os.path.dirname(__file__), f"{app_name}")
 
         proc = QProcess(self)
         proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -33,48 +33,26 @@ class MainWindow(QMainWindow):
         env = QProcessEnvironment.systemEnvironment()
         proc.setProcessEnvironment(env)
 
-        proc.start(sys.executable, [sysid_path])
+        proc.start(sys.executable, [path])
 
         proc.readyReadStandardOutput.connect(lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"), end=""))
 
         self._procs.append(proc)
 
-
+    def handle_sysid_click(self):
+        self.handling("SysID_GUI.py")
 
     def handle_bba_click(self):
-        bba_path = os.path.join(os.path.dirname(__file__), "BBA_GUI.py")
+        self.handling("BBA_GUI.py")
 
-        proc = QProcess(self)
-        proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        proc.setWorkingDirectory(self.cwd)
-
-        env = QProcessEnvironment.systemEnvironment()
-        proc.setProcessEnvironment(env)
-
-        proc.start(sys.executable, [bba_path])
-
-        proc.readyReadStandardOutput.connect(lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"), end=""))
-
-        self._procs.append(proc)
     def handle_emittance_click(self):
         pass
     def handle_knobs_click(self):
         pass
+
     def handle_compute_response_matrix_click(self):
-        compute_response_matrix_path = os.path.join(os.path.dirname(__file__), "ComputeResponseMatrix_GUI.py")
+        self.handling("ComputeResponseMatrix_GUI.py")
 
-        proc = QProcess(self)
-        proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        proc.setWorkingDirectory(self.cwd)
-
-        env = QProcessEnvironment.systemEnvironment()
-        proc.setProcessEnvironment(env)
-
-        proc.start(sys.executable, [compute_response_matrix_path])
-
-        proc.readyReadStandardOutput.connect(lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"), end=""))
-
-        self._procs.append(proc)
 if __name__ == "__main__":
     app = QApplication([])
     app.setQuitOnLastWindowClosed(False)
