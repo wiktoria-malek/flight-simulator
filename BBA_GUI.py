@@ -1,7 +1,7 @@
 import sys, os, pickle
 from datetime import datetime
 import numpy as np
-
+import re
 from PyQt6 import uic
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
@@ -85,6 +85,9 @@ class ChiSquaredWindow(QDialog):
         self._O.append(O); self._D.append(D); self._W.append(W)
         self._redraw()
 
+
+
+
     def _redraw(self):
         x = list(range(1, len(self._O) + 1))
         self._set_lines(x, self._O, self._D, self._W)
@@ -113,9 +116,6 @@ class ChiSquaredWindow(QDialog):
             self._O0=next((value for value in O if value), 1)
             self._D0=next((value for value in D if value), 1)
             self._W0=next((value for value in W if value),1)
-        # O=list(map(float, O))
-        # D=list(map(float, D))
-        # W=list(map(float, W))
 
         self._O = [(value/self._O0)**2 for value in O]
         self._D = [(value/self._D0)**2 for value in D]
@@ -129,11 +129,10 @@ class MainWindow(QMainWindow):
         self.interface = interface
         self.dir_name = dir_name
         self._cancel = False
+        self._number_re = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
 
         ui_path = os.path.join(os.path.dirname(__file__), "BBA_GUI.ui")
         uic.loadUi(ui_path, self)
-
-        #self.setCentralWidget(popup_button)
 
         self.engine = CorrectionEngine(interface)
         self._hist_orbit = []
@@ -170,6 +169,10 @@ class MainWindow(QMainWindow):
         self.lineEdit_3.setText("10")
         self.lineEdit_4.setText("0.001")
         self.lineEdit_5.setText("10")
+
+    def _finding_float(self,text, default):
+        m = self._number_re.search(text)
+        return float(m.group(0)) if m else default
 
     def _setup_canvases(self):
         if FigureCanvas is None:
@@ -291,14 +294,23 @@ class MainWindow(QMainWindow):
         try:
             default_dir = os.path.join(self.cwd, "Data")
             os.makedirs(default_dir, exist_ok=True)
-            fn, _ = QFileDialog.getSaveFileName(self, "Save DFS response (R & R')",os.path.join(default_dir, "dfs_response.npz"),"NumPy archive (*.npz)")
+            fn, _ = QFileDialog.getSaveFileName(self, "Save DFS response (R_nom & R_off')",os.path.join(default_dir, "dfs_response.npz"),"NumPy archive (*.npz)")
             if not fn:
                 return
 
             corrs, bpms = self._get_selection()
-            # print(f"{len(corrs)} corretors selected"
-            #       f" {len(bpms)} bpms selected")
 
+            #R_nom=None
+
+            # if (txt:=self.trajectory_response_3.text().strip()):
+            #     tr=self.traj_response
+            #     h_gui=[c for c in corrs if c in tr["hcorrs"]]
+            #     v_gui=[c for c in corrs if c in tr["vcorrs"]]
+            #
+            #     if h_gui or v_gui:
+            #         Rx = reorder_matrix_to_gui(tr["Rxx"], tr["bpms"], tr["hcorrs"], bpms, h_gui)
+            #         Ry = reorder_matrix_to_gui(tr["Ryy"], tr["bpms"], tr["vcorrs"], bpms, v_gui)
+            #         R_nom={"delta":0.01,"Rx":Rx,"Ry":Ry}
 
             prog, cb = self._with_progress(len(corrs), "Measuring response (nominal)…")
             R_nom = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
@@ -343,6 +355,11 @@ class MainWindow(QMainWindow):
             prog.close()
 
             self.engine.set_highintensity_flag(True)
+            if self.wfs_change_3.text().strip():
+                scale=self._read_change_intensity()
+                print(f"The scale is {self.scale}")
+
+
             self.interface.change_intensity()
             prog, cb = self._with_progress(len(corrs), "Measuring response (high intensity)…")
             R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
@@ -478,19 +495,21 @@ class MainWindow(QMainWindow):
         return orbit_w, disp_w, wake_w, rcond, iters
 
     def _read_reset_intensity(self):
-        pass
+        scale=self._finding_float(self.wfs_reset_3.text(),1)
+        return scale
 
+    def _read_change_intensity(self):
+        scale=self._finding_float(self.wfs_change_3.text(),0.9)
+        return scale
 
     def _read_change_energy(self):
-        txt=(self.change_energy_3.text() or "").strip()
-        return float(txt) if txt else 0.98
+        scale=self._finding_float(self.dfs_change_3.text(), 0.98)
+        return scale
 
 
     def _read_reset_energy(self):
-        pass
-    def _read_change_intensity(self):
-        pass
-
+        scale=self._finding_float(self.dfs_reset_3.text(), 1)
+        return scale
 
 
 
@@ -538,10 +557,6 @@ class MainWindow(QMainWindow):
                     print("ignored (not in response.pkl): ", ", ", ".join(dropped))")
                     corrs=h_gui+v_gui
 
-                # R2=np.vstack([R2_file, np.zeros_like(R2_file)])
-                # N=len(bpms)
-                # R2[N:,:Rx_file.shape[1]]=0
-                # R2[N:, Rx_file.shape[1]:] = Ry_file
                 Rx=reorder_matrix_to_gui(Rx_file, tr["bpms"], h_file, bpms, h_gui)
                 Ry=reorder_matrix_to_gui(Ry_file, tr["bpms"], v_file, bpms, v_gui)
 

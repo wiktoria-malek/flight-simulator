@@ -42,6 +42,8 @@ class MainWindow(QMainWindow):
     def handle_sysid_click(self):
         self.handling("SysID_GUI.py")
 
+
+
     def handle_bba_click(self):
         self.handling("BBA_GUI.py")
 

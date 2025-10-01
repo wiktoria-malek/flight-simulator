@@ -84,6 +84,7 @@ class InterfaceATF2_Ext_RFTrack:
         #TO DO!!
 
     def change_intensity(self, *args): #nominal, higher than reset
+
         self.__setup_beam0()
         self.__track_bunch()
         #TO DO!!
@@ -93,6 +94,10 @@ class InterfaceATF2_Ext_RFTrack:
         self.__setup_beam2()
         self.__track_bunch()
         #TO DO!!
+
+
+
+
     def get_sequence(self):
         return self.sequence
 
