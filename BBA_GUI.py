@@ -334,52 +334,60 @@ class MainWindow(QMainWindow):
         try:
             default_dir = os.path.join(self.cwd, "Data")
             os.makedirs(default_dir, exist_ok=True)
-            fn, _ = QFileDialog.getSaveFileName(self, "Save WFS response (R_low & R_high)",os.path.join(default_dir, "wfs_response.npz"),"NumPy archive (*.npz)" )
+            fn, _ = QFileDialog.getSaveFileName(self, "Save WFS response (R_low & R_high)",os.path.join(default_dir, "wfs_response.npz"),"NumPy archive (*.npz)")
             if not fn:
                 return
 
             corrs, bpms = self._get_selection()
 
-            self.engine.set_highintensity_flag(False)
+            R_low, corrs = self._using_traj_response(corrs, bpms)
 
-            # if self.wfs_reset_3.text().strip():
-            #     self._read_reset_intensity()
-            #     print(f"The reset intensity scale is {self.scale}")
-            #     self.interface.reset_intensity(self.scale)
+            R_high = None
+            if (wfs_path := self.wfs_response_3.text().strip()) and os.path.isfile(wfs_path):
+                try:
+                    R_wake = load_wfs_npz(wfs_path, bpms, corrs)
+                    if R_low is not None:
+                        Rx_low = R_low["Rx"]
+                        Ry_low = R_low["Ry"]
+                    else:
+                        Rx_low = Ry_low = np.zeros_like(R_wake[:len(bpms), :])
+                    Rx_high = Rx_low + R_wake[:len(bpms), :]
+                    Ry_high = Ry_low + R_wake[len(bpms):, :]
+                    R_high = {"delta": 0.01, "Rx": Rx_high, "Ry": Ry_high}
+                except Exception:
+                    pass
 
-
-            self.interface.reset_intensity()
-            prog, cb = self._with_progress(len(corrs), "Measuring response (low intensity)…")
-            R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
-            prog.close()
-
-            self.engine.set_highintensity_flag(True)
-
-            if self.wfs_change_3.text().strip():
-                self._read_change_intensity()
-                print(f"The change intensity scale is {self.scale}")
-                self.interface.change_intensity(self.scale)
-            else:
-                self.interface.change_intensity(0.9)
-                prog, cb = self._with_progress(len(corrs), "Measuring response (high intensity)…")
-                R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
+            if R_low is None:
+                self.engine.set_highintensity_flag(False)
+                self.interface.reset_intensity(self._read_reset_intensity())
+                prog, cb = self._with_progress(len(corrs),"Measuring response (low intensity)…")
+                R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
                 prog.close()
-                self.interface.reset_intensity()
+
+            if R_high is None:
+                self.engine.set_highintensity_flag(True)
+                self.interface.change_intensity(self._read_change_intensity())
+                prog, cb = self._with_progress(len(corrs),"Measuring response (high intensity)…")
+                R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01, triangular=self._force_triangular(), progress_cb=cb)
+                prog.close()
+                self.interface.reset_intensity(self._read_reset_intensity())
                 self.engine.set_highintensity_flag(False)
 
             np.savez(
                 fn,
                 bpms=np.array(bpms, dtype=object),
                 correctors=np.array(corrs, dtype=object),
-                delta_low=R_low["delta"],  Rx_low=R_low["Rx"],  Ry_low=R_low["Ry"],
+                delta_low=R_low["delta"], Rx_low=R_low["Rx"], Ry_low=R_low["Ry"],
                 delta_high=R_high["delta"], Rx_high=R_high["Rx"], Ry_high=R_high["Ry"],
                 note="WFS: response at low and high intensity for wakefield-free steering.",
             )
-            if hasattr(self, "wfs_response_3"):
-                self.wfs_response_3.setText(fn)
-            QMessageBox.information(self, "WFS", f"Saved WFS responses to:\n{fn}")
+            self.wfs_response_3.setText(fn)
+            QMessageBox.information(self, "WFS",f"Saved WFS responses to:\n{fn}")
+
         except Exception as e:
             QMessageBox.critical(self, "WFS error", str(e))
+
+
 
     def _pick_and_load_traj_response(self):
 

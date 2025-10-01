@@ -32,9 +32,11 @@ class InterfaceATF2_Ext_RFTrack:
         Nparticles = 10000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, Nparticles)
         
-    def __setup_beam1(self):
+    def __setup_beam1(self,scale):
         # Beam for DFS - Reduced energy
-        Pref = 0.98 * self.Pref # 98% of nominal energy
+        Pref= scale * self.Pref
+
+        #Pref = 0.98 * self.Pref # 98% of nominal energy
         T = rft.Bunch6d_twiss()
         T.emitt_x = 2e-3 # mm.mrad normalised emittance
         T.emitt_y = 1.179228346e-5 # mm.mrad
@@ -73,30 +75,25 @@ class InterfaceATF2_Ext_RFTrack:
         B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
         self.lattice.track(B0_offset)
 
-    def change_energy(self, *args):
-        self.__setup_beam1()
+    def change_energy(self, scale):
+        self.__setup_beam1(scale)
+
         self.__track_bunch()
-        #TO DO!!
 
 
-    def reset_energy(self, *args):
+    def reset_energy(self, scale=1):
         self.__setup_beam0()
         self.__track_bunch()
-        #TO DO!!
 
     def change_intensity(self, scale): #reduced charge
 
         self.__setup_beam2(scale)
         self.__track_bunch()
-        #TO DO!!
 
 
-    def reset_intensity(self, *args):
+    def reset_intensity(self, scale=1):
         self.__setup_beam0()
         self.__track_bunch()
-        #TO DO!!
-
-
 
 
     def get_sequence(self):
