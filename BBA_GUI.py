@@ -300,28 +300,20 @@ class MainWindow(QMainWindow):
 
             corrs, bpms = self._get_selection()
 
-            #R_nom=None
+            R_nom, corrs_gui = self._using_traj_response(corrs, bpms)
+            corrs = corrs_gui
 
-            # if (txt:=self.trajectory_response_3.text().strip()):
-            #     tr=self.traj_response
-            #     h_gui=[c for c in corrs if c in tr["hcorrs"]]
-            #     v_gui=[c for c in corrs if c in tr["vcorrs"]]
-            #
-            #     if h_gui or v_gui:
-            #         Rx = reorder_matrix_to_gui(tr["Rxx"], tr["bpms"], tr["hcorrs"], bpms, h_gui)
-            #         Ry = reorder_matrix_to_gui(tr["Ryy"], tr["bpms"], tr["vcorrs"], bpms, v_gui)
-            #         R_nom={"delta":0.01,"Rx":Rx,"Ry":Ry}
-
-            prog, cb = self._with_progress(len(corrs), "Measuring response (nominal)…")
-            R_nom = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
-            prog.close()
+            if R_nom is None:
+                prog, cb = self._with_progress(len(corrs), "Measuring response (nominal)…")
+                R_nom = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
+                prog.close()
 
             self.engine.set_offenergy_flag(True)
-            self.interface.change_energy()
+            self.interface.change_energy(self._read_change_energy())
             prog, cb = self._with_progress(len(corrs), "Measuring response (off-energy)…")
-            R_test = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
+            R_off = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
             prog.close()
-            self.interface.reset_energy()
+            self.interface.reset_energy(self._read_reset_energy())
             self.engine.set_offenergy_flag(False)
 
             np.savez( #npz is a zip of numpy arrays
@@ -329,11 +321,11 @@ class MainWindow(QMainWindow):
                 bpms=np.array(bpms, dtype=object),
                 correctors=np.array(corrs, dtype=object),
                 delta_nom=R_nom["delta"], Rx_nom=R_nom["Rx"], Ry_nom=R_nom["Ry"],
-                delta_test=R_test["delta"], Rx_test=R_test["Rx"], Ry_test=R_test["Ry"],
+                delta_test=R_off["delta"], Rx_test=R_off["Rx"], Ry_test=R_off["Ry"],
                 note="DFS: response at nominal (R) and changed energy (R').",
             )               #delta is a step size used for varying correctors
-            if hasattr(self, "dfs_response_3"):
-                self.dfs_response_3.setText(fn)
+
+            self.dfs_response_3.setText(fn)
             QMessageBox.information(self, "DFS", f"Saved DFS responses to:\n{fn}")
         except Exception as e:
             QMessageBox.critical(self, "DFS error", str(e))
@@ -349,23 +341,31 @@ class MainWindow(QMainWindow):
             corrs, bpms = self._get_selection()
 
             self.engine.set_highintensity_flag(False)
+
+            # if self.wfs_reset_3.text().strip():
+            #     self._read_reset_intensity()
+            #     print(f"The reset intensity scale is {self.scale}")
+            #     self.interface.reset_intensity(self.scale)
+
+
             self.interface.reset_intensity()
             prog, cb = self._with_progress(len(corrs), "Measuring response (low intensity)…")
             R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
             prog.close()
 
             self.engine.set_highintensity_flag(True)
+
             if self.wfs_change_3.text().strip():
-                scale=self._read_change_intensity()
-                print(f"The scale is {self.scale}")
-
-
-            self.interface.change_intensity()
-            prog, cb = self._with_progress(len(corrs), "Measuring response (high intensity)…")
-            R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
-            prog.close()
-            self.interface.reset_intensity()
-            self.engine.set_highintensity_flag(False)
+                self._read_change_intensity()
+                print(f"The change intensity scale is {self.scale}")
+                self.interface.change_intensity(self.scale)
+            else:
+                self.interface.change_intensity(0.9)
+                prog, cb = self._with_progress(len(corrs), "Measuring response (high intensity)…")
+                R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
+                prog.close()
+                self.interface.reset_intensity()
+                self.engine.set_highintensity_flag(False)
 
             np.savez(
                 fn,
@@ -511,7 +511,26 @@ class MainWindow(QMainWindow):
         scale=self._finding_float(self.dfs_reset_3.text(), 1)
         return scale
 
+    def _using_traj_response(self,corrs, bpms):
+        if not getattr(self, "traj_response", None):
+            return None, corrs
+        tr = self.traj_response
+        h_gui = [c for c in corrs if c in tr["hcorrs"]]
+        v_gui = [c for c in corrs if c in tr["vcorrs"]]
+        if not (h_gui or v_gui):
+            return None, corrs
 
+        Rx = reorder_matrix_to_gui(np.asarray(tr["Rxx"]), tr["bpms"],tr["hcorrs"], bpms, h_gui)
+        Ry = reorder_matrix_to_gui(np.asarray(tr["Ryy"]), tr["bpms"],tr["vcorrs"], bpms, v_gui)
+
+        nb, nh, nv = len(bpms), len(h_gui), len(v_gui)
+        Rx_full = np.zeros((nb, nh + nv))
+        Ry_full = np.zeros((nb, nh + nv))
+        Rx_full[:, :nh] = Rx
+        Ry_full[:, nh:] = Ry
+        R_nom = {"delta": 0.01, "Rx": Rx_full, "Ry": Ry_full}
+
+        return R_nom, h_gui + v_gui
 
     def _start_correction(self):
 
@@ -519,8 +538,6 @@ class MainWindow(QMainWindow):
 
         try:
             self._cancel = False
-
-
             w1, w2, w3, rcond, iters = self._read_params()
             orbit_w, disp_w, wake_w = w1, w2, w3
 
@@ -535,42 +552,10 @@ class MainWindow(QMainWindow):
             corrs, bpms = self._get_selection()
             print("Selected corrs: ")
             print(corrs)
-            if getattr(self, "traj_file", None):
-                tr=self.traj_response
-                print("Selected corrs from the file:")
-                print(tr["hcorrs"]), print(tr["vcorrs"])
 
-                Rx_file=np.asarray(tr["Rxx"], float)
-                Ry_file=np.asarray(tr["Ryy"], float)
-                R2_file=np.hstack((Rx_file, Ry_file))
-
-                h_file=list(map(str, tr["hcorrs"]))
-                v_file=list(map(str, tr["vcorrs"]))
-
-                file_cols=h_file+v_file
-
-                h_gui=[c for c in corrs if c in h_file]
-                v_gui=[c for c in corrs if c in v_file]
-                dropped=[c for c in corrs if c not in file_cols]
-
-                if dropped:
-                    print("ignored (not in response.pkl): ", ", ", ".join(dropped))")
-                    corrs=h_gui+v_gui
-
-                Rx=reorder_matrix_to_gui(Rx_file, tr["bpms"], h_file, bpms, h_gui)
-                Ry=reorder_matrix_to_gui(Ry_file, tr["bpms"], v_file, bpms, v_gui)
-
-                nh = len(h_gui)
-                nv = len(v_gui)
-                nb = len(bpms)
-
-                Rx_full = np.zeros((nb, nh + nv))
-                Ry_full = np.zeros((nb, nh + nv))
-                Rx_full[:, :nh]= Rx
-                Ry_full[:, nh:] = Ry
-                R_nom = np.vstack((Rx_full, Ry_full))
-                corrs=h_gui+v_gui
-                #R_nom=R2
+            R_nom_tr, corrs = self._using_traj_response(corrs, bpms)
+            if R_nom_tr is not None:
+                R_nom = np.vstack([R_nom_tr["Rx"], R_nom_tr["Ry"]])
 
             if hasattr(self, "dfs_response_3"):
                 dfs_path = (self.dfs_response_3.text() or "").strip()
