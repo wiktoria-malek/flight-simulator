@@ -163,7 +163,6 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(self._stop_correction)
 
         self.setWindowTitle("BBA")
-
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
         self.lineEdit_3.setText("10")
@@ -309,11 +308,14 @@ class MainWindow(QMainWindow):
                 prog.close()
 
             self.engine.set_offenergy_flag(True)
-            self.interface.change_energy(self._read_change_energy())
+            self.interface.change_energy(scale=self._read_change_energy())
+            print(f"Change energy scale is {self._read_change_energy()}")
             prog, cb = self._with_progress(len(corrs), "Measuring response (off-energy)…")
             R_off = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
             prog.close()
             self.interface.reset_energy(self._read_reset_energy())
+            print(f"Reset energy scale is {self._read_reset_energy()}")
+
             self.engine.set_offenergy_flag(False)
 
             np.savez( #npz is a zip of numpy arrays
@@ -360,6 +362,7 @@ class MainWindow(QMainWindow):
             if R_low is None:
                 self.engine.set_highintensity_flag(False)
                 self.interface.reset_intensity(self._read_reset_intensity())
+                print(f"Reset intensity scale is {self._read_reset_intensity()}")
                 prog, cb = self._with_progress(len(corrs),"Measuring response (low intensity)…")
                 R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
                 prog.close()
@@ -367,6 +370,7 @@ class MainWindow(QMainWindow):
             if R_high is None:
                 self.engine.set_highintensity_flag(True)
                 self.interface.change_intensity(self._read_change_intensity())
+                print(f"Change intensity scale is {self._read_change_intensity()}")
                 prog, cb = self._with_progress(len(corrs),"Measuring response (high intensity)…")
                 R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01, triangular=self._force_triangular(), progress_cb=cb)
                 prog.close()
