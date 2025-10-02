@@ -77,10 +77,8 @@ class InterfaceATF2_Ext_RFTrack:
 
     def change_energy(self, scale):
         self.__setup_beam1(scale)
-
         self.__track_bunch()
 
-        #change energy missing one argument(scale)
 
 
     def reset_energy(self, scale=1):

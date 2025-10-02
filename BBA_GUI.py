@@ -15,7 +15,7 @@ except Exception:
     FigureCanvas = Figure = None
 
 from DFS_WFS_Correction_BBA import CorrectionEngine
-from Response_BBA import load_dfs_npz, load_wfs_npz, reorder_matrix_to_gui
+from Response import load_dfs_npz, load_wfs_npz, reorder_matrix_to_gui
 
 
 class ChiSquaredWindow(QDialog):
@@ -298,24 +298,24 @@ class MainWindow(QMainWindow):
                 return
 
             corrs, bpms = self._get_selection()
+            delta_nom_energy=self._read_change_energy()
+            reset_energy=self._read_reset_energy()
 
-            R_nom, corrs_gui = self._using_traj_response(corrs, bpms)
-            corrs = corrs_gui
+            self.engine.set_offenergy_flag(False)
+            self.interface.reset_energy(reset_energy)
 
-            if R_nom is None:
-                prog, cb = self._with_progress(len(corrs), "Measuring response (nominal)…")
-                R_nom = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
-                prog.close()
+            prog, cb = self._with_progress(len(corrs), "Measuring R  (nominal energy)…")
+            R_nom = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(),progress_cb=cb)
+            prog.close()
 
             self.engine.set_offenergy_flag(True)
-            self.interface.change_energy(scale=self._read_change_energy())
-            print(f"Change energy scale is {self._read_change_energy()}")
-            prog, cb = self._with_progress(len(corrs), "Measuring response (off-energy)…")
-            R_off = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
-            prog.close()
-            self.interface.reset_energy(self._read_reset_energy())
-            print(f"Reset energy scale is {self._read_reset_energy()}")
+            self.interface.change_energy(delta_nom_energy)
 
+            prog, cb = self._with_progress(len(corrs), "Measuring R′ (off-energy)…")
+            R_off = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(),progress_cb=cb)
+            prog.close()
+
+            self.interface.reset_energy(reset_energy)
             self.engine.set_offenergy_flag(False)
 
             np.savez( #npz is a zip of numpy arrays
@@ -341,41 +341,25 @@ class MainWindow(QMainWindow):
                 return
 
             corrs, bpms = self._get_selection()
+            change_intensity=self._read_change_intensity()
+            reset_intensity=self._read_reset_intensity()
 
-            R_low, corrs = self._using_traj_response(corrs, bpms)
+            self.engine.set_highintensity_flag(False)
+            self.interface.reset_intensity(reset_intensity)
 
-            R_high = None
-            if (wfs_path := self.wfs_response_3.text().strip()) and os.path.isfile(wfs_path):
-                try:
-                    R_wake = load_wfs_npz(wfs_path, bpms, corrs)
-                    if R_low is not None:
-                        Rx_low = R_low["Rx"]
-                        Ry_low = R_low["Ry"]
-                    else:
-                        Rx_low = Ry_low = np.zeros_like(R_wake[:len(bpms), :])
-                    Rx_high = Rx_low + R_wake[:len(bpms), :]
-                    Ry_high = Ry_low + R_wake[len(bpms):, :]
-                    R_high = {"delta": 0.01, "Rx": Rx_high, "Ry": Ry_high}
-                except Exception:
-                    pass
+            prog, cb = self._with_progress(len(corrs), "Measuring R_low (low current)…")
+            R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(),progress_cb=cb)
+            prog.close()
 
-            if R_low is None:
-                self.engine.set_highintensity_flag(False)
-                self.interface.reset_intensity(self._read_reset_intensity())
-                print(f"Reset intensity scale is {self._read_reset_intensity()}")
-                prog, cb = self._with_progress(len(corrs),"Measuring response (low intensity)…")
-                R_low = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(), progress_cb=cb)
-                prog.close()
+            self.engine.set_highintensity_flag(True)
+            self.interface.change_intensity(change_intensity)
 
-            if R_high is None:
-                self.engine.set_highintensity_flag(True)
-                self.interface.change_intensity(self._read_change_intensity())
-                print(f"Change intensity scale is {self._read_change_intensity()}")
-                prog, cb = self._with_progress(len(corrs),"Measuring response (high intensity)…")
-                R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01, triangular=self._force_triangular(), progress_cb=cb)
-                prog.close()
-                self.interface.reset_intensity(self._read_reset_intensity())
-                self.engine.set_highintensity_flag(False)
+            prog, cb = self._with_progress(len(corrs), "Measuring R_high (high current)…")
+            R_high = self.engine.compute_response_matrix(corrs, bpms, delta=0.01,triangular=self._force_triangular(),progress_cb=cb)
+            prog.close()
+
+            self.interface.reset_intensity(reset_intensity)
+            self.engine.set_highintensity_flag(False)
 
             np.savez(
                 fn,
@@ -541,8 +525,14 @@ class MainWindow(QMainWindow):
         Rx_full[:, :nh] = Rx
         Ry_full[:, nh:] = Ry
         R_nom = {"delta": 0.01, "Rx": Rx_full, "Ry": Ry_full}
+        #B0 = np.concatenate([np.asarray(tr["Bx"]).ravel(),np.asarray(tr["By"]).ravel()])
+        file_bpms=list(map(str,tr["bpms"]))
+        selected_index=[file_bpms.index(b) for b in bpms]
 
-        return R_nom, h_gui + v_gui
+        Bx_selected=np.asarray(tr["Bx"], float).ravel()[selected_index]
+        By_selected=np.asarray(tr["By"], float).ravel()[selected_index]
+        B0=np.concatenate([Bx_selected, By_selected])
+        return R_nom, h_gui + v_gui, B0
 
     def _start_correction(self):
 
@@ -565,10 +555,11 @@ class MainWindow(QMainWindow):
             print("Selected corrs: ")
             print(corrs)
 
-            R_nom_tr, corrs = self._using_traj_response(corrs, bpms)
+            R_nom_tr, corrs,B0 = self._using_traj_response(corrs, bpms)
             if R_nom_tr is not None:
                 R_nom = np.vstack([R_nom_tr["Rx"], R_nom_tr["Ry"]])
-
+            else:
+                B0=None
             if hasattr(self, "dfs_response_3"):
                 dfs_path = (self.dfs_response_3.text() or "").strip()
                 if dfs_path and os.path.isfile(dfs_path):
@@ -603,6 +594,12 @@ class MainWindow(QMainWindow):
                 triangular=self._force_triangular(),
                 R_nom=R_nom, R_disp=R_disp, R_wake=R_wake,
                 iter_cb=on_iter,
+                scale_change_energy=self._read_change_energy(),
+                scale_reset_energy=self._read_reset_energy(),
+                scale_change_intensity=self._read_change_intensity(),
+                scale_reset_intensity=self._read_reset_intensity(),
+                y_ref=B0,
+
             )
             self.setWindowTitle("BBA")
             QMessageBox.information(self, "Correction", "Correction finished.")
