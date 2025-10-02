@@ -102,20 +102,20 @@ class CorrectionEngine:
         if disp_w > 0 and R_disp is None:
             rm0 = self.compute_response_matrix(corrs, bpms, delta=0.01, triangular=triangular)
             self.set_offenergy_flag(True)
-            self.interface.change_energy()
+            self.interface.change_energy(scale=0.98)
             rm1 = self.compute_response_matrix(corrs, bpms, delta=0.01, triangular=triangular)
-            self.interface.reset_energy()
+            self.interface.reset_energy(scale=1)
             self.set_offenergy_flag(False)
             R_disp = np.vstack([rm1["Rx"], rm1["Ry"]]) - np.vstack([rm0["Rx"], rm0["Ry"]])
 
         if wake_w > 0 and R_wake is None:
             self.set_highintensity_flag(False)
-            self.interface.reset_intensity()
+            self.interface.reset_intensity(scale=1)
             rL = self.compute_response_matrix(corrs, bpms, delta=0.01, triangular=triangular)
             self.set_highintensity_flag(True)
-            self.interface.change_intensity()
+            self.interface.change_intensity(scale=0.9)
             rH = self.compute_response_matrix(corrs, bpms, delta=0.01, triangular=triangular)
-            self.interface.reset_intensity()
+            self.interface.reset_intensity(scale=1)
             self.set_highintensity_flag(False)
             R_wake = np.vstack([rH["Rx"], rH["Ry"]]) - np.vstack([rL["Rx"], rL["Ry"]])
 
@@ -130,9 +130,9 @@ class CorrectionEngine:
 
             if disp_w > 0 and R_disp is not None:
                 self.set_offenergy_flag(True)
-                self.interface.change_energy()
+                self.interface.change_energy(scale=0.98)
                 y_off = self._y_nom(bpms)
-                self.interface.reset_energy()
+                self.interface.reset_energy(scale=1)
                 self.set_offenergy_flag(False)
                 disp_vec = y_off - y_nom
                 A_terms.append(disp_w * R_disp)
@@ -140,12 +140,12 @@ class CorrectionEngine:
 
             if wake_w > 0 and R_wake is not None:
                 self.set_highintensity_flag(False)
-                self.interface.reset_intensity()
+                self.interface.reset_intensity(scale=1)
                 y_low = self._y_nom(bpms)
                 self.set_highintensity_flag(True)
-                self.interface.change_intensity()
+                self.interface.change_intensity(scale=0.9)
                 y_high = self._y_nom(bpms)
-                self.interface.reset_intensity()
+                self.interface.reset_intensity(scale=1)
                 self.set_highintensity_flag(False)
                 wake_vec = y_high - y_low
                 A_terms.append(wake_w * R_wake)
@@ -183,9 +183,9 @@ class CorrectionEngine:
             disp_rms = None
             if disp_w > 0 and R_disp is not None:
                 self.set_offenergy_flag(True)
-                self.interface.change_energy()
+                self.interface.change_energy(scale=0.98)
                 y_off_after = self._y_nom(bpms)
-                self.interface.reset_energy()
+                self.interface.reset_energy(scale=1)
                 self.set_offenergy_flag(False)
                 disp_vec_after = y_off_after - y_nom_after
                 disp_rms = float(np.linalg.norm(disp_vec_after) / np.sqrt(len(disp_vec_after)))
@@ -194,12 +194,12 @@ class CorrectionEngine:
             wake_rms = None
             if wake_w > 0 and R_wake is not None:
                 self.set_highintensity_flag(False)
-                self.interface.reset_intensity()
+                self.interface.reset_intensity(scale=1)
                 y_low_after = self._y_nom(bpms)
                 self.set_highintensity_flag(True)
-                self.interface.change_intensity()
+                self.interface.change_intensity(scale=0.9)
                 y_high_after = self._y_nom(bpms)
-                self.interface.reset_intensity()
+                self.interface.reset_intensity(scale=1)
                 self.set_highintensity_flag(False)
                 wake_vec_after = y_high_after - y_low_after
                 wake_rms = float(np.linalg.norm(wake_vec_after) / np.sqrt(len(wake_vec_after)))
