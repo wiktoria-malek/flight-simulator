@@ -24,7 +24,10 @@ class ChiSquaredWindow(QDialog):
         self.setWindowTitle("χ² = w₁·O + w₂·D + w₃·W")
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
-        self.setFixedSize(520, 320)
+        #self.setFixedSize(520, 320)
+        self.setMinimumSize(520, 320)
+        self.resize(700, 420)
+        self.setSizeGripEnabled(True)
         self.setSizeGripEnabled(True)
 
         self.w1 = self.w2 = self.w3 = 1.0
@@ -509,12 +512,12 @@ class MainWindow(QMainWindow):
 
     def _using_traj_response(self,corrs, bpms):
         if not getattr(self, "traj_response", None):
-            return None, corrs
+            return None, corrs, None
         tr = self.traj_response
-        h_gui = [c for c in corrs if c in tr["hcorrs"]]
-        v_gui = [c for c in corrs if c in tr["vcorrs"]]
+        h_gui = [c for c in corrs if c in tr.get("hcorrs",[])]
+        v_gui = [c for c in corrs if c in tr.get("vcorrs",[])]
         if not (h_gui or v_gui):
-            return None, corrs
+            return None, corrs,None
 
         Rx = reorder_matrix_to_gui(np.asarray(tr["Rxx"]), tr["bpms"],tr["hcorrs"], bpms, h_gui)
         Ry = reorder_matrix_to_gui(np.asarray(tr["Ryy"]), tr["bpms"],tr["vcorrs"], bpms, v_gui)
@@ -531,7 +534,7 @@ class MainWindow(QMainWindow):
 
         Bx_selected=np.asarray(tr["Bx"], float).ravel()[selected_index]
         By_selected=np.asarray(tr["By"], float).ravel()[selected_index]
-        B0=np.concatenate([Bx_selected, By_selected])
+        B0=np.concatenate([Bx_selected, By_selected]).astype(float).reshape(-1,1)
         return R_nom, h_gui + v_gui, B0
 
     def _start_correction(self):
@@ -563,12 +566,16 @@ class MainWindow(QMainWindow):
             if hasattr(self, "dfs_response_3"):
                 dfs_path = (self.dfs_response_3.text() or "").strip()
                 if dfs_path and os.path.isfile(dfs_path):
-                    R_nom, R_disp = load_dfs_npz(dfs_path, bpms, corrs)
+                    dfs_data=load_dfs_npz(dfs_path,bpms,corrs)
+                    if isinstance(dfs_data,tuple) and len(dfs_data)==2:
+                        R_nom,R_disp=dfs_data
 
             if hasattr(self, "wfs_response_3"):
                 wfs_path = (self.wfs_response_3.text() or "").strip()
                 if wfs_path and os.path.isfile(wfs_path):
-                    R_wake = load_wfs_npz(wfs_path, bpms, corrs)
+                    wfs_data=load_wfs_npz(wfs_path,bpms,corrs)
+                    if wfs_data is not None:
+                        R_wake=wfs_data
 
 
             def on_iter(i, orbit_rms, disp_rms, wake_rms):
