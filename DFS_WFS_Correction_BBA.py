@@ -9,7 +9,7 @@ class CorrectionEngine:
     def _measure_orbit_vec(self,bpms):
         S=State(interface=self.interface)
         O=S.get_orbit(bpms)
-        x=O["x"].reshape(-1,1)
+        x=O["x"].reshape(-1,1) #column vector
         y=O["y"].reshape(-1,1)
         return x,y
 
@@ -58,7 +58,7 @@ class CorrectionEngine:
         wake_w=float(wake_w)
 
         if y_ref is not None:
-            y_ref=np.asarray(y_ref,float).reshape(-1,1)
+            y_ref=np.asarray(y_ref,float).reshape(-1,1) #making it that way for the y_nom-y_ref
 
         for it in range(int(max_iters)):
             #nominal
@@ -104,13 +104,13 @@ class CorrectionEngine:
             B=np.vstack(B_terms)
 
             dtheta, *_ = np.linalg.lstsq(A, -B, rcond=float(rcond))
-            kicks = (gain * dtheta).ravel().tolist()
+            kicks = (gain * dtheta).ravel().tolist() #to keep it stable
             self.interface.vary_correctors(corrs, kicks)
 
             for i, c in enumerate(corrs):
                 self.accumulated[c] += kicks[i]
 
-            orbit_rms=float(np.linalg.norm(y_nom)/np.sqrt(y_nom.size))
+            orbit_rms=float(np.linalg.norm(y_nom)/np.sqrt(y_nom.size)) # sqrt(1/N Σy_nom^2/)
             disp_rms=float(np.linalg.norm(y_off-y_nom)/np.sqrt(y_off.size)) \
                         if (disp_w and R_disp is not None) else None
             wake_rms=float(np.linalg.norm(y_high-y_low)/np.sqrt(y_nom.size)) \
