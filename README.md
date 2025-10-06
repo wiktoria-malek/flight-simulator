@@ -97,25 +97,24 @@ Reads corrector strengths for all devices in `self.corrs`.
 
 ---
 
-## Placeholder (not implemented)
+## Placeholder
 
-These exist for API completeness but currently do nothing:
+These are used by the BBA GUI. All of them re-track:
 
-### `change_energy(*args) -> None`
+### `change_energy(scale: float) -> None`
 
-No-op placeholder for changing beam energy.
+Creates an off-energy bunch with Pref = scale * Pref_nom (e.g. 0.98) and tracks it.
 
-### `reset_energy(*args) -> None`
+### `reset_energy(scale: float) -> None`
 
-No-op placeholder for restoring nominal energy.
+Restores the nominal bunch (ignores scale and goes back to __setup_beam0()), then tracks.
 
-### `change_intensity(*args) -> None`
+### `change_intensity(scale: float) -> None`
 
-No-op placeholder for changing beam intensity.
+Creates a low-charge bunch with population = scale * population_nom (e.g. 0.90) and tracks it.
+### `reset_intensity(scale: float) -> None`
 
-### `reset_intensity(*args) -> None`
-
-No-op placeholder for restoring nominal intensity.
+Restores the nominal bunch (ignores scale and goes back to __setup_beam0()), then tracks.
 
 ---
 

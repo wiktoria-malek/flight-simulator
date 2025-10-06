@@ -118,33 +118,3 @@ class CorrectionEngine:
 
             if iter_cb and not iter_cb(it, orbit_rms, disp_rms, wake_rms):
                 break
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

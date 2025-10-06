@@ -82,7 +82,7 @@ class InterfaceATF2_Ext_RFTrack:
 
 
     def reset_energy(self, scale=1):
-        self.__setup_beam0()
+        self.__setup_beam0( )
         self.__track_bunch()
 
     def change_intensity(self, scale): #reduced charge
@@ -168,3 +168,20 @@ class InterfaceATF2_Ext_RFTrack:
             elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
+
+
+    def align_everything(self):
+        self.lattice.align_elements()
+        self.__track_bunch()
+
+    def misalign_quadrupoles(self,sigma_x=0.100,sigma_y=0.100):
+        self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
+        self.__track_bunch()
+# sigma_X = 0.100 # mm, 100 um rms misalignment
+# LINAC_BBA.scatter_elements('quadrupole', sigma_X, sigma_X, 0, 0, 0, 0, 'center');
+
+    def misalign_bpms(self,sigma_x=0.100,sigma_y=0.100):
+        self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
+        self.__track_bunch()
+
+# LINAC_BBA.scatter_elements('bpm', sigma_X, sigma_X, 0, 0, 0, 0, 'center');
