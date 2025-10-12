@@ -4,7 +4,7 @@ import numpy as np
 import glob
 import os
 
-with open('/userhome/atfop1/CERN-Flight_Simulator/flight-simulator-live/Data/new_SYSID_20250619_090834/response.pkl', 'rb') as f:
+with open('/userhome/atfop1/CERN-Flight_Simulator/flight-simulator-live/Data/new_SYSID_20250619_090834/response2.pkl', 'rb') as f:
     R = pickle.load(f)
 
 bpms=R["bpms"]

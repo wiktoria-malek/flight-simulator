@@ -137,18 +137,18 @@ class State:
             filename = f"{basename}_{time_str}.pkl"
         correctors = {
             'names': self.correctors['names'],
-            'bdes': self.correctors['bdes'],
-            'bact': self.correctors['bact']
+            'bdes': self.correctors['bdes'], #setpoint for a corrector
+            'bact': self.correctors['bact'] #readback for a corr
         }
         bpms = {
             'names': self.bpms['names'],
             'x': self.bpms['x'],
             'y': self.bpms['y'],
-            'tmit': self.bpms['tmit']
+            'tmit': self.bpms['tmit'] #it's a local intensity at each bpm
         }
-        icts = {
+        icts = { #tells us about intensity
             'names': self.icts['names'],
-            'charge': self.icts['charge']
+            'charge': self.icts['charge'] #intensity
         }
         state = {
             "sequence": self.sequence,
@@ -164,4 +164,4 @@ class State:
         return filename
             
     def push(self, interface):
-        interface.push(self.correctors['names'], self.correctors['bdes'])
+        interface.push(self.correctors['names'], self.correctors['bdes']) #restores, because errors would add up i think

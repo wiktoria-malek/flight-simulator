@@ -1,31 +1,6 @@
-import sys
+g is after the dipole
+j if before
 
-from PyQt6.QtWidgets import QApplication, QDialog, QMainWindow, QPushButton
+btv has to arrive to that
 
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-
-        self.setWindowTitle("My App")
-
-        button = QPushButton("Press me for a dialog!")
-        button.clicked.connect(self.button_clicked)
-        self.setCentralWidget(button)
-
-    def button_clicked(self, s):
-        print("click", s)
-
-        dlg = QDialog(self)
-        dlg.setWindowTitle("HELLO!")
-        dlg.exec()
-
-
-app = QApplication(sys.argv)
-window = MainWindow()
-window.show()
-app.exec()
-
-
-
-
+virtual machine - need it over a ticket, put in copy giacomo, technical network

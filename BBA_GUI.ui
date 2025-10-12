@@ -29,103 +29,6 @@
          <number>0</number>
         </property>
 
-        <widget class="QWidget" name="tab_corrbpms">
-         <attribute name="title">
-          <string>Correctors &amp;&amp; BPMs</string>
-         </attribute>
-         <layout class="QHBoxLayout" name="horizontalLayout_6">
-          <item>
-           <widget class="QGroupBox" name="groupBox_5">
-            <property name="title">
-             <string>Correctors</string>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_14">
-             <item>
-              <layout class="QVBoxLayout" name="verticalLayout">
-               <item>
-                <widget class="QListWidget" name="correctors_list">
-                 <property name="selectionMode">
-                  <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <layout class="QHBoxLayout" name="correctors_buttons_layout">
-                 <item>
-                  <widget class="QPushButton" name="save_correctors_button">
-                   <property name="text">
-                    <string>Save As..</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="load_correctors_button">
-                   <property name="text">
-                    <string>Load..</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="clear_correctors_button">
-                   <property name="text">
-                    <string>Clear</string>
-                   </property>
-                  </widget>
-                 </item>
-                </layout>
-               </item>
-              </layout>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QGroupBox" name="groupBox_8">
-            <property name="title">
-             <string>BPMs</string>
-            </property>
-            <layout class="QVBoxLayout" name="verticalLayout_15">
-             <item>
-              <layout class="QVBoxLayout" name="verticalLayout_13">
-               <item>
-                <widget class="QListWidget" name="bpms_list">
-                 <property name="selectionMode">
-                  <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <layout class="QHBoxLayout" name="horizontalLayout_7">
-                 <item>
-                  <widget class="QPushButton" name="save_bpms_button">
-                   <property name="text">
-                    <string>Save As..</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="load_bpms_button">
-                   <property name="text">
-                    <string>Load..</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="clear_bpms_button">
-                   <property name="text">
-                    <string>Clear</string>
-                   </property>
-                  </widget>
-                 </item>
-                </layout>
-               </item>
-              </layout>
-             </item>
-            </layout>
-           </widget>
-          </item>
-         </layout>
-        </widget>
 
         <widget class="QWidget" name="tab_response">
          <attribute name="title">
@@ -339,6 +242,109 @@
          </layout>
         </widget>
 
+        <!--CORRECTORS AND BPMS TAB -->
+        <widget class="QWidget" name="tab_corrbpms">
+         <attribute name="title">
+          <string>Correctors &amp;&amp; BPMs</string>
+         </attribute>
+         <layout class="QHBoxLayout" name="horizontalLayout_6">
+          <item>
+           <widget class="QGroupBox" name="groupBox_5">
+            <property name="title">
+             <string>Correctors</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_14">
+             <item>
+              <layout class="QVBoxLayout" name="verticalLayout">
+               <item>
+                <widget class="QListWidget" name="correctors_list">
+                 <property name="selectionMode">
+                  <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+                 </property>
+                </widget>
+               </item>
+
+               <item>
+
+                <layout class="QHBoxLayout" name="correctors_buttons_layout">
+                 <item>
+                  <widget class="QPushButton" name="save_correctors_button">
+                   <property name="text">
+                    <string>Save As..</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="load_correctors_button">
+                   <property name="text">
+                    <string>Load..</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="clear_correctors_button">
+                   <property name="text">
+                    <string>Clear</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_8">
+            <property name="title">
+             <string>BPMs</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_15">
+             <item>
+              <layout class="QVBoxLayout" name="verticalLayout_13">
+               <item>
+                <widget class="QListWidget" name="bpms_list">
+                 <property name="selectionMode">
+                  <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="horizontalLayout_7">
+                 <item>
+                  <widget class="QPushButton" name="save_bpms_button">
+                   <property name="text">
+                    <string>Save As..</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="load_bpms_button">
+                   <property name="text">
+                    <string>Load..</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="clear_bpms_button">
+                   <property name="text">
+                    <string>Clear</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+
+
+     <!--CORRECTION TAB -->
         <widget class="QWidget" name="tab_correction">
          <attribute name="title">
           <string>Correction</string>
@@ -469,6 +475,7 @@
            <widget class="QGroupBox" name="groupBox_2">
             <property name="title">
              <string>Trajectory</string>
+
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_8">
              <item>
@@ -484,6 +491,26 @@
                </property>
               </widget>
              </item>
+
+
+            <item>
+           <layout class="QHBoxLayout" name="trajectory_bba_layout">
+            <item alignment="Qt::AlignmentFlag::AlignLeft">
+             <widget class="QPushButton" name="save_trajectory_bba_button">
+              <property name="text">
+               <string>Save As..</string>
+              </property>
+               <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+             </widget>
+            </item>
+           </layout>
+            </item>
+
             </layout>
            </widget>
           </item>
@@ -507,6 +534,26 @@
                </property>
               </widget>
              </item>
+
+           <item>
+           <layout class="QHBoxLayout" name="dispersion_bba_layout">
+            <item alignment="Qt::AlignmentFlag::AlignLeft">
+             <widget class="QPushButton" name="save_dispersion_bba_button">
+              <property name="text">
+               <string>Save As..</string>
+              </property>
+               <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+             </widget>
+            </item>
+           </layout>
+            </item>
+
+
             </layout>
            </widget>
           </item>
@@ -530,6 +577,25 @@
                </property>
               </widget>
              </item>
+
+                         <item>
+           <layout class="QHBoxLayout" name="wakefield_bba_layout">
+            <item alignment="Qt::AlignmentFlag::AlignLeft">
+             <widget class="QPushButton" name="save_wakefield_bba_button">
+              <property name="text">
+               <string>Save As..</string>
+              </property>
+               <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+             </widget>
+            </item>
+           </layout>
+            </item>
+
             </layout>
            </widget>
           </item>

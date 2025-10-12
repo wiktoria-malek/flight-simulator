@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
             bpms = self.bpms
 
 
-        #if corr doesnt start with zh or zv, it is removed?? so all zx..., ipkick etc
+        #if corr doesnt start with zh or zv, is it removed?? so all zx..., ipkick etc
         hcorrs = [string for string in correctors if string.lower().startswith('zh')]
         vcorrs = [string for string in correctors if string.lower().startswith('zv')]
 
@@ -388,11 +388,11 @@ class MainWindow(QMainWindow):
         self.plot.repaint()
         
     def __save_as_button_clicked(self):
-        dir_name = self.cwd + '/response.pkl'
+        dir_name = self.cwd + '/response2.pkl'
         os.chdir (self.cwd)
         filename, _ = QFileDialog.getSaveFileName(None, "Save Response Matrix", dir_name, "Piclke Files (*.pkl)")
         if filename:
-            self.R.save('response.pkl')
+            self.R.save('response2.pkl')
 
 ## MAIN
 app = QApplication(sys.argv)

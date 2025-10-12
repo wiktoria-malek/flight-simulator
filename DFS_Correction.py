@@ -15,7 +15,7 @@ import signal
 import os
 
 R0 = Response('response0.pkl')
-R1 = Response('response1.pkl')
+R1 = Response('response2.pkl')
 
 # The list of correctors to use
 hcorrs = R0.hcorrs[1:10]

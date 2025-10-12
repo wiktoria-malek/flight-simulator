@@ -8,7 +8,7 @@ import numpy as np
 import glob
 import os
 
-R = Response('response.pkl')
+R = Response('response2.pkl')
 
 # Use glob to get the list of DATA files
 datafiles = glob.glob('DATA*.pkl')
