@@ -2,14 +2,10 @@ import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QVBoxLayout,QDialog, QLabel)
 from PyQt6.QtWidgets import QSizePolicy
-
-try:
-    import matplotlib
-    matplotlib.use("QtAgg")
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.figure import Figure
-except Exception:
-    FigureCanvas = Figure = None
+import matplotlib
+matplotlib.use("QtAgg")
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 class ChiSquaredWindow(QDialog):
     def __init__(self, parent=None):
@@ -33,7 +29,7 @@ class ChiSquaredWindow(QDialog):
         self._W0=None
 
         layout = QVBoxLayout(self)
-        self.info = QLabel("w1=1.0, w2=1.0, w3=1.0")
+        self.info = QLabel(f"w1={self.w1}, w2={self.w2}, w3={self.w3}")
         layout.addWidget(self.info,alignment=Qt.AlignmentFlag.AlignTop.AlignCenter)
 
         self.info.setVisible(False)
@@ -68,7 +64,12 @@ class ChiSquaredWindow(QDialog):
 
     def set_weights(self, w1, w2, w3):
         self.w1, self.w2, self.w3 = float(w1), float(w2), float(w3)
-        self.info.setText(f"w1={self.w1:g}, w2={self.w2:g}, w3={self.w3:g}")
+        txt=f"w1={self.w1:g}, w2={self.w2:g}, w3={self.w3:g}"
+        self.info.setText(txt)
+        if self._title is not None:
+            self._title.set_text(txt)
+            self.canvas.draw_idle()
+
 
     def clear(self):
         self._O.clear(); self._D.clear(); self._W.clear()
@@ -98,9 +99,6 @@ class ChiSquaredWindow(QDialog):
         # W=W_beg
         self._O.append(O); self._D.append(D); self._W.append(W)
         self._redraw()
-
-
-
 
     def _redraw(self):
         x = list(range(1, len(self._O) + 1))

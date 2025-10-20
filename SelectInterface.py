@@ -15,7 +15,7 @@ class InterfaceSelectionDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose one of the following Interfaces:"))
 
-        interfaces = [ 'InterfaceATF2_DR', 'InterfaceATF2_Ext', 'InterfaceATF2_Linac', 'InterfaceATF2_Ext_RFTrack' ]
+        interfaces = [ 'InterfaceATF2_DR', 'InterfaceATF2_Ext', 'InterfaceATF2_Linac', 'InterfaceATF2_Ext_RFTrack','InterfaceCLEAR_RFTrack' ]
 
         self.radio_buttons = []
         for f in interfaces:
@@ -24,7 +24,7 @@ class InterfaceSelectionDialog(QDialog):
             layout.addWidget(rb)
 
         if self.radio_buttons:
-            self.radio_buttons[3].setChecked(True)
+            self.radio_buttons[4].setChecked(True)
 
         buttons = QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         self.button_box = QDialogButtonBox(buttons)
@@ -57,13 +57,24 @@ class InterfaceSelectionDialog(QDialog):
                     case 'InterfaceATF2_Ext_RFTrack':
                         from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
                         globals()['InterfaceATF2_Ext_RFTrack'] = InterfaceATF2_Ext_RFTrack
-                        self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.02, nsamples=1)
+                        self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.00, nsamples=1)
 
                         #TESTS:
 
                         self.selected_interface.align_everything()
                         #self.selected_interface.misalign_quadrupoles()
-                        #self.selected_interface.misalign_bpms()
+                        self.selected_interface.misalign_bpms()
+
+                    case 'InterfaceCLEAR_RFTrack':
+                        from InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
+                        globals()['InterfaceCLEAR_RFTrack'] = InterfaceCLEAR_RFTrack
+                        self.selected_interface = InterfaceCLEAR_RFTrack(jitter=0.0, bpm_resolution=0.02, nsamples=1)
+
+                        #TESTS:
+                        #
+                        # self.selected_interface.align_everything()
+                        # #self.selected_interface.misalign_quadrupoles()
+                        # #self.selected_interface.misalign_bpms()
 
 
                 self.selected_interface_name = self.selected_interface.get_name()

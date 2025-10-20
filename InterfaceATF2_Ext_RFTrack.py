@@ -74,6 +74,11 @@ class InterfaceATF2_Ext_RFTrack:
         yaw   = self.jitter*I0.sigma_px
         B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
         self.lattice.track(B0_offset)
+        I=B0_offset.get_info()
+        print("Emittance after tracking:")
+        print(f"εx = {I.emitt_x}[mm.rad]")
+        print(f"εy = {I.emitt_y}[mm.rad]")
+        print(f"εz = {I.emitt_z}[mm.permille]")
 
     def change_energy(self, scale):
         self.__setup_beam1(scale)
