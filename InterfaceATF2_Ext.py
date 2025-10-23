@@ -81,7 +81,7 @@ class InterfaceATF2_Ext:
         return self.corrs
 
     def get_hcorrectors_names(self):
-        return [string for string in self.corrs if string.lower().startswith('zh')]
+        return [string for string in self.corrs if (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
 
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]

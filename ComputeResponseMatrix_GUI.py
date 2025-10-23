@@ -233,8 +233,7 @@ class MainWindow(QMainWindow):
             bpms = self.bpms
 
 
-        #if corr doesnt start with zh or zv, is it removed?? so all zx..., ipkick etc
-        hcorrs = [string for string in correctors if string.lower().startswith('zh')]
+        hcorrs = [string for string in correctors if (string.lower().startswith('zh') or string.lower().startswith('zx'))]
         vcorrs = [string for string in correctors if string.lower().startswith('zv')]
 
         # Pick all correctors preceding the last bpm

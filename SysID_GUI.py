@@ -308,8 +308,8 @@ class MainWindow(QMainWindow):
         self.worker.moveToThread(self.thread)
 
         #FOR THE BBA!
-        self.worker.cond="scale_I"
-        self.worker.scale_I=0.90
+        self.worker.cond="nominal"
+        #self.worker.scale_E=0.98
 
 
         self.thread.started.connect(self.worker.run)

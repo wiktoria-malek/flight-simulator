@@ -111,7 +111,7 @@ class InterfaceATF2_Ext_RFTrack:
         return self.corrs
 
     def get_hcorrectors_names(self):
-        return [string for string in self.corrs if string.lower().startswith('zh')]
+        return [string for string in self.corrs if (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
 
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
@@ -132,7 +132,7 @@ class InterfaceATF2_Ext_RFTrack:
         print("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
-            if corrector[:2] == "ZH":
+            if corrector[:2] == "ZH" or corrector[:2] == "ZX":
                 bdes[i] = (self.lattice[corrector].get_strength()[0]*10)  # gauss*m
             elif corrector[:2] == "ZV":
                 bdes[i] = (self.lattice[corrector].get_strength()[1]*10)  # gauss*m
@@ -158,7 +158,7 @@ class InterfaceATF2_Ext_RFTrack:
         if not isinstance(names, list):
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
-            if corr[:2] == "ZH":
+            if corr[:2] == "ZH" or corr[:2] == "ZX":
                 self.lattice[corr].set_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
                 self.lattice[corr].set_strength(0.0, val/10)  # T*mm
@@ -168,7 +168,7 @@ class InterfaceATF2_Ext_RFTrack:
         if not isinstance(names, list):
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
-            if corr[:2] == "ZH":
+            if corr[:2] == "ZH" or corr[:2] == "ZX":
                 self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val/10)  # T*mm

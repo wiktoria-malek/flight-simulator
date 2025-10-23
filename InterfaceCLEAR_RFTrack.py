@@ -119,7 +119,7 @@ class InterfaceCLEAR_RFTrack:
                     if 'QFD' in name:
                         K = get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
                     elif 'QDD' in name:
-                        K = -get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                        K = get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
                     element = rft.Quadrupole(L, Pref / self.Q, K)
                 elif element_type == 'Corrector':
                     element = rft.Corrector(L)
@@ -352,23 +352,22 @@ class InterfaceCLEAR_RFTrack:
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
         for i in range(self.nsamples):
-            for j,name in enumerate(self.bpms):
-                b=self.bpm_elements[name]
-                reading = b.get_reading()
-                x[i,j] = reading[0]
-                y[i,j] = reading[1]
-                tmit[i,j] = b.get_total_charge()
+            # for j,name in enumerate(self.bpms):
+            #     b=self.bpm_elements[name]
+            #     reading = b.get_reading()
+            #     x[i,j] = reading[0]
+            #     y[i,j] = reading[1]
+            #     tmit[i,j] = b.get_total_charge()
 
-            for j_s,name in enumerate(self.screens):
+            for j,name in enumerate(self.screens):
                 s=self.screen_elements[name]
                 B=s.get_bunch()
                 I=B.get_info()
-                j=len(self.bpms)+j_s
                 x[i,j] = I.mean_x #is it ok? #mm
                 y[i,j] = I.mean_y
                 tmit[i,j] = B.get_total_charge()
 
-        bpms = { "names": self.bpms+self.screens, "x": x, "y": y, "tmit": tmit } #i think its not a correct sentence, its just appending
+        bpms = { "names": self.screens, "x": x, "y": y, "tmit": tmit }
         return bpms
 
     def push(self, names, corr_vals):
