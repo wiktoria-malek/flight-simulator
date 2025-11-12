@@ -59,11 +59,33 @@ class InterfaceATF2_Ext:
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
 
-    def change_energy(self, *args):
-        pass
+    def change_energy(self, *kvargs):
+        # some parsing to extract delta_freq
+        delta_freq = -2
+
+        # test for valid range and integer value
+        if (delta_freq ~= int32(delta_freq)):
+            error ('DR frequency change is not an integer: %s', num2str(delta_freq))
+
+        if (-5 > delta_freq || delta_freq > 5):
+            error ('DR frequency change is out of a safe range: %d', delta_freq)
+
+        pv = PV('atf:rfRamp:sw')
+        pv.put(1 if delta_freq else 0)
+        sleep(2)
+
+        pv = PV('atf:rfRamp:freq:set')
+        pv.put(delta_freq)
+        sleep(2)
 
     def reset_energy(self, *args):
-        pass
+        pv = PV('atf:rfRamp:sw')
+        pv.put(0)
+        sleep(2)
+
+        pv = PV('atf:rfRamp:freq:set')
+        pv.put(0)
+        sleep(2)
 
     def change_intensity(self, *args):
         pass
