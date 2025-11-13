@@ -109,9 +109,10 @@ class InterfaceATF2_Ext:
 
             # read x_counter
 
-            os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
+            x_counter = PV('INJ:LaserIntensityXcount').get()
 
-            [name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
+            #os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
+            #[name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
 
             print(x_counter)
 
@@ -124,15 +125,19 @@ class InterfaceATF2_Ext:
 
             if pulse >= 0:
                 print('laser up')
-                os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
+                PV('INJ:setLaserIntUpAngle').put(int(pulse))
+                #os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
             else:
                 print('laser down')
                 pulse = -pulse
-                os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
+                PV('INJ:setLaserIntDownAngle').put(int(pulse))
+                #os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
 
-            os.system('caput INJ:setLaserIntSend 1')
+            PV('INJ:setLaserIntSend').put(1)
+            #os.system('caput INJ:setLaserIntSend 1')
             time.sleep(0.5)
-            os.system('caput INJ:setLaserIntSend.PROC 1')
+            PV('INJ:setLaserIntSend').put(1)
+            #os.system('caput INJ:setLaserIntSend.PROC 1')
 
             time.sleep(3)
             elapsed = time.perf_counter() - start
@@ -151,11 +156,11 @@ class InterfaceATF2_Ext:
 
         # read x_counter
 
-        os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
-
-        [name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
-
+        x_counter = PV('INJ:LaserIntensityXcount').get()
         print(x_counter)
+
+        #os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
+        #[name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
 
         angle_read = np.mod(x_counter, 72000) / 200.0 + ang_offset
 
@@ -163,21 +168,25 @@ class InterfaceATF2_Ext:
 
         if pulse >= 0:
             print('laser up')
-            os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
+            PV('INJ:setLaserIntUpAngle').put(int(pulse))
+            #os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
         else:
             print('laser down')
             pulse = -pulse
-            os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
+            PV('INJ:setLaserIntDownAngle').put(int(pulse))
+            #os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
 
-        os.system('caput INJ:setLaserIntSend 1')
+        PV('INJ:setLaserIntSend').put(1)
+        #os.system('caput INJ:setLaserIntSend 1')
         time.sleep(0.5)
-        os.system('caput INJ:setLaserIntSend.PROC 1')
+
+        PV('INJ:setLaserIntSend.PROC').put(1)
+        #os.system('caput INJ:setLaserIntSend.PROC 1')
 
         time.sleep(3)
         elapsed = time.perf_counter() - start
         print('InterfaceATF2::ChangeBunchCharge()', elapsed)
         return self
-
 
 
     def get_sequence(self):
