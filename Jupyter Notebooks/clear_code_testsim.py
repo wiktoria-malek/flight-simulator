@@ -33,7 +33,7 @@ def get_Quad_K_from_I(I, Lquad, P_ref):
     K = get_Quad_K(G_0, P_ref)
     return K
 
-with open('CLEAR_Beamline_Survey.txt') as file:
+with open('../Interfaces/CLEAR/CLEAR_Beamline_Survey.txt') as file:
     lines = file.readlines()
 
 # Loop through the survey line-by-line and construct a dict of all relevant elements

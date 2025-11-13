@@ -182,11 +182,8 @@ class InterfaceATF2_Ext_RFTrack:
     def misalign_quadrupoles(self,sigma_x=0.100,sigma_y=0.100):
         self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
-# sigma_X = 0.100 # mm, 100 um rms misalignment
-# LINAC_BBA.scatter_elements('quadrupole', sigma_X, sigma_X, 0, 0, 0, 0, 'center');
 
     def misalign_bpms(self,sigma_x=0.100,sigma_y=0.100):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
-# LINAC_BBA.scatter_elements('bpm', sigma_X, sigma_X, 0, 0, 0, 0, 'center');

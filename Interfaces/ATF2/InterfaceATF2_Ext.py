@@ -1,7 +1,5 @@
-import sys
+import sys, time, math,os
 import numpy as np
-import time
-
 from epics import PV, ca
 
 class InterfaceATF2_Ext:
@@ -64,34 +62,123 @@ class InterfaceATF2_Ext:
         delta_freq = -2
 
         # test for valid range and integer value
-        if (delta_freq ~= int32(delta_freq)):
-            error ('DR frequency change is not an integer: %s', num2str(delta_freq))
+        if delta_freq != np.int32(delta_freq):
+            raise Exception('DR frequency change is not an integer: %s',delta_freq)
 
-        if (-5 > delta_freq || delta_freq > 5):
-            error ('DR frequency change is out of a safe range: %d', delta_freq)
+        if (-5 > delta_freq) or (delta_freq > 5):
+            raise Exception('DR frequency change is out of a safe range: %d', delta_freq)
 
         pv = PV('atf:rfRamp:sw')
         pv.put(1 if delta_freq else 0)
-        sleep(2)
+        time.sleep(2)
 
         pv = PV('atf:rfRamp:freq:set')
         pv.put(delta_freq)
-        sleep(2)
+        time.sleep(2)
 
     def reset_energy(self, *args):
         pv = PV('atf:rfRamp:sw')
         pv.put(0)
-        sleep(2)
+        time.sleep(2)
 
         pv = PV('atf:rfRamp:freq:set')
         pv.put(0)
-        sleep(2)
+        time.sleep(2)
 
     def change_intensity(self, *args):
-        pass
+
+        start = time.perf_counter()
+
+        laserintensity = 0.1
+
+        if laserintensity <= 0.0:
+            raise ValueError('Laser intensity should be strict positive')
+
+        elif laserintensity >= 1.0:
+            raise ValueError(f'Laser intensity should be below 1: {laserintensity}')
+
+        elif laserintensity >= 0.30:
+            raise ValueError(f'Laser intensity should be below 0.3 - internal warning {laserintensity}')
+
+        else:
+            ang_offset = 2.0
+
+            angle = 180.0 / np.pi / 4.0 * math.acos(2.0 * laserintensity - 1.0) - ang_offset
+
+            ### calculate current angle
+
+            # read x_counter
+
+            os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
+
+            [name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
+
+            print(x_counter)
+
+            angle_read = np.mod(x_counter, 72000) / 200.0 + ang_offset
+
+            if not hasattr(self, '_angle_before'):
+                self._angle_before = angle_read
+
+            pulse = np.int32((angle - angle_read) * 200)
+
+            if pulse >= 0:
+                print('laser up')
+                os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
+            else:
+                print('laser down')
+                pulse = -pulse
+                os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
+
+            os.system('caput INJ:setLaserIntSend 1')
+            time.sleep(0.5)
+            os.system('caput INJ:setLaserIntSend.PROC 1')
+
+            time.sleep(3)
+            elapsed = time.perf_counter() - start
+            print('InterfaceATF2::ChangeBunchCharge()', elapsed)
+            return self
+
 
     def reset_intensity(self, *args):
-        pass
+        start = time.perf_counter()
+
+        ang_offset = 2.0
+
+        angle = self._angle_before
+
+        ### calculate current angle
+
+        # read x_counter
+
+        os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
+
+        [name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
+
+        print(x_counter)
+
+        angle_read = np.mod(x_counter, 72000) / 200.0 + ang_offset
+
+        pulse = int((angle - angle_read) * 200)
+
+        if pulse >= 0:
+            print('laser up')
+            os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
+        else:
+            print('laser down')
+            pulse = -pulse
+            os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
+
+        os.system('caput INJ:setLaserIntSend 1')
+        time.sleep(0.5)
+        os.system('caput INJ:setLaserIntSend.PROC 1')
+
+        time.sleep(3)
+        elapsed = time.perf_counter() - start
+        print('InterfaceATF2::ChangeBunchCharge()', elapsed)
+        return self
+
+
 
     def get_sequence(self):
         return self.sequence

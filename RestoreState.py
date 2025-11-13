@@ -1,4 +1,4 @@
-from InterfaceATF2_Linac import InterfaceATF2_Linac
+from Interfaces.ATF2.InterfaceATF2_Linac import InterfaceATF2_Linac
 from State import State
 import os
 

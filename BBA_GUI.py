@@ -326,7 +326,7 @@ class MainWindow(QMainWindow):
                     bxm = np.asarray(minus_file["bpms"]["x"]).squeeze()
                     bym = np.asarray(minus_file["bpms"]["y"]).squeeze()
 
-                    bact_p = np.asarray(plus_file["correctors"]["bact"]).squeeze()
+                    bact_p = np.asarray(plus_file["correctors"]["bact"]).squeeze() # bact is an actual corrector value/kick that was applied
                     bact_m = np.asarray(minus_file["correctors"]["bact"]).squeeze()
 
                     bpms_names = list(map(str, plus_file["bpms"]["names"]))
@@ -352,7 +352,7 @@ class MainWindow(QMainWindow):
                     if pairs == pairs0 and plane == "x":
                         px = bxp[indeces]
                         mx = bxm[indeces]
-                        B0_x = (px + mx) / 2
+                        B0_x = (px + mx) / 2 # golden orbit
                         rowx = np.full(nb, np.nan)
                         for k, b in enumerate(present):
                             rowx[pos[b]] = B0_x[k]
@@ -370,7 +370,7 @@ class MainWindow(QMainWindow):
                         continue
                     column_value = np.full(len(selected_bpms), np.nan, dtype=float)
                     for k, b in enumerate(present):
-                        column_value[pos[b]] = (plus_value[k] - minus_value[k]) / (k_plus - k_minus)
+                        column_value[pos[b]] = (plus_value[k] - minus_value[k]) / (k_plus - k_minus) # (bpm plus - bpm minus) /(kick plus - kick minus0
                     cols.append(column_value)
 
                 if cols:
@@ -525,10 +525,9 @@ class MainWindow(QMainWindow):
             bpms_dx[bpms_name] = float(data[DX_column])
             bpms_dy[bpms_name] = float(data[DY_column])
 
-        target_disp_x = np.array([bpms_dx.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)
-        target_disp_y = np.array([bpms_dy.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)
+        target_disp_x = np.array([bpms_dx.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1) # m
+        target_disp_y = np.array([bpms_dy.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1) # m
 
-        # what about the units??
         return target_disp_x, target_disp_y
 
     def _start_correction(self):
@@ -571,7 +570,7 @@ class MainWindow(QMainWindow):
                 # nominal
                 self.S.pull(self.interface)
                 O0 = self.S.get_orbit(bpms)
-                O0x = O0['x'].reshape(-1, 1)
+                O0x = O0['x'].reshape(-1, 1) # turns an array into a column vector
                 O0y = O0['y'].reshape(-1, 1)
 
                 # dfs
@@ -601,7 +600,10 @@ class MainWindow(QMainWindow):
                     wgt_wfs * (O2y - O0y),
                 ))
 
-                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx)
+                # A = U * Sigma * V^T
+                # A^+ = V * Sigma^+ * U^T
+
+                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx) #theta = - gain * Axx^+ *Bx
                 corrY = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By)
 
                 vals = np.concatenate([corrX.ravel(), corrY.ravel()])  # flattens an array
@@ -749,8 +751,7 @@ class MainWindow(QMainWindow):
         if "dfs_change" in settings: self.dfs_change_3.setText(str(settings["dfs_change"]))
         if "wfs_reset" in settings:  self.wfs_reset_3.setText(str(settings["wfs_reset"]))
         if "wfs_change" in settings: self.wfs_change_3.setText(str(settings["wfs_change"]))
-        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(
-            settings["data_dirs"]["traj"] or "")
+        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
         if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")
         if hasattr(self, "wfs_response_3"): self.wfs_response_3.setText(settings["data_dirs"]["wfs"] or "")
 

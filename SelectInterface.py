@@ -1,10 +1,8 @@
-import sys
-import glob
 from PyQt6.QtWidgets import (
-    QApplication, QDialog, QVBoxLayout, QDialogButtonBox,
-    QRadioButton, QLabel, QMessageBox
+    QDialog, QVBoxLayout, QDialogButtonBox,
+    QRadioButton, QLabel
 )
-from PyQt6.QtCore import Qt
+
 
 class InterfaceSelectionDialog(QDialog):
     def __init__(self, parent=None):
@@ -40,22 +38,22 @@ class InterfaceSelectionDialog(QDialog):
             if rb.isChecked():
                 match rb.text():
                     case 'InterfaceATF2_DR':
-                        from InterfaceATF2_DR import InterfaceATF2_DR
+                        from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
                         globals()['InterfaceATF2_DR'] = InterfaceATF2_DR
                         self.selected_interface = InterfaceATF2_DR(nsamples=3)
 
                     case 'InterfaceATF2_Ext':
-                        from InterfaceATF2_Ext import InterfaceATF2_Ext
+                        from Interfaces.ATF2.InterfaceATF2_Ext import InterfaceATF2_Ext
                         globals()['InterfaceATF2_Ext'] = InterfaceATF2_Ext
                         self.selected_interface = InterfaceATF2_Ext(nsamples=3)
 
                     case 'InterfaceATF2_Linac':
-                        from InterfaceATF2_Linac import InterfaceATF2_Linac
+                        from Interfaces.ATF2.InterfaceATF2_Linac import InterfaceATF2_Linac
                         globals()['InterfaceATF2_Linac'] = InterfaceATF2_Linac
                         self.selected_interface = InterfaceATF2_Linac(nsamples=3)
 
                     case 'InterfaceATF2_Ext_RFTrack':
-                        from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
+                        from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
                         globals()['InterfaceATF2_Ext_RFTrack'] = InterfaceATF2_Ext_RFTrack
                         self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.00, nsamples=1)
 
@@ -66,7 +64,7 @@ class InterfaceSelectionDialog(QDialog):
                         self.selected_interface.misalign_bpms()
 
                     case 'InterfaceCLEAR_RFTrack':
-                        from InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
+                        from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
                         globals()['InterfaceCLEAR_RFTrack'] = InterfaceCLEAR_RFTrack
                         self.selected_interface = InterfaceCLEAR_RFTrack(jitter=0.0, bpm_resolution=0.02, nsamples=1)
 

@@ -1,17 +1,12 @@
 import sys
 sys.path.append('/userhome/alatina/flight-simulator')
 
-from InterfaceATF2_Linac import InterfaceATF2_Linac
+from Interfaces.ATF2.InterfaceATF2_Linac import InterfaceATF2_Linac
 from Response import Response
 from State import State
 
-from datetime import datetime
-from functools import partial
-
 import matplotlib.pyplot as plt
 import numpy as np
-import signal
-import os
 
 R0 = Response('response0.pkl')
 R1 = Response('response1.pkl')
