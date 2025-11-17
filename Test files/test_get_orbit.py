@@ -7,7 +7,7 @@ import os
 import time
 
 # Set up environment
-data_path = 'Data'
+data_path = '../Data'
 try:
     os.mkdir(data_path)
 except:

@@ -76,7 +76,7 @@ class InterfaceATF2_Ext:
         pv.put(delta_freq)
         time.sleep(2)
 
-    def reset_energy(self, *args):
+    def reset_energy(self):
         pv = PV('atf:rfRamp:sw')
         pv.put(0)
         time.sleep(2)
@@ -145,7 +145,7 @@ class InterfaceATF2_Ext:
             return self
 
 
-    def reset_intensity(self, *args):
+    def reset_intensity(self):
         start = time.perf_counter()
 
         ang_offset = 2.0

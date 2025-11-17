@@ -4,13 +4,16 @@ from datetime import datetime
 import numpy as np
 from PyQt6 import uic
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
+                             QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 from State import State
+
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Response import Response
 from ChiSquaredPopup_BBA import ChiSquaredWindow
+
 
 class MainWindow(QMainWindow):
     def __init__(self, interface, dir_name):
@@ -65,6 +68,28 @@ class MainWindow(QMainWindow):
         self.dfs_change_3.setText("0.98")
         self.wfs_reset_3.setText("1")
         self.wfs_change_3.setText("0.90")
+
+        correctors = I.get_correctors()
+        correctors_list = correctors['names']
+
+        if correctors_list is not None:
+            hcorrs = I.get_hcorrectors_names()
+            vcorrs = I.get_vcorrectors_names()
+            hcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in hcorrs])
+            vcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in vcorrs])
+
+            def clean_array(a):
+                a = np.array([0 if x is None else x for x in a], dtype=float)
+                a[np.isnan(a)] = 0
+                return a
+
+            max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
+            max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
+
+        self.max_horizontal_current_spinbox.setValue(max_curr_h)
+        self.max_horizontal_current_spinbox.setSingleStep(0.01)
+        self.max_vertical_current_spinbox.setValue(max_curr_v)
+        self.max_vertical_current_spinbox.setSingleStep(0.01)
 
     def _on_start_click(self):
         if not self._running:
@@ -149,7 +174,8 @@ class MainWindow(QMainWindow):
         base = base_dir or self.dir_name
         os.makedirs(base, exist_ok=True)
         if use_dialog:
-            fn, _ = QFileDialog.getSaveFileName(self, f"{saving_name}", os.path.join(self.dir_name, f"{filename}"),"Text (*.txt)")
+            fn, _ = QFileDialog.getSaveFileName(self, f"{saving_name}", os.path.join(self.dir_name, f"{filename}"),
+                                                "Text (*.txt)")
             if not fn:
                 return
         else:
@@ -161,7 +187,8 @@ class MainWindow(QMainWindow):
     def _loading_func(self, elements_list, filename, loading_name, *, use_dialog=True, base_dir=None):
         base = base_dir or self.dir_name
         if use_dialog:
-            fn, _ = QFileDialog.getOpenFileName(self, f"{loading_name}", os.path.join(base, f"{filename}"),"Text (*.txt)")
+            fn, _ = QFileDialog.getOpenFileName(self, f"{loading_name}", os.path.join(base, f"{filename}"),
+                                                "Text (*.txt)")
         else:
             fn = os.path.join(base, filename)
         selected = None
@@ -224,7 +251,8 @@ class MainWindow(QMainWindow):
         self._pick_and_load_data_dir(oper="wfs", button_ui=self.wfs_response_3, button_name="WFS Data Loaded")
 
     def _pick_and_load_traj_data(self):
-        self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
+        self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,
+                                     button_name="Trajectory Data Loaded")
 
     def _find_useful_files(self, directory):
         p_files = glob.glob(os.path.join(directory, "DATA_*_p*.pkl"))
@@ -282,7 +310,8 @@ class MainWindow(QMainWindow):
         if not (info_traj and info_traj["ok"] and info_dfs and info_dfs["ok"] and info_wfs and info_wfs["ok"]):
             raise RuntimeError("Please select all data directories")
 
-        hcorrs = [string for string in selected_corrs if (string.lower().startswith('zh') or ("DHG" in string) or (string.lower().startswith('zx')))]
+        hcorrs = [string for string in selected_corrs if
+                  (string.lower().startswith('zh') or ("DHG" in string) or (string.lower().startswith('zx')))]
         vcorrs = [string for string in selected_corrs if
                   (string.lower().startswith('zv') or (("SDV" in string) or ("DHJ" in string)))]
 
@@ -326,7 +355,8 @@ class MainWindow(QMainWindow):
                     bxm = np.asarray(minus_file["bpms"]["x"]).squeeze()
                     bym = np.asarray(minus_file["bpms"]["y"]).squeeze()
 
-                    bact_p = np.asarray(plus_file["correctors"]["bact"]).squeeze() # bact is an actual corrector value/kick that was applied
+                    bact_p = np.asarray(plus_file["correctors"][
+                                            "bact"]).squeeze()  # bact is an actual corrector value/kick that was applied
                     bact_m = np.asarray(minus_file["correctors"]["bact"]).squeeze()
 
                     bpms_names = list(map(str, plus_file["bpms"]["names"]))
@@ -352,7 +382,7 @@ class MainWindow(QMainWindow):
                     if pairs == pairs0 and plane == "x":
                         px = bxp[indeces]
                         mx = bxm[indeces]
-                        B0_x = (px + mx) / 2 # golden orbit
+                        B0_x = (px + mx) / 2  # golden orbit
                         rowx = np.full(nb, np.nan)
                         for k, b in enumerate(present):
                             rowx[pos[b]] = B0_x[k]
@@ -370,7 +400,8 @@ class MainWindow(QMainWindow):
                         continue
                     column_value = np.full(len(selected_bpms), np.nan, dtype=float)
                     for k, b in enumerate(present):
-                        column_value[pos[b]] = (plus_value[k] - minus_value[k]) / (k_plus - k_minus) # (bpm plus - bpm minus) /(kick plus - kick minus0
+                        column_value[pos[b]] = (plus_value[k] - minus_value[k]) / (
+                                    k_plus - k_minus)  # (bpm plus - bpm minus) /(kick plus - kick minus0
                     cols.append(column_value)
 
                 if cols:
@@ -391,7 +422,7 @@ class MainWindow(QMainWindow):
 
         if self._force_triangular() or _force_triangular:
             corrs, bpms = selected_corrs, selected_bpms
-            Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower.startswith('zx'))       )]
+            Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower.startswith('zx')))]
             Cy = [s for s in corrs if (s.lower().startswith('zv') or (("SDV" in s) or ("DHJ" in s)))]
 
             Mx = self._heaviside_function_for_checkbox(correctors=Cx, bpms=bpms)
@@ -525,8 +556,8 @@ class MainWindow(QMainWindow):
             bpms_dx[bpms_name] = float(data[DX_column])
             bpms_dy[bpms_name] = float(data[DY_column])
 
-        target_disp_x = np.array([bpms_dx.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1) # m
-        target_disp_y = np.array([bpms_dy.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1) # m
+        target_disp_x = np.array([bpms_dx.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)  # m
+        target_disp_y = np.array([bpms_dy.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)  # m
 
         return target_disp_x, target_disp_y
 
@@ -561,6 +592,15 @@ class MainWindow(QMainWindow):
             dP_P = self._read_change_energy() - 1
 
             target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
+            max_osc_h = self.horizontal_excursion_spinbox.value()
+            max_osc_v = self.vertical_excursion_spinbox.value()
+            max_curr_h = self.max_horizontal_current_spinbox.value()
+            max_curr_v = self.max_vertical_current_spinbox.value()
+
+            def clamp(val, max_val):
+                if max_val == 0.0:
+                    return val
+                return max(-max_val, min(val, max_val))
 
             for it in range(iters):
                 if self._cancel:
@@ -570,7 +610,7 @@ class MainWindow(QMainWindow):
                 # nominal
                 self.S.pull(self.interface)
                 O0 = self.S.get_orbit(bpms)
-                O0x = O0['x'].reshape(-1, 1) # turns an array into a column vector
+                O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
                 O0y = O0['y'].reshape(-1, 1)
 
                 # dfs
@@ -596,14 +636,14 @@ class MainWindow(QMainWindow):
                 ))
                 By = np.vstack((
                     wgt_orb * (O0y - B0y),
-                    wgt_dfs * ((O1y - O0y) - dP_P * target_disp_y  * 1e3),
+                    wgt_dfs * ((O1y - O0y) - dP_P * target_disp_y * 1e3),
                     wgt_wfs * (O2y - O0y),
                 ))
 
                 # A = U * Sigma * V^T
                 # A^+ = V * Sigma^+ * U^T
 
-                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx) #theta = - gain * Axx^+ *Bx
+                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx)  # theta = - gain * Axx^+ *Bx
                 corrY = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By)
 
                 vals = np.concatenate([corrX.ravel(), corrY.ravel()])  # flattens an array
@@ -751,7 +791,8 @@ class MainWindow(QMainWindow):
         if "dfs_change" in settings: self.dfs_change_3.setText(str(settings["dfs_change"]))
         if "wfs_reset" in settings:  self.wfs_reset_3.setText(str(settings["wfs_reset"]))
         if "wfs_change" in settings: self.wfs_change_3.setText(str(settings["wfs_change"]))
-        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
+        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(
+            settings["data_dirs"]["traj"] or "")
         if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")
         if hasattr(self, "wfs_response_3"): self.wfs_response_3.setText(settings["data_dirs"]["wfs"] or "")
 

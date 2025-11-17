@@ -41,3 +41,18 @@ def acq_params(japc_address, japc_selector = 'VIRTUAL', lattice_configuration = 
     else:
         data = JapcReadback[japc_address, japc_selector]
     return data
+
+
+japc_address_des = 'CA.DHG0225/Acquisition#currentAverage'
+japc_address_act = JapcReadback.DHG0225
+
+japc_selector = 'SCT.USER.SETUP'
+japc.setSelector(japc_selector)
+bdes = japc.getParam(japc_address_des)
+
+time.sleep(1)
+japc_selector = japc_address_act[1]
+bdact = japc.getParam(japc_address_act[0])
+correctors = { "names": japc_address_des[3:10], "bdes": bdes, "bact": bdact }
+
+#data = JapcReadback[japc_address, japc_selector]

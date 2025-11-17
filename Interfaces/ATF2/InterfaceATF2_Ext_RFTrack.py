@@ -84,8 +84,6 @@ class InterfaceATF2_Ext_RFTrack:
         self.__setup_beam1(scale)
         self.__track_bunch()
 
-
-
     def reset_energy(self, scale=1):
         self.__setup_beam0( )
         self.__track_bunch()
@@ -94,7 +92,6 @@ class InterfaceATF2_Ext_RFTrack:
 
         self.__setup_beam2(scale)
         self.__track_bunch()
-
 
     def reset_intensity(self, scale=1):
         self.__setup_beam0()
