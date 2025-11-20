@@ -74,17 +74,17 @@ class InterfaceATF2_Linac:
         pv = PV('CM1L:phaseRead')
         self.phase_kl1 = pv.get()
 
-    def change_energy(self,rel_phase=5):
+    def change_energy(self,rel_phase=5, grad=None, **kwargs):
         pv = PV('CM1L:phaseWrite')
         pv.put(self.phase_kl1+rel_phase)
         time.sleep(1)
         
-    def reset_energy(self):
+    def reset_energy(self,**kwargs):
         pv = PV('CM1L:phaseWrite')
         pv.put(self.phase_kl1)
         time.sleep(1)
 
-    def change_intensity(self, *args):
+    def change_intensity(self, laserintensity=0.1,ang_offset=2.0,**kwargs):
         start = time.perf_counter()
 
         laserintensity = 0.1
@@ -142,7 +142,7 @@ class InterfaceATF2_Linac:
             print('InterfaceATF2::ChangeBunchCharge()', elapsed)
             return self
 
-    def reset_intensity(self, *args):
+    def reset_intensity(self,**kwargs):
         start = time.perf_counter()
 
         ang_offset = 2.0

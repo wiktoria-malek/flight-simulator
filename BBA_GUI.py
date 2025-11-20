@@ -64,17 +64,18 @@ class MainWindow(QMainWindow):
         self.lineEdit_4.setText("0.001")
         self.lineEdit_5.setText("10")
         self.lineEdit_6.setText("0.4")
-        self.dfs_reset_3.setText("1")
-        self.dfs_change_3.setText("0.98")
-        self.wfs_reset_3.setText("1")
-        self.wfs_change_3.setText("0.90")
+        self.dfs_reset_3.setText("grad = 1")
+        self.dfs_change_3.setText("grad = 0.98")
+        self.wfs_reset_3.setText("grad = 1")
+        self.wfs_change_3.setText("grad = 0.90")
 
-        correctors = I.get_correctors()
+        correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
-
+        max_curr_h=0.0
+        max_curr_v=0.0
         if correctors_list is not None:
-            hcorrs = I.get_hcorrectors_names()
-            vcorrs = I.get_vcorrectors_names()
+            hcorrs = self.interface.get_hcorrectors_names()
+            vcorrs = self.interface.get_vcorrectors_names()
             hcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in hcorrs])
             vcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in vcorrs])
 
@@ -102,9 +103,28 @@ class MainWindow(QMainWindow):
         else:
             self._step = True
 
-    def _finding_float(self, text, default):
-        m = self._number_re.search(text)
-        return float(m.group(0)) if m else default
+    def _read_all_parameters(self,text,grad=None):
+        text = text.strip()
+        params = {}
+        for p in text.split(","):
+            p = p.strip()
+            if not p:
+                continue
+            k,v = p.split("=",1)
+            k = k.strip()
+            v = v.strip()
+            try:
+                params[k] = float(v)
+            except ValueError:
+                raise ValueError(f"Not a number encountered in {p}")
+        return params
+
+    def _expand_data_path(self,path):
+        home=os.path.expanduser("~")
+        #/Users/wiktoriamalek/Desktop/flight-simulator/Data/ATF2_Ext_RFT_20251023_111743_nominal
+        if path.startswith(home+os.sep): #the character used by the operating system to separate pathname components
+            return "~"+path[len(home):]
+        return path
 
     def _setup_canvases(self):
         if FigureCanvas is None:
@@ -422,7 +442,7 @@ class MainWindow(QMainWindow):
 
         if self._force_triangular() or _force_triangular:
             corrs, bpms = selected_corrs, selected_bpms
-            Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower.startswith('zx')))]
+            Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower().startswith('zx')))]
             Cy = [s for s in corrs if (s.lower().startswith('zv') or (("SDV" in s) or ("DHJ" in s)))]
 
             Mx = self._heaviside_function_for_checkbox(correctors=Cx, bpms=bpms)
@@ -518,20 +538,20 @@ class MainWindow(QMainWindow):
         return orbit_w, disp_w, wake_w, rcond, iters, gain
 
     def _read_reset_intensity(self):
-        scale = self._finding_float(self.wfs_reset_3.text(), 1)
-        return scale
+        text = self.wfs_reset_3.text()
+        return self._read_all_parameters(text,grad=1)
 
     def _read_change_intensity(self):
-        scale = self._finding_float(self.wfs_change_3.text(), 0.9)
-        return scale
+        text = self.wfs_change_3.text()
+        return self._read_all_parameters(text,grad=0.90)
 
     def _read_change_energy(self):
-        scale = self._finding_float(self.dfs_change_3.text(), 0.98)
-        return scale
+        text = self.dfs_change_3.text()
+        return self._read_all_parameters(text,grad=0.98)
 
     def _read_reset_energy(self):
-        scale = self._finding_float(self.dfs_reset_3.text(), 1)
-        return scale
+        text = self.dfs_reset_3.text()
+        return self._read_all_parameters(text,grad=1)
 
     def _get_dispersion_from_twiss_file(self):
         # madx
@@ -588,15 +608,12 @@ class MainWindow(QMainWindow):
             # DR_momentum_compaction = 2.1e-3
 
             # dP_P = -deltafreq / DR_freq / DR_momentum_compaction
-
-            dP_P = self._read_change_energy() - 1
+            grad = self._read_change_energy().get("grad")
+            dP_P = grad - 1
 
             target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
-            max_osc_h = self.horizontal_excursion_spinbox.value()
-            max_osc_v = self.vertical_excursion_spinbox.value()
-            max_curr_h = self.max_horizontal_current_spinbox.value()
-            max_curr_v = self.max_vertical_current_spinbox.value()
-
+            max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
+            max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
             def clamp(val, max_val):
                 if max_val == 0.0:
                     return val
@@ -614,17 +631,21 @@ class MainWindow(QMainWindow):
                 O0y = O0['y'].reshape(-1, 1)
 
                 # dfs
-                self.interface.change_energy(scale=self._read_change_energy())
+                dfs_params_change = self._read_change_energy()
+                dfs_params_reset = self._read_reset_energy()
+                self.interface.change_energy(**dfs_params_change)
                 self.S.pull(self.interface)
-                self.interface.reset_energy(scale=self._read_reset_energy())
+                self.interface.reset_energy(**dfs_params_reset)
                 O1 = self.S.get_orbit(bpms)
                 O1x = O1['x'].reshape(-1, 1)
                 O1y = O1['y'].reshape(-1, 1)
 
                 # wfs
-                self.interface.change_intensity(scale=self._read_change_intensity())
+                wfs_params_change = self._read_change_intensity()
+                wfs_params_reset = self._read_reset_intensity()
+                self.interface.change_intensity(**wfs_params_change)
                 self.S.pull(self.interface)
-                self.interface.reset_intensity(scale=self._read_reset_intensity())
+                self.interface.reset_intensity(**wfs_params_reset)
                 O2 = self.S.get_orbit(bpms)
                 O2x = O2['x'].reshape(-1, 1)
                 O2y = O2['y'].reshape(-1, 1)
@@ -646,7 +667,9 @@ class MainWindow(QMainWindow):
                 corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx)  # theta = - gain * Axx^+ *Bx
                 corrY = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By)
 
-                vals = np.concatenate([corrX.ravel(), corrY.ravel()])  # flattens an array
+                vals_x = [clamp(v,max_curr_h) for v in corrX.ravel()]
+                vals_y = [clamp(v,max_curr_v) for v in corrY.ravel()] # flattens an array
+                vals = np.array(vals_x + vals_y)
                 self.interface.vary_correctors(Cx + Cy, vals)
 
                 self._hist_orbit.append(float(np.linalg.norm(O0x - B0x) + np.linalg.norm(O0y - B0y)))
@@ -696,7 +719,7 @@ class MainWindow(QMainWindow):
         self._plot_series(self.wake_canvas, self.wake_fig, [], None, "[mm]")
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy, Bx, By):
-
+        time_str = datetime.now().strftime("%y%m%d%H%M%S")
         save_session_dir = os.path.join("Data", f"BBA_{self.interface.get_name()}_{time_str}_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
 
@@ -716,8 +739,8 @@ class MainWindow(QMainWindow):
             "dfs_change": self._read_change_energy(),
             "wfs_reset": self._read_reset_intensity(),
             "wfs_change": self._read_change_intensity(),
-            "data_dirs": {k: (v["dir"] if v else None) for k, v in self._data_dirs.items()},
-
+            "data_dirs": {k: (self._expand_data_path(v["dir"]) if v else None)
+                          for k, v in self._data_dirs.items()},
         }
 
         with open(os.path.join(save_session_dir, "correction_settings.json"), "w") as f:
@@ -771,6 +794,7 @@ class MainWindow(QMainWindow):
                 for key, path in paths.items():
                     if not path:
                         continue
+                    path = os.path.expanduser(os.path.expandvars(path))
                     info = self._find_useful_files(path)
                     if info["ok"]:
                         self._data_dirs[key] = info
@@ -787,30 +811,35 @@ class MainWindow(QMainWindow):
         if "rcond" in settings: self.lineEdit_4.setText(str(settings["rcond"]))
         if "iters" in settings:  self.lineEdit_5.setText(str(settings["iters"]))
         if "gain" in settings: self.lineEdit_6.setText(str(settings["gain"]))
-        if "dfs_reset" in settings: self.dfs_reset_3.setText(str(settings["dfs_reset"]))
-        if "dfs_change" in settings: self.dfs_change_3.setText(str(settings["dfs_change"]))
-        if "wfs_reset" in settings:  self.wfs_reset_3.setText(str(settings["wfs_reset"]))
-        if "wfs_change" in settings: self.wfs_change_3.setText(str(settings["wfs_change"]))
-        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(
-            settings["data_dirs"]["traj"] or "")
+        if "dfs_reset" in settings:
+            text = ", ".join(f"{k} = {v:g}" for k, v in settings["dfs_reset"].items())
+            self.dfs_reset_3.setText(text)
+        if "dfs_change" in settings:
+            text = ", ".join(f"{k} = {v:g}" for k, v in settings["dfs_change"].items())
+            self.dfs_change_3.setText(text)
+        if "wfs_reset" in settings:
+            text = ", ".join(f"{k} = {v:g}" for k, v in settings["wfs_reset"].items())
+            self.wfs_reset_3.setText(text)
+        if "wfs_change" in settings:
+            text = ", ".join(f"{k} = {v:g}" for k, v in settings["wfs_change"].items())
+            self.wfs_change_3.setText(text)
+        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
         if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")
         if hasattr(self, "wfs_response_3"): self.wfs_response_3.setText(settings["data_dirs"]["wfs"] or "")
 
 
 if __name__ == "__main__":
-    app = QApplication([])
-
-    from SelectInterface import InterfaceSelectionDialog
-
-    dialog = InterfaceSelectionDialog()
-    if dialog.exec():
-        I = dialog.selected_interface
-        print(f"Selected interface: {dialog.selected_interface_name}")
-    else:
+    app = QApplication(sys.argv)
+    #from SelectInterface import InterfaceSelectionDialog
+    import SelectInterface
+    dialog = SelectInterface.choose_acc_and_interface()
+    if dialog is None:
         print("Selection cancelled.")
         sys.exit(1)
 
-    project_name = dialog.selected_interface_name
+    I=dialog
+    project_name=I.get_name()
+    print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = f"Data/{project_name}_{time_str}"
 

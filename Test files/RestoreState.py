@@ -3,7 +3,7 @@ from State import State
 import os
 
 # Get the list of all files in the current directory
-files = [f for f in os.listdir('.') if os.path.isfile(f) and f.startswith("machine_status")]
+files = [f for f in os.listdir('..') if os.path.isfile(f) and f.startswith("machine_status")]
 
 # Reset
 filename = files[0]

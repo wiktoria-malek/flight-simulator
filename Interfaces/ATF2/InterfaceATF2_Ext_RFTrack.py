@@ -80,23 +80,21 @@ class InterfaceATF2_Ext_RFTrack:
         print(f"εy = {I.emitt_y}[mm.rad]")
         print(f"εz = {I.emitt_z}[mm.permille]")
 
-    def change_energy(self, scale):
-        self.__setup_beam1(scale)
+    def change_energy(self, grad=None, **kwargs):
+        self.__setup_beam1(grad)
         self.__track_bunch()
 
-    def reset_energy(self, scale=1):
+    def reset_energy(self, grad=1,**kwargs):
         self.__setup_beam0( )
         self.__track_bunch()
 
-    def change_intensity(self, scale): #reduced charge
-
-        self.__setup_beam2(scale)
+    def change_intensity(self, grad=None, **kwargs): #reduced charge
+        self.__setup_beam2(grad)
         self.__track_bunch()
 
-    def reset_intensity(self, scale=1):
+    def reset_intensity(self, grad=1,**kwargs):
         self.__setup_beam0()
         self.__track_bunch()
-
 
     def get_sequence(self):
         return self.sequence

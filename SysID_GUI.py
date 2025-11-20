@@ -310,8 +310,6 @@ class MainWindow(QMainWindow):
         #FOR THE BBA!
         self.worker.cond="nominal"
         #self.worker.scale_E=0.98
-
-
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
@@ -349,17 +347,26 @@ class MainWindow(QMainWindow):
 app = QApplication(sys.argv)
 
 ## Select interface
-from SelectInterface import InterfaceSelectionDialog
-dialog = InterfaceSelectionDialog()
-if dialog.exec():
-    print(f"Selected interface: {dialog.selected_interface_name}")
-    I = dialog.selected_interface
-else:
+#from SelectInterface import InterfaceSelectionDialog
+import SelectInterface
+#dialog = InterfaceSelectionDialog()
+dialog = SelectInterface.choose_acc_and_interface()
+if dialog is None:
     print("Selection cancelled.")
     sys.exit(1)
 
+# if dialog.exec():
+#     print(f"Selected interface: {dialog.selected_interface_name}")
+#     I = dialog.selected_interface
+# else:
+#     print("Selection cancelled.")
+#     sys.exit(1)
+I=dialog
+project_name=I.get_name()
+print(f"Selected interface: {project_name}")
+
 ## Prepare project space
-project_name = dialog.selected_interface_name
+#project_name = dialog.selected_interface_name
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 dir_name = f"Data/{project_name}_{time_str}"
 

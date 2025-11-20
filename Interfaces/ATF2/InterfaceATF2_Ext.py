@@ -57,7 +57,7 @@ class InterfaceATF2_Ext:
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
 
-    def change_energy(self, *kvargs):
+    def change_energy(self, delta_freq=None, **kwargs):
         # some parsing to extract delta_freq
         delta_freq = -2
 
@@ -76,7 +76,7 @@ class InterfaceATF2_Ext:
         pv.put(delta_freq)
         time.sleep(2)
 
-    def reset_energy(self):
+    def reset_energy(self,**kwargs):
         pv = PV('atf:rfRamp:sw')
         pv.put(0)
         time.sleep(2)
@@ -85,7 +85,7 @@ class InterfaceATF2_Ext:
         pv.put(0)
         time.sleep(2)
 
-    def change_intensity(self, *args):
+    def change_intensity(self, laserintensity =0.1, ang_offset = 2.0, **kwargs):
 
         start = time.perf_counter()
 
@@ -145,7 +145,7 @@ class InterfaceATF2_Ext:
             return self
 
 
-    def reset_intensity(self):
+    def reset_intensity(self, ang_offset=None,**kwargs):
         start = time.perf_counter()
 
         ang_offset = 2.0
