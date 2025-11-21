@@ -32,7 +32,6 @@ class InterfaceCLEAR_RFTrack:
     def obtaining_the_lattice(self, filename):
         with open(filename) as file:
             lines = file.readlines()
-
         element_descriptions = {}
         previous_name = None
         quad_index = 0
@@ -48,7 +47,6 @@ class InterfaceCLEAR_RFTrack:
 
             if name == 'CA.BTV0800':
                 continue
-
             element_type = None
             if 'QFD' in name or 'QDD' in name:
                 element_type = 'Quadrupole'
@@ -154,8 +152,7 @@ class InterfaceCLEAR_RFTrack:
         self.jitter = jitter
         self.nsamples = nsamples
         self.mass=rft.electronmass
-
-        self.lattice,self.element_descriptions,self.start,self.end=self.obtaining_the_lattice(filename="CLEAR_Beamline_Survey.txt")
+        self.lattice,self.element_descriptions,self.start,self.end=self.obtaining_the_lattice(filename="Interfaces/CLEAR/CLEAR_Beamline_Survey.txt")
         self.lattice.set_bpm_resolution(bpm_resolution)
 
         elements_in_lattice=list(self.lattice['*'])
@@ -182,9 +179,6 @@ class InterfaceCLEAR_RFTrack:
         self.Drift1 = rft.Drift(1.0)
         self.lattice.append(self.Drift1)
         self.lattice.get_length()
-
-
-
         # scr = next(iter(self.lattice._get_screens()))
         # print(type(scr))
         # print([m for m in dir(scr) if
@@ -268,7 +262,6 @@ class InterfaceCLEAR_RFTrack:
                     center = s + L / 2 if L > 0 else s
                     highlight_positions.append(center)
                     highlight_names.append(short_name)
-
             s += L
 
         print("Screens in lattice:")
@@ -276,8 +269,6 @@ class InterfaceCLEAR_RFTrack:
             elem = element_descriptions[name]
             if elem['element_type'] == 'Screen':
                 print(name, "->", name.split('.')[-1], "at", elem['s_start'])
-
-
 
     def __track_bunch(self):
         I0 = self.B0.get_info()

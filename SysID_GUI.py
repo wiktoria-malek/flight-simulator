@@ -49,7 +49,7 @@ class Worker(QObject):
         self.Niter = Niter
         self.running = False
 
-        # FOR THE BBA!!
+        # FOR THE BBA_GUI!!
         self.cond="nominal"
         self.scale_E=0.98
         self.scale_I=0.90
@@ -58,7 +58,7 @@ class Worker(QObject):
     def run(self):
         self.running = True
 
-        # FOR THE BBA!!
+        # FOR THE BBA_GUI!!
 
         if self.cond == "scale_E":
             self.interface.change_energy(self.scale_E)
@@ -132,7 +132,7 @@ class Worker(QObject):
 
                 time.sleep(1)
 
-#FOR THE BBA!!
+#FOR THE BBA_GUI!!
         if self.cond=="scale_E":
             self.interface.reset_energy()
         elif self.cond=="scale_I":
@@ -307,7 +307,7 @@ class MainWindow(QMainWindow):
         self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
         self.worker.moveToThread(self.thread)
 
-        #FOR THE BBA!
+        #FOR THE BBA_GUI!
         self.worker.cond="nominal"
         #self.worker.scale_E=0.98
         self.thread.started.connect(self.worker.run)

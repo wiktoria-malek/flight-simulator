@@ -1,5 +1,4 @@
-import json
-import sys, os, pickle, re, matplotlib, glob, time
+import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
 from PyQt6 import uic
@@ -7,15 +6,14 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
                              QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 from State import State
-
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from Response import Response
 from ChiSquaredPopup_BBA import ChiSquaredWindow
+from SaveOrLoad_BBA import SaveOrLoad_BBA
+from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 
-
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def __init__(self, interface, dir_name):
         super().__init__()
         self.cwd = os.getcwd()
@@ -57,7 +55,7 @@ class MainWindow(QMainWindow):
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
         self.corrs = self.S.get_correctors()["names"]
-        self.setWindowTitle("BBA")
+        self.setWindowTitle("BBA_GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
         self.lineEdit_3.setText("10")
@@ -186,57 +184,6 @@ class MainWindow(QMainWindow):
         except Exception:
             return False
 
-    def _saving_func(self, elements_list, filename, saving_name, *, use_dialog=True,
-                     base_dir=None):  # * - must be passed by keyword
-        items = elements_list.selectedItems()
-        if not items:
-            items = [elements_list.item(i) for i in range(elements_list.count())]
-        base = base_dir or self.dir_name
-        os.makedirs(base, exist_ok=True)
-        if use_dialog:
-            fn, _ = QFileDialog.getSaveFileName(self, f"{saving_name}", os.path.join(self.dir_name, f"{filename}"),
-                                                "Text (*.txt)")
-            if not fn:
-                return
-        else:
-            fn = os.path.join(base, filename)
-        with open(fn, "w") as f:
-            for it in items:
-                f.write(f"{it.text()}\n")
-
-    def _loading_func(self, elements_list, filename, loading_name, *, use_dialog=True, base_dir=None):
-        base = base_dir or self.dir_name
-        if use_dialog:
-            fn, _ = QFileDialog.getOpenFileName(self, f"{loading_name}", os.path.join(base, f"{filename}"),
-                                                "Text (*.txt)")
-        else:
-            fn = os.path.join(base, filename)
-        selected = None
-        if fn and os.path.isfile(fn):
-            with open(fn, "r") as f:
-                selected = [ln.strip() for ln in f]
-        if selected is None:
-            selected = (
-                self.S.get_bpms()["names"] if elements_list is self.bpms_list else self.S.get_correctors()["names"])
-
-        elements_list.clearSelection()
-        for name in selected:
-            for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):
-                it.setSelected(True)
-
-    def _save_correctors(self):
-        self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors")
-
-    def _save_bpms(self):
-        self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs")
-
-    def _load_correctors(self):
-        self._loading_func(loading_name="Load Correctors", filename="correctors.txt",
-                           elements_list=self.correctors_list)
-
-    def _load_bpms(self):
-        self._loading_func(loading_name="Load BPMs", filename="bpms.txt", elements_list=self.bpms_list)
-
     def _with_progress(self, total, title):
         prog = QProgressDialog(title, "Cancel", 0, total, self)
         prog.setWindowModality(Qt.WindowModality.ApplicationModal)  # user cant interact with the main window
@@ -250,255 +197,6 @@ class MainWindow(QMainWindow):
             return not prog.wasCanceled()
 
         return prog, cb
-
-    def _pick_and_load_data_dir(self, button_ui, button_name, oper):
-        default_dir = os.path.join(self.cwd, "Data")
-        os.makedirs(default_dir, exist_ok=True)
-        folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
-        if not folder:
-            return
-        info = self._find_useful_files(folder)
-        if not info["ok"]:
-            QMessageBox.warning(self, "Load data", "Wrong data directory selected")
-        self._data_dirs[oper] = info
-        button_ui.setText(folder)
-        QMessageBox.information(button_ui, "Data directory selected", button_name)
-
-    def _pick_and_load_disp_data(self):
-        self._pick_and_load_data_dir(oper="dfs", button_ui=self.dfs_response_3, button_name="DFS Data Loaded")
-
-    def _pick_and_load_wake_data(self):
-        self._pick_and_load_data_dir(oper="wfs", button_ui=self.wfs_response_3, button_name="WFS Data Loaded")
-
-    def _pick_and_load_traj_data(self):
-        self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,
-                                     button_name="Trajectory Data Loaded")
-
-    def _find_useful_files(self, directory):
-        p_files = glob.glob(os.path.join(directory, "DATA_*_p*.pkl"))
-        m_files = glob.glob(os.path.join(directory, "DATA_*_m*.pkl"))
-
-        regex = re.compile(r"DATA_(.+)_(p|m)(\d+)\.pkl$")  # 3 groups - name corr, plus or minus, iteration
-        p_index = {}
-        m_index = {}
-
-        for p in p_files:
-            r = regex.search(os.path.basename(p))
-            if r:
-                corr, pm, iter = r.group(1), r.group(2), r.group(3)
-                p_index[(corr, iter)] = p
-
-        for m in m_files:
-            r = regex.search(os.path.basename(m))
-            if r:
-                corr, pm, iter = r.group(1), r.group(2), r.group(3)
-                m_index[(corr, iter)] = m
-
-        valid_pairs = {}
-
-        for (corr, iter), fp in p_index.items():
-            fm = m_index.get((corr, iter))
-            if fm:
-                valid_pairs.setdefault(corr, []).append((fp, fm))  # dict for each corrector
-
-        return {
-            "ok": bool(valid_pairs),
-            "dir": directory,
-            "pairs": valid_pairs,
-            "p_files": p_files,
-            "m_files": m_files,
-        }
-
-    def _heaviside_function_for_checkbox(self, bpms, correctors):
-        bpms_position = self.interface.get_elements_position(bpms)
-        corrs_position = self.interface.get_elements_position(correctors)
-
-        M = np.zeros((len(bpms), len(correctors)), dtype=bool)
-
-        for j, cj in enumerate(corrs_position):
-            for i, bi in enumerate(bpms_position):
-                M[i, j] = (bi >= cj)
-
-        return M
-
-    def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, _force_triangular=False):
-
-        info_traj = self._data_dirs["traj"]
-        info_dfs = self._data_dirs["dfs"]
-        info_wfs = self._data_dirs["wfs"]
-
-        if not (info_traj and info_traj["ok"] and info_dfs and info_dfs["ok"] and info_wfs and info_wfs["ok"]):
-            raise RuntimeError("Please select all data directories")
-
-        hcorrs = [string for string in selected_corrs if
-                  (string.lower().startswith('zh') or ("DHG" in string) or (string.lower().startswith('zx')))]
-        vcorrs = [string for string in selected_corrs if
-                  (string.lower().startswith('zv') or (("SDV" in string) or ("DHJ" in string)))]
-
-        pairs0 = info_traj["pairs"]
-        pairs1 = info_dfs["pairs"]
-        pairs2 = info_wfs["pairs"]
-
-        R0xx = np.full((len(selected_bpms), len(hcorrs)), np.nan, dtype=float)
-        R0yy = np.full((len(selected_bpms), len(vcorrs)), np.nan, dtype=float)
-        R0xy = np.zeros((len(selected_bpms), len(vcorrs)))
-        R0yx = np.zeros((len(selected_bpms), len(hcorrs)))
-
-        R1xx = np.full((len(selected_bpms), len(hcorrs)), np.nan, dtype=float)
-        R1yy = np.full((len(selected_bpms), len(vcorrs)), np.nan, dtype=float)
-        R1xy = np.zeros((len(selected_bpms), len(vcorrs)))
-        R1yx = np.zeros((len(selected_bpms), len(hcorrs)))
-
-        R2xx = np.full((len(selected_bpms), len(hcorrs)), np.nan, dtype=float)
-        R2yy = np.full((len(selected_bpms), len(vcorrs)), np.nan, dtype=float)
-        R2xy = np.zeros((len(selected_bpms), len(vcorrs)))
-        R2yx = np.zeros((len(selected_bpms), len(hcorrs)))
-        rows_B0x, rows_B0y = [], []
-
-        pos = {b: i for i, b in enumerate(selected_bpms)}
-        nb = len(selected_bpms)
-
-        def _calculating_Rxx_or_Ryy(which_matrix, corrs_type, plane, pairs):
-
-            for j, corr in enumerate(corrs_type):  # j is a column
-                if corr not in pairs:
-                    continue
-                cols = []  # one column per plus/minus iteration
-                for fp, fm in pairs[corr]:
-                    with open(fp, "rb") as f:
-                        plus_file = pickle.load(f)
-                    with open(fm, "rb") as f:
-                        minus_file = pickle.load(f)
-
-                    bxp = np.asarray(plus_file["bpms"]["x"]).squeeze()  # turns into a vector (N,) instead of (N,1)
-                    byp = np.asarray(plus_file["bpms"]["y"]).squeeze()
-                    bxm = np.asarray(minus_file["bpms"]["x"]).squeeze()
-                    bym = np.asarray(minus_file["bpms"]["y"]).squeeze()
-
-                    bact_p = np.asarray(plus_file["correctors"][
-                                            "bact"]).squeeze()  # bact is an actual corrector value/kick that was applied
-                    bact_m = np.asarray(minus_file["correctors"]["bact"]).squeeze()
-
-                    bpms_names = list(map(str, plus_file["bpms"]["names"]))
-                    present = [b for b in selected_bpms if b in bpms_names]
-
-                    if not present:
-                        continue
-                    indeces = [bpms_names.index(b) for b in present]
-                    corrs_names = list(map(str, plus_file["correctors"]["names"]))
-
-                    if corr not in corrs_names:
-                        continue
-                    i_corr = corrs_names.index(corr)
-                    if plane == "x":
-                        plus_value = bxp[indeces]
-                        minus_value = bxm[indeces]
-                    elif plane == "y":
-                        plus_value = byp[indeces]
-                        minus_value = bym[indeces]
-
-                    k_plus = float(bact_p[i_corr])
-                    k_minus = float(bact_m[i_corr])
-                    if pairs == pairs0 and plane == "x":
-                        px = bxp[indeces]
-                        mx = bxm[indeces]
-                        B0_x = (px + mx) / 2  # golden orbit
-                        rowx = np.full(nb, np.nan)
-                        for k, b in enumerate(present):
-                            rowx[pos[b]] = B0_x[k]
-                        rows_B0x.append(rowx)
-
-                        py = byp[indeces]
-                        my = bym[indeces]
-                        B0_y = (py + my) / 2
-                        rowy = np.full(nb, np.nan)
-                        for k, b in enumerate(present):
-                            rowy[pos[b]] = B0_y[k]
-                        rows_B0y.append(rowy)
-
-                    if k_plus - k_minus == 0:
-                        continue
-                    column_value = np.full(len(selected_bpms), np.nan, dtype=float)
-                    for k, b in enumerate(present):
-                        column_value[pos[b]] = (plus_value[k] - minus_value[k]) / (
-                                    k_plus - k_minus)  # (bpm plus - bpm minus) /(kick plus - kick minus0
-                    cols.append(column_value)
-
-                if cols:
-                    which_matrix[:, j] = np.nanmean(np.vstack(cols), axis=0)
-            return which_matrix
-
-        R0xx = _calculating_Rxx_or_Ryy(which_matrix=R0xx, corrs_type=hcorrs, plane="x", pairs=pairs0)
-        R0yy = _calculating_Rxx_or_Ryy(which_matrix=R0yy, corrs_type=vcorrs, plane="y", pairs=pairs0)
-
-        B0x = np.nanmean(np.vstack(rows_B0x), axis=0).reshape(-1, 1)
-        B0y = np.nanmean(np.vstack(rows_B0y), axis=0).reshape(-1, 1)
-
-        R1xx = _calculating_Rxx_or_Ryy(which_matrix=R1xx, corrs_type=hcorrs, plane="x", pairs=pairs1)
-        R1yy = _calculating_Rxx_or_Ryy(which_matrix=R1yy, corrs_type=vcorrs, plane="y", pairs=pairs1)
-
-        R2xx = _calculating_Rxx_or_Ryy(which_matrix=R2xx, corrs_type=hcorrs, plane="x", pairs=pairs2)
-        R2yy = _calculating_Rxx_or_Ryy(which_matrix=R2yy, corrs_type=vcorrs, plane="y", pairs=pairs2)
-
-        if self._force_triangular() or _force_triangular:
-            corrs, bpms = selected_corrs, selected_bpms
-            Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower().startswith('zx')))]
-            Cy = [s for s in corrs if (s.lower().startswith('zv') or (("SDV" in s) or ("DHJ" in s)))]
-
-            Mx = self._heaviside_function_for_checkbox(correctors=Cx, bpms=bpms)
-            My = self._heaviside_function_for_checkbox(correctors=Cy, bpms=bpms)
-
-            R0xx = np.where(Mx, R0xx, 0.0)  # builds new array, R0xx shape, if Mx is true otherwise 0.0
-            R1xx = np.where(Mx, R1xx, 0.0)
-            R2xx = np.where(Mx, R2xx, 0.0)
-
-            R0yy = np.where(My, R0yy, 0.0)
-            R1yy = np.where(My, R1yy, 0.0)
-            R2yy = np.where(My, R2yy, 0.0)
-
-        return R0xx, R0yy, R0xy, R0yx, R1xx, R1yy, R1xy, R1yx, R2xx, R2yy, R2xy, R2yx, B0x, B0y
-
-    def _creating_response_matrices(self):
-
-        w1, w2, w3, rcond, iters, gain = self._read_params()
-        wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
-
-        corrs, bpms = self._get_selection()
-        R0xx, R0yy, R0xy, R0yx, R1xx, R1yy, R1xy, R1yx, R2xx, R2yy, R2xy, R2yx, B0x, B0y = self._get_data_from_loaded_directories(
-            selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular())
-
-        R0 = np.block([
-            [R0xx, R0xy],
-            [R0yx, R0yy],
-        ])
-
-        R1 = np.block([
-            [R1xx, R1xy],
-            [R1yx, R1yy],
-        ])
-
-        R2 = np.block([
-            [R2xx, R2xy],
-            [R2yx, R2yy],
-        ])
-
-        R_nom = R0
-        R_disp = R1 - R0
-        R_wake = R2 - R0
-
-        Axx = np.vstack((
-            wgt_orb * R0xx,
-            wgt_dfs * (R1xx - R0xx),
-            wgt_wfs * (R2xx - R0xx),
-        ))
-
-        Ayy = np.vstack((
-            wgt_orb * R0yy,
-            wgt_dfs * (R1yy - R0yy),
-            wgt_wfs * (R2yy - R0yy),
-        ))
-
-        return Axx, Ayy, B0x, B0y
 
     def _read_params(self):
         def getf(name, default):  # gets the text value and turns it into a float
@@ -553,34 +251,6 @@ class MainWindow(QMainWindow):
         text = self.dfs_reset_3.text()
         return self._read_all_parameters(text,grad=1)
 
-    def _get_dispersion_from_twiss_file(self):
-        # madx
-        corrs, bpms = self._get_selection()
-        with open('Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
-            # lines=file.readlines()
-            lines = [line.strip() for line in file if line.strip()]
-
-        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
-        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
-        columns = lines[star_symbol].lstrip("*").split()
-
-        DX_column = columns.index("DX")
-        DY_column = columns.index("DY")
-        elements_names = columns.index("NAME")
-
-        bpms_dx, bpms_dy = {}, {}
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            bpms_name = data[elements_names].strip('"')
-
-            bpms_dx[bpms_name] = float(data[DX_column])
-            bpms_dy[bpms_name] = float(data[DY_column])
-
-        target_disp_x = np.array([bpms_dx.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)  # m
-        target_disp_y = np.array([bpms_dy.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)  # m
-
-        return target_disp_x, target_disp_y
-
     def _start_correction(self):
         try:
             self._cancel = False
@@ -602,7 +272,7 @@ class MainWindow(QMainWindow):
 
             Axx, Ayy, B0x, B0y = self._creating_response_matrices()
 
-            self.setWindowTitle("BBA - [Correction running]")
+            self.setWindowTitle("BBA_GUI - [Correction running]")
 
             # DR_freq = 714e3; # 714 MHz in kHz
             # DR_momentum_compaction = 2.1e-3
@@ -611,7 +281,7 @@ class MainWindow(QMainWindow):
             grad = self._read_change_energy().get("grad")
             dP_P = grad - 1
 
-            target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
+            target_disp_x, target_disp_y = self._get_dispersion_from__file()
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
             def clamp(val, max_val):
@@ -682,12 +352,12 @@ class MainWindow(QMainWindow):
                 self._plot_series(self.wake_canvas, self.wake_fig, self._hist_wake, None, None)
                 QApplication.processEvents()
 
-            self.setWindowTitle("BBA")
+            self.setWindowTitle("BBA_GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
             self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy, Bx, By)
 
         except Exception as e:
-            self.setWindowTitle("BBA")
+            self.setWindowTitle("BBA_GUI")
             QMessageBox.critical(self, "Correction error", str(e))
 
     def _stop_correction(self):
@@ -718,116 +388,6 @@ class MainWindow(QMainWindow):
         self._plot_series(self.disp_canvas, self.disp_fig, [], None, "[mm]")
         self._plot_series(self.wake_canvas, self.wake_fig, [], None, "[mm]")
 
-    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy, Bx, By):
-        time_str = datetime.now().strftime("%y%m%d%H%M%S")
-        save_session_dir = os.path.join("Data", f"BBA_{self.interface.get_name()}_{time_str}_session_settings")
-        os.makedirs(save_session_dir, exist_ok=True)
-
-        self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors",
-                          use_dialog=False, base_dir=save_session_dir)
-        self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs", use_dialog=False,
-                          base_dir=save_session_dir)
-
-        correction_settings = {
-            "w1": w1,
-            "w2": w2,
-            "w3": w3,
-            "rcond": rcond,
-            "iters": iters,
-            "gain": gain,
-            "dfs_reset": self._read_reset_energy(),
-            "dfs_change": self._read_change_energy(),
-            "wfs_reset": self._read_reset_intensity(),
-            "wfs_change": self._read_change_intensity(),
-            "data_dirs": {k: (self._expand_data_path(v["dir"]) if v else None)
-                          for k, v in self._data_dirs.items()},
-        }
-
-        with open(os.path.join(save_session_dir, "correction_settings.json"), "w") as f:
-            json.dump(correction_settings, f, indent=2)
-
-        def __save_graph_data(path, series):
-            with open(path, "w") as f:
-                f.write("Iteration\tvalue\n")
-                for i, v in enumerate(series, start=1):
-                    f.write(f"{i}\t{v}\n")
-
-        __save_graph_data(os.path.join(save_session_dir, "trajectory_after_correction.txt"), self._hist_orbit)
-        __save_graph_data(os.path.join(save_session_dir, "dispersion_after_correction.txt"), self._hist_disp)
-        __save_graph_data(os.path.join(save_session_dir, "wakefield_after_correction.txt"), self._hist_wake)
-
-        corrs, bpms = self._get_selection()
-        R0xx, R0yy, R0xy, R0yx, R1xx, R1yy, R1xy, R1yx, R2xx, R2yy, R2xy, R2yx, B0x, B0y = self._get_data_from_loaded_directories(
-            selected_corrs=corrs, selected_bpms=bpms)
-
-        correction_matrices = {
-            "Axx": Axx, "Ayy": Ayy, "B0x": B0x, "B0y": B0y,
-            "R0xx": R0xx, "R1xx": R1xx, "R2xx": R2xx,
-            "R0yy": R0yy, "R1yy": R1yy, "R2yy": R2yy,
-            "Bx": Bx, "By": By,
-        }
-        with open(os.path.join(save_session_dir, "correction_matrices.pkl"), "wb") as f:
-            pickle.dump(correction_matrices, f)
-
-    def load_session_settings(self):
-        default_dir = os.path.join(self.cwd, "Data")
-        os.makedirs(default_dir, exist_ok=True)
-        folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
-        if not folder:
-            return
-        if hasattr(self, "session_database_3"):
-            self.session_database_3.setText(folder)
-        QMessageBox.information(self.session_database_3, "Data directory selected", "Loaded session")
-
-        # load correctors
-        self._loading_func(elements_list=self.correctors_list, filename="correctors.txt",
-                           loading_name="Load Correctors", use_dialog=False, base_dir=folder)
-        # load bpms
-        self._loading_func(elements_list=self.bpms_list, filename="bpms.txt", loading_name="Load BPMs",
-                           use_dialog=False, base_dir=folder)
-
-        correction_settings_path = os.path.join(folder, "correction_settings.json")
-        try:
-            with open(correction_settings_path, "r") as f:
-                settings = json.load(f)
-                paths = settings.get("data_dirs") or {}
-                for key, path in paths.items():
-                    if not path:
-                        continue
-                    path = os.path.expanduser(os.path.expandvars(path))
-                    info = self._find_useful_files(path)
-                    if info["ok"]:
-                        self._data_dirs[key] = info
-                    else:
-                        QMessageBox.warning(self, "Load session", "Data directory not found")
-
-        except Exception as e:
-            QMessageBox.warning(self, "Load session", str(e))
-            settings = {}
-
-        if "w1" in settings: self.lineEdit.setText(str(settings["w1"]))
-        if "w2" in settings: self.lineEdit_2.setText(str(settings["w2"]))
-        if "w3" in settings: self.lineEdit_3.setText(str(settings["w3"]))
-        if "rcond" in settings: self.lineEdit_4.setText(str(settings["rcond"]))
-        if "iters" in settings:  self.lineEdit_5.setText(str(settings["iters"]))
-        if "gain" in settings: self.lineEdit_6.setText(str(settings["gain"]))
-        if "dfs_reset" in settings:
-            text = ", ".join(f"{k} = {v:g}" for k, v in settings["dfs_reset"].items())
-            self.dfs_reset_3.setText(text)
-        if "dfs_change" in settings:
-            text = ", ".join(f"{k} = {v:g}" for k, v in settings["dfs_change"].items())
-            self.dfs_change_3.setText(text)
-        if "wfs_reset" in settings:
-            text = ", ".join(f"{k} = {v:g}" for k, v in settings["wfs_reset"].items())
-            self.wfs_reset_3.setText(text)
-        if "wfs_change" in settings:
-            text = ", ".join(f"{k} = {v:g}" for k, v in settings["wfs_change"].items())
-            self.wfs_change_3.setText(text)
-        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
-        if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")
-        if hasattr(self, "wfs_response_3"): self.wfs_response_3.setText(settings["data_dirs"]["wfs"] or "")
-
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     #from SelectInterface import InterfaceSelectionDialog
@@ -842,7 +402,6 @@ if __name__ == "__main__":
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = f"Data/{project_name}_{time_str}"
-
     w = MainWindow(I, out_dir)
     w.show()
     sys.exit(app.exec())
