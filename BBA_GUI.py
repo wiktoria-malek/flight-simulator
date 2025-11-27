@@ -157,7 +157,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             ax.set_title(None)
         ax.set_title(title)
         ax.set_xlabel("Iteration", fontsize=8)
-        ax.set_ylabel(ylabel, fontsize=7)
+        ax.set_ylabel(ylabel="[mm]", fontsize=7)
         ax.tick_params(axis="both", which="major", labelsize=7)
         ax.yaxis.get_offset_text().set_fontsize(7)
         ax.grid(True, alpha=0.3)
@@ -281,7 +281,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             grad = self._read_change_energy().get("grad")
             dP_P = grad - 1
 
-            target_disp_x, target_disp_y = self._get_dispersion_from__file()
+            target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
             def clamp(val, max_val):
@@ -378,12 +378,11 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._chi_dlg.activateWindow()  # giving it a keyboard focus
 
     def _clear_graphs(self):
+        # it doesnt do fresh - start, it only clears the graphs
         self._cancel = True
-
         self._hist_orbit.clear()
         self._hist_disp.clear()
         self._hist_wake.clear()
-
         self._plot_series(self.traj_canvas, self.traj_fig, [], None, "[mm]")
         self._plot_series(self.disp_canvas, self.disp_fig, [], None, "[mm]")
         self._plot_series(self.wake_canvas, self.wake_fig, [], None, "[mm]")

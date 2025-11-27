@@ -213,9 +213,9 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="reconstructButton">
+       <widget class="QPushButton" name="measureButton">
         <property name="text">
-         <string>Compute</string>
+         <string>Measure</string>
         </property>
        </widget>
       </item>
