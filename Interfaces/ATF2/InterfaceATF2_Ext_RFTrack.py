@@ -9,9 +9,14 @@ class InterfaceATF2_Ext_RFTrack:
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.lattice = rft.Lattice('Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
         self.lattice.set_bpm_resolution(bpm_resolution)
+        for s in self.lattice['*OTR*']:
+            screen = rft.Screen()
+            screen.set_name(s.get_name())
+            s.replace_with(screen)
         self.sequence = [ e.get_name() for e in self.lattice['*'] ]
         self.bpms = [ e.get_name() for e in self.lattice.get_bpms() ]
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors() ]
+        self.screens = [ e.get_name() for e in self.lattice.get_screens() ]
         self.Pref = 1.2999999e3 # 1.3 GeV/c
         self.population = population
         self.jitter = jitter
@@ -102,6 +107,9 @@ class InterfaceATF2_Ext_RFTrack:
     def get_bpms_names(self):
         return self.bpms
 
+    def get_screens_names(self):
+        return self.screens
+
     def get_correctors_names(self):
         return self.corrs
 
@@ -148,6 +156,30 @@ class InterfaceATF2_Ext_RFTrack:
                 tmit[i,j] = b.get_total_charge()
         bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
         return bpms
+
+    def get_screens(self):
+        print('Reading screens...')
+        nscreens = len(self.screens)
+        hpixel = np.ones(nscreens) * 0.1 # mm, horizonatl size of a pixel
+        vpixel = np.ones(nscreens) * 0.1 # mm, vertical size of a pixel
+        images = []
+        hedges_all = []
+        vedges_all = []
+        for i,s in enumerate(self.lattice.get_screens()):
+            m = s.get_bunch().get_phase_space('%x %y')
+            nx = np.ptp(m[:,0]) / xpixel[i]
+            ny = np.ptp(m[:,1]) / ypixel[i]
+            image, hedges, vedges = np.histogram2d(m[:,0], m[:,1], bins=(nx,ny))
+            images.append(image)
+            hedges_all.append(hedges)
+            vedges_all.append(vedges)
+        screens = { "names": self.screens,
+                    "hpixel": hpixel,
+                    "vpixel": vpixel,
+                    "hedges" : hedges_all,
+                    "vedges" : vedges_all,
+                    "images": images }
+        return screens
 
     def push(self, names, corr_vals):
         if not isinstance(names, list):
