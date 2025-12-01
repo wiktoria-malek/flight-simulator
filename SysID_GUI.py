@@ -339,6 +339,11 @@ class MainWindow(QMainWindow):
             self.__set_status_in_title("[Stopping...]")
             self.worker.stop()
         self.__set_status_in_title("[Idle]")
+        print('SysID stopped.')
+        print("Restoring initial correctors' settings...")
+        self.interface.push(self.correctors['names'], self.correctors['bdes'])
+        print("Restored initial correctors' settings.")
+
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()
