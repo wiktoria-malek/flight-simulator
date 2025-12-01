@@ -217,6 +217,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "working_directory_dialog"):
             self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
 
+
         self.__set_status_in_title("[Idle]")
 
     def __save_correctors_button_clicked(self):
@@ -358,8 +359,8 @@ class MainWindow(QMainWindow):
         self.plot_widget.repaint()
 
     def _pick_and_load_data_dir(self):
-        default_dir = '~/flight-simulator-data/'
-        path = os.path.expanduser(os.path.expandvars(default_dir))
+        default_dir = os.path.join(self.cwd, "Data")
+        os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
         if not folder:
             return

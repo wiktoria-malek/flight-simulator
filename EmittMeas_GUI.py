@@ -15,7 +15,6 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
         ui_path = os.path.join(here, "EmittMeas_GUI.ui")
         uic.loadUi(ui_path, self)
         self.simulation_atf2 = Emitt_Meas_Simulation()
-
         self.screensListWidget.addItems(["OTR0X", "OTR1X", "OTR2X", "OTR3X"])
         self.cwd = os.getcwd()
         self.loadTwissButton.clicked.connect(self._pick_and_load_lattice_data)
@@ -26,10 +25,10 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
         self._hist_y_phase_space = []
         self._otr_s=[] # position of otrs
         self._otr_names = []
-
         self._lattice_s=[]
         self._lattice_sigma_x=[]
         self._lattice_sigma_y=[]
+        self.L=
 
         self._setup_canvases()
         #self.chosen_interface = chosen_interface
@@ -113,9 +112,10 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
         highlight_names=[]
         # Reconstruct lattice positions
         s = 0.0
-        lattice, element_descriptions, start, end = self.simulation_atf2.obtaining_the_lattice(filename='Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
-
-        names = list(element_descriptions.keys())
+        lattice = self.simulation_atf2.lattice
+        start=lattice[-1].get_name()
+        end=lattice[0].get_name()
+        names = list(self.simulation_atf2.lattice.keys())
         start_index = names.index(start)
         end_index = names.index(end) + 1
         names_in_lattice = names[start_index:end_index]
@@ -140,11 +140,12 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
                 print(name, "->", name.split('.')[-1], "at", elem['s_start'])
 
         # Plot the screen markers
+        # error propagation
+        # monte carlo
         y_min,y_max=ax.get_ylim()
         for name, pos in zip(highlight_names, highlight_positions):
             ax.axvline(x=pos, color='k', linestyle='--', alpha=0.3)
             ax.text(pos, 0, name, rotation=90, verticalalignment='bottom', fontsize=8)
-
         canvas.draw_idle()
 
     def _plot_phase_space(self, fig, plane_for_M, ylabel, xlabel):
@@ -169,7 +170,7 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
         #if self.chosen_interface == "ATF2":
         emitt_meas_simulation = self.simulation_atf2
         filename = emitt_meas_simulation.filename
-        lattice, element_descriptions, start, end = emitt_meas_simulation.obtaining_the_lattice(filename='Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
+        lattice = self.simulation_atf2.lattice
         B0 = emitt_meas_simulation.setup_beam0()
         lattice.track(B0)
         T = lattice.get_transport_table('%S %sigma_x %sigma_y')
@@ -185,7 +186,7 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
 
         self._hist_sigma_x = list(sigma_x_i)
         self._hist_sigma_y = list(sigma_y_i)
-        self._otr_names = inserted_screens
+        self._otr_names = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
 
         mass = rft.electronmass
         Pref = emitt_meas_simulation.Pref
