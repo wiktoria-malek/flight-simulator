@@ -10,10 +10,14 @@ import time
 import sys
 import os
 
-from PyQt6 import uic
-from PyQt6.QtGui import QPixmap, QIcon, QPainter
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox, QDoubleSpinBox,
+    QComboBox, QCheckBox, QAbstractItemView, QFileDialog, QSizePolicy
+)
+from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QPainter, QPixmap, QBrush, QPainterPath, QImage, QPalette
 
 import matplotlib
 matplotlib.use('QtAgg')
@@ -29,7 +33,6 @@ class MatplotlibWidget(FigureCanvas):
         super().__init__(fig)
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
-
 
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
@@ -49,21 +52,9 @@ class Worker(QObject):
         self.Niter = Niter
         self.running = False
 
-        # FOR THE BBA_GUI!!
-        self.cond="nominal"
-        self.scale_E=0.98
-        self.scale_I=0.90
-
     @pyqtSlot()
     def run(self):
         self.running = True
-
-        # FOR THE BBA_GUI!!
-
-        if self.cond == "scale_E":
-            self.interface.change_energy(self.scale_E)
-        elif self.cond == "scale_I":
-            self.interface.change_intensity(self.scale_I)
 
         I = self.interface
         S = self.S
@@ -113,7 +104,6 @@ class Worker(QObject):
                 nsamples = Op['stdx'].size
                 Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
-                self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
 
                 if corrector in S.get_hcorrectors_names():
                     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
@@ -125,21 +115,12 @@ class Worker(QObject):
                         kicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
 
                 kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
+                np.savetxt('kicks.txt', kicks, delimiter='\n')
 
-                with open('kicks.txt', 'w') as f:
-                    for c, k in zip(self.correctors, kicks):
-                        f.write(f'{c} {k}\n')
-
+                self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
                 time.sleep(1)
 
-#FOR THE BBA_GUI!!
-        if self.cond=="scale_E":
-            self.interface.reset_energy()
-        elif self.cond=="scale_I":
-            self.interface.reset_intensity()
-
         self.finished.emit()
-
 
     def stop(self):
         self.running = False
@@ -147,11 +128,24 @@ class Worker(QObject):
 class MainWindow(QMainWindow):
     def __set_status_in_title(self, status):
         self.setWindowTitle("SYSID - " + self.interface.__class__.__name__ + " " + status)
-    
+        self.setWindowIcon(QIcon('../SysID_GUI/CERN_logo.png'))
+        
+        self.logo = QPixmap('../SysID_GUI/CERN_logo.png')
+        self.logo = self.logo.scaled(75, 75, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.show()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setOpacity(0.5)
+
+        x = self.width() - self.logo.width() - 2
+        y = 2
+        
+        painter.drawPixmap(x, y, self.logo)
+
     def __init__(self, interface, dir_name):
         super().__init__()
 
-        # SysID
         self.worker = None
         self.thread = None
 
@@ -173,43 +167,179 @@ class MainWindow(QMainWindow):
             max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
             max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
 
-        # Load the interface
-        uic.loadUi("SysID_GUI.ui", self)
+        self.__set_status_in_title("[Idle]")
+        self.setGeometry(100, 100, 800, 800)
 
-        # Replace the placeholder with your real widget
-        self.right_layout.removeWidget(self.plot_widget)
-        self.plot_widget.deleteLater()
-        self.plot_widget = MatplotlibWidget(self)
-        self.right_layout.addWidget(self.plot_widget)
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
 
-        # Setting up the interface
-        self.save_correctors_button.clicked.connect(self.__save_correctors_button_clicked)
-        self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
-        self.clear_correctors_button.clicked.connect(self.__clear_correctors_button_clicked)
-        self.save_bpms_button.clicked.connect(self.__save_bpms_button_clicked)
-        self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
-        self.clear_bpms_button.clicked.connect(self.__clear_bpms_button_clicked)
-        self.start_button.clicked.connect(self.__start_button_clicked)
-        self.stop_button.clicked.connect(self.__stop_button_clicked)
+        main_layout = QVBoxLayout(main_widget)
+        top_layout = QHBoxLayout()
+        main_layout.addLayout(top_layout)
 
+        # Left side layout
+        left_layout = QVBoxLayout()
+        top_layout.addLayout(left_layout,1)
+
+        # Correctors list
+        correctors_layout = QHBoxLayout()
+        left_layout.addLayout(correctors_layout)
+
+        correctors_label = QLabel("Correctors:")
+        correctors_layout.addWidget(correctors_label)
+
+        self.correctors_list = QListWidget()
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
+        left_layout.addWidget(self.correctors_list)
 
+        # Save / Load / Clear correctors buttons
+        button_layout = QHBoxLayout()
+        left_layout.addLayout(button_layout)
+
+        self.save_correctors_button = QPushButton("Save As..")
+        self.save_correctors_button.clicked.connect(self.__save_correctors_button_clicked)
+        button_layout.addWidget(self.save_correctors_button)
+
+        self.load_correctors_button = QPushButton("Load..")
+        self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
+        button_layout.addWidget(self.load_correctors_button)
+
+        self.clear_correctors_button = QPushButton("Clear")
+        self.clear_correctors_button.clicked.connect(self.__clear_correctors_button_clicked)
+        button_layout.addWidget(self.clear_correctors_button)
+
+        # Middle layout
+        middle_layout = QVBoxLayout()
+        top_layout.addLayout(middle_layout)
+
+        # BPMs list
+        bpms_layout = QHBoxLayout()
+        left_layout.addLayout(bpms_layout)
+
+        bpms_label = QLabel("BPMs:")
+        bpms_layout.addWidget(bpms_label)
+
+        self.bpms_list = QListWidget()
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.bpms_list.insertItems(0, bpms_list)
+        left_layout.addWidget(self.bpms_list)
 
+        # Save / Load / Clear bpms buttons
+        button_layout = QHBoxLayout()
+        left_layout.addLayout(button_layout)
+
+        self.save_bpms_button = QPushButton("Save As..")
+        self.save_bpms_button.clicked.connect(self.__save_bpms_button_clicked)
+        button_layout.addWidget(self.save_bpms_button)
+
+        self.load_bpms_button = QPushButton("Load..")
+        self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
+        button_layout.addWidget(self.load_bpms_button)
+
+        self.clear_bpms_button = QPushButton("Clear")
+        self.clear_bpms_button.clicked.connect(self.__clear_bpms_button_clicked)
+        button_layout.addWidget(self.clear_bpms_button)
+
+        # Right side layout
+        right_layout = QVBoxLayout()
+        top_layout.addLayout(right_layout,2)
+
+        # Info section
+        info_layout = QVBoxLayout()
+        right_layout.addLayout(info_layout)
+
+        self.info_label = QLabel("Data Storage:")
+        self.info_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        info_layout.addWidget(self.info_label)
+
+        self.working_directory_input = QLineEdit("Working directory:")
         self.working_directory_input.setText(dir_name)
+        info_layout.addWidget(self.working_directory_input)
 
+        # Options sectionQFileDialog
+        options_layout = QVBoxLayout()
+        right_layout.addLayout(options_layout)
+
+        self.options_label = QLabel("Options")
+        self.options_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        options_layout.addWidget(self.options_label)
+
+        cycle_mode_layout = QHBoxLayout()
+        options_layout.addLayout(cycle_mode_layout)
+
+        self.cycle_mode_label = QLabel("Cycle mode")
+        cycle_mode_layout.addWidget(self.cycle_mode_label)
+
+        self.cycle_mode_combobox = QComboBox()
+        self.cycle_mode_combobox.addItems(["Repeat all"])
+        cycle_mode_layout.addWidget(self.cycle_mode_combobox)
+
+        # Correctors Current
+        current_layout = QHBoxLayout()
+        options_layout.addLayout(current_layout)
+
+        self.current_label = QLabel("Max strength (gauss*m)")
+        current_layout.addWidget(self.current_label)
+        current_layout.addStretch()  # This stretch  expands to fill space
+
+        self.horizontal_current_label = QLabel("H:")
+        current_layout.addWidget(self.horizontal_current_label)
+
+        self.max_horizontal_current_spinbox = QDoubleSpinBox()
         self.max_horizontal_current_spinbox.setValue(max_curr_h)
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
+        current_layout.addWidget(self.max_horizontal_current_spinbox)
+
+        self.vertical_current_label = QLabel(" V:")
+        current_layout.addWidget(self.vertical_current_label)
+
+        self.max_vertical_current_spinbox = QDoubleSpinBox()
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+        current_layout.addWidget(self.max_vertical_current_spinbox)
+
+        # Orbit Excursion
+        excursion_layout = QHBoxLayout()
+        options_layout.addLayout(excursion_layout)
+
+        self.excursion_label = QLabel("Orbit excursion (mm)")
+        excursion_layout.addWidget(self.excursion_label)
+        excursion_layout.addStretch()  # This stretch  expands to fill space
+
+        self.horizontal_excursion_label = QLabel("H:")
+        excursion_layout.addWidget(self.horizontal_excursion_label)
+
+        self.horizontal_excursion_spinbox = QDoubleSpinBox()
         self.horizontal_excursion_spinbox.setValue(0.5)
         self.horizontal_excursion_spinbox.setSingleStep(0.1)
+        excursion_layout.addWidget(self.horizontal_excursion_spinbox)
+
+        self.vertical_excursion_label = QLabel("V:")
+        excursion_layout.addWidget(self.vertical_excursion_label)
+
+        self.vertical_excursion_spinbox = QDoubleSpinBox()
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
+        excursion_layout.addWidget(self.vertical_excursion_spinbox)
 
-        self.__set_status_in_title("[Idle]")
+        # Plot
+        self.plot = MatplotlibWidget(self)
+        options_layout.addWidget(self.plot)
+
+        # Start and Stop buttons
+        buttons_layout = QHBoxLayout()
+        main_layout.addLayout(buttons_layout)
+
+        self.start_button = QPushButton("START")
+        self.start_button.setStyleSheet("background-color: red; color: white;")
+        self.start_button.clicked.connect(self.__start_button_clicked)
+        buttons_layout.addWidget(self.start_button)
+
+        self.stop_button = QPushButton("STOP")
+        self.stop_button.setStyleSheet("background-color: green; color: white;")
+        self.stop_button.clicked.connect(self.__stop_button_clicked)
+        buttons_layout.addWidget(self.stop_button)
 
     def __save_correctors_button_clicked(self):
         dir_name = self.cwd + '/' + self.working_directory_input.text()
@@ -307,9 +437,6 @@ class MainWindow(QMainWindow):
         self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
         self.worker.moveToThread(self.thread)
 
-        #FOR THE BBA_GUI!
-        self.worker.cond="nominal"
-        #self.worker.scale_E=0.98
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
@@ -332,41 +459,32 @@ class MainWindow(QMainWindow):
         self.__set_status_in_title("[Idle]")
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
-        self.plot_widget.axes.clear()
-        self.plot_widget.axes.errorbar(range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
-        self.plot_widget.axes.errorbar(range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
-        self.plot_widget.axes.legend(loc='upper left')
-        self.plot_widget.axes.set_xlabel('Bpm [#]')
-        self.plot_widget.axes.set_ylabel('Orbit [mm]')
-        self.plot_widget.axes.set_title(f"Corrector '{corrector}'")
-        self.plot_widget.axes.grid()
-        self.plot_widget.draw()
-        self.plot_widget.repaint()
+        self.plot.axes.clear()
+        self.plot.axes.errorbar(range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
+        self.plot.axes.errorbar(range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
+        self.plot.axes.legend(loc='upper left')
+        self.plot.axes.set_xlabel('Bpm [#]')
+        self.plot.axes.set_ylabel('Orbit [mm]')
+        self.plot.axes.set_title(f"Corrector '{corrector}'")
+        self.plot.axes.grid()
+        self.plot.draw()
+        self.plot.repaint()
 
 ## MAIN
 app = QApplication(sys.argv)
 
 ## Select interface
-#from SelectInterface import InterfaceSelectionDialog
-import SelectInterface
-#dialog = InterfaceSelectionDialog()
-dialog = SelectInterface.choose_acc_and_interface()
-if dialog is None:
+from SelectInterface import InterfaceSelectionDialog
+dialog = InterfaceSelectionDialog()
+if dialog.exec():
+    print(f"Selected interface: {dialog.selected_interface_name}")
+    I = dialog.selected_interface
+else:
     print("Selection cancelled.")
     sys.exit(1)
 
-# if dialog.exec():
-#     print(f"Selected interface: {dialog.selected_interface_name}")
-#     I = dialog.selected_interface
-# else:
-#     print("Selection cancelled.")
-#     sys.exit(1)
-I=dialog
-project_name=I.get_name()
-print(f"Selected interface: {project_name}")
-
 ## Prepare project space
-#project_name = dialog.selected_interface_name
+project_name = dialog.selected_interface_name
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 dir_name = f"Data/{project_name}_{time_str}"
 

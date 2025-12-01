@@ -232,7 +232,8 @@ class MainWindow(QMainWindow):
                 self.bpms_list.item(i).setSelected(True)
             bpms = self.bpms
 
-        hcorrs = [string for string in correctors if string.lower().startswith('zh')]
+
+        hcorrs = [string for string in correctors if (string.lower().startswith('zh') or string.lower().startswith('zx'))]
         vcorrs = [string for string in correctors if string.lower().startswith('zv')]
 
         # Pick all correctors preceding the last bpm
@@ -386,11 +387,11 @@ class MainWindow(QMainWindow):
         self.plot.repaint()
         
     def __save_as_button_clicked(self):
-        dir_name = self.cwd + '/response.pkl'
+        dir_name = self.cwd + '/response2.pkl'
         os.chdir (self.cwd)
         filename, _ = QFileDialog.getSaveFileName(None, "Save Response Matrix", dir_name, "Piclke Files (*.pkl)")
         if filename:
-            self.R.save('response.pkl')
+            self.R.save('response2.pkl')
 
 ## MAIN
 app = QApplication(sys.argv)

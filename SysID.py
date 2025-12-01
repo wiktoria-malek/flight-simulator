@@ -1,5 +1,5 @@
 # from InterfaceATF2_Linac import InterfaceATF2_Linac
-from InterfaceATF2_DR import InterfaceATF2_DR
+from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
 # from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 from State import State
 from datetime import datetime

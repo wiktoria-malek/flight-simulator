@@ -112,7 +112,7 @@ R.Ryy = Ryy
 R.Bx = Bx
 R.By = By
 
-R.save('response.pkl')
+R.save('response2.pkl')
 
 # Plots
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
