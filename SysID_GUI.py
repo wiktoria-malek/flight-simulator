@@ -221,11 +221,11 @@ class MainWindow(QMainWindow):
         self.__set_status_in_title("[Idle]")
 
     def __save_correctors_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text()
+        dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
         selected_correctors = self.correctors_list.selectedItems()
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/correctors.txt'
+        dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
                     f.write(f"{item.text()}\n")
 
     def __load_correctors_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/correctors.txt'
+        dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
@@ -251,11 +251,11 @@ class MainWindow(QMainWindow):
         self.correctors_list.clearSelection()
 
     def __save_bpms_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text()
+        dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
         selected_bpms = self.bpms_list.selectedItems()
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/bpms.txt'
+        dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
@@ -263,7 +263,7 @@ class MainWindow(QMainWindow):
                     f.write(f"{item.text()}\n")
 
     def __load_bpms_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/bpms.txt'
+        dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
@@ -286,7 +286,7 @@ class MainWindow(QMainWindow):
 
         self.__set_status_in_title("[Running...]")
 
-        dir_name = self.cwd + '/' + self.working_directory_input.text()
+        dir_name = self.working_directory_input.text()
         os.makedirs(dir_name, exist_ok=True)
         os.chdir(dir_name)
 
@@ -387,6 +387,7 @@ print(f"Selected interface: {project_name}")
 #project_name = dialog.selected_interface_name
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
+dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
 ## Main Window
 window = MainWindow(I, dir_name)
