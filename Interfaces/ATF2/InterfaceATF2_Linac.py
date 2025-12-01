@@ -74,7 +74,7 @@ class InterfaceATF2_Linac:
         pv = PV('CM1L:phaseRead')
         self.phase_kl1 = pv.get()
 
-    def change_energy(self,rel_phase=5, grad=None, **kwargs):
+    def change_energy(self,rel_phase=5, **kwargs):
         pv = PV('CM1L:phaseWrite')
         pv.put(self.phase_kl1+rel_phase)
         time.sleep(1)

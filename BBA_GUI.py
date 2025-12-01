@@ -51,7 +51,50 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         if hasattr(self, "pushButton_11"):
             self.pushButton_11.clicked.connect(self.load_session_settings)
 
+        self.linac_energy_settings="rel_phase=5"
+        self.linac_intensity_settings="laser_intensity=0.1, ang_offset=2.0"
+        self.linac_reset_e_settings="rel_phase=0"
+        self.linac_reset_ch_settings="laser_intensity=0, ang_offset=0"
+        self.dr_energy_settings="rel_phase=5"
+        self.dr_intensity_settings="laser_intensity=0.1, ang_offset=2.0"
+        self.dr_reset_e_settings="rel_phase=0"
+        self.dr_reset_ch_settings="laser_intensity=0, ang_offset=0"
+        self.ext_energy_settings="delta_freq=-2"
+        self.ext_intensity_settings="laser_intensity=0.1, ang_offset=2.0"
+        self.ext_reset_e_settings="rel_phase=0"
+        self.ext_reset_ch_settings="laser_intensity=0, ang_offset=0"
+        self.rftrack_energy_settings="grad=0.98"
+        self.rftrack_intensity_settings="grad=0.90"
+        self.rftrack_reset_e_settings="grad=0"
+        self.rftrack_reset_ch_settings="grad=0"
         self._running = False
+
+        self.appropriate_settings_energy=None
+        self.appropriate_settings_intensity=None
+        self.appropriate_settings_reset_e=None
+        self.appropriate_settings_reset_ch=None
+
+        if interface.get_name()=='ATF2_DR':
+            self.appropriate_settings_energy=self.dr_energy_settings
+            self.appropriate_settings_intensity=self.dr_intensity_settings
+            self.appropriate_settings_reset_e=self.dr_reset_e_settings
+            self.appropriate_settings_reset_ch=self.dr_reset_ch_settings
+        elif interface.get_name()=='ATF2_Ext':
+            self.appropriate_settings_energy=self.ext_energy_settings
+            self.appropriate_settings_intensity=self.ext_intensity_settings
+            self.appropriate_settings_reset_e=self.ext_reset_e_settings
+            self.appropriate_settings_reset_ch=self.ext_reset_ch_settings
+        elif interface.get_name()=='ATF2_Linac':
+            self.appropriate_settings_energy=self.linac_energy_settings
+            self.appropriate_settings_intensity=self.linac_intensity_settings
+            self.appropriate_settings_reset_e=self.linac_reset_e_settings
+            self.appropriate_settings_reset_ch=self.linac_reset_ch_settings
+        elif interface.get_name()=='ATF2_Ext_RFT':
+            self.appropriate_settings_energy=self.rftrack_energy_settings
+            self.appropriate_settings_intensity=self.rftrack_intensity_settings
+            self.appropriate_settings_reset_e=self.rftrack_reset_e_settings
+            self.appropriate_settings_reset_ch = self.rftrack_reset_ch_settings
+
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
         self.corrs = self.S.get_correctors()["names"]
@@ -62,10 +105,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.lineEdit_4.setText("0.001")
         self.lineEdit_5.setText("10")
         self.lineEdit_6.setText("0.4")
-        self.dfs_reset_3.setText("grad = 1")
-        self.dfs_change_3.setText("grad = 0.98")
-        self.wfs_reset_3.setText("grad = 1")
-        self.wfs_change_3.setText("grad = 0.90")
+        self.dfs_reset_3.setText(self.appropriate_settings_reset_e)
+        self.dfs_change_3.setText(self.appropriate_settings_energy)
+        self.wfs_reset_3.setText(self.appropriate_settings_reset_ch)
+        self.wfs_change_3.setText(self.appropriate_settings_intensity)
 
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']

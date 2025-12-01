@@ -50,8 +50,8 @@
 
 
            <item>
-            <widget class="QPushButton" name="sysid_interface_button">
-             <property name="text"><string>SysID</string></property>
+            <widget class="QPushButton" name="sysid_interface_orbit_button">
+             <property name="text"><string>SysID - Orbit</string></property>
              <property name="sizePolicy">
               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                <horstretch>0</horstretch><verstretch>0</verstretch>
@@ -59,6 +59,31 @@
              </property>
             </widget>
            </item>
+
+           <item>
+            <widget class="QPushButton" name="sysid_interface_dispersion_button">
+             <property name="text"><string>SysID - Dispersion</string></property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch><verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+            </widget>
+           </item>
+
+           <item>
+            <widget class="QPushButton" name="sysid_interface_wakefield_button">
+             <property name="text"><string>SysID - Wakefield</string></property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch><verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+            </widget>
+           </item>
+
+
+
            <item>
             <widget class="QPushButton" name="compute_matrix_button">
              <property name="text"><string>Compute Response Matrix</string></property>
