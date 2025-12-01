@@ -205,11 +205,13 @@ class InterfaceATF2_Linac:
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_icts(self):
+        return None # Reading the icts is time consuming and unnecessary for SysID and BBA
         print("Reading ict's...")
         charge = []
         for ict in self.ict_names:
             pv = PV(f'{ict}')
             charge.append(pv.get())
+        print("ICT's read.")
         names = [ self.ict_names ] if type(self.ict_names) == str else self.ict_names
         charge = np.array(charge)
         icts = { "names": names, "charge": charge }
