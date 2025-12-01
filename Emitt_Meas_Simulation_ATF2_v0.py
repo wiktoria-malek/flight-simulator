@@ -1,5 +1,5 @@
 import numpy as np
-import math
+import math,re, sys
 import RF_Track as rft
 import matplotlib.pyplot as plt
 
@@ -7,13 +7,6 @@ class Emitt_Meas_Simulation:
     def __init__(self, filename='Ext_ATF2/ATF2_EXT_FF_v5.2.twiss'):
         self.Pref=1.2999999e3
         self.filename=filename
-        self.lattice = rft.Lattice(filename)
-        self.sequence = [ e.get_name() for e in self.lattice['*']]
-        self.screens = [e.get_name() for e in self.lattice['*OTR*']]
-        for s in self.lattice['*OTR*']:
-            screen = rft.Screen()
-            screen.set_name(s.get_name())
-            s.replace_with(screen)
 
     def get_data_from_twiss_file(self):
         with open(self.filename, "r") as file:
@@ -108,6 +101,7 @@ class Emitt_Meas_Simulation:
         }
         return Sigma_xy_beam
 
+
     def setup_beam0(self):
         entrance_name, entrance, otrs = self.get_data_from_twiss_file()
         population = 2e10
@@ -126,13 +120,137 @@ class Emitt_Meas_Simulation:
         B0 = rft.Bunch6d(mass, population, charge, Pref, Twiss, nParticles)
         return B0
 
+    def get_ITF(self,I):
+        return 1.29404711e-2  - 2.59458259e-07*I # T/A
+
+    def get_grad(self,I, Lquad=0.226):
+        G_0 = I * self.get_ITF(I) / Lquad    # T/m
+        return G_0
+
+    def get_Quad_K(self,G_0, Pref):
+        K = 299.8 *G_0 / Pref  # 1/m^2
+        return K
+
+    def get_Quad_K_from_I(self,I, Lquad, Pref):
+        G_0 = self.get_grad(I, Lquad)
+        K = self.get_Quad_K(G_0, Pref)
+        return K
+
+    def obtaining_the_lattice(self,filename):
+        with open(filename) as file:
+            lines = file.readlines()
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+        idx = {c: i for i, c in enumerate(columns)}
+
+        NAME_col = idx["NAME"]
+        KEYWORD_col = idx["KEYWORD"]
+        S_col = idx["S"]
+        L_col = idx["L"]
+
+        element_descriptions = {}
+        quad_index = 0
+        corr_index = 0
+
+        start_name = "ATF2$START"
+        end_name = "ATF2$END"
+
+        for line in lines[dollar_sign + 1:]:
+            if not line.strip():
+                continue
+            if line[0] != ' ' and line[0] != '"':
+                continue
+
+            data = line.split()
+            if len(data) <= max(NAME_col, KEYWORD_col, S_col, L_col):
+                continue
+
+            name = data[NAME_col].strip('"')
+            keyword = data[KEYWORD_col].strip('"')
+            s_end = float(data[S_col])
+            L = float(data[L_col])
+            s_start = s_end - L
+
+            element_type = None
+            upper_name = name.upper()
+
+            if upper_name.startswith(("QF", "QD", "QS", "QM", "QK")) and keyword == "QUADRUPOLE":
+                element_type = "Quadrupole"
+            elif upper_name.startswith("OTR"):
+                element_type = "Screen"
+            elif keyword == "MONITOR":
+                element_type = "BPM"
+            elif keyword == "DRIFT":
+                element_type = "Drift"
+            elif keyword in ("HKICKER", "VKICKER"):
+                element_type = "Corrector"
+            elif keyword == "MARKER":
+                element_type = "Marker"
+            else:
+                element_type = "Other"
+
+            element_descriptions[name] = {
+                "element_type": element_type,
+                "L": L,
+                "s_start": s_start,
+                "s_end": s_end,
+                "quad_index": quad_index if element_type == "Quadrupole" else None,
+                "corr_index": corr_index if element_type == "Corrector" else None,
+            }
+
+            if element_type == "Quadrupole":
+                quad_index += 1
+            if element_type == "Corrector":
+                corr_index += 1
+        lattice = rft.Lattice(filename)
+        return lattice, element_descriptions, start_name, end_name
+
     def measure_sigmas(self,return_bunches=False):
         otr_names = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
         otr_names_upper = [n.upper() for n in otr_names]
 
+        lattice, element_descriptions, start, end = self.obtaining_the_lattice(filename=self.filename)
         B0 = self.setup_beam0()
-        self.lattice.track(B0)
-        B_screens = self.lattice.get_bunch_at_screens()
+        L = rft.Lattice()
+        inserted_screens = []
+        try:
+            elements = lattice['*']
+        except Exception:
+            elements = [lattice[i] for i in range(lattice.size())]
+        for elem in elements:
+            try:
+                L.append_ref(elem)
+            except Exception:
+                L.append(elem)
+            name = None
+            if hasattr(elem, "get_name"):
+                try:
+                    name = elem.get_name()
+                except Exception:
+                    name = None
+            if name is None and hasattr(elem, "name"):
+                name = getattr(elem, "name", None)
+
+            if isinstance(name, bytes):
+                name = name.decode()
+
+            if name is None:
+                continue
+
+            name_str = str(name).strip('"').upper()
+
+            if name_str in otr_names_upper:
+                scr = rft.Screen()
+                try:
+                    scr.name = name_str + "_SCR"
+                except Exception:
+                    pass
+                L.append(scr)
+                inserted_screens.append(name_str)
+
+        L.track(B0)
+        B_screens = L.get_bunch_at_screens()
 
         sigma_x = []
         sigma_y = []
@@ -144,10 +262,10 @@ class Emitt_Meas_Simulation:
 
         sigma_x = np.array(sigma_x)
         sigma_y = np.array(sigma_y)
-        screens_names=self.screens
+        print("Found screens at:", inserted_screens)
 
         if return_bunches:
-            return sigma_x,sigma_y, B_screens, screens_names
+            return sigma_x,sigma_y, B_screens, inserted_screens
         else:
             return sigma_x, sigma_y
 
@@ -183,9 +301,10 @@ class Emitt_Meas_Simulation:
         return emittance_x, emittance_y, beta_x, beta_y, alpha_x, alpha_y, gamma_x, gamma_y
 
     def _plot_vertical_beam_size(self):
+        lattice, element_descriptions, start, end = self.obtaining_the_lattice(filename=self.filename)
         B0 = self.setup_beam0()
-        self.lattice.track(B0)
-        L=self.lattice
+        lattice.track(B0)
+        L=lattice
         lattice_length = L.get_length()
         print("Lattice length:", lattice_length)
         T = L.get_transport_table('%S %sigma_y')
@@ -195,10 +314,11 @@ class Emitt_Meas_Simulation:
         plt.show()
 
     def _plot_horizontal_beam_size(self):
+        lattice, element_descriptions, start, end = self.obtaining_the_lattice(filename=self.filename)
         B0 = self.setup_beam0()
-        self.lattice.track(B0)
+        lattice.track(B0)
 
-        L=self.lattice
+        L=lattice
         lattice_length = L.get_length()
         print("Lattice length:", lattice_length)
         T = L.get_transport_table('%S %sigma_x')
@@ -229,6 +349,8 @@ class Emitt_Meas_Simulation:
 if __name__ == "__main__":
     w = Emitt_Meas_Simulation()
 
+    lattice, element_descriptions, start, end = w.obtaining_the_lattice(filename='Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
+
     entrance_name, entrance, otrs = w.get_data_from_twiss_file()
     Mx, My = w.compute_transport_matrix()
     Sigma_xy_beam = w.compute_beam_matrix()
@@ -239,11 +361,17 @@ if __name__ == "__main__":
 
     w._plot_vertical_beam_size()
     w._plot_horizontal_beam_size()
-    w._plot_normalised_horizontal_phase_space(otr_name = 'OTR1X')
-    w._plot_normalised_vertical_phase_space(otr_name = 'OTR1X')
+    w._plot_normalised_horizontal_phase_space(otr_name = 'OTR0X')
+    w._plot_normalised_vertical_phase_space(otr_name = 'OTR0X')
     mass = rft.electronmass
     Pref = w.Pref
     beta_gamma = Pref / mass
     print(f"Beta gamma is: {beta_gamma}")
     print(f"emittance_x (normalised) = {emittance_x} mm mrad")
     print(f"emittance_y (normalised) = {emittance_y} mm mrad")
+
+
+
+
+
+

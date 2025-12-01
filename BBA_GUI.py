@@ -7,11 +7,28 @@ from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog
                              QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 from State import State
 matplotlib.use("QtAgg")
+from enum import Enum
+from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from ChiSquaredPopup_BBA import ChiSquaredWindow
 from SaveOrLoad_BBA import SaveOrLoad_BBA
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
+
+class Machine(Enum):
+    ATF2_DR = "ATF2_DR"
+    ATF2_EXT = "ATF2_Ext"
+    ATF2_LINAC = "ATF2_Linac"
+    ATF2_EXT_RFT = "ATF2_Ext_RFT"
+
+
+@dataclass()
+class MachineSettings:
+    energy: str
+    intensity: str
+    reset_e: str
+    reset_ch: str
+
 
 class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def __init__(self, interface, dir_name):
@@ -51,7 +68,47 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         if hasattr(self, "pushButton_11"):
             self.pushButton_11.clicked.connect(self.load_session_settings)
 
+        self._machine_settings={
+            Machine.ATF2_DR: MachineSettings(
+                energy="rel_phase=5",
+                intensity="laser_intensity=0.1, ang_offset=2.0",
+                reset_e="rel_phase=0",
+                reset_ch="laser_intensity=0.0, ang_offset=0.0",
+            ),
+            Machine.ATF2_EXT: MachineSettings(
+                energy="delta_freq=-2",
+                intensity="laser_intensity=0.1, ang_offset=2.0",
+                reset_e="rel_phase=0",
+                reset_ch="laser_intensity=0.0, ang_offset=0.0",
+            ),
+            Machine.ATF2_LINAC: MachineSettings(
+                energy="rel_phase=5.0",
+                intensity="laser_intensity=0.1, ang_offset=2.0",
+                reset_e="rel_phase=0.0",
+                reset_ch="laser_intensity=0.0, ang_offset=0.0",
+            ),
+            Machine.ATF2_EXT_RFT: MachineSettings(
+                energy="grad=0.98",
+                intensity="grad=0.90",
+                reset_e="grad=0",
+                reset_ch="grad=0",
+            ),
+        }
+
         self._running = False
+
+        #later change it to enum instead of if/elif!!
+        self.appropriate_settings_energy=None
+        self.appropriate_settings_intensity=None
+        self.appropriate_settings_reset_e=None
+        self.appropriate_settings_reset_ch=None
+        interface_name=interface.get_name()
+        machine=Machine(interface_name)
+        settings=self._machine_settings[machine]
+        self.appropriate_settings_energy=settings.energy
+        self.appropriate_settings_intensity=settings.intensity
+        self.appropriate_settings_reset_e=settings.reset_e
+        self.appropriate_settings_reset_ch=settings.reset_ch
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
         self.corrs = self.S.get_correctors()["names"]
@@ -62,10 +119,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.lineEdit_4.setText("0.001")
         self.lineEdit_5.setText("10")
         self.lineEdit_6.setText("0.4")
-        self.dfs_reset_3.setText("grad = 1")
-        self.dfs_change_3.setText("grad = 0.98")
-        self.wfs_reset_3.setText("grad = 1")
-        self.wfs_change_3.setText("grad = 0.90")
+        self.dfs_reset_3.setText(self.appropriate_settings_reset_e)
+        self.dfs_change_3.setText(self.appropriate_settings_energy)
+        self.wfs_reset_3.setText(self.appropriate_settings_reset_ch)
+        self.wfs_change_3.setText(self.appropriate_settings_intensity)
 
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']

@@ -13,10 +13,10 @@ class InterfaceATF2_Ext_RFTrack:
             screen = rft.Screen()
             screen.set_name(s.get_name())
             s.replace_with(screen)
-        self.sequence = [ e.get_name() for e in self.lattice['*'] ]
-        self.bpms = [ e.get_name() for e in self.lattice.get_bpms() ]
-        self.corrs = [ e.get_name() for e in self.lattice.get_correctors() ]
-        self.screens = [ e.get_name() for e in self.lattice.get_screens() ]
+        self.sequence = [ e.get_name() for e in self.lattice['*']]
+        self.bpms = [ e.get_name() for e in self.lattice.get_bpms()]
+        self.corrs = [ e.get_name() for e in self.lattice.get_correctors()]
+        self.screens = [ e.get_name() for e in self.lattice.get_screens()]
         self.Pref = 1.2999999e3 # 1.3 GeV/c
         self.population = population
         self.jitter = jitter
@@ -40,7 +40,6 @@ class InterfaceATF2_Ext_RFTrack:
     def __setup_beam1(self,scale):
         # Beam for DFS - Reduced energy
         Pref= scale * self.Pref
-
         #Pref = 0.98 * self.Pref # 98% of nominal energy
         T = rft.Bunch6d_twiss()
         T.emitt_x = 2e-3 # mm.mrad normalised emittance
@@ -167,8 +166,8 @@ class InterfaceATF2_Ext_RFTrack:
         vedges_all = []
         for i,s in enumerate(self.lattice.get_screens()):
             m = s.get_bunch().get_phase_space('%x %y')
-            nx = np.ptp(m[:,0]) / xpixel[i]
-            ny = np.ptp(m[:,1]) / ypixel[i]
+            nx = np.ptp(m[:,0]) / hpixel[i]
+            ny = np.ptp(m[:,1]) / vpixel[i]
             image, hedges, vedges = np.histogram2d(m[:,0], m[:,1], bins=(nx,ny))
             images.append(image)
             hedges_all.append(hedges)

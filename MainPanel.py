@@ -15,11 +15,14 @@ class MainWindow(QMainWindow):
         uic.loadUi(ui_path, self)
         self.application_choice=None
 
-        self.sysid_interface_button.clicked.connect(self.handle_sysid_click)
+        #self.sysid_interface_button.clicked.connect(self.handle_sysid_click)
         self.compute_matrix_button.clicked.connect(self.handle_compute_response_matrix_click)
         self.bba_interface_button.clicked.connect(self.handle_bba_click)
         self.emittance_interface_button.clicked.connect(self.handle_emittance_click)
         self.knobs_interface_button.clicked.connect(self.handle_knobs_click)
+        self.sysid_interface_orbit_button.clicked.connect(self.handle_sysid_orbit_click)
+        self.sysid_interface_dispersion_button.clicked.connect(self.handle_sysid_dispersion_click)
+        self.sysid_interface_wakefield_button.clicked.connect(self.handle_sysid_wakefield_click)
 
         self._procs=[]
         self.setWindowTitle("Choose the application")
@@ -63,6 +66,12 @@ class MainWindow(QMainWindow):
     def handle_emittance_click(self):
         pass
     def handle_knobs_click(self):
+        pass
+    def handle_sysid_orbit_click(self):
+        pass
+    def handle_sysid_dispersion_click(self):
+        pass
+    def handle_sysid_wakefield_click(self):
         pass
 
     def handle_compute_response_matrix_click(self):

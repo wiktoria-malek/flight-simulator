@@ -111,7 +111,7 @@
           <widget class="QListWidget" name="screensListWidget">
            <property name="minimumSize">
             <size>
-             <width>20</width>
+             <width>70</width>
              <height>120</height>
             </size>
            </property>
