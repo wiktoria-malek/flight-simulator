@@ -352,17 +352,14 @@ class MainWindow(QMainWindow):
         self.plot_widget.draw()
         self.plot_widget.repaint()
 
-    def _pick_and_load_data_dir(self, button_name):
+    def _pick_and_load_data_dir(self):
         default_dir = os.path.join(self.cwd, "Data")
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
         if not folder:
             return
-        info = self._find_useful_files(folder)
-        if not info["ok"]:
-            QMessageBox.warning(self, "Load data", "Wrong data directory selected")
-        self.working_directory_dialog.setText(folder)
-        QMessageBox.information(self.working_directory_dialog, "Data directory selected", button_name)
+        self.working_directory_input.setText(folder)
+        #QMessageBox.information(self.working_directory_dialog, "Data directory selected", self.working_directory_dialog)
 
 ## MAIN
 app = QApplication(sys.argv)
