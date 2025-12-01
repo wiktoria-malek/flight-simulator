@@ -242,7 +242,7 @@ class InterfaceATF2_Linac:
             x.append(a[self.bpm_indexes, 1])
             y.append(a[self.bpm_indexes, 2])
             tmit.append(status * a[self.bpm_indexes, 3])
-            time.sleep(1)
+            time.sleep(0.35)
         names = [ self.bpms ] if type(self.bpms) == str else self.bpms
         x = np.vstack(x) / 1e3 # mm
         y = np.vstack(y) / 1e3 # mm
