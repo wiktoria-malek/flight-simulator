@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
         Niter = 3
 
         self.thread = QThread()
-        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
+        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
         self.worker.moveToThread(self.thread)
 
         #FOR THE BBA_GUI!
