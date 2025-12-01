@@ -457,7 +457,8 @@ if __name__ == "__main__":
     project_name=I.get_name()
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir = f"Data/{project_name}_{time_str}"
-    w = MainWindow(I, out_dir)
+    dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
+    dir_name = os.path.expanduser(os.path.expandvars(dir_name))
+    w = MainWindow(I, dir_name)
     w.show()
     sys.exit(app.exec())
