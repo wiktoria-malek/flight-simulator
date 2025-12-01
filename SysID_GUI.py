@@ -301,8 +301,8 @@ class MainWindow(QMainWindow):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
 
-        S = State(interface=self.interface)
-        S.save(basename='machine_status')
+        self.S = State(interface=self.interface)
+        self.S.save(basename='machine_status')
 
         kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
         max_osc_h = self.horizontal_excursion_spinbox.value()
@@ -340,7 +340,8 @@ class MainWindow(QMainWindow):
         self.__set_status_in_title("[Idle]")
         print('SysID stopped.')
         print("Restoring initial correctors' settings...")
-        self.interface.push(self.correctors['names'], self.correctors['bdes'])
+        selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        self.interface.push(selected_correctors, self.S.get_correctors(selected_correctors)['bdes'])
         print("Restored initial correctors' settings.")
 
 
