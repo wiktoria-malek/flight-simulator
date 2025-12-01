@@ -12,7 +12,7 @@ import os
 
 from PyQt6 import uic
 from PyQt6.QtGui import QPixmap, QIcon, QPainter
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget,QMessageBox
 from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
 
 import matplotlib
@@ -48,6 +48,11 @@ class Worker(QObject):
         self.max_curr_v = max_curr_v
         self.Niter = Niter
         self.running = False
+
+        #self.working_directory_dialog.clicked.connect()
+
+        if hasattr(self, "working_directory_dialog"):
+            self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
 
         # FOR THE BBA_GUI!!
         self.cond="nominal"
@@ -209,6 +214,10 @@ class MainWindow(QMainWindow):
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
 
+        if hasattr(self, "working_directory_dialog"):
+            self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
+
+
         self.__set_status_in_title("[Idle]")
 
     def __save_correctors_button_clicked(self):
@@ -342,6 +351,18 @@ class MainWindow(QMainWindow):
         self.plot_widget.axes.grid()
         self.plot_widget.draw()
         self.plot_widget.repaint()
+
+    def _pick_and_load_data_dir(self, button_name):
+        default_dir = os.path.join(self.cwd, "Data")
+        os.makedirs(default_dir, exist_ok=True)
+        folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
+        if not folder:
+            return
+        info = self._find_useful_files(folder)
+        if not info["ok"]:
+            QMessageBox.warning(self, "Load data", "Wrong data directory selected")
+        self.working_directory_dialog.setText(folder)
+        QMessageBox.information(self.working_directory_dialog, "Data directory selected", button_name)
 
 ## MAIN
 app = QApplication(sys.argv)
