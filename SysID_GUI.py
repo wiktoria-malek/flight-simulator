@@ -82,7 +82,6 @@ class Worker(QObject):
         for iter in range(self.Niter):
             if self.running == False:
                 break
-            for icorr, corrector in enumerate(self.correctors):
                 if self.running == False:
                     break
 
@@ -99,6 +98,7 @@ class Worker(QObject):
                 S.pull(I)
                 S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
                 Op = S.get_orbit(self.bpms)
+                print('CIAO - GET ORBIT')
 
                 print(f"Corrector {corrector} '-' excitation...")
                 curr_m = corr['bdes'] - kick
@@ -110,6 +110,7 @@ class Worker(QObject):
                 S.pull(I)
                 S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
                 Om = S.get_orbit(self.bpms)
+                print('CIAO - GET ORBIT --')
 
                 I.push(corrector, corr['bdes'])
 
@@ -301,8 +302,8 @@ class MainWindow(QMainWindow):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
 
-        S = State(interface=self.interface)
-        S.save(basename='machine_status')
+        self.S = State(interface=self.interface)
+        self.S.save(basename='machine_status')
 
         kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
         max_osc_h = self.horizontal_excursion_spinbox.value()
@@ -312,7 +313,7 @@ class MainWindow(QMainWindow):
         Niter = 3
 
         self.thread = QThread()
-        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
+        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
         self.worker.moveToThread(self.thread)
 
         #FOR THE BBA_GUI!
@@ -340,9 +341,8 @@ class MainWindow(QMainWindow):
         self.__set_status_in_title("[Idle]")
         print('SysID stopped.')
         print("Restoring initial correctors' settings...")
-        self.interface.push(self.correctors['names'], self.correctors['bdes'])
-        print("Restored initial correctors' settings.")
-
+        selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        self.interface.push(selected_correctors, self.S.get_correctors(selected_correctors)['bdes'])
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()

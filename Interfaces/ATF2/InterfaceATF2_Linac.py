@@ -87,13 +87,8 @@ class InterfaceATF2_Linac:
     def change_intensity(self, laserintensity=0.1,ang_offset=2.0,**kwargs):
         start = time.perf_counter()
 
-        laserintensity = 0.1
-
         if laserintensity <= 0.0:
             raise ValueError('Laser intensity should be strict positive')
-
-        elif laserintensity >= 1.0:
-            raise ValueError(f'Laser intensity should be below 1: {laserintensity}')
 
         elif laserintensity >= 0.30:
             raise ValueError(f'Laser intensity should be below 0.3 - internal warning {laserintensity}')
@@ -217,6 +212,7 @@ class InterfaceATF2_Linac:
         names = [ self.ict_names ] if type(self.ict_names) == str else self.ict_names
         charge = np.array(charge)
         icts = { "names": names, "charge": charge }
+        print('DEBUG message')
         return icts
 
     def get_correctors(self):

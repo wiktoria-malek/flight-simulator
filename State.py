@@ -13,11 +13,14 @@ class State:
         self.correctors = interface.get_correctors()
         self.bpms = interface.get_bpms()
         self.icts = interface.get_icts()
+        print('CIAO')
         self.sequence = interface.get_sequence()
+        print('CIAO2')
         self.hcorrectors_names = interface.get_hcorrectors_names()
         self.vcorrectors_names = interface.get_vcorrectors_names()
         self.timestamp = datetime.now()
-
+        print('CIAO3')
+        
     def push(self, interface):
         interface.push(self.correctors['names'], self.correctors['bdes']) #sets the desired current for one or more correctors
 
@@ -27,6 +30,7 @@ class State:
     def get_correctors(self, names=None):
         if names is not None:
             corr_indexes = np.array([index for index, string in enumerate(self.correctors['names']) if string in names])
+            print(corr_indexes)
             correctors = {
                 "names": np.array(self.correctors['names'])[corr_indexes],
                 "bdes": np.array(self.correctors['bdes'])[corr_indexes],
