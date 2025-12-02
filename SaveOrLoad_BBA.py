@@ -112,9 +112,12 @@ class SaveOrLoad_BBA():
                 for i, v in enumerate(series, start=1):
                     f.write(f"{i}\t{v}\n")
 
-        __save_graph_data(os.path.join(save_session_dir, "trajectory_after_correction.txt"), self._hist_orbit)
-        __save_graph_data(os.path.join(save_session_dir, "dispersion_after_correction.txt"), self._hist_disp)
-        __save_graph_data(os.path.join(save_session_dir, "wakefield_after_correction.txt"), self._hist_wake)
+        __save_graph_data(os.path.join(save_session_dir, "trajectory_x_after_correction.txt"), self._hist_orbit_x)
+        __save_graph_data(os.path.join(save_session_dir, "dispersion_x_after_correction.txt"), self._hist_disp_x)
+        __save_graph_data(os.path.join(save_session_dir, "wakefield_x_after_correction.txt"), self._hist_wake_x)
+        __save_graph_data(os.path.join(save_session_dir, "trajectory_y_after_correction.txt"), self._hist_orbit_y)
+        __save_graph_data(os.path.join(save_session_dir, "dispersion_y_after_correction.txt"), self._hist_disp_y)
+        __save_graph_data(os.path.join(save_session_dir, "wakefield_y_after_correction.txt"), self._hist_wake_y)
 
         corrs, bpms = self._get_selection()
         R0xx, R0yy, R0xy, R0yx, R1xx, R1yy, R1xy, R1yx, R2xx, R2yy, R2xy, R2yx, B0x, B0y = self._get_data_from_loaded_directories(
