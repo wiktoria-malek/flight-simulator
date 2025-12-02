@@ -149,6 +149,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.max_vertical_current_spinbox.setSingleStep(0.01)
 
     def _on_start_click(self):
+        print("Starting button clicked...")
         if not self._running:
             self._running = True
             self._step = True
@@ -311,6 +312,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
     def _start_correction(self):
         try:
+            print("Starting correction...")
             self._cancel = False
             w1, w2, w3, rcond, iters, gain = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
@@ -356,12 +358,15 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 self._step = False
 
                 # nominal
+                print("Measuring orbit")
                 self.S.pull(self.interface)
                 O0 = self.S.get_orbit(bpms)
                 O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
                 O0y = O0['y'].reshape(-1, 1)
 
                 # dfs
+                print("Measuring dispersion")
+
                 dfs_params_change = self._read_change_energy()
                 dfs_params_reset = self._read_reset_energy()
                 self.interface.change_energy(**dfs_params_change)
@@ -372,6 +377,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 O1y = O1['y'].reshape(-1, 1)
 
                 # wfs
+                print("Measuring wakefield")
+
                 wfs_params_change = self._read_change_intensity()
                 wfs_params_reset = self._read_reset_intensity()
                 self.interface.change_intensity(**wfs_params_change)
