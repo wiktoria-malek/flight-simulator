@@ -460,10 +460,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self._hist_orbit_y.append(filtering_norm_y(O0y,B0y))
                 if w2>0 and O1x is not None:
                     self._hist_disp_x.append(filtering_norm_x(O0x,O1x))
-                    self._hist_disp_y.append(filtering_norm_y(O0y,B0y))
+                    self._hist_disp_y.append(filtering_norm_y(O0y,O1y))
                 if w3>0 and O2x is not None:
                     self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
-                    self._hist_wake_y.append(filtering_norm_y(O0y,B0y))
+                    self._hist_wake_y.append(filtering_norm_y(O0y,O2y))
 
 
                 self._plot_series(canvas=self.traj_canvas, fig=self.traj_fig, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y , title=None, ylabel=None)
