@@ -341,6 +341,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
+
             def clamp(val, max_val):
                 if max_val == 0.0:
                     return val
@@ -457,8 +458,8 @@ if __name__ == "__main__":
     project_name=I.get_name()
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
+    dir_name = f"~/flight-simulator-data/BBA_{I.get_name()}_{time_str}_session_settings"
     dir_name = os.path.expanduser(os.path.expandvars(dir_name))
-    w = MainWindow(I, dir_name)
+    w = MainWindow(interface=I, dir_name=dir_name)
     w.show()
     sys.exit(app.exec())

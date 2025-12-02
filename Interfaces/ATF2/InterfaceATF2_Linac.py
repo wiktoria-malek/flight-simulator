@@ -239,18 +239,20 @@ class InterfaceATF2_Linac:
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
             print(f'Sample = {sample}')
-            a = p.get().reshape((-1, 20))
-            status = a[self.bpm_indexes, 0]
-            # Set elements that are not equal to 1 to zero
-            status[status != 1] = 0
-            x.append(a[self.bpm_indexes, 1])
-            y.append(a[self.bpm_indexes, 2])
-            tmit.append(status * a[self.bpm_indexes, 3])
+            a_pv = p.get()
+            if hasattr(a_pv, "__len__") and len(a_pv)>=20:
+                a = a_pv.reshape((-1, 20))
+                status = a[self.bpm_indexes, 0]
+                # Set elements that are not equal to 1 to zero
+                status[status != 1] = 0
+                x.append(a[self.bpm_indexes, 1])
+                y.append(a[self.bpm_indexes, 2])
+                tmit.append(status * a[self.bpm_indexes, 3])
             time.sleep(0.35)
         names = [ self.bpms ] if type(self.bpms) == str else self.bpms
-        x = np.vstack(x) / 1e3 # mm
-        y = np.vstack(y) / 1e3 # mm
-        tmit = np.vstack(tmit)
+        x = np.vstack(x) / 1e3 if len(x) else []# mm
+        y = np.vstack(y) / 1e3 if len(y) else [] # mm
+        tmit = np.vstack(tmit) if len(tmit) else []
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
 
