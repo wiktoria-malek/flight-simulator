@@ -105,7 +105,7 @@ class InterfaceSelectionDialog(QDialog):
                 case 'InterfaceATF2_Linac':
                     from Interfaces.ATF2.InterfaceATF2_Linac import InterfaceATF2_Linac
                     globals()['InterfaceATF2_Linac'] = InterfaceATF2_Linac
-                    self.selected_interface = InterfaceATF2_Linac(nsamples=1)
+                    self.selected_interface = InterfaceATF2_Linac(nsamples=3)
 
                 case 'InterfaceATF2_Ext_RFTrack':
                     from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
