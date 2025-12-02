@@ -437,7 +437,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self._hist_disp.append(float(np.linalg.norm(O1x - O0x) + np.linalg.norm(O1y - O0y)))
                 if w3>0 and O2x is not None:
                     self._hist_wake.append(float(np.linalg.norm(O2x - O0x) + np.linalg.norm(O2y - O0y)))
-
+#
                 self._plot_series(self.traj_canvas, self.traj_fig, self._hist_orbit, None, None)
                 self._plot_series(self.disp_canvas, self.disp_fig, self._hist_disp, None, None)
                 self._plot_series(self.wake_canvas, self.wake_fig, self._hist_wake, None, None)
