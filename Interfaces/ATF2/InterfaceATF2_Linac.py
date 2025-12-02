@@ -71,8 +71,8 @@ class InterfaceATF2_Linac:
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
-        pv = PV('CM1L:phaseRead')
-        self.phase_kl1 = pv.get()
+        self.phase_kl1 = PV('CM1L:phaseRead').get()
+        self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
     def change_energy(self,rel_phase=5, **kwargs):
         pv = PV('CM1L:phaseWrite')
@@ -84,105 +84,18 @@ class InterfaceATF2_Linac:
         pv.put(self.phase_kl1)
         time.sleep(1)
 
-    def change_intensity(self, laserintensity=0.1,ang_offset=2.0,**kwargs):
-        start = time.perf_counter()
-
-        laserintensity = 0.1
-
-        if laserintensity <= 0.0:
-            raise ValueError('Laser intensity should be strict positive')
-
-        elif laserintensity >= 1.0:
-            raise ValueError(f'Laser intensity should be below 1: {laserintensity}')
-
-        elif laserintensity >= 0.30:
-            raise ValueError(f'Laser intensity should be below 0.3 - internal warning {laserintensity}')
-
-        else:
-            ang_offset = 2.0
-
-            angle = 180.0 / np.pi / 4.0 * math.acos(2.0 * laserintensity - 1.0) - ang_offset
-
-            ### calculate current angle
-
-            # read x_counter
-
-            x_counter = PV('INJ:LaserIntensityXcount').get()
-
-            # os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
-            # [name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
-
-            print(x_counter)
-
-            angle_read = np.mod(x_counter, 72000) / 200.0 + ang_offset
-
-            if not hasattr(self, '_angle_before'):
-                self._angle_before = angle_read
-
-            pulse = np.int32((angle - angle_read) * 200)
-
-            if pulse >= 0:
-                print('laser up')
-                PV('INJ:setLaserIntUpAngle').put(int(pulse))
-                # os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
-            else:
-                print('laser down')
-                pulse = -pulse
-                PV('INJ:setLaserIntDownAngle').put(int(pulse))
-                # os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
-
-            PV('INJ:setLaserIntSend').put(1)
-            # os.system('caput INJ:setLaserIntSend 1')
-            time.sleep(0.5)
-            PV('INJ:setLaserIntSend').put(1)
-            # os.system('caput INJ:setLaserIntSend.PROC 1')
-
-            time.sleep(3)
-            elapsed = time.perf_counter() - start
-            print('InterfaceATF2::ChangeBunchCharge()', elapsed)
-            return self
+    def change_intensity(self, laserintensity=0.15,**kwargs):
+        print(f'Changing laser intensity to {laserintensity}...')
+        self.laser_intensity = float(PV('RFGun:LasetIntensity1:Read').get())
+        laser_intensity = laserintensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
+        PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
+        time.sleep(3)
+        
+        return self
 
     def reset_intensity(self,**kwargs):
-        start = time.perf_counter()
-
-        ang_offset = 2.0
-
-        angle = self._angle_before
-
-        ### calculate current angle
-
-        # read x_counter
-
-        x_counter = PV('INJ:LaserIntensityXcount').get()
-        print(x_counter)
-
-        # os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
-        # [name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
-
-        angle_read = np.mod(x_counter, 72000) / 200.0 + ang_offset
-
-        pulse = int((angle - angle_read) * 200)
-
-        if pulse >= 0:
-            print('laser up')
-            PV('INJ:setLaserIntUpAngle').put(int(pulse))
-            # os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
-        else:
-            print('laser down')
-            pulse = -pulse
-            PV('INJ:setLaserIntDownAngle').put(int(pulse))
-            # os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
-
-        PV('INJ:setLaserIntSend').put(1)
-        # os.system('caput INJ:setLaserIntSend 1')
-        time.sleep(0.5)
-
-        PV('INJ:setLaserIntSend.PROC').put(1)
-        # os.system('caput INJ:setLaserIntSend.PROC 1')
-
-        time.sleep(3)
-        elapsed = time.perf_counter() - start
-        print('InterfaceATF2::ChangeBunchCharge()', elapsed)
+        print('Resetting laser intensity...')
+        self.change_intensity(self, laserintensity=self.laser_intensity / 500)
         return self
 
     def get_sequence(self, *args):
