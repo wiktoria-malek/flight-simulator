@@ -1,5 +1,5 @@
 #it would be good to have a log console
-#
+#restore button
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
@@ -411,10 +411,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
 
-
                 #for next iterations
+                # /Users/wiktoriamalek/flight-simulator/Data/BBA_ATF2_Ext_RFT_20251119_114213_session_settings
                 Axx[np.isnan(Axx)] = 0
                 Ayy[np.isnan(Ayy)] = 0
+                Axx[np.isnan(Bx.ravel()),:] =0
+                Ayy[np.isnan(By.ravel()),:] = 0
 
                 Bx[np.isnan(Bx)] = 0
                 By[np.isnan(By)] = 0
@@ -433,15 +435,23 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 vals_x = [clamp(v,max_curr_h) for v in corrX.ravel()]
                 vals_y = [clamp(v,max_curr_v) for v in corrY.ravel()] # flattens an array
+
                 vals = np.array(vals_x + vals_y)
                 self.interface.vary_correctors(Cx + Cy, vals)
+                def filtering_norm(Ox,Oy,Bx,By):
+                    Ox[np.isnan(Ox)] = 0
+                    Oy[np.isnan(Oy)] = 0
+                    Bx[np.isnan(Bx)] = 0
+                    By[np.isnan(By)] = 0
+                    return float(np.linalg.norm(Ox - Bx) + np.linalg.norm(Oy - By))
+
                 if w1>0:
-                    self._hist_orbit.append(float(np.linalg.norm(O0x - B0x) + np.linalg.norm(O0y - B0y)))
+                    self._hist_orbit.append(filtering_norm(O0x,O0y,B0x,B0y))
                 if w2>0 and O1x is not None:
-                    self._hist_disp.append(float(np.linalg.norm(O1x - O0x) + np.linalg.norm(O1y - O0y)))
+                    self._hist_disp.append(filtering_norm(O0x,O0y,O1x,O1y))
                 if w3>0 and O2x is not None:
-                    self._hist_wake.append(float(np.linalg.norm(O2x - O0x) + np.linalg.norm(O2y - O0y)))
-#
+                    self._hist_wake.append(filtering_norm(O0x,O0y,O2x,O2y))
+
                 self._plot_series(self.traj_canvas, self.traj_fig, self._hist_orbit, None, None)
                 self._plot_series(self.disp_canvas, self.disp_fig, self._hist_disp, None, None)
                 self._plot_series(self.wake_canvas, self.wake_fig, self._hist_wake, None, None)
