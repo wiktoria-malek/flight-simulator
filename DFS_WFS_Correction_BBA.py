@@ -1,5 +1,7 @@
 import os, pickle, re, matplotlib, glob
 import numpy as np
+from selenium.webdriver.common import by
+
 matplotlib.use("QtAgg")
 
 class DFS_WFS_Correction_BBA():
@@ -99,35 +101,60 @@ class DFS_WFS_Correction_BBA():
                     with open(fm, "rb") as f:
                         minus_file = pickle.load(f)
 
-                    bxp = np.asarray(plus_file["bpms"]["x"]).squeeze()  # turns into a vector (N,) instead of (N,1)
-                    byp = np.asarray(plus_file["bpms"]["y"]).squeeze()
-                    bxm = np.asarray(minus_file["bpms"]["x"]).squeeze()
-                    bym = np.asarray(minus_file["bpms"]["y"]).squeeze()
+                    bxp = np.asarray(plus_file["bpms"]["x"])  # turns into a vector (N,) instead of (N,1)
+                    byp = np.asarray(plus_file["bpms"]["y"])
+                    bxm = np.asarray(minus_file["bpms"]["x"])
+                    bym = np.asarray(minus_file["bpms"]["y"])
 
-                    bact_p = np.asarray(plus_file["correctors"][
-                                            "bact"]).squeeze()  # bact is an actual corrector value/kick that was applied
+                    bact_p = np.asarray(plus_file["correctors"]["bact"]).squeeze()  # bact is an actual corrector value/kick that was applied
                     bact_m = np.asarray(minus_file["correctors"]["bact"]).squeeze()
 
-                    bpms_names = list(map(str, plus_file["bpms"]["names"]))
-                    present = [b for b in selected_bpms if b in bpms_names]
-
+                    if bxp.ndim>1:
+                        bxp=bxp.mean(axis=0)
+                        bxm=bxm.mean(axis=0)
+                        byp=byp.mean(axis=0)
+                        bym=bym.mean(axis=0)
+                    bpms_names_real = plus_file["bpms"]["names"]
+                    if isinstance(bpms_names_real, list):
+                        if len(bpms_names_real) > 0 and isinstance(bpms_names_real[0], list):
+                            bpms_names = [str(b) for b in bpms_names_real[0]]
+                        else:
+                            bpms_names = [str(b) for b in bpms_names_real]
+                    else:
+                        bpms_names = [str(bpms_names_real)]
+                    present=[b for b in selected_bpms if b in bpms_names]
                     if not present:
                         continue
                     indeces = [bpms_names.index(b) for b in present]
-                    corrs_names = list(map(str, plus_file["correctors"]["names"]))
-
-                    if corr not in corrs_names:
-                        continue
-                    i_corr = corrs_names.index(corr)
-                    if plane == "x":
+                    max_idx=max(indeces)
+                    if plane=="x":
+                        if max_idx >= len(bxp):
+                            continue
                         plus_value = bxp[indeces]
                         minus_value = bxm[indeces]
                     elif plane == "y":
+                        if max_idx >= len(byp):
+                            continue
                         plus_value = byp[indeces]
                         minus_value = bym[indeces]
 
+                    corrs_names_real = plus_file["correctors"]["names"]
+                    if isinstance(corrs_names_real, list):
+                        if len(corrs_names_real) > 0 and isinstance(corrs_names_real[0], list):
+                            corrs_names = [str(c) for c in corrs_names_real[0]]
+                        else:
+                            corrs_names = [str(c) for c in corrs_names_real]
+                    else:
+                        corrs_names = [str(corrs_names_real)]
+
+                    if corr not in corrs_names:
+                        continue
+
+                    i_corr = corrs_names.index(corr)
                     k_plus = float(bact_p[i_corr])
                     k_minus = float(bact_m[i_corr])
+
+
                     if pairs == pairs0 and plane == "x":
                         px = bxp[indeces]
                         mx = bxm[indeces]

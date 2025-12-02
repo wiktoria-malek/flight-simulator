@@ -1,3 +1,5 @@
+#it would be good to have a log console
+
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
@@ -97,7 +99,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
         self._running = False
 
-        #later change it to enum instead of if/elif!!
         self.appropriate_settings_energy=None
         self.appropriate_settings_intensity=None
         self.appropriate_settings_reset_e=None

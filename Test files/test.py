@@ -1,19 +1,9 @@
+import pickle
 import numpy as np
-import math
-import RF_Track as rft
-import matplotlib.pyplot as plt
+f = pickle.load(open("/Users/wiktoriamalek/flight-simulator-data/ATF2_Linac_20251202_051813_Dispersion/DATA_ZH1L_p0000.pkl", "rb"))
 
-class Emitt_Meas_Simulation:
-    def __init__(self):
-        self.Pref=1.2999999e3
-        self.lattice = rft.Lattice('../Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
-        self.sequence = [ e.get_name() for e in self.lattice['*']]
-        self.screens = [e.get_name() for e in self.lattice['*OTR*']]
-        for s in self.lattice['*OTR*']:
-            screen = rft.Screen()
-            screen.set_name(s.get_name())
-            s.replace_with(screen)
+bxp = np.asarray(f["bpms"]["x"])
+names = list(map(str, f["bpms"]["names"]))
 
-if __name__ == "__main__":
-    w = Emitt_Meas_Simulation()
-    print(w.sequence)
+print("names:", names, len(names))
+print("bxp.shape:", bxp.shape)
