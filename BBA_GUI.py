@@ -1,5 +1,5 @@
 #it would be good to have a log console
-
+#
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
@@ -405,8 +405,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     By.append(wgt_dfs*(O1y-O0y))
 
                 if w3>0 and O2x is not None:
-                    By.append(wgt_wfs*(O2x-O0x))
-                    Bx.append(wgt_wfs*(O2y-O0y))
+                    By.append(wgt_wfs*(O2y-O0y))
+                    Bx.append(wgt_wfs*(O2x-O0x))
 
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
@@ -421,16 +421,40 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 #         wgt_wfs * (O2y - O0y),
                 #     ))
 
-                # A = U * Sigma * V^T
+                #for next iterations
+                Axx_ok=Axx.copy()
+                Ayy_ok=Ayy.copy()
+                Bx_ok=Bx.copy()
+                By_ok=By.copy()
+                Cx_ok=Cx.copy()
+                Cy_ok=Cy.copy()
+
+                filter_nans_x=np.all(np.isfinite(Axx_ok),axis=1)&np.isfinite(Bx_ok).ravel() # axis for bpm rows
+                filter_nans_y=np.all(np.isfinite(Ayy_ok),axis=1)&np.isfinite(By_ok).ravel()
+                Axx_ok=Axx_ok[filter_nans_x,:]
+                Bx_ok=Bx_ok[filter_nans_x,:]
+                Ayy_ok=Ayy_ok[filter_nans_y,:]
+                By_ok=By_ok[filter_nans_y,:]
+
+                # A = U * Sigma * V^
                 # A^+ = V * Sigma^+ * U^T
 
-                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx)  # theta = - gain * Axx^+ *Bx
-                corrY = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By)
+                filter_corr_x=np.all(np.isfinite(Axx_ok),axis=0)
+                filter_corr_y=np.all(np.isfinite(Ayy_ok),axis=0)
+
+                Axx_ok=Axx_ok[:,filter_corr_x]
+                Ayy_ok=Ayy_ok[:,filter_corr_y]
+
+                Cx_ok=[c for c,ok in zip(Cx_ok,filter_corr_x) if ok]
+                Cy_ok=[c for c,ok in zip(Cy_ok,filter_corr_y) if ok]
+
+                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx_ok)  # theta = - gain * Axx^+ *Bx
+                corrY   = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By_ok)
 
                 vals_x = [clamp(v,max_curr_h) for v in corrX.ravel()]
                 vals_y = [clamp(v,max_curr_v) for v in corrY.ravel()] # flattens an array
                 vals = np.array(vals_x + vals_y)
-                self.interface.vary_correctors(Cx + Cy, vals)
+                self.interface.vary_correctors(Cx_ok + Cy_ok, vals)
                 if w1>0:
                     self._hist_orbit.append(float(np.linalg.norm(O0x - B0x) + np.linalg.norm(O0y - B0y)))
                 if w2>0 and O1x is not None:
