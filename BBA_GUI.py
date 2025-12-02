@@ -75,19 +75,19 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 energy="rel_phase=5",
                 intensity="laser_intensity=0.1, ang_offset=2.0",
                 reset_e="rel_phase=0",
-                reset_ch="laser_intensity=0.0, ang_offset=0.0",
+                reset_ch="laser_intensity=0.1",
             ),
             Machine.ATF2_EXT: MachineSettings(
                 energy="delta_freq=-2",
-                intensity="laser_intensity=0.1, ang_offset=2.0",
+                intensity="laser_intensity=0.15",
                 reset_e="rel_phase=0",
-                reset_ch="laser_intensity=0.0, ang_offset=0.0",
+                reset_ch="laser_intensity=0.1",
             ),
             Machine.ATF2_LINAC: MachineSettings(
                 energy="rel_phase=5.0",
-                intensity="laser_intensity=0.1, ang_offset=2.0",
+                intensity="laser_intensity=0.15",
                 reset_e="rel_phase=0.0",
-                reset_ch="laser_intensity=0.0, ang_offset=0.0",
+                reset_ch="laser_intensity=0.1",
             ),
             Machine.ATF2_EXT_RFT: MachineSettings(
                 energy="grad=0.98",
@@ -98,7 +98,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         }
 
         self._running = False
-
         self.appropriate_settings_energy=None
         self.appropriate_settings_intensity=None
         self.appropriate_settings_reset_e=None
