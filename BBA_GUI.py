@@ -439,7 +439,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 # A = U * Sigma * V^
                 # A^+ = V * Sigma^+ * U^T
 
-                filter_corr_x=np.all(np.isfinite(Axx_ok),axis=0)
+                filter_corr_x=np.all(np.isfinite(Axx_ok),axis=0) #corrs
                 filter_corr_y=np.all(np.isfinite(Ayy_ok),axis=0)
 
                 Axx_ok=Axx_ok[:,filter_corr_x]
@@ -448,8 +448,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 Cx_ok=[c for c,ok in zip(Cx_ok,filter_corr_x) if ok]
                 Cy_ok=[c for c,ok in zip(Cy_ok,filter_corr_y) if ok]
 
-                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx_ok)  # theta = - gain * Axx^+ *Bx
-                corrY   = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By_ok)
+                corrX = -gain * (np.linalg.pinv(Axx_ok, rcond=rcond) @ Bx_ok)  # theta = - gain * Axx^+ *Bx
+                corrY   = -gain * (np.linalg.pinv(Ayy_ok, rcond=rcond) @ By_ok)
 
                 vals_x = [clamp(v,max_curr_h) for v in corrX.ravel()]
                 vals_y = [clamp(v,max_curr_v) for v in corrY.ravel()] # flattens an array
