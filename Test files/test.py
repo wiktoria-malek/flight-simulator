@@ -1,9 +1,15 @@
-import pickle
 import numpy as np
-f = pickle.load(open("/Users/wiktoriamalek/flight-simulator-data/ATF2_Linac_20251202_051813_Dispersion/DATA_ZH1L_p0000.pkl", "rb"))
+import numpy.random as rnd
+import random
+A=np.random.random((5,10))
+print(A)
+print(A.shape)
+A[3,5]=np.nan
+print(A)
 
-bxp = np.asarray(f["bpms"]["x"])
-names = list(map(str, f["bpms"]["names"]))
+filter_nans_y = np.all(np.isfinite(A), axis=1).ravel()
+print(filter_nans_y)
 
-print("names:", names, len(names))
-print("bxp.shape:", bxp.shape)
+A[np.isnan(A)] = 0
+print(A)
+

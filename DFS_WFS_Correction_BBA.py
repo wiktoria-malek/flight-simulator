@@ -241,17 +241,23 @@ class DFS_WFS_Correction_BBA():
         R_disp = R1 - R0
         R_wake = R2 - R0
 
-        Axx = np.vstack((
-            wgt_orb * R0xx,
-            wgt_dfs * (R1xx - R0xx),
-            wgt_wfs * (R2xx - R0xx),
-        ))
+        Axx=[]
+        Ayy=[]
 
-        Ayy = np.vstack((
-            wgt_orb * R0yy,
-            wgt_dfs * (R1yy - R0yy),
-            wgt_wfs * (R2yy - R0yy),
-        ))
+        if wgt_orb > 0:
+            Axx.append(wgt_orb * R0xx)
+            Ayy.append(wgt_orb * R0yy)
+
+        if wgt_dfs > 0:
+            Axx.append(wgt_dfs * (R1xx - R0xx))
+            Ayy.append(wgt_dfs * (R1yy - R0yy))
+
+        if wgt_wfs > 0:
+            Axx.append(wgt_wfs * (R2xx - R0xx))
+            Ayy.append(wgt_wfs * (R2yy - R0yy))
+
+        Axx = np.vstack(Axx)
+        Ayy = np.vstack(Ayy)
 
         return Axx, Ayy, B0x, B0y
 
