@@ -165,6 +165,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         for p in text.split(","):
             p = p.strip()
             if not p:
+                #
                 continue
             k,v = p.split("=",1)
             k = k.strip()
