@@ -46,7 +46,8 @@ class MainWindow(QMainWindow):
         self._procs.append(proc)
 
     def _latest_response_file(self) -> str | None:
-        root = Path(self.cwd) / "Data"
+        root = f"~/flight-simulator-data/"
+        root = os.path.expanduser(os.path.expandvars(root))
         if not root.exists():
             return None
         files = []
