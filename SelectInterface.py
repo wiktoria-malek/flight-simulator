@@ -124,13 +124,13 @@ class InterfaceSelectionDialog(QDialog):
                 case 'InterfaceCLEAR_RFTrack':
                     from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
                     globals()['InterfaceCLEAR_RFTrack'] = InterfaceCLEAR_RFTrack
-                    self.selected_interface = InterfaceCLEAR_RFTrack(jitter=0.0, bpm_resolution=0.02, nsamples=1)
+                    self.selected_interface = InterfaceCLEAR_RFTrack(jitter=0.1, bpm_resolution=0.05, nsamples=1)
 
                     # TESTS:
                     #
-                    # self.selected_interface.align_everything()
-                    # #self.selected_interface.misalign_quadrupoles()
-                    # #self.selected_interface.misalign_bpms()
+                    self.selected_interface.align_everything()
+                    self.selected_interface.misalign_quadrupoles()
+                    self.selected_interface.misalign_bpms()
                 case 'InterfaceCLEAR_real':
                     from Interfaces.CLEAR.InterfaceCLEAR_real import InterfaceCLEAR_real
                     globals()['InterfaceCLEAR_real'] = InterfaceCLEAR_real
