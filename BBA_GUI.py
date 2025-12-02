@@ -358,46 +358,68 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 self._step = False
 
                 # nominal
-                print("Measuring orbit")
-                self.S.pull(self.interface)
-                O0 = self.S.get_orbit(bpms)
-                O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
-                O0y = O0['y'].reshape(-1, 1)
+                if w1>0:
+                    print("Measuring orbit")
+                    self.S.pull(self.interface)
+                    O0 = self.S.get_orbit(bpms)
+                    O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
+                    O0y = O0['y'].reshape(-1, 1)
+                else:
+                    O0y=O0x=None
 
                 # dfs
-                print("Measuring dispersion")
-
-                dfs_params_change = self._read_change_energy()
-                dfs_params_reset = self._read_reset_energy()
-                self.interface.change_energy(**dfs_params_change)
-                self.S.pull(self.interface)
-                self.interface.reset_energy(**dfs_params_reset)
-                O1 = self.S.get_orbit(bpms)
-                O1x = O1['x'].reshape(-1, 1)
-                O1y = O1['y'].reshape(-1, 1)
+                if w2>0:
+                    print("Measuring dispersion")
+                    dfs_params_change = self._read_change_energy()
+                    dfs_params_reset = self._read_reset_energy()
+                    self.interface.change_energy(**dfs_params_change)
+                    self.S.pull(self.interface)
+                    self.interface.reset_energy(**dfs_params_reset)
+                    O1 = self.S.get_orbit(bpms)
+                    O1x = O1['x'].reshape(-1, 1)
+                    O1y = O1['y'].reshape(-1, 1)
+                else:
+                    O1x=O1y=None
 
                 # wfs
-                print("Measuring wakefield")
+                if w3>0:
+                    print("Measuring wakefield")
+                    wfs_params_change = self._read_change_intensity()
+                    wfs_params_reset = self._read_reset_intensity()
+                    self.interface.change_intensity(**wfs_params_change)
+                    self.S.pull(self.interface)
+                    self.interface.reset_intensity(**wfs_params_reset)
+                    O2 = self.S.get_orbit(bpms)
+                    O2x = O2['x'].reshape(-1, 1)
+                    O2y = O2['y'].reshape(-1, 1)
+                else:
+                    O2x=O2y=None
+                Bx=[]
+                By=[]
+                if w1>0:
+                    Bx.append(wgt_orb*(O0x-B0x))
+                    By.append(wgt_orb*(O0y-B0y))
 
-                wfs_params_change = self._read_change_intensity()
-                wfs_params_reset = self._read_reset_intensity()
-                self.interface.change_intensity(**wfs_params_change)
-                self.S.pull(self.interface)
-                self.interface.reset_intensity(**wfs_params_reset)
-                O2 = self.S.get_orbit(bpms)
-                O2x = O2['x'].reshape(-1, 1)
-                O2y = O2['y'].reshape(-1, 1)
+                if w2>0 and O1x is not None:
+                    Bx.append(wgt_dfs*(O1x-O0x))
+                    By.append(wgt_dfs*(O1y-O0y))
 
-                Bx = np.vstack((
-                    wgt_orb * (O0x - B0x),
-                    wgt_dfs * (O1x - O0x),
-                    wgt_wfs * (O2x - O0x),
-                ))
-                By = np.vstack((
-                    wgt_orb * (O0y - B0y),
-                    wgt_dfs * (O1y - O0y),
-                    wgt_wfs * (O2y - O0y),
-                ))
+                if w3>0 and O2x is not None:
+                    By.append(wgt_wfs*(O2x-O0x))
+                    Bx.append(wgt_wfs*(O2y-O0y))
+
+                Bx=np.vstack(Bx)
+                By=np.vstack(By)
+                # Bx = np.vstack((
+                #         wgt_orb * (O0x - B0x),
+                #         wgt_dfs * (O1x - O0x),
+                #         wgt_wfs * (O2x - O0x),
+                #     ))
+                # By = np.vstack((
+                #         wgt_orb * (O0y - B0y),
+                #         wgt_dfs * (O1y - O0y),
+                #         wgt_wfs * (O2y - O0y),
+                #     ))
 
                 # A = U * Sigma * V^T
                 # A^+ = V * Sigma^+ * U^T
@@ -409,10 +431,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 vals_y = [clamp(v,max_curr_v) for v in corrY.ravel()] # flattens an array
                 vals = np.array(vals_x + vals_y)
                 self.interface.vary_correctors(Cx + Cy, vals)
-
-                self._hist_orbit.append(float(np.linalg.norm(O0x - B0x) + np.linalg.norm(O0y - B0y)))
-                self._hist_disp.append(float(np.linalg.norm(O1x - O0x) + np.linalg.norm(O1y - O0y)))
-                self._hist_wake.append(float(np.linalg.norm(O2x - O0x) + np.linalg.norm(O2y - O0y)))
+                if w1>0:
+                    self._hist_orbit.append(float(np.linalg.norm(O0x - B0x) + np.linalg.norm(O0y - B0y)))
+                if w2>0 and O1x is not None:
+                    self._hist_disp.append(float(np.linalg.norm(O1x - O0x) + np.linalg.norm(O1y - O0y)))
+                if w3>0 and O2x is not None:
+                    self._hist_wake.append(float(np.linalg.norm(O2x - O0x) + np.linalg.norm(O2y - O0y)))
 
                 self._plot_series(self.traj_canvas, self.traj_fig, self._hist_orbit, None, None)
                 self._plot_series(self.disp_canvas, self.disp_fig, self._hist_disp, None, None)
