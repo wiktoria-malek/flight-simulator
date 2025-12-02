@@ -221,11 +221,11 @@ class MainWindow(QMainWindow):
         self.__set_status_in_title("[Idle]")
 
     def __save_correctors_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text()
+        dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
         selected_correctors = self.correctors_list.selectedItems()
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/correctors.txt'
+        dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
                     f.write(f"{item.text()}\n")
 
     def __load_correctors_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/correctors.txt'
+        dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
@@ -251,11 +251,11 @@ class MainWindow(QMainWindow):
         self.correctors_list.clearSelection()
 
     def __save_bpms_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text()
+        dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
         selected_bpms = self.bpms_list.selectedItems()
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/bpms.txt'
+        dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
@@ -263,7 +263,7 @@ class MainWindow(QMainWindow):
                     f.write(f"{item.text()}\n")
 
     def __load_bpms_button_clicked(self):
-        dir_name = self.cwd + '/' + self.working_directory_input.text() + '/bpms.txt'
+        dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
@@ -286,7 +286,7 @@ class MainWindow(QMainWindow):
 
         self.__set_status_in_title("[Running...]")
 
-        dir_name = self.cwd + '/' + self.working_directory_input.text()
+        dir_name = self.working_directory_input.text()
         os.makedirs(dir_name, exist_ok=True)
         os.chdir(dir_name)
 
@@ -302,8 +302,8 @@ class MainWindow(QMainWindow):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
 
-        S = State(interface=self.interface)
-        S.save(basename='machine_status')
+        self.S = State(interface=self.interface)
+        self.S.save(basename='machine_status')
 
         kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
         max_osc_h = self.horizontal_excursion_spinbox.value()
@@ -313,7 +313,7 @@ class MainWindow(QMainWindow):
         Niter = 3
 
         self.thread = QThread()
-        self.worker = Worker(self.interface, S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
+        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
         self.worker.moveToThread(self.thread)
 
         #FOR THE BBA_GUI!
@@ -339,6 +339,12 @@ class MainWindow(QMainWindow):
             self.__set_status_in_title("[Stopping...]")
             self.worker.stop()
         self.__set_status_in_title("[Idle]")
+        print('SysID stopped.')
+        print("Restoring initial correctors' settings...")
+        selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        self.interface.push(selected_correctors, self.S.get_correctors(selected_correctors)['bdes'])
+        print("Restored initial correctors' settings.")
+
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()
@@ -386,7 +392,8 @@ print(f"Selected interface: {project_name}")
 ## Prepare project space
 #project_name = dialog.selected_interface_name
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-dir_name = f"Data/{project_name}_{time_str}"
+dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
+dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
 ## Main Window
 window = MainWindow(I, dir_name)

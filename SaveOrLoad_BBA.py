@@ -53,7 +53,8 @@ class SaveOrLoad_BBA():
         self._loading_func(loading_name="Load BPMs", filename="bpms.txt", elements_list=self.bpms_list)
 
     def _pick_and_load_data_dir(self, button_ui, button_name, oper):
-        default_dir = os.path.join(self.cwd, "Data")
+        default_dir = f"~/flight-simulator-data/"
+        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
         if not folder:
@@ -63,7 +64,7 @@ class SaveOrLoad_BBA():
             QMessageBox.warning(self, "Load data", "Wrong data directory selected")
         self._data_dirs[oper] = info
         button_ui.setText(folder)
-        QMessageBox.information(button_ui, "Data directory selected", button_name)
+        #QMessageBox.information(button_ui, "Data directory selected", button_name)
 
     def _pick_and_load_disp_data(self):
         self._pick_and_load_data_dir(oper="dfs", button_ui=self.dfs_response_3, button_name="DFS Data Loaded")
@@ -77,7 +78,9 @@ class SaveOrLoad_BBA():
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy, Bx, By):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
-        save_session_dir = os.path.join("Data", f"BBA_{self.interface.get_name()}_{time_str}_session_settings")
+        default_dir = f"~/flight-simulator-data/"
+        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
+        save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}_{time_str}_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
 
         self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors",
@@ -127,7 +130,8 @@ class SaveOrLoad_BBA():
             pickle.dump(correction_matrices, f)
 
     def load_session_settings(self):
-        default_dir = os.path.join(self.cwd, "Data")
+        default_dir = f"~/flight-simulator-data/"
+        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
         if not folder:
