@@ -159,7 +159,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         else:
             self._step = True
 
-    def _read_all_parameters(self,text,grad=None):
+    def _read_all_parameters(self,text):
         text = text.strip()
         params = {}
         for p in text.split(","):
@@ -295,19 +295,19 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
     def _read_reset_intensity(self):
         text = self.wfs_reset_3.text()
-        return self._read_all_parameters(text,grad=1)
+        return self._read_all_parameters(text)
 
     def _read_change_intensity(self):
         text = self.wfs_change_3.text()
-        return self._read_all_parameters(text,grad=0.90)
+        return self._read_all_parameters(text)
 
     def _read_change_energy(self):
         text = self.dfs_change_3.text()
-        return self._read_all_parameters(text,grad=0.98)
+        return self._read_all_parameters(text)
 
     def _read_reset_energy(self):
         text = self.dfs_reset_3.text()
-        return self._read_all_parameters(text,grad=1)
+        return self._read_all_parameters(text)
 
     def _start_correction(self):
         try:
@@ -336,8 +336,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             # DR_momentum_compaction = 2.1e-3
 
             # dP_P = -deltafreq / DR_freq / DR_momentum_compaction
-            grad = self._read_change_energy().get("grad")
-            dP_P = grad - 1
+            # if self._machine_settings==Machine.ATF2_LINAC:
+            #     cont
+            # grad = self._read_change_energy()
+            # dP_P = grad - 1
 
             target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
@@ -381,12 +383,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 Bx = np.vstack((
                     wgt_orb * (O0x - B0x),
-                    wgt_dfs * ((O1x - O0x) - dP_P * target_disp_x * 1e3),
+                    wgt_dfs * (O1x - O0x),
                     wgt_wfs * (O2x - O0x),
                 ))
                 By = np.vstack((
                     wgt_orb * (O0y - B0y),
-                    wgt_dfs * ((O1y - O0y) - dP_P * target_disp_y * 1e3),
+                    wgt_dfs * (O1y - O0y),
                     wgt_wfs * (O2y - O0y),
                 ))
 
@@ -402,8 +404,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 self.interface.vary_correctors(Cx + Cy, vals)
 
                 self._hist_orbit.append(float(np.linalg.norm(O0x - B0x) + np.linalg.norm(O0y - B0y)))
-                self._hist_disp.append(float(np.linalg.norm((O1x - O0x) - dP_P * target_disp_x) + np.linalg.norm(
-                    (O1y - O0y) - dP_P * target_disp_y)))
+                self._hist_disp.append(float(np.linalg.norm(O1x - O0x) + np.linalg.norm(O1y - O0y)))
                 self._hist_wake.append(float(np.linalg.norm(O2x - O0x) + np.linalg.norm(O2y - O0y)))
 
                 self._plot_series(self.traj_canvas, self.traj_fig, self._hist_orbit, None, None)

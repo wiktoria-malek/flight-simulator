@@ -1,7 +1,5 @@
 import os, pickle, re, matplotlib, glob
 import numpy as np
-from selenium.webdriver.common import by
-
 matplotlib.use("QtAgg")
 
 class DFS_WFS_Correction_BBA():
@@ -114,6 +112,7 @@ class DFS_WFS_Correction_BBA():
                         bxm=bxm.mean(axis=0)
                         byp=byp.mean(axis=0)
                         bym=bym.mean(axis=0)
+
                     bpms_names_real = plus_file["bpms"]["names"]
                     if isinstance(bpms_names_real, list):
                         if len(bpms_names_real) > 0 and isinstance(bpms_names_real[0], list):
