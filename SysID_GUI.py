@@ -359,8 +359,7 @@ class MainWindow(QMainWindow):
         self.plot_widget.repaint()
 
     def _pick_and_load_data_dir(self):
-        default_dir = f"~/flight-simulator-data/"
-        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
+        default_dir = os.path.join(self.cwd, "Data")
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
         if not folder:
