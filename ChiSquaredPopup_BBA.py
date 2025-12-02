@@ -120,7 +120,6 @@ class ChiSquaredWindow(QDialog):
         super().closeEvent(e)
 
     def calculating_chi(self, O, D, W):
-
         if not O:
             return
 

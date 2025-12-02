@@ -44,9 +44,9 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         ui_path = os.path.join(os.path.dirname(__file__), "BBA_GUI.ui")
         uic.loadUi(ui_path, self)
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
-        self._hist_orbit = []
-        self._hist_disp = []
-        self._hist_wake = []
+        self._hist_orbit_x,self._hist_orbit_y = [],[]
+        self._hist_disp_x,self._hist_disp_y = [],[]
+        self._hist_wake_x,self._hist_wake_y = [],[]
         self._chi_dlg = None
         self._setup_canvases()
         self._populate_lists()
@@ -203,13 +203,16 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.disp_fig, self.disp_canvas = install(self.plot_widget_4)
         self.wake_fig, self.wake_canvas = install(self.plot_widget_5)
 
-    def _plot_series(self, canvas, fig, values, title, ylabel):
+    def _plot_series(self, canvas, fig, values_x,values_y, title, ylabel):
         if canvas is None:
             return
         fig.clear()
         ax = fig.add_subplot(111)
-        if values:
-            ax.plot(range(1, len(values) + 1), values, marker="o")
+        if values_x:
+            ax.plot(range(1, len(values_x) + 1), values_x, marker="o",color='red',label="x")
+        if values_y:
+            ax.plot(range(1, len(values_y) + 1), values_y, marker="o",color='blue',label="y")
+        ax.legend(fontsize=7)
         if title is not None:
             ax.set_title(title)
         else:
@@ -317,9 +320,9 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             w1, w2, w3, rcond, iters, gain = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
-            self._hist_orbit.clear()
-            self._hist_disp.clear()
-            self._hist_wake.clear()
+            self._hist_orbit_x.clear(),self._hist_orbit_y.clear()
+            self._hist_disp_x.clear(),self._hist_disp_y.clear()
+            self._hist_wake_x.clear(),self._hist_wake_y.clear()
 
             if getattr(self, "_chi_dlg", None):
                 self._chi_dlg.set_weights(w1, w2, w3)
@@ -438,23 +441,34 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 vals = np.array(vals_x + vals_y)
                 self.interface.vary_correctors(Cx + Cy, vals)
-                def filtering_norm(Ox,Oy,Bx,By):
+
+                def filtering_norm_x(Ox,Bx):
                     Ox[np.isnan(Ox)] = 0
-                    Oy[np.isnan(Oy)] = 0
+                    #Oy[np.isnan(Oy)] = 0
                     Bx[np.isnan(Bx)] = 0
+                    #By[np.isnan(By)] = 0
+                    return float(np.linalg.norm(Ox - Bx))
+                def filtering_norm_y(Oy,By):
+                    #Ox[np.isnan(Ox)] = 0
+                    Oy[np.isnan(Oy)] = 0
+                    #Bx[np.isnan(Bx)] = 0
                     By[np.isnan(By)] = 0
-                    return float(np.linalg.norm(Ox - Bx) + np.linalg.norm(Oy - By))
+                    return float(np.linalg.norm(Oy - By))
 
                 if w1>0:
-                    self._hist_orbit.append(filtering_norm(O0x,O0y,B0x,B0y))
+                    self._hist_orbit_x.append(filtering_norm_x(O0x,B0x))
+                    self._hist_orbit_y.append(filtering_norm_y(O0y,B0y))
                 if w2>0 and O1x is not None:
-                    self._hist_disp.append(filtering_norm(O0x,O0y,O1x,O1y))
+                    self._hist_disp_x.append(filtering_norm_x(O0x,O1x))
+                    self._hist_disp_y.append(filtering_norm_y(O0y,B0y))
                 if w3>0 and O2x is not None:
-                    self._hist_wake.append(filtering_norm(O0x,O0y,O2x,O2y))
+                    self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
+                    self._hist_wake_y.append(filtering_norm_y(O0y,B0y))
 
-                self._plot_series(self.traj_canvas, self.traj_fig, self._hist_orbit, None, None)
-                self._plot_series(self.disp_canvas, self.disp_fig, self._hist_disp, None, None)
-                self._plot_series(self.wake_canvas, self.wake_fig, self._hist_wake, None, None)
+
+                self._plot_series(canvas=self.traj_canvas, fig=self.traj_fig, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y , title=None, ylabel=None)
+                self._plot_series(canvas=self.disp_canvas,fig= self.disp_fig, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,title=None, ylabel=None)
+                self._plot_series(canvas=self.wake_canvas, fig=self.wake_fig, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,title=None, ylabel= None)
                 QApplication.processEvents()
 
             self.setWindowTitle("BBA_GUI")
@@ -472,12 +486,11 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def _show_chi_squared_graphs(self):
         if getattr(self, "_chi_dlg", None) is None:
             self._chi_dlg = ChiSquaredWindow(self)
-
         w1, w2, w3, *_ = self._read_params()
         self._chi_dlg.set_weights(w1, w2, w3)
         self._chi_dlg.info.setText = f"w1={w1:g}, w2={w2:g}, w3={w3:g}"
-        self._chi_dlg.calculating_chi(self._hist_orbit, self._hist_disp, self._hist_wake)
-
+        self._chi_dlg.calculating_chi(self._hist_orbit_x, self._hist_disp_x, self._hist_wake_x)
+        #CORRECT IT
         self._chi_dlg.show()
         self._chi_dlg.raise_()  # top of the stacking order
         self._chi_dlg.activateWindow()  # giving it a keyboard focus
@@ -485,12 +498,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def _clear_graphs(self):
         # it doesnt do fresh - start, it only clears the graphs
         self._cancel = True
-        self._hist_orbit.clear()
-        self._hist_disp.clear()
-        self._hist_wake.clear()
-        self._plot_series(self.traj_canvas, self.traj_fig, [], None, "[mm]")
-        self._plot_series(self.disp_canvas, self.disp_fig, [], None, "[mm]")
-        self._plot_series(self.wake_canvas, self.wake_fig, [], None, "[mm]")
+        self._hist_orbit_x.clear(),self._hist_orbit_y.clear()
+        self._hist_disp_x.clear(),self._hist_disp_y.clear()
+        self._hist_wake_x.clear(),self._hist_wake_y.clear()
+        self._plot_series(self.traj_canvas, self.traj_fig, values_x=[], values_y=[],title=None, ylabel="[mm]")
+        self._plot_series(self.disp_canvas, self.disp_fig, values_x=[],values_y=[], title=None, ylabel="[mm]")
+        self._plot_series(self.wake_canvas, self.wake_fig, values_x=[],values_y=[], title=None, ylabel="[mm]")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
