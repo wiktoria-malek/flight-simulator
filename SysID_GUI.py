@@ -65,10 +65,6 @@ class Worker(QObject):
     @pyqtSlot()
     def run(self):
         self.running = True
-        if self.cond == "scale_E":
-            self.interface.change_energy(self.scale_E)
-        elif self.cond == "scale_I":
-            self.interface.change_intensity(self.scale_I)
 
         total_steps=self.Niter*len(self.correctors)
         self.progress_value=0
@@ -91,6 +87,9 @@ class Worker(QObject):
                 corr = S.get_correctors(corrector)
                 kick = kicks[icorr]
 
+                if not self.running:
+                    break
+
                 print(f"Corrector {corrector} '+' excitation...")
                 curr_p = corr['bdes'] + kick
                 if corrector in S.get_hcorrectors_names():
@@ -98,6 +97,10 @@ class Worker(QObject):
                 else:
                     curr_p = clamp(curr_p, self.max_curr_v)
                 I.push(corrector, curr_p)
+
+                if not self.running:
+                    break
+
                 S.pull(I)
                 S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
                 Op = S.get_orbit(self.bpms)
@@ -109,6 +112,10 @@ class Worker(QObject):
                 else:
                     curr_m = clamp(curr_m, self.max_curr_v)
                 I.push(corrector, curr_m)
+
+                if not self.running:
+                    break
+
                 S.pull(I)
                 S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
                 Om = S.get_orbit(self.bpms)
@@ -143,10 +150,7 @@ class Worker(QObject):
 
                 time.sleep(1)
 
-        if self.cond=="scale_E":
-            self.interface.reset_energy()
-        elif self.cond=="scale_I":
-            self.interface.reset_intensity()
+        self.running = False
         self.finished.emit()
 
     def stop(self):
@@ -324,8 +328,6 @@ class MainWindow(QMainWindow):
         self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
         self.worker.moveToThread(self.thread)
 
-        #FOR THE BBA_GUI!
-        self.worker.cond="nominal"
         #self.worker.scale_E=0.98
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
@@ -344,6 +346,7 @@ class MainWindow(QMainWindow):
         self.thread.finished.connect(clear_thread)
         self.worker.plot_data.connect(self.__update_plot)
         self.worker.progress.connect(self._update_progress)
+
         self.thread.start()
 
     def __stop_button_clicked(self):
@@ -353,11 +356,10 @@ class MainWindow(QMainWindow):
             self.progressBar.setValue(0)
         self.__set_status_in_title("[Idle]")
         print('SysID stopped.')
-        print("Restoring initial correctors' settings...")
-        selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
-        self.interface.push(selected_correctors, self.S.get_correctors(selected_correctors)['bdes'])
-        print("Restored initial correctors' settings.")
-
+        # print("Restoring initial correctors' settings...")
+        # selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        # self.interface.push(selected_correctors, self.S.get_correctors(selected_correctors)['bdes'])
+        # print("Restored initial correctors' settings.")
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()

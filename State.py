@@ -134,7 +134,7 @@ class State:
             self.vcorrectors_names = data['vcorrectors_names']
             self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
         except Exception:
-            pass
+            raise Exception(f"Could not load {filename}")
 
     def save(self, basename=None, filename=None):
         if basename is not None:
