@@ -104,32 +104,37 @@ class State:
     """
 
     def load(self, filename):
-        with open(filename, "rb") as pickle_file:
-            data = pickle.load(pickle_file)
-        self.sequence = data['sequence']
-        self.correctors = data['correctors']
-        self.bpms = data['bpms']
-        self.icts = data['icts']
-        """
-        self.correctors = {
-            "names": data['correctors']['names']
-            "bdes": data['correctors']['bdes']
-            "bact": data['correctors']['bact']
-        }
-        self.bpms = {
-            "names": data['bpms']['names'],
-            "x": data['bpms']['x'],
-            "y": data['bpms']['y'],
-            "tmit": data['bpms']['tmit']
-        }
-        self.icts = {
-            "names": data['icts']['names'],
-            "charge": data['icts']['charge']
-        }
-        """
-        self.hcorrectors_names = data['hcorrectors_names']
-        self.vcorrectors_names = data['vcorrectors_names']
-        self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
+        from glob import glob
+        f = glob(f'{filename}*')
+        try:
+            with open(f[0], "rb") as pickle_file:
+                data = pickle.load(pickle_file)
+            self.sequence = data['sequence']
+            self.correctors = data['correctors']
+            self.bpms = data['bpms']
+            self.icts = data['icts']
+            """
+            self.correctors = {
+                "names": data['correctors']['names']
+                "bdes": data['correctors']['bdes']
+                "bact": data['correctors']['bact']
+            }
+            self.bpms = {
+                "names": data['bpms']['names'],
+                "x": data['bpms']['x'],
+                "y": data['bpms']['y'],
+                "tmit": data['bpms']['tmit']
+            }
+            self.icts = {
+                "names": data['icts']['names'],
+                "charge": data['icts']['charge']
+            }
+            """
+            self.hcorrectors_names = data['hcorrectors_names']
+            self.vcorrectors_names = data['vcorrectors_names']
+            self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
+        except Exception:
+            pass
 
     def save(self, basename=None, filename=None):
         if basename is not None:
