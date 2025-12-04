@@ -336,7 +336,7 @@ class MainWindow(QMainWindow):
         def clear_thread():
             self.thread = None
             self.worker = None
-            print("Restoring initial correctors' strengths")
+            print("Restoring initial correctors' settings...")
             self.S.load('machine_status')
             self.S.push(self.interface)
             self.progressBar.setValue(100)
