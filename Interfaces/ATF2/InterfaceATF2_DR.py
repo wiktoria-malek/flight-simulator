@@ -67,22 +67,23 @@ class InterfaceATF2_DR:
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
-        self.phase_kl1 = PV('CM1L:phaseRead').get()
         self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
-    def change_energy(self, rel_phase=5,scale=None, **kwargs):
-        pv = PV('CM1L:phaseWrite')
-        pv.put(self.phase_kl1 + rel_phase)
-        time.sleep(1)
+    def change_energy(self, delta_freq=None, **kwargs):
+      
+        PV('RAMP:CONTROL_ON_SW').put(1)
+        time.sleep(2)
+
+        PV('RAMP:MI2:ONOFF_SW').put(1)
+        time.sleep(2)
 
     def reset_energy(self,**kwargs):
-        pv = PV('CM1L:phaseWrite')
-        pv.put(self.phase_kl1)
-        time.sleep(1)
+        PV('RAMP:CONTROL_OFF_SW').put(0)
+        time.sleep(2)
         
     def change_intensity(self, laserintensity,**kwargs):
         print(f'Changing laser intensity to {laserintensity}...')
-        self.laser_intensity = float(PV('RFGun:LasetIntensity1:Read').get())
+        self.laser_intensity = float(PV('RFGun:LaserIntensity1:Read').get())
         laser_intensity = laserintensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
@@ -91,7 +92,7 @@ class InterfaceATF2_DR:
 
     def reset_intensity(self,**kwargs):
         print('Resetting laser intensity...')
-        self.change_intensity(self, laserintensity=self.laser_intensity / 500)
+        self.change_intensity(laserintensity=self.laser_intensity / 500)
         return self
 
     def get_sequence(self, *args):
@@ -173,7 +174,7 @@ class InterfaceATF2_DR:
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
-        time.sleep(1)
+        time.sleep(2)
     
     def vary_correctors(self, names, corr_vals):
         if type(corr_vals) is float:
@@ -186,4 +187,4 @@ class InterfaceATF2_DR:
             pv_des = PV(f'{corrector}:currentWrite')
             curr_val = pv_des.get()
             pv_des.put(curr_val + corr_val)
-        time.sleep(1)
+        time.sleep(2)

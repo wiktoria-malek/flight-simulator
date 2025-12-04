@@ -1,53 +1,27 @@
-python
 import pickle
-import numpy as np
 
-def load_matrix_from_pickle(filepath):
-    """Loads a matrix (NumPy array) from a .pkl file."""
-    try:
-        with open(filepath, 'rb') as f:
-            matrix = pickle.load(f)
-            # Optional: Ensure the loaded object is a NumPy array for safety
-            if not isinstance(matrix, np.ndarray):
-                raise TypeError(f"Data in {filepath} is not a NumPy array.")
-            return matrix
-    except FileNotFoundError:
-        print(f"Error: The file {filepath} was not found.")
-        return None
-    except Exception as e:
-        print(f"An error occurred while loading {filepath}: {e}")
+def subtract_dictionaries_by_key(file1, file2):
+    with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
+        dict_a = pickle.load(f1)
+        dict_b = pickle.load(f2)
+    
+    if dict_a.keys() != dict_b.keys():
+        print("Error: Dictionaries do not have the same keys.")
         return None
 
-def compute_matrix_difference(file1, file2):
-    """Loads two matrices and computes their difference (matrix1 - matrix2)."""
-    matrix1 = load_matrix_from_pickle(file1)
-    matrix2 = load_matrix_from_pickle(file2)
+    difference_dict = {}
+    for key in dict_a:
+        # Check if values are numeric before trying to subtract
+        if isinstance(dict_a[key], (int, float)) and isinstance(dict_b[key], (int, float)):
+            difference_dict[key] = dict_a[key] - dict_b[key]
+        else:
+            print(f"Warning: Non-numeric value found for key {key}. Skipping subtraction for this key.")
 
-    if matrix1 is None or matrix2 is None:
-        return None
+    return difference_dict
 
-    try:
-        # NumPy allows direct subtraction of arrays
-        difference = matrix1 - matrix2
-        return difference
-    except ValueError as e:
-        print(f"Error: Matrix dimensions do not match for subtraction. Details: {e}")
-        return None
+file_path_1 = "/mnt/nas1/atf-users/userhome/pkorysko/flight-simulator-data/ATF2_Ext_20251204_234007_Dispersion/response2.pkl"
+file_path_2 = "/mnt/nas1/atf-users/userhome/pkorysko/flight-simulator-data/ATF2_Ext_20251204_221116_Orbit/response2.pkl"
 
-# --- Example Usage ---
-file_path_1 = "matrix_a.pkl"
-file_path_2 = "matrix_b.pkl"
+result_dict = subtract_dictionaries_by_key(file_path_1, file_path_2)
 
-# Note: You need to have these .pkl files created first.
-# Example on how to create them (uncomment to run once):
-# matrix_a = np.array([[1, 2], [3, 4]])
-# matrix_b = np.array([[1, 1], [1, 1]])
-# with open(file_path_1, 'wb') as f: pickle.dump(matrix_a, f)
-# with open(file_path_2, 'wb') as f: pickle.dump(matrix_b, f)
-
-
-result_matrix = compute_matrix_difference(file_path_1, file_path_2)
-
-if result_matrix is not None:
-    print("\nMatrix A:")
-    print(load_matrix_from_pi
+print(result_dict)
