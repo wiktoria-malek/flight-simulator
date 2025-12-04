@@ -73,7 +73,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._machine_settings={
             Machine.ATF2_DR: MachineSettings(
                 energy="rel_phase=5",
-                intensity="laser_intensity=0.1, ang_offset=2.0",
+                intensity="laser_intensity=0.1",
                 reset_e="rel_phase=0",
                 reset_ch="laserintensity=0.1",
             ),
