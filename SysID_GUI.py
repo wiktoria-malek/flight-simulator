@@ -328,6 +328,8 @@ class MainWindow(QMainWindow):
         def clear_thread():
             self.thread = None
             self.worker = None
+            self.S.load('machine_status')
+            self.S.push(self.interface)
 
         self.thread.finished.connect(clear_thread)
         self.worker.plot_data.connect(self.__update_plot)
