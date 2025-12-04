@@ -19,6 +19,8 @@
 # display dispersion/wakefield, display response response matrices, including r1-r0, r2-r0
 # in com...gui do the differences between two directories
 # target dispersion should not be hard coded, but there should be a method called get target dispersion
+# introduce beta function to the cirrection
+
 Done:
 
 # it would be good to have a log console

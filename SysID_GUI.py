@@ -10,14 +10,14 @@ import sys
 import os
 from PyQt6 import uic
 from PyQt6.QtGui import QPixmap, QIcon, QPainter
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget,QMessageBox
+from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressBar
 from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
 
 import matplotlib
 matplotlib.use('QtAgg')
 import matplotlib.pyplot as plt
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 class MatplotlibWidget(FigureCanvas):
@@ -30,6 +30,7 @@ class MatplotlibWidget(FigureCanvas):
 
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
+    progress=pyqtSignal(int)
     finished = pyqtSignal()
 
     def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter):
@@ -45,7 +46,10 @@ class Worker(QObject):
         self.max_curr_v = max_curr_v
         self.Niter = Niter
         self.running = False
-
+        self.progress_value=0
+        # self.progressBar=QProgressBar()
+        # self.progress.setRange(0, 100)
+        # self.progressBar.setValue(0)
         #self.working_directory_dialog.clicked.connect()
 
         if hasattr(self, "working_directory_dialog"):
@@ -56,15 +60,18 @@ class Worker(QObject):
         self.scale_E=0.98
         self.scale_I=0.90
 
+
+
     @pyqtSlot()
     def run(self):
         self.running = True
-
         if self.cond == "scale_E":
             self.interface.change_energy(self.scale_E)
         elif self.cond == "scale_I":
             self.interface.change_intensity(self.scale_I)
 
+        total_steps=self.Niter*len(self.correctors)
+        self.progress_value=0
         I = self.interface
         S = self.S
         kicks = self.kicks
@@ -115,6 +122,10 @@ class Worker(QObject):
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
                 self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
 
+                self.progress_value=self.progress_value + 1
+                percent = int(self.progress_value / total_steps * 100)
+                self.progress.emit(percent)
+
                 if corrector in S.get_hcorrectors_names():
                     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
                     if np.max(np.abs(Diff_x_clean)) != 0.0:
@@ -136,9 +147,7 @@ class Worker(QObject):
             self.interface.reset_energy()
         elif self.cond=="scale_I":
             self.interface.reset_intensity()
-
         self.finished.emit()
-
 
     def stop(self):
         self.running = False
@@ -146,7 +155,11 @@ class Worker(QObject):
 class MainWindow(QMainWindow):
     def __set_status_in_title(self, status):
         self.setWindowTitle("SYSID - " + self.interface.__class__.__name__ + " " + status)
-    
+
+    @pyqtSlot(int)
+    def _update_progress(self,value):
+        self.progressBar.setValue(value)
+
     def __init__(self, interface, dir_name):
         super().__init__()
 
@@ -275,6 +288,7 @@ class MainWindow(QMainWindow):
         self.bpms_list.clearSelection()
 
     def __start_button_clicked(self):
+        self.progressBar.setValue(0)
         if self.thread and self.thread.isRunning():
             return  # already running
 
@@ -325,16 +339,18 @@ class MainWindow(QMainWindow):
             print("Restoring initial correctors' strengths")
             self.S.load('machine_status')
             self.S.push(self.interface)
+            self.progressBar.setValue(100)
 
         self.thread.finished.connect(clear_thread)
         self.worker.plot_data.connect(self.__update_plot)
-
+        self.worker.progress.connect(self._update_progress)
         self.thread.start()
 
     def __stop_button_clicked(self):
         if self.worker:
             self.__set_status_in_title("[Stopping...]")
             self.worker.stop()
+            self.progressBar.setValue(0)
         self.__set_status_in_title("[Idle]")
         print('SysID stopped.')
         print("Restoring initial correctors' settings...")
@@ -363,6 +379,7 @@ class MainWindow(QMainWindow):
             return
         self.working_directory_input.setText(folder)
         #QMessageBox.information(self.working_directory_dialog, "Data directory selected", self.working_directory_dialog)
+
 
 ## MAIN
 app = QApplication(sys.argv)
