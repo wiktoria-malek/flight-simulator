@@ -80,7 +80,7 @@ class InterfaceATF2_DR:
         pv.put(self.phase_kl1)
         time.sleep(1)
         
-    def change_intensity(self, laserintensity=0.15,**kwargs):
+    def change_intensity(self, laserintensity,**kwargs):
         print(f'Changing laser intensity to {laserintensity}...')
         self.laser_intensity = float(PV('RFGun:LasetIntensity1:Read').get())
         laser_intensity = laserintensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
