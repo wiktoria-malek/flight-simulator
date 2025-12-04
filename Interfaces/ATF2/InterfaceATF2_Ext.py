@@ -24,6 +24,7 @@ class InterfaceATF2_Ext:
         ]
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
+        '''
         monitors = [
             "MB1X", "MB2X", "MQF1X", "MQD2X", "MQF3X", "MQF4X", "MQD5X", "MQF6X",
             "MQF7X", "MQD8X", "MQF9X", "MQD10X", "MQF11X", "MQD12X", "MQF13X",
@@ -36,6 +37,13 @@ class InterfaceATF2_Ext:
             "MSF1FF", "MQF1FF", "MSD0FF", "MQD0FF", "M1&2IP", "MPIP", "MDUMP",
             "ICT1X", "ICTDUMP", "MW1X", "MW1IP", "MPREIP", "MIPA", "MIPB"
         ]
+        '''
+        monitors = [
+            "MB1X", "MB2X", "MQF1X", "MQD2X", "MQF3X", "MQF4X", "MQD5X", "MQF6X",
+            "MQF7X", "MQD8X", "MQF9X", "MQD10X", "MQF11X", "MQD12X", "MQF13X",
+            "MQD14X", "MQF15X", "MQD16X", "MQF17X", "MQD18X", "MQF19X",
+            "MQF21X",         ]
+
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
         # Check if the bpms in the config files are known to Epics
@@ -56,37 +64,21 @@ class InterfaceATF2_Ext:
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
+        self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
     def change_energy(self, delta_freq=None, **kwargs):
-        # some parsing to extract delta_freq
-        delta_freq = -2
-
-        # test for valid range and integer value
-        if delta_freq != np.int32(delta_freq):
-            raise Exception('DR frequency change is not an integer: %s',delta_freq)
-
-        if (-5 > delta_freq) or (delta_freq > 5):
-            raise Exception('DR frequency change is out of a safe range: %d', delta_freq)
-
-        pv = PV('atf:rfRamp:sw')
-        pv.put(1 if delta_freq else 0)
+      
+        PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)
 
-        pv = PV('atf:rfRamp:freq:set')
-        pv.put(delta_freq)
+        PV('RAMP:MI2:ONOFF_SW').put(1)
         time.sleep(2)
 
     def reset_energy(self,**kwargs):
-        pv = PV('atf:rfRamp:sw')
-        pv.put(0)
+        PV('RAMP:CONTROL_OFF_SW').put(0)
         time.sleep(2)
 
-        pv = PV('atf:rfRamp:freq:set')
-        pv.put(0)
-        time.sleep(2)
-
-    def change_intensity(self, laserintensity =0.1, ang_offset = 2.0, **kwargs):
-
+    def change_intensity(self, laserintensity,**kwargs):
         print(f'Changing laser intensity to {laserintensity}...')
         self.laser_intensity = float(PV('RFGun:LaserIntensity1:Read').get())
         laser_intensity = laserintensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
@@ -94,50 +86,11 @@ class InterfaceATF2_Ext:
         time.sleep(3)
         return self
 
-    def reset_intensity(self, ang_offset=None,**kwargs):
-        start = time.perf_counter()
-
-        ang_offset = 2.0
-
-        angle = self._angle_before
-
-        ### calculate current angle
-
-        # read x_counter
-
-        x_counter = PV('INJ:LaserIntensityXcount').get()
-        print(x_counter)
-
-        #os.system('caget -# 1 INJ:LaserIntensityXcount > /tmp/bba_laserxcount.txt')
-        #[name, dummy, x_counter] = np.genfromtxt('/tmp/bba_laserxcount.txt', '%s %f %f')
-
-        angle_read = np.mod(x_counter, 72000) / 200.0 + ang_offset
-
-        pulse = int((angle - angle_read) * 200)
-
-        if pulse >= 0:
-            print('laser up')
-            PV('INJ:setLaserIntUpAngle').put(int(pulse))
-            #os.system(f"caput INJ:setLaserIntUpAngle {int(pulse)}")
-        else:
-            print('laser down')
-            pulse = -pulse
-            PV('INJ:setLaserIntDownAngle').put(int(pulse))
-            #os.system(f'caput INJ:setLaserIntDownAngle {int(pulse)}')
-
-        PV('INJ:setLaserIntSend').put(1)
-        #os.system('caput INJ:setLaserIntSend 1')
-        time.sleep(0.5)
-
-        PV('INJ:setLaserIntSend.PROC').put(1)
-        #os.system('caput INJ:setLaserIntSend.PROC 1')
-
-        time.sleep(3)
-        elapsed = time.perf_counter() - start
-        print('InterfaceATF2::ChangeBunchCharge()', elapsed)
+    def reset_intensity(self,**kwargs):
+        print('Resetting laser intensity...')
+        self.change_intensity(laserintensity=self.laser_intensity / 500)
         return self
-
-
+    
     def get_sequence(self):
         return self.sequence
 
@@ -194,7 +147,7 @@ class InterfaceATF2_Ext:
             x.append(a[self.bpm_indexes, 1])
             y.append(a[self.bpm_indexes, 2])
             tmit.append(status * a[self.bpm_indexes, 3])
-            time.sleep(1)
+            time.sleep(0.35)
         names = [ self.bpms ] if type(self.bpms) == str else self.bpms
         x = np.vstack(x) / 1e3 # mm
         y = np.vstack(y) / 1e3 # mm

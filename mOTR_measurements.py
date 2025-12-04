@@ -89,7 +89,7 @@ def acquire_otr_image(otr_id_str):
     image_data_pv = PV(pv_img_data_name)
     image_acquire_pv = PV(pv_acquire_name)
     otr_in_pv.put(1)
-    time.sleep(3) 
+    time.sleep(5) 
     image_acquire_pv.put(1) 
     time.sleep(3) 
     img_data = image_data_pv.get() 
