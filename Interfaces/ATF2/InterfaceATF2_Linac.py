@@ -156,6 +156,8 @@ class InterfaceATF2_Linac:
                 status = a[self.bpm_indexes, 0]
                 # Set elements that are not equal to 1 to zero
                 status[status != 1] = 0
+                if np.sum(np.isnan(a[self.bpm_indexes, 1:2])):
+                    print('Attention please!!! Nan in raw data.... !!!!')
                 x.append(a[self.bpm_indexes, 1])
                 y.append(a[self.bpm_indexes, 2])
                 tmit.append(status * a[self.bpm_indexes, 3])
