@@ -1,12 +1,15 @@
 import RF_Track as rft
 import numpy as np
 import time
+from LogConsole_BBA import LogConsole
+from datetime import datetime
 
-class InterfaceATF2_Ext_RFTrack:
+class InterfaceATF2_Ext_RFTrack():
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
+        self.log = print
         self.lattice = rft.Lattice('Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
         self.lattice.set_bpm_resolution(bpm_resolution)
         for s in self.lattice['*OTR*']:
@@ -23,6 +26,9 @@ class InterfaceATF2_Ext_RFTrack:
         self.nsamples = nsamples
         self.__setup_beam0()
         self.__track_bunch()
+
+    def log_messages(self,console):
+        self.log=console or print
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
@@ -79,10 +85,15 @@ class InterfaceATF2_Ext_RFTrack:
         B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
         self.lattice.track(B0_offset)
         I=B0_offset.get_info()
-        print("Emittance after tracking:")
-        print(f"εx = {I.emitt_x}[mm.rad]")
-        print(f"εy = {I.emitt_y}[mm.rad]")
-        print(f"εz = {I.emitt_z}[mm.permille]")
+        # print("Emittance after tracking:")
+        # print(f"εx = {I.emitt_x}[mm.rad]")
+        # print(f"εy = {I.emitt_y}[mm.rad]")
+        # print(f"εz = {I.emitt_z}[mm.permille]")
+
+        self.log("Emittance after tracking:")
+        self.log(f"εx = {I.emitt_x}[mm.rad]")
+        self.log(f"εy = {I.emitt_y}[mm.rad]")
+        self.log(f"εz = {I.emitt_z}[mm.permille]")
 
     def change_energy(self, grad=None, **kwargs):
         self.__setup_beam1(grad)
@@ -122,7 +133,8 @@ class InterfaceATF2_Ext_RFTrack:
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_icts(self):
-        print("Reading ict's...")
+        #print("Reading ict's...")
+        self.log("Reading ict's...")
         charge = [ bpm.get_total_charge() for bpm in self.lattice.get_bpms() ]
         icts = {
             "names": self.bpms,
@@ -131,7 +143,8 @@ class InterfaceATF2_Ext_RFTrack:
         return icts
 
     def get_correctors(self):
-        print("Reading correctors' strengths...")
+        #print("Reading correctors' strengths...")
+        self.log("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
             if corrector[:2] == "ZH" or corrector[:2] == "ZX":
@@ -142,7 +155,8 @@ class InterfaceATF2_Ext_RFTrack:
         return correctors
     
     def get_bpms(self):
-        print('Reading bpms...')
+        #print('Reading bpms...')
+        self.log('Reading bpms...')
         x = np.zeros((self.nsamples, len(self.bpms)))
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
@@ -157,7 +171,8 @@ class InterfaceATF2_Ext_RFTrack:
         return bpms
 
     def get_screens(self):
-        print('Reading screens...')
+        #print('Reading screens...')
+        self.log('Reading screens...')
         nscreens = len(self.screens)
         hpixel = np.ones(nscreens) * 0.1 # mm, horizonatl size of a pixel
         vpixel = np.ones(nscreens) * 0.1 # mm, vertical size of a pixel
@@ -199,7 +214,6 @@ class InterfaceATF2_Ext_RFTrack:
             elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
-
 
     def align_everything(self):
         self.lattice.align_elements()

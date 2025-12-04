@@ -127,8 +127,8 @@ class InterfaceSelectionDialog(QDialog):
                     self.selected_interface = InterfaceCLEAR_RFTrack(jitter=0.1, bpm_resolution=0.05, nsamples=1)
 
                     # TESTS:
-                    #
-                    self.selected_interface.align_everything()
+
+                    # self.selected_interface.align_everything()
                     self.selected_interface.misalign_quadrupoles()
                     self.selected_interface.misalign_bpms()
                 case 'InterfaceCLEAR_real':

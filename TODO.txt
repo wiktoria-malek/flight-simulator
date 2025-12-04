@@ -1,0 +1,29 @@
+# restore button
+# when you substract matrices, if a corrector is missing, you should ignore it
+# threshold doesnt work
+# maybe instead of golden orbit, correct from current orbit
+# in the chi squared popup, instead of just rms values, put the test orbit and another one to see if it converges
+# error bars on the graphs - not a standard error, but something else instead
+# remember to put sato sans screenshots for the clic presentation
+# create 3 panels inside bba gui for the plots
+# i think we also need filtering cx and cy in the bba gui
+# make a proposed name in the session settings, just like in sysid when you want to save a file
+# weights bpm
+# display test orbits
+# DR cycle => 400 000 turns
+# Linac RFT Simulation
+# OTR => Interface
+# Emittance Measurements
+# should we add weights to every bpm in the gui?
+# add progress bar to sysid 0-100
+# display dispersion/wakefield, display response response matrices, including r1-r0, r2-r0
+# in com...gui do the differences between two directories
+# target dispersion should not be hard coded, but there should be a method called get target dispersion
+Done:
+
+# it would be good to have a log console
+# dont change the table with device names in sysid while extending thw window
+# improve the laser stability
+# make log console also print in the real terminal
+# append points after end of correction, because right now it's just clearing it
+# chi should have a norm (sum)

@@ -1,12 +1,9 @@
-#it would be good to have a log console
-#restore button
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
 from PyQt6 import uic
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
-                             QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 from State import State
 matplotlib.use("QtAgg")
 from enum import Enum
@@ -14,8 +11,10 @@ from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from ChiSquaredPopup_BBA import ChiSquaredWindow
+from LogConsole_BBA import LogConsole
 from SaveOrLoad_BBA import SaveOrLoad_BBA
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
+from ChangeBpmsWeights_BBA import ChangeBpmsWeights_BBA
 
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
@@ -23,14 +22,12 @@ class Machine(Enum):
     ATF2_LINAC = "ATF2_Linac"
     ATF2_EXT_RFT = "ATF2_Ext_RFT"
 
-
 @dataclass()
 class MachineSettings:
     energy: str
     intensity: str
     reset_e: str
     reset_ch: str
-
 
 class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def __init__(self, interface, dir_name):
@@ -44,10 +41,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         ui_path = os.path.join(os.path.dirname(__file__), "BBA_GUI.ui")
         uic.loadUi(ui_path, self)
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
+        self._hist_orbit, self._hist_disp,self._hist_wake=[],[],[]
         self._hist_orbit_x,self._hist_orbit_y = [],[]
         self._hist_disp_x,self._hist_disp_y = [],[]
         self._hist_wake_x,self._hist_wake_y = [],[]
         self._chi_dlg = None
+        self.log_console=None
         self._setup_canvases()
         self._populate_lists()
         self.save_correctors_button.clicked.connect(self._save_correctors)
@@ -56,6 +55,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.save_bpms_button.clicked.connect(self._save_bpms)
         self.load_bpms_button.clicked.connect(self._load_bpms)
         self.clear_bpms_button.clicked.connect(self.bpms_list.clearSelection)
+        self.pushButton_log.clicked.connect(self._show_console_log)
 
         if hasattr(self, "pushButton_8"):  # traj
             self.pushButton_8.clicked.connect(self._pick_and_load_traj_data)
@@ -126,8 +126,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
+
         max_curr_h=0.0
         max_curr_v=0.0
+
         if correctors_list is not None:
             hcorrs = self.interface.get_hcorrectors_names()
             vcorrs = self.interface.get_vcorrectors_names()
@@ -149,9 +151,11 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
     def _on_start_click(self):
         print("Starting button clicked...")
+        self.log("Starting button clicked...")
         if not self._running:
             self._running = True
             self._step = True
+
             try:
                 self._start_correction()
             finally:
@@ -165,7 +169,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         for p in text.split(","):
             p = p.strip()
             if not p:
-                #
                 continue
             k,v = p.split("=",1)
             k = k.strip()
@@ -178,7 +181,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
     def _expand_data_path(self,path):
         home=os.path.expanduser("~")
-        #/Users/wiktoriamalek/Desktop/flight-simulator/Data/ATF2_Ext_RFT_20251023_111743_nominal
         if path.startswith(home+os.sep): #the character used by the operating system to separate pathname components
             return "~"+path[len(home):]
         return path
@@ -186,6 +188,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def _setup_canvases(self):
         if FigureCanvas is None:
             self.traj_canvas = self.disp_canvas = self.wake_canvas = None
+            self.traj_ax=self.disp_ax = self.wake_ax = None
             return
 
         def install(host):
@@ -197,29 +200,28 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 layout = QVBoxLayout(host)
                 layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(canvas)
-            return fig, canvas
+            ax = fig.add_subplot(111)
+            return fig, canvas,ax
 
-        self.traj_fig, self.traj_canvas = install(self.plot_widget_3)
-        self.disp_fig, self.disp_canvas = install(self.plot_widget_4)
-        self.wake_fig, self.wake_canvas = install(self.plot_widget_5)
+        self.traj_fig, self.traj_canvas, self.traj_ax = install(self.plot_widget_3)
+        self.disp_fig, self.disp_canvas,self.disp_ax = install(self.plot_widget_4)
+        self.wake_fig, self.wake_canvas, self.wake_ax = install(self.plot_widget_5)
 
-    def _plot_series(self, canvas, fig, values_x,values_y, title, ylabel):
-        if canvas is None:
+    def _plot_series(self, ax, canvas, values_x,values_y, title=None,ylabel="[mm]"):
+        if canvas is None or ax is None:
             return
-        fig.clear()
-        ax = fig.add_subplot(111)
+        ax.clear()
         if values_x:
             ax.plot(range(1, len(values_x) + 1), values_x, marker="o",color='red',label="x")
         if values_y:
             ax.plot(range(1, len(values_y) + 1), values_y, marker="o",color='blue',label="y")
-        ax.legend(fontsize=7)
+        if values_x or values_y:
+            ax.legend(fontsize=7)
         if title is not None:
             ax.set_title(title)
-        else:
-            ax.set_title(None)
-        ax.set_title(title)
         ax.set_xlabel("Iteration", fontsize=8)
-        ax.set_ylabel(ylabel="[mm]", fontsize=7)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel, fontsize=7)
         ax.tick_params(axis="both", which="major", labelsize=7)
         ax.yaxis.get_offset_text().set_fontsize(7)
         ax.grid(True, alpha=0.3)
@@ -316,17 +318,13 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def _start_correction(self):
         try:
             print("Starting correction...")
+            self.log("Starting correction...")
             self._cancel = False
             w1, w2, w3, rcond, iters, gain = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
-            self._hist_orbit_x.clear(),self._hist_orbit_y.clear()
-            self._hist_disp_x.clear(),self._hist_disp_y.clear()
-            self._hist_wake_x.clear(),self._hist_wake_y.clear()
-
             if getattr(self, "_chi_dlg", None):
                 self._chi_dlg.set_weights(w1, w2, w3)
-                self._chi_dlg.clear()
 
             corrs, bpms = self._get_selection()
 
@@ -359,10 +357,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if self._cancel:
                     break
                 self._step = False
-
                 # nominal
                 if w1>0:
                     print("Measuring orbit")
+                    self.log("Measuring orbit")
                     self.S.pull(self.interface)
                     O0 = self.S.get_orbit(bpms)
                     O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
@@ -373,6 +371,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 # dfs
                 if w2>0:
                     print("Measuring dispersion")
+                    self.log("Measuring dispersion")
                     dfs_params_change = self._read_change_energy()
                     dfs_params_reset = self._read_reset_energy()
                     self.interface.change_energy(**dfs_params_change)
@@ -387,6 +386,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 # wfs
                 if w3>0:
                     print("Measuring wakefield")
+                    self.log("Measuring wakefield")
                     wfs_params_change = self._read_change_intensity()
                     wfs_params_reset = self._read_reset_intensity()
                     self.interface.change_intensity(**wfs_params_change)
@@ -414,8 +414,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
 
-                #for next iterations
-                # /Users/wiktoriamalek/flight-simulator/Data/BBA_ATF2_Ext_RFT_20251119_114213_session_settings
                 Axx[np.isnan(Axx)] = 0
                 Ayy[np.isnan(Ayy)] = 0
                 Axx[np.isnan(Bx.ravel()),:] =0
@@ -458,30 +456,36 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if w1>0:
                     self._hist_orbit_x.append(filtering_norm_x(O0x,B0x))
                     self._hist_orbit_y.append(filtering_norm_y(O0y,B0y))
+                    self._hist_orbit.append(filtering_norm_x(O0x,B0x) + filtering_norm_y(O0y,B0y))
+
                 if w2>0 and O1x is not None:
                     self._hist_disp_x.append(filtering_norm_x(O0x,O1x))
                     self._hist_disp_y.append(filtering_norm_y(O0y,O1y))
+                    self._hist_disp.append(filtering_norm_x(O0x,O1x) + filtering_norm_y(O0y,O1y))
                 if w3>0 and O2x is not None:
                     self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
                     self._hist_wake_y.append(filtering_norm_y(O0y,O2y))
+                    self._hist_wake.append(filtering_norm_x(O0x,O2x) + filtering_norm_y(O0y,O2y))
 
-
-                self._plot_series(canvas=self.traj_canvas, fig=self.traj_fig, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y , title=None, ylabel=None)
-                self._plot_series(canvas=self.disp_canvas,fig= self.disp_fig, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,title=None, ylabel=None)
-                self._plot_series(canvas=self.wake_canvas, fig=self.wake_fig, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,title=None, ylabel= None)
+                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y , title=None,ylabel="[mm]")
+                self._plot_series(ax=self.disp_ax,canvas= self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,title=None,ylabel="[mm]")
+                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,title=None,ylabel="[mm]")
                 QApplication.processEvents()
 
             self.setWindowTitle("BBA_GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
+            self.log("Correction finished.")
             self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy, Bx, By)
 
         except Exception as e:
             self.setWindowTitle("BBA_GUI")
             QMessageBox.critical(self, "Correction error", str(e))
+            self.log(f"Correction error: {e}")
 
     def _stop_correction(self):
         self._cancel = True
         QMessageBox.information(self, "Correction", "Stop requested. Finishing current iteration...")
+        self.log("Stop requested. Finishing current iteration...")
 
     def _show_chi_squared_graphs(self):
         if getattr(self, "_chi_dlg", None) is None:
@@ -489,11 +493,25 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         w1, w2, w3, *_ = self._read_params()
         self._chi_dlg.set_weights(w1, w2, w3)
         self._chi_dlg.info.setText = f"w1={w1:g}, w2={w2:g}, w3={w3:g}"
-        self._chi_dlg.calculating_chi(self._hist_orbit_x, self._hist_disp_x, self._hist_wake_x)
-        #CORRECT IT
+        self._chi_dlg.calculating_chi(self._hist_orbit, self._hist_disp, self._hist_wake)
         self._chi_dlg.show()
         self._chi_dlg.raise_()  # top of the stacking order
         self._chi_dlg.activateWindow()  # giving it a keyboard focus
+
+    def _show_console_log(self):
+        if self.log_console is None:
+            self.log_console=LogConsole(self)
+        self.log_console.show()
+        self.log_console.raise_()
+        self.log_console.activateWindow()
+
+    def log(self,text):
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        line=f"[{timestamp}] {text}"
+        if self.log_console is None:
+            self.log_console=LogConsole(self)
+            self.log_console.show()
+        self.log_console.log(line)
 
     def _clear_graphs(self):
         # it doesnt do fresh - start, it only clears the graphs
@@ -501,9 +519,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._hist_orbit_x.clear(),self._hist_orbit_y.clear()
         self._hist_disp_x.clear(),self._hist_disp_y.clear()
         self._hist_wake_x.clear(),self._hist_wake_y.clear()
-        self._plot_series(self.traj_canvas, self.traj_fig, values_x=[], values_y=[],title=None, ylabel="[mm]")
-        self._plot_series(self.disp_canvas, self.disp_fig, values_x=[],values_y=[], title=None, ylabel="[mm]")
-        self._plot_series(self.wake_canvas, self.wake_fig, values_x=[],values_y=[], title=None, ylabel="[mm]")
+        self._hist_orbit.clear(),self._hist_disp.clear(),self._hist_wake.clear()
+        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],title=None,ylabel="[mm]")
+        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
+        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -521,5 +540,9 @@ if __name__ == "__main__":
     dir_name = f"~/flight-simulator-data/BBA_{I.get_name()}_{time_str}_session_settings"
     dir_name = os.path.expanduser(os.path.expandvars(dir_name))
     w = MainWindow(interface=I, dir_name=dir_name)
+
+    if hasattr(I, "log_messages"):
+        I.log_messages(w.log)
+
     w.show()
     sys.exit(app.exec())

@@ -2,14 +2,12 @@ from State import State
 from datetime import datetime
 from functools import partial
 from collections import deque
-
 import numpy as np
 import threading
 import signal
 import time
 import sys
 import os
-
 from PyQt6 import uic
 from PyQt6.QtGui import QPixmap, QIcon, QPainter
 from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget,QMessageBox
@@ -17,7 +15,6 @@ from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
 
 import matplotlib
 matplotlib.use('QtAgg')
-
 import matplotlib.pyplot as plt
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -62,8 +59,6 @@ class Worker(QObject):
     @pyqtSlot()
     def run(self):
         self.running = True
-
-        # FOR THE BBA_GUI!!
 
         if self.cond == "scale_E":
             self.interface.change_energy(self.scale_E)
@@ -137,7 +132,6 @@ class Worker(QObject):
 
                 time.sleep(1)
 
-#FOR THE BBA_GUI!!
         if self.cond=="scale_E":
             self.interface.reset_energy()
         elif self.cond=="scale_I":

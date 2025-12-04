@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>751</width>
-    <height>685</height>
+    <width>732</width>
+    <height>561</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -40,7 +40,7 @@
            <number>2</number>
           </property>
           <property name="sizeConstraint">
-           <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
+           <enum>QLayout::SetDefaultConstraint</enum>
           </property>
           <item>
            <layout class="QHBoxLayout" name="correctors_header_layout">
@@ -55,12 +55,17 @@
           </item>
           <item>
            <widget class="QListWidget" name="correctors_list">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="selectionMode">
-             <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+             <enum>QAbstractItemView::NoSelection</enum>
             </property>
            </widget>
           </item>
-
           <item>
            <layout class="QHBoxLayout" name="correctors_buttons_layout">
             <item>
@@ -70,7 +75,6 @@
               </property>
              </widget>
             </item>
-
             <item>
              <widget class="QPushButton" name="load_correctors_button">
               <property name="text">
@@ -78,7 +82,6 @@
               </property>
              </widget>
             </item>
-
             <item>
              <widget class="QPushButton" name="clear_correctors_button">
               <property name="text">
@@ -88,8 +91,6 @@
             </item>
            </layout>
           </item>
-
-
           <item>
            <layout class="QHBoxLayout" name="bpms_header_layout">
             <item>
@@ -103,8 +104,14 @@
           </item>
           <item>
            <widget class="QListWidget" name="bpms_list">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="selectionMode">
-             <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+             <enum>QAbstractItemView::NoSelection</enum>
             </property>
            </widget>
           </item>
@@ -135,8 +142,6 @@
           </item>
          </layout>
         </item>
-
-        <!--SAVING THE DATA -->
         <item>
          <layout class="QVBoxLayout" name="right_layout">
           <property name="spacing">
@@ -155,7 +160,6 @@
             </property>
            </widget>
           </item>
-          <!-- END OF IT-->
           <item>
            <layout class="QHBoxLayout" name="working_directory_layout">
             <item>
@@ -184,8 +188,6 @@
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-
-
               <property name="text">
                <string>Options</string>
               </property>
@@ -228,9 +230,9 @@
               <item>
                <spacer name="current_spacer">
                 <property name="orientation">
-                 <enum>Qt::Orientation::Horizontal</enum>
+                 <enum>Qt::Vertical</enum>
                 </property>
-                 <property name="sizeHint" stdset="0">
+                <property name="sizeHint" stdset="0">
                  <size>
                   <width>40</width>
                   <height>20</height>
@@ -240,6 +242,12 @@
               </item>
               <item>
                <widget class="QLabel" name="horizontal_current_label">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                 <property name="text">
                  <string>H:</string>
                 </property>
@@ -254,6 +262,12 @@
               </item>
               <item>
                <widget class="QLabel" name="vertical_current_label">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                 <property name="text">
                  <string> V:</string>
                 </property>
@@ -280,7 +294,7 @@
               <item>
                <spacer name="excursion_spacer">
                 <property name="orientation">
-                 <enum>Qt::Orientation::Horizontal</enum>
+                 <enum>Qt::Vertical</enum>
                 </property>
                 <property name="sizeHint" stdset="0">
                  <size>
@@ -292,6 +306,12 @@
               </item>
               <item>
                <widget class="QLabel" name="horizontal_excursion_label">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                 <property name="text">
                  <string>H:</string>
                 </property>
@@ -309,6 +329,12 @@
               </item>
               <item>
                <widget class="QLabel" name="vertical_excursion_label">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                 <property name="text">
                  <string>V:</string>
                 </property>
