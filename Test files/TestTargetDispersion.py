@@ -1,6 +1,6 @@
 import sys
-sys.path.append('..')
-sys.path.append('../Interfaces/ATF2')
+sys.path.append('.')
+sys.path.append('Interfaces/ATF2')
 
 from State import State
 
@@ -16,16 +16,15 @@ project_name = I.get_name()
 print(f"Selected interface: {project_name}")
 
 # TEST 1 - Read one bpm
-names = I.get_bpms_names()
-mb1x_disp_x, mb1x_disp_y = I.get_target_dispersion(names)
+mb1x_disp_x, mb1x_disp_y = I.get_target_dispersion("MB1X")
 print('disp x @ MB1X = ', mb1x_disp_x, ' m')
 print('disp y @ MB1X = ', mb1x_disp_y, ' m')
 
 # TEST 2 - Read several bpms
-
-mb1x_disp_x, mb1x_disp_y = I.get_target_dispersion("MB1X")
-print('disp x @ MB1X = ', mb1x_disp_x, ' m')
-print('disp y @ MB1X = ', mb1x_disp_y, ' m')
+names = I.get_bpms_names()
+disp_x, disp_y = I.get_target_dispersion(names[:5])
+print('disp x first 5 BPMS = ', disp_x, ' m')
+print('disp y first 5 BPMS = ', disp_y, ' m')
 
 # TEST 3 - Read all bpms
 target_disp_x, target_disp_y = I.get_target_dispersion()

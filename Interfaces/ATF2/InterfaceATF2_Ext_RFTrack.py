@@ -133,8 +133,7 @@ class InterfaceATF2_Ext_RFTrack():
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None):
-        with open('Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
-            # lines=file.readlines()
+        with open('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))

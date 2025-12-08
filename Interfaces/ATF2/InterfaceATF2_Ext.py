@@ -114,6 +114,29 @@ class InterfaceATF2_Ext:
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
+    def get_target_dispersion(self, names=None):
+        with open('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+
+        DX_column = columns.index("DX")
+        DY_column = columns.index("DY")
+        elements_names = columns.index("NAME")
+
+        target_disp_x, target_disp_y = [], []
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            bpms_name = data[elements_names].strip('"')
+
+            if names == None or bpms_name in names:
+                target_disp_x.append(float(data[DX_column]))
+                target_disp_y.append(float(data[DY_column]))
+
+        return target_disp_x, target_disp_y
+    
     def get_icts(self):
         print("Reading ict's...")
         charge = []
