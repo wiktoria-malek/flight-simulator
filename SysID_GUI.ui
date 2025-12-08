@@ -194,9 +194,47 @@
              </widget>
             </item>
             <item>
-             <layout class="QHBoxLayout" name="cycle_mode_layout">
+             <layout class="QHBoxLayout" name="correction_mode">
+              <item>
+               <widget class="QLabel" name="label">
+                <property name="text">
+                 <string>Correction Mode</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="choose_mode">
+                <property name="maximumSize">
+                 <size>
+                  <width>300</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>Orbit Correction</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Changed energy</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Changed intensity</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
               <item>
                <widget class="QLabel" name="cycle_mode_label">
+                <property name="maximumSize">
+                 <size>
+                  <width>170</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
                 <property name="text">
                  <string>Cycle mode</string>
                 </property>
@@ -204,6 +242,12 @@
               </item>
               <item>
                <widget class="QComboBox" name="cycle_mode_combobox">
+                <property name="maximumSize">
+                 <size>
+                  <width>200</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
                 <item>
                  <property name="text">
                   <string>Repeat all</string>
@@ -219,21 +263,28 @@
              </layout>
             </item>
             <item>
-             <layout class="QHBoxLayout" name="current_layout">
-              <item>
-               <widget class="QLabel" name="current_label">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
-                </property>
+             <layout class="QGridLayout" name="change_layout">
+              <item row="0" column="0">
+               <widget class="QLabel" name="change_energy">
                 <property name="text">
-                 <string>Max strength (gauss*m)</string>
+                 <string>Change energy</string>
                 </property>
                </widget>
               </item>
-              <item>
+              <item row="1" column="1">
+               <widget class="QLineEdit" name="change_intensity_settings">
+                <property name="maximumSize">
+                 <size>
+                  <width>300</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="3">
                <widget class="QLabel" name="horizontal_current_label">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -246,14 +297,65 @@
                 </property>
                </widget>
               </item>
-              <item>
-               <widget class="QDoubleSpinBox" name="max_horizontal_current_spinbox">
+              <item row="0" column="1">
+               <widget class="QLineEdit" name="change_energy_settings">
+                <property name="maximumSize">
+                 <size>
+                  <width>300</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="excursion_label_2">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>300</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>Change intensity</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="2">
+               <spacer name="change_spacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item row="1" column="4">
+               <widget class="QDoubleSpinBox" name="max_vertical_current_spinbox">
+                <property name="enabled">
+                 <bool>true</bool>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>70</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
                 <property name="singleStep">
                  <double>0.010000000000000</double>
                 </property>
                </widget>
               </item>
-              <item>
+              <item row="1" column="3">
                <widget class="QLabel" name="vertical_current_label">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -266,10 +368,35 @@
                 </property>
                </widget>
               </item>
-              <item>
-               <widget class="QDoubleSpinBox" name="max_vertical_current_spinbox">
+              <item row="0" column="4">
+               <widget class="QDoubleSpinBox" name="max_horizontal_current_spinbox">
+                <property name="maximumSize">
+                 <size>
+                  <width>70</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
                 <property name="singleStep">
                  <double>0.010000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="2">
+               <widget class="QLabel" name="current_label">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>170</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>Max strength (gauss*m)</string>
                 </property>
                </widget>
               </item>

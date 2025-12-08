@@ -8,11 +8,12 @@ import signal
 import time
 import sys
 import os
+from dataclasses import dataclass
 from PyQt6 import uic
 from PyQt6.QtGui import QPixmap, QIcon, QPainter
 from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressBar
 from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
-
+from enum import Enum
 import matplotlib
 matplotlib.use('QtAgg')
 import matplotlib.pyplot as plt
@@ -20,13 +21,30 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+class Mode(Enum):
+    Orbit = "Orbit Correction"
+    Dispersion = "Changed energy"
+    Wakefield = "Changed intensity"
+
+class Machine(Enum):
+    ATF2_DR = "ATF2_DR"
+    ATF2_EXT = "ATF2_Ext"
+    ATF2_LINAC = "ATF2_Linac"
+    ATF2_EXT_RFT = "ATF2_Ext_RFT"
+
+@dataclass()
+class MachineSettings:
+    energy: str
+    intensity: str
+    reset_e: str
+    reset_ch: str
+
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
         fig = Figure(tight_layout=True)
         super().__init__(fig)
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
-
 
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
@@ -47,20 +65,9 @@ class Worker(QObject):
         self.Niter = Niter
         self.running = False
         self.progress_value=0
-        # self.progressBar=QProgressBar()
-        # self.progress.setRange(0, 100)
-        # self.progressBar.setValue(0)
-        #self.working_directory_dialog.clicked.connect()
 
         if hasattr(self, "working_directory_dialog"):
             self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
-
-        # FOR THE BBA_GUI!!
-        self.cond="nominal"
-        self.scale_E=0.98
-        self.scale_I=0.90
-
-
 
     @pyqtSlot()
     def run(self):
@@ -208,14 +215,17 @@ class MainWindow(QMainWindow):
         self.start_button.clicked.connect(self.__start_button_clicked)
         self.stop_button.clicked.connect(self.__stop_button_clicked)
 
+        self.choose_mode.setCurrentText(Mode.Orbit.value)
+        self.mode=Mode.Orbit
+        self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
+        self.change_energy_settings.setText("")
+        self.change_intensity_settings.setText("")
+
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
-
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.bpms_list.insertItems(0, bpms_list)
-
         self.working_directory_input.setText(dir_name)
-
         self.max_horizontal_current_spinbox.setValue(max_curr_h)
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
@@ -227,9 +237,61 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "working_directory_dialog"):
             self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
-
-
         self.__set_status_in_title("[Idle]")
+
+        self._machine_settings={
+            Machine.ATF2_DR: MachineSettings(
+                energy="rel_phase=5",
+                intensity="laser_intensity=0.1, ang_offset=2.0",
+                reset_e="rel_phase=0",
+                reset_ch="laserintensity=0.1",
+            ),
+            Machine.ATF2_EXT: MachineSettings(
+                energy="delta_freq=-2",
+                intensity="laserintensity=0.15",
+                reset_e="rel_phase=0",
+                reset_ch="laserintensity=0.1",
+            ),
+            Machine.ATF2_LINAC: MachineSettings(
+                energy="rel_phase=5.0",
+                intensity="laserintensity=0.15",
+                reset_e="rel_phase=0.0",
+                reset_ch="laserintensity=0.1",
+            ),
+            Machine.ATF2_EXT_RFT: MachineSettings(
+                energy="grad=0.98",
+                intensity="grad=0.90",
+                reset_e="grad=0",
+                reset_ch="grad=0",
+            ),
+        }
+
+        self.appropriate_settings_energy=None
+        self.appropriate_settings_intensity=None
+        self.appropriate_settings_reset_e=None
+        self.appropriate_settings_reset_ch=None
+        interface_name=interface.get_name()
+        machine=Machine(interface_name)
+        settings=self._machine_settings[machine]
+        self.appropriate_settings_energy=settings.energy
+        self.appropriate_settings_intensity=settings.intensity
+        self.appropriate_settings_reset_e=settings.reset_e
+        self.appropriate_settings_reset_ch=settings.reset_ch
+
+
+    def _choose_the_correction_mode(self):
+        data_mode=self.choose_mode.currentText()
+        self.mode=Mode(data_mode)
+
+        if self.mode == Mode.Orbit:
+            self.change_energy_settings.setText("")
+            self.change_intensity_settings.setText("")
+        elif self.mode==Mode.Dispersion:
+            self.change_energy_settings.setText(self.appropriate_settings_energy)
+            self.change_intensity_settings.setText("")
+        elif self.mode==Mode.Wakefield:
+            self.change_energy_settings.setText("")
+            self.change_intensity_settings.setText(self.appropriate_settings_intensity)
 
     def __save_correctors_button_clicked(self):
         dir_name = self.working_directory_input.text()
@@ -292,6 +354,13 @@ class MainWindow(QMainWindow):
         self.bpms_list.clearSelection()
 
     def __start_button_clicked(self):
+        if self.mode==Mode.Orbit:
+            print("Orbit mode active.")
+        elif self.mode==Mode.Dispersion:
+            print("Dispersion mode active.")
+        elif self.mode==Mode.Wakefield:
+            print("Wakefield mode active.")
+
         self.progressBar.setValue(0)
         if self.thread and self.thread.isRunning():
             return  # already running
