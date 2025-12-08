@@ -4,13 +4,13 @@ import time
 from LogConsole_BBA import LogConsole
 from datetime import datetime
 
-class InterfaceATF2_Ext_RFTrack():
+class InterfaceATF2_DR_RFTrack():
     def get_name(self):
-        return 'ATF2_Ext_RFT'
+        return 'ATF2_DR_RFT'
 
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.log = print
-        self.lattice = rft.Lattice('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
+        self.lattice = rft.Lattice('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws')
         self.lattice.set_bpm_resolution(bpm_resolution)
         for s in self.lattice['*OTR*']:
             screen = rft.Screen()
@@ -34,10 +34,12 @@ class InterfaceATF2_Ext_RFTrack():
         T = rft.Bunch6d_twiss()
         T.emitt_x = 5.2 # mm.mrad normalised emittance
         T.emitt_y = 0.03 # mm.mrad
-        T.beta_x = 6.848560987 # m
-        T.beta_y = 2.935758992 # m
-        T.alpha_x = 1.108024744
-        T.alpha_y = -1.907222942
+        T.alpha_x = -4.46977512
+        T.alpha_y = 1.286939438
+        T.beta_x = 5.329581905 # m
+        T.beta_y = 1.710527297 # m
+        T.disp_x = 0.1327935005 # m
+        T.disp_px = 0.1112759177
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 10000 # number of macroparticles
@@ -50,10 +52,12 @@ class InterfaceATF2_Ext_RFTrack():
         T = rft.Bunch6d_twiss()
         T.emitt_x = 5.2 # mm.mrad normalised emittance
         T.emitt_y = 0.03 # mm.mrad
-        T.beta_x = 6.848560987 # m
-        T.beta_y = 2.935758992 # m
-        T.alpha_x = 1.108024744
-        T.alpha_y = -1.907222942
+        T.alpha_x = -4.46977512
+        T.alpha_y = 1.286939438
+        T.beta_x = 5.329581905 # m
+        T.beta_y = 1.710527297 # m
+        T.disp_x = 0.1327935005 # m
+        T.disp_px = 0.1112759177
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 10000 # number of macroparticles
@@ -66,10 +70,12 @@ class InterfaceATF2_Ext_RFTrack():
         T = rft.Bunch6d_twiss()
         T.emitt_x = 5.2 # mm.mrad normalised emittance
         T.emitt_y = 0.03 # mm.mrad
-        T.beta_x = 6.848560987 # m
-        T.beta_y = 2.935758992 # m
-        T.alpha_x = 1.108024744
-        T.alpha_y = -1.907222942
+        T.alpha_x = -4.46977512
+        T.alpha_y = 1.286939438
+        T.beta_x = 5.329581905 # m
+        T.beta_y = 1.710527297 # m
+        T.disp_x = 0.1327935005 # m
+        T.disp_px = 0.1112759177
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 10000 # number of macroparticles
@@ -133,7 +139,7 @@ class InterfaceATF2_Ext_RFTrack():
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None):
-        with open('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
+        with open('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws', "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
