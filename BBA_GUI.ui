@@ -26,9 +26,8 @@
          <enum>QTabWidget::North</enum>
         </property>
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
-
         <widget class="QWidget" name="tab_response">
          <attribute name="title">
           <string>Response Matrices</string>
@@ -342,7 +341,6 @@
           </item>
          </layout>
         </widget>
-
         <widget class="QWidget" name="tab_corrbpms">
          <attribute name="title">
           <string>Correctors &amp;&amp; BPMs</string>
@@ -416,9 +414,14 @@
             </item>
            </layout>
           </item>
-
           <item>
            <widget class="QGroupBox" name="groupBox_10">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="title">
              <string>Compute Response Matrix</string>
             </property>
@@ -455,7 +458,7 @@
               <widget class="QPushButton" name="compute_response_matrix_button">
                <property name="maximumSize">
                 <size>
-                 <width>200</width>
+                 <width>1000</width>
                  <height>16777215</height>
                 </size>
                </property>
@@ -469,7 +472,6 @@
           </item>
          </layout>
         </widget>
-
         <widget class="QWidget" name="tab_correction">
          <attribute name="title">
           <string>Correction</string>
@@ -819,7 +821,6 @@
           </item>
          </layout>
         </widget>
-
        </widget>
       </item>
      </layout>

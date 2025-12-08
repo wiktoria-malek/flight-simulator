@@ -2,8 +2,8 @@ import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
 from PyQt6 import uic
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
+from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 from State import State
 matplotlib.use("QtAgg")
 from enum import Enum
@@ -48,8 +48,11 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._hist_wake_x,self._hist_wake_y = [],[]
         self._chi_dlg = None
         self.log_console=None
+        self.show_response_matrix=None
         self._setup_canvases()
         self._populate_lists()
+        self._procs=[]
+        self.radio_buttons=[self.mode_orbit,self.mode_dispersion, self.mode_wakefield]
         self.pushButton_log.clicked.connect(self._show_console_log)
         self.session_database_3.setText(dir_name)
         if hasattr(self, "pushButton_8"):  # traj
@@ -64,6 +67,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             self.clear_graphs_button.clicked.connect(self._clear_graphs)
         if hasattr(self, "pushButton_11"):
             self.pushButton_11.clicked.connect(self.load_session_settings)
+
+        self.modes= [ 'Orbit', 'Dispersion', 'Wakefield']
 
         self._machine_settings={
             Machine.ATF2_DR: MachineSettings(
@@ -150,6 +155,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
 
     def _on_start_click(self):
         print("Starting button clicked...")
@@ -526,15 +532,55 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
         self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
 
-    def _display_response_matrix(self):
-        # as a popup
-        # mode has to be selected
+    def handling(self, app_name,cwd=None, args=None):
+        try:
+            path = os.path.join(os.path.dirname(__file__), app_name)
+            workdir=os.path.expanduser(os.path.expandvars(cwd))
 
-        pass
+            proc = QProcess(self)
+            proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+            proc.setWorkingDirectory(workdir)
+
+            env = QProcessEnvironment.systemEnvironment()
+            proc.setProcessEnvironment(env)
+
+            argv = [path] + (args or [])
+            proc.start(sys.executable, argv)
+
+            proc.readyReadStandardOutput.connect(
+                lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"))
+            )
+            self._procs.append(proc)
+            print(workdir)
+
+        except Exception as e:
+            self.log(f"Error: {e}")
+            print(e)
+
+    def _display_response_matrix(self):
+        orbit_dir=self.trajectory_response_3.text()
+        dispersion_dir=self.dfs_response_3.text()
+        wakefield_dir=self.wfs_response_3.text()
+        selected_mode=None
+
+        for rb in self.radio_buttons:
+            if rb.isChecked():
+                selected_mode = rb.text()
+                break
+
+        if selected_mode is None:
+            selected_mode = self.modes[0]
+
+        if selected_mode==self.modes[0]:
+            data_dir=orbit_dir
+        elif selected_mode==self.modes[1]:
+            data_dir=dispersion_dir
+        elif selected_mode==self.modes[2]:
+            data_dir=wakefield_dir
+        self.handling('ComputeResponseMatrix_GUI.py', cwd=data_dir,args=[data_dir])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    #from SelectInterface import InterfaceSelectionDialog
     import SelectInterface
     dialog = SelectInterface.choose_acc_and_interface()
     if dialog is None:
