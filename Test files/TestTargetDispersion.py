@@ -9,6 +9,10 @@ import numpy as np
 import glob
 import os
 
+if 0:
+    from Interfaces.ATF2.InterfaceATF2_DR_RFTrack import InterfaceATF2_DR_RFTrack
+    I = InterfaceATF2_DR_RFTrack()
+
 from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 I = InterfaceATF2_Ext_RFTrack()
 
