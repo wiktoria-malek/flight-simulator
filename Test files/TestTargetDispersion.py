@@ -9,7 +9,7 @@ import numpy as np
 import glob
 import os
 
-from InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
+from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 I = InterfaceATF2_Ext_RFTrack()
 
 project_name = I.get_name()

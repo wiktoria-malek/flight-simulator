@@ -49,14 +49,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.log_console=None
         self._setup_canvases()
         self._populate_lists()
-        self.save_correctors_button.clicked.connect(self._save_correctors)
-        self.load_correctors_button.clicked.connect(self._load_correctors)
-        self.clear_correctors_button.clicked.connect(self.correctors_list.clearSelection)
-        self.save_bpms_button.clicked.connect(self._save_bpms)
-        self.load_bpms_button.clicked.connect(self._load_bpms)
-        self.clear_bpms_button.clicked.connect(self.bpms_list.clearSelection)
         self.pushButton_log.clicked.connect(self._show_console_log)
-
+        self.session_database_3.setText(dir_name)
         if hasattr(self, "pushButton_8"):  # traj
             self.pushButton_8.clicked.connect(self._pick_and_load_traj_data)
         if hasattr(self, "pushButton_9"):  # dfs
@@ -123,6 +117,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.dfs_change_3.setText(self.appropriate_settings_energy)
         self.wfs_reset_3.setText(self.appropriate_settings_reset_ch)
         self.wfs_change_3.setText(self.appropriate_settings_intensity)
+        self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
 
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
@@ -523,6 +518,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],title=None,ylabel="[mm]")
         self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
         self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
+
+    def _display_response_matrix(self):
+        # as a popup
+        # mode has to be selected
+
+        pass
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
