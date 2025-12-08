@@ -60,7 +60,7 @@ class InterfaceSelectionDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose one of the following Interfaces:"))
         if selected_acc=='ATF2':
-            interfaces = ['InterfaceATF2_DR', 'InterfaceATF2_Ext', 'InterfaceATF2_Linac', 'InterfaceATF2_Ext_RFTrack']
+            interfaces = ['InterfaceATF2_DR', 'InterfaceATF2_Ext', 'InterfaceATF2_Linac', 'InterfaceATF2_DR_RFTrack', 'InterfaceATF2_Ext_RFTrack']
         elif selected_acc=='CLEAR':
             interfaces = ['InterfaceCLEAR_RFTrack' , 'InterfaceCLEAR_real']
         self.radio_buttons = []
@@ -106,6 +106,11 @@ class InterfaceSelectionDialog(QDialog):
                     from Interfaces.ATF2.InterfaceATF2_Linac import InterfaceATF2_Linac
                     globals()['InterfaceATF2_Linac'] = InterfaceATF2_Linac
                     self.selected_interface = InterfaceATF2_Linac(nsamples=3)
+
+                case 'InterfaceATF2_DR_RFTrack':
+                    from Interfaces.ATF2.InterfaceATF2_DR_RFTrack import InterfaceATF2_DR_RFTrack
+                    globals()['InterfaceATF2_DR_RFTrack'] = InterfaceATF2_DR_RFTrack
+                    self.selected_interface = InterfaceATF2_DR_RFTrack(jitter=0.0, bpm_resolution=0.00, nsamples=1)
 
                 case 'InterfaceATF2_Ext_RFTrack':
                     from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack

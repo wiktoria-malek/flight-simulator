@@ -20,6 +20,7 @@ class Machine(Enum):
     ATF2_DR = "ATF2_DR"
     ATF2_EXT = "ATF2_Ext"
     ATF2_LINAC = "ATF2_Linac"
+    ATF2_DR_RFT = "ATF2_DR_RFT"
     ATF2_EXT_RFT = "ATF2_Ext_RFT"
 
 @dataclass()
@@ -82,6 +83,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 intensity="laserintensity=0.15",
                 reset_e="rel_phase=0.0",
                 reset_ch="laserintensity=0.1",
+            ),
+            Machine.ATF2_DR_RFT: MachineSettings(
+                energy="grad=0.98",
+                intensity="grad=0.90",
+                reset_e="grad=0",
+                reset_ch="grad=0",
             ),
             Machine.ATF2_EXT_RFT: MachineSettings(
                 energy="grad=0.98",
