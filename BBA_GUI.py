@@ -68,15 +68,15 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
         self._machine_settings={
             Machine.ATF2_DR: MachineSettings(
-                energy="rel_phase=5",
-                intensity="laserintensity=0.05",
-                reset_e="rel_phase=0",
+                energy="delta_freq=5",
+                intensity="laserintensity=0.15",
+                reset_e="delta_freq=0",
                 reset_ch="laserintensity=0.1",
             ),
             Machine.ATF2_EXT: MachineSettings(
                 energy="delta_freq=-2",
                 intensity="laserintensity=0.15",
-                reset_e="rel_phase=0",
+                reset_e="delta_freq=0",
                 reset_ch="laserintensity=0.1",
             ),
             Machine.ATF2_LINAC: MachineSettings(

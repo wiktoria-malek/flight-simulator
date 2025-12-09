@@ -456,7 +456,7 @@ class MainWindow(QMainWindow):
         self.worker.progress.connect(self._update_progress)
 
         self.thread.start()
-#
+
     def __stop_button_clicked(self):
         if self.worker:
             self.__set_status_in_title("[Stopping...]")
@@ -515,6 +515,6 @@ dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
 dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
 ## Main Window
-window = MainWindow(I, dir_name)
+window = MainWindow(interface=I, dir_name=dir_name)
 window.show()
 sys.exit(app.exec())
