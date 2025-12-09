@@ -74,7 +74,8 @@ class InterfaceATF2_DR:
         PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)
 
-        PV('RAMP:MI2:ONOFF_SW').put(1)
+        PV('RAMP:PL4:ONOFF_SW').put(1)
+        # PV('RAMP:MI2:ONOFF_SW').put(1)
         time.sleep(2)
 
     def reset_energy(self,**kwargs):
@@ -156,7 +157,6 @@ class InterfaceATF2_DR:
             tmit.append(a[:, 3])
             time.sleep(1)
         names = [ self.bpms ] if type(self.bpms) == str else self.bpms
-        print(x)
         x = np.vstack(x) / 1e3 # mm
         y = np.vstack(y) / 1e3 # mm
 

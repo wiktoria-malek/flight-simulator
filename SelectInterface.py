@@ -95,7 +95,7 @@ class InterfaceSelectionDialog(QDialog):
                 case 'InterfaceATF2_DR':
                     from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
                     globals()['InterfaceATF2_DR'] = InterfaceATF2_DR
-                    self.selected_interface = InterfaceATF2_DR(nsamples=1)
+                    self.selected_interface = InterfaceATF2_DR(nsamples=10)
 
                 case 'InterfaceATF2_Ext':
                     from Interfaces.ATF2.InterfaceATF2_Ext import InterfaceATF2_Ext

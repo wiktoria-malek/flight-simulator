@@ -237,10 +237,6 @@ class DFS_WFS_Correction_BBA():
             [R2yx, R2yy],
         ])
 
-        R_nom = R0
-        R_disp = R1 - R0
-        R_wake = R2 - R0
-
         Axx=[]
         Ayy=[]
 
@@ -260,31 +256,3 @@ class DFS_WFS_Correction_BBA():
         Ayy = np.vstack(Ayy)
 
         return Axx, Ayy, B0x, B0y
-
-    def _get_dispersion_from_twiss_file(self):
-        # madx
-        corrs, bpms = self._get_selection()
-        with open('Data/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
-            # lines=file.readlines()
-            lines = [line.strip() for line in file if line.strip()]
-
-        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
-        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
-        columns = lines[star_symbol].lstrip("*").split()
-
-        DX_column = columns.index("DX")
-        DY_column = columns.index("DY")
-        elements_names = columns.index("NAME")
-
-        bpms_dx, bpms_dy = {}, {}
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            bpms_name = data[elements_names].strip('"')
-
-            bpms_dx[bpms_name] = float(data[DX_column])
-            bpms_dy[bpms_name] = float(data[DY_column])
-
-        target_disp_x = np.array([bpms_dx.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)  # m
-        target_disp_y = np.array([bpms_dy.get(bpm, 0.0) for bpm in bpms]).reshape(-1, 1)  # m
-
-        return target_disp_x, target_disp_y

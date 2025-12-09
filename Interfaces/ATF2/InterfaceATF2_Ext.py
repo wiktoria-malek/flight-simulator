@@ -76,7 +76,8 @@ class InterfaceATF2_Ext:
         PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)
 
-        PV('RAMP:MI2:ONOFF_SW').put(1)
+        # PV('RAMP:MI2:ONOFF_SW').put(1)
+        PV('RAMP:PL4:ONOFF_SW').put(1)
         time.sleep(2)
 
     def reset_energy(self,**kwargs):

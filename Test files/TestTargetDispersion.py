@@ -27,6 +27,7 @@ print('disp y @ MB1X = ', mb1x_disp_y, ' m')
 # TEST 2 - Read several bpms
 names = I.get_bpms_names()
 disp_x, disp_y = I.get_target_dispersion(names[:5])
+print('name of bpms = ', names)
 print('disp x first 5 BPMS = ', disp_x, ' m')
 print('disp y first 5 BPMS = ', disp_y, ' m')
 

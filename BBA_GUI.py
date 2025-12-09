@@ -359,15 +359,17 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     break
                 self._step = False
                 # nominal
-                if w1>0:
-                    print("Measuring orbit")
-                    self.log("Measuring orbit")
-                    self.S.pull(self.interface)
-                    O0 = self.S.get_orbit(bpms)
-                    O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
-                    O0y = O0['y'].reshape(-1, 1)
-                else:
-                    O0y=O0x=None
+                print("Measuring orbit")
+                self.log("Measuring orbit")
+                self.S.pull(self.interface)
+                print('State::pull done')
+                O0 = self.S.get_orbit(bpms)
+                O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
+                O0y = O0['y'].reshape(-1, 1)
+                
+                if it == 0:
+                    B0x = O0x
+                    B0y = O0y
 
                 # dfs
                 if w2>0:
@@ -404,17 +406,21 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     Bx.append(wgt_orb*(O0x-B0x))
                     By.append(wgt_orb*(O0y-B0y))
 
+                print(Bx[-1].shape)
                 if w2>0 and O1x is not None:
                     Bx.append(wgt_dfs*(O1x-O0x))
                     By.append(wgt_dfs*(O1y-O0y))
 
+                print(Bx[-1].shape)
                 if w3>0 and O2x is not None:
                     By.append(wgt_wfs*(O2y-O0y))
                     Bx.append(wgt_wfs*(O2x-O0x))
 
+                print(Bx[-1].shape)
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
 
+                print(' AAAA ')
                 Axx[np.isnan(Axx)] = 0
                 Ayy[np.isnan(Ayy)] = 0
                 Axx[np.isnan(Bx.ravel()),:] =0
@@ -454,15 +460,18 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     By[np.isnan(By)] = 0
                     return float(np.linalg.norm(Oy - By))
 
+                print(' AAAA1 ')
                 if w1>0:
                     self._hist_orbit_x.append(filtering_norm_x(O0x,B0x))
                     self._hist_orbit_y.append(filtering_norm_y(O0y,B0y))
                     self._hist_orbit.append(filtering_norm_x(O0x,B0x) + filtering_norm_y(O0y,B0y))
 
+                print(' AAAA2 ')
                 if w2>0 and O1x is not None:
                     self._hist_disp_x.append(filtering_norm_x(O0x,O1x))
                     self._hist_disp_y.append(filtering_norm_y(O0y,O1y))
                     self._hist_disp.append(filtering_norm_x(O0x,O1x) + filtering_norm_y(O0y,O1y))
+                print(' AAAA3 ')
                 if w3>0 and O2x is not None:
                     self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
                     self._hist_wake_y.append(filtering_norm_y(O0y,O2y))
