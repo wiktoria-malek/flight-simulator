@@ -157,12 +157,14 @@ class InterfaceSelectionDialog(QDialog):
         return super().eventFilter(obj, event)
 
 def choose_acc_and_interface(parent=None):
+    '''
     acc_dialog = SelectAcc(parent=parent)
     if acc_dialog.exec():
         accelerator = acc_dialog.selected_machine
     else:
         return None
-
+    '''
+    accelerator = 'ATF2'
     interface_dialog=InterfaceSelectionDialog(accelerator,parent)
     if interface_dialog.exec():
         return interface_dialog.selected_interface

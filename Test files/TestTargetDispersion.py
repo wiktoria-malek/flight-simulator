@@ -9,12 +9,12 @@ import numpy as np
 import glob
 import os
 
-if 0:
+if 1:
     from Interfaces.ATF2.InterfaceATF2_DR_RFTrack import InterfaceATF2_DR_RFTrack
     I = InterfaceATF2_DR_RFTrack()
-
-from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
-I = InterfaceATF2_Ext_RFTrack()
+else:
+    from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
+    I = InterfaceATF2_Ext_RFTrack()
 
 project_name = I.get_name()
 print(f"Selected interface: {project_name}")
