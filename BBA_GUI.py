@@ -9,8 +9,8 @@ matplotlib.use("QtAgg")
 from enum import Enum
 from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from ChiSquaredPopup_BBA import ChiSquaredWindow
 from LogConsole_BBA import LogConsole
 from SaveOrLoad_BBA import SaveOrLoad_BBA
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
@@ -46,7 +46,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._hist_orbit_x,self._hist_orbit_y = [],[]
         self._hist_disp_x,self._hist_disp_y = [],[]
         self._hist_wake_x,self._hist_wake_y = [],[]
-        self._chi_dlg = None
         self.log_console=None
         self.show_response_matrix=None
         self._setup_canvases()
@@ -61,8 +60,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             self.pushButton_9.clicked.connect(self._pick_and_load_disp_data)
         if hasattr(self, "pushButton_10"):  # wfs
             self.pushButton_10.clicked.connect(self._pick_and_load_wake_data)
-        if hasattr(self, "popup_button"):
-            self.popup_button.clicked.connect(self._show_chi_squared_graphs)
         if hasattr(self, "clear_graphs_button"):
             self.clear_graphs_button.clicked.connect(self._clear_graphs)
         if hasattr(self, "pushButton_11"):
@@ -202,11 +199,13 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         def install(host):
             fig = Figure(figsize=(5, 2.4), tight_layout=True)
             canvas = FigureCanvas(fig)
+            toolbar = NavigationToolbar(canvas, host)
             layout = host.layout()
             if layout is None:
                 from PyQt6.QtWidgets import QVBoxLayout
                 layout = QVBoxLayout(host)
                 layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(toolbar)
             layout.addWidget(canvas)
             ax = fig.add_subplot(111)
             return fig, canvas,ax
@@ -330,9 +329,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             self._cancel = False
             w1, w2, w3, rcond, iters, gain = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
-
-            if getattr(self, "_chi_dlg", None):
-                self._chi_dlg.set_weights(w1, w2, w3)
 
             corrs, bpms = self._get_selection()
 
@@ -494,17 +490,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._cancel = True
         QMessageBox.information(self, "Correction", "Stop requested. Finishing current iteration...")
         self.log("Stop requested. Finishing current iteration...")
-
-    def _show_chi_squared_graphs(self):
-        if getattr(self, "_chi_dlg", None) is None:
-            self._chi_dlg = ChiSquaredWindow(self)
-        w1, w2, w3, *_ = self._read_params()
-        self._chi_dlg.set_weights(w1, w2, w3)
-        self._chi_dlg.info.setText = f"w1={w1:g}, w2={w2:g}, w3={w3:g}"
-        self._chi_dlg.calculating_chi(self._hist_orbit, self._hist_disp, self._hist_wake)
-        self._chi_dlg.show()
-        self._chi_dlg.raise_()  # top of the stacking order
-        self._chi_dlg.activateWindow()  # giving it a keyboard focus
 
     def _show_console_log(self):
         if self.log_console is None:

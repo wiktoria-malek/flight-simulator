@@ -225,6 +225,11 @@
                   <string>Changed intensity</string>
                  </property>
                 </item>
+                <item>
+                 <property name="text">
+                  <string>All modes at once</string>
+                 </property>
+                </item>
                </widget>
               </item>
               <item>
@@ -236,28 +241,21 @@
                  </size>
                 </property>
                 <property name="text">
-                 <string>Cycle mode</string>
+                 <string>Number of cycles</string>
                 </property>
                </widget>
               </item>
               <item>
-               <widget class="QComboBox" name="cycle_mode_combobox">
+               <widget class="QLineEdit" name="niter_number">
                 <property name="maximumSize">
                  <size>
-                  <width>200</width>
+                  <width>150</width>
                   <height>16777215</height>
                  </size>
                 </property>
-                <item>
-                 <property name="text">
-                  <string>Repeat all</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
-                  <string>Repeat selected</string>
-                 </property>
-                </item>
+                <property name="text">
+                 <string>3</string>
+                </property>
                </widget>
               </item>
              </layout>

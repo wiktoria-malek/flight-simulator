@@ -264,7 +264,7 @@ class DFS_WFS_Correction_BBA():
     def _get_dispersion_from_twiss_file(self):
         # madx
         corrs, bpms = self._get_selection()
-        with open('Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
+        with open('Data/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
             # lines=file.readlines()
             lines = [line.strip() for line in file if line.strip()]
 

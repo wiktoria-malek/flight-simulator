@@ -349,7 +349,7 @@ class Emitt_Meas_Simulation:
 if __name__ == "__main__":
     w = Emitt_Meas_Simulation()
 
-    lattice, element_descriptions, start, end = w.obtaining_the_lattice(filename='Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
+    lattice, element_descriptions, start, end = w.obtaining_the_lattice(filename='Data/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
 
     entrance_name, entrance, otrs = w.get_data_from_twiss_file()
     Mx, My = w.compute_transport_matrix()

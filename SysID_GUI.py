@@ -25,6 +25,7 @@ class Mode(Enum):
     Orbit = "Orbit Correction"
     Dispersion = "Changed energy"
     Wakefield = "Changed intensity"
+    All = "All modes at once"
 
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
@@ -177,6 +178,7 @@ class MainWindow(QMainWindow):
         # SysID
         self.worker = None
         self.thread = None
+        self.counter=-1
 
         self.cwd = os.getcwd()
         self.interface = interface
@@ -242,7 +244,7 @@ class MainWindow(QMainWindow):
         self._machine_settings={
             Machine.ATF2_DR: MachineSettings(
                 energy="rel_phase=5",
-                intensity="laser_intensity=0.1, ang_offset=2.0",
+                intensity="laserintensity=0.1, ang_offset=2.0",
                 reset_e="rel_phase=0",
                 reset_ch="laserintensity=0.1",
             ),
@@ -293,6 +295,10 @@ class MainWindow(QMainWindow):
             self.change_energy_settings.setText("")
             self.change_intensity_settings.setText(self.appropriate_settings_intensity)
 
+        elif self.mode==Mode.All:
+            self.change_energy_settings.setText("")
+            self.change_intensity_settings.setText("")
+            self.counter+=1
     def __save_correctors_button_clicked(self):
         dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
@@ -353,13 +359,48 @@ class MainWindow(QMainWindow):
     def __clear_bpms_button_clicked(self):
         self.bpms_list.clearSelection()
 
+    def _read_all_parameters(self,text):
+        text = text.strip()
+        params = {}
+        for p in text.split(","):
+            p = p.strip()
+            if not p:
+                continue
+            k,v = p.split("=",1)
+            k = k.strip()
+            v = v.strip()
+            try:
+                params[k] = float(v)
+            except ValueError:
+                raise ValueError(f"Not a number encountered in {p}")
+        return params
+
+    def _read_change_intensity(self):
+        text = self.change_intensity_settings.text()
+        return self._read_all_parameters(text)
+
+    def _read_change_energy(self):
+        text = self.change_energy_settings.text()
+        return self._read_all_parameters(text)
+
     def __start_button_clicked(self):
+        # if self.mode == Mode.All:
+        #     for mode in (Mode.Orbit, Mode.Dispersion, Mode.Wakefield):
+        #
+        self.S = State(interface=self.interface)
+        self.S.save(basename='machine_status')
         if self.mode==Mode.Orbit:
             print("Orbit mode active.")
+
         elif self.mode==Mode.Dispersion:
             print("Dispersion mode active.")
+            dfs_params_change = self._read_change_energy()
+            self.interface.change_energy(**dfs_params_change)
+
         elif self.mode==Mode.Wakefield:
             print("Wakefield mode active.")
+            wfs_params_change = self._read_change_intensity()
+            self.interface.change_intensity(**wfs_params_change)
 
         self.progressBar.setValue(0)
         if self.thread and self.thread.isRunning():
@@ -383,21 +424,19 @@ class MainWindow(QMainWindow):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
 
-        self.S = State(interface=self.interface)
-        self.S.save(basename='machine_status')
 
         kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
         max_osc_h = self.horizontal_excursion_spinbox.value()
         max_osc_v = self.vertical_excursion_spinbox.value()
         max_curr_h = self.max_horizontal_current_spinbox.value()
         max_curr_v = self.max_vertical_current_spinbox.value()
-        Niter = 3
+        Niter = int(self.niter_number.text())
+        print(f"Niter: {Niter}")
 
         self.thread = QThread()
         self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
         self.worker.moveToThread(self.thread)
 
-        #self.worker.scale_E=0.98
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
@@ -425,10 +464,6 @@ class MainWindow(QMainWindow):
             self.progressBar.setValue(0)
         self.__set_status_in_title("[Idle]")
         print('SysID stopped.')
-        # print("Restoring initial correctors' settings...")
-        # selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
-        # self.interface.push(selected_correctors, self.S.get_correctors(selected_correctors)['bdes'])
-        # print("Restored initial correctors' settings.")
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()
@@ -449,7 +484,6 @@ class MainWindow(QMainWindow):
         if not folder:
             return
         self.working_directory_input.setText(folder)
-        #QMessageBox.information(self.working_directory_dialog, "Data directory selected", self.working_directory_dialog)
 
 
 ## MAIN
