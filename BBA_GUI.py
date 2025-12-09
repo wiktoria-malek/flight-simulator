@@ -37,7 +37,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.dir_name = dir_name
         self._cancel = False
         self._number_re = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
-        self.S = State(interface=interface)
+        self.S = State(interface=self.interface)
         ui_path = os.path.join(os.path.dirname(__file__), "BBA_GUI.ui")
         uic.loadUi(ui_path, self)
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
@@ -345,7 +345,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             # grad = self._read_change_energy()
             # dP_P = grad - 1
 
-            target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
+            # TO DO target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
 
