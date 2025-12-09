@@ -456,7 +456,7 @@ class MainWindow(QMainWindow):
         self.worker.progress.connect(self._update_progress)
 
         self.thread.start()
-
+#
     def __stop_button_clicked(self):
         if self.worker:
             self.__set_status_in_title("[Stopping...]")
