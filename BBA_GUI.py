@@ -65,7 +65,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             self.pushButton_11.clicked.connect(self.load_session_settings)
 
         self.modes= [ 'Orbit', 'Dispersion', 'Wakefield']
-
+#
         self._machine_settings={
             Machine.ATF2_DR: MachineSettings(
                 energy="delta_freq=5",
