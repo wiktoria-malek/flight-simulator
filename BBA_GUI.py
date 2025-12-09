@@ -9,7 +9,6 @@ matplotlib.use("QtAgg")
 from enum import Enum
 from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from LogConsole_BBA import LogConsole
 from SaveOrLoad_BBA import SaveOrLoad_BBA
@@ -199,13 +198,11 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         def install(host):
             fig = Figure(figsize=(5, 2.4), tight_layout=True)
             canvas = FigureCanvas(fig)
-            toolbar = NavigationToolbar(canvas, host)
             layout = host.layout()
             if layout is None:
                 from PyQt6.QtWidgets import QVBoxLayout
                 layout = QVBoxLayout(host)
                 layout.setContentsMargins(0, 0, 0, 0)
-            layout.addWidget(toolbar)
             layout.addWidget(canvas)
             ax = fig.add_subplot(111)
             return fig, canvas,ax
