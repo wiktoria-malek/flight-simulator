@@ -15,11 +15,14 @@ class InterfaceATF2_DR:
  'MB5R', 'MB6R', 'ZV3R', 'ZH3R', 'MB7R', 'MB8R', 'ZV4R', 'ZH4R',
  'MB9R', 'MB10R', 'ZV5R', 'ZH5R', 'MB11R', 'MB12R', 'ZV6R', 'ZH6R',
  'MB13R', 'MB14R', 'ZV7R', 'ZH7R', 'MB15R', 'MB16R', 'ZV8R', 'ZH8R',
- 'MB17R', 'MB18R', 'ZV9R', 'ZH9R', 'MB19R', 'MBX1', 'MBX2', 'MB21R', 'MB22R', 'ZH10R', 'ZV10R',
- 'MB23R', 'ZH11R', 'MB24R','ZV11R', 'MB25R', 'ZH12R', 'MB26R','ZV12R',  
+ 'MB17R', 'MB18R', 'ZV9R', 'ZH9R', 'MB19R', 'MBX1', 'MBX2', 'MB21R', 'MB22R', # 'ZH10R', 
+ 'ZV10R',
+ 'MB23R', 'ZH11R', 'MB24R','ZV11R', 'MB25R', # 'ZH12R',
+ 'MB26R','ZV12R',  
  'MB27R', 'ZV13R', 'MB28R', 'ZH13R', 'MB29R', 'ZV14R', 'MB30R', 'ZH14R', 'ZV15R',
- 'MB31R', 'ZV16R', 'ZH15R', 'MB32R', 'MB33R', 'ZV17R', 'ZH16R',
- 'MB34R', 'ZV18R', 'MB35R', 'ZH17R', 'MB36R', 'MB37R', 'ZV19R', 'ZH18R',
+ 'MB31R', # 'ZV16R', 'ZH15R',
+ 'MB32R', 'MB33R', 'ZV17R', 'ZH16R',
+ 'MB34R', 'ZV18R', 'MB35R', 'ZH17R', 'MB36R', 'MB37R', 'ZV19R', # 'ZH18R',
  'MB38R', 'MB39R', 'ZV20R', 'ZH19R', 'MB40R', 'MB41R', 'ZV21R', 'ZH20R',
  'MB42R', 'MB43R', 'ZV22R', 'ZH21R', 'MB44R', 'MB45R', 'ZV23R', 'ZH22R',
  'MB46R', 'MB47R', 'ZV24R', 'ZH23R', 'MB48R', 'MB49R', 'ZV25R', 'ZH24R',
@@ -29,14 +32,18 @@ class InterfaceATF2_DR:
  'MB62R', 'MB63R', 'ZV32R', 'ZH31R', 'MB64R', 'MB65R', 'ZH32R', 'ZV33R',
  'MB66R', 'ZV34R', 'MB67R', 'ZH33R', 'MB68R', 'MB69R', 'ZH34R', 'ZV35R',
  'MB70R', 'ZV36R', 'MB71R', 'ZH35R', 'ZV37R', 'MB72R', 'ZH36R', 'MB73R', 'ZV38R',
- 'MB74R', 'ZH37R', 'ZV39R', 'MB76R', 'ZV40R', 'MB77R', 'ZH38R',
- 'MB78R', 'ZH41R', 'MB79R', 'ZV39R', 'ZH42R', 'MB80R', 'ZV43R', 'ZH40R',
- 'MB81R','MB82R', 'ZV44R', 'ZH41R', 'MB83R', 'ZV45R', 'MB84R', 'ZH42R', 'MB85R', 'MB86R',
+ 'MB74R', 'ZH37R', # 'ZV39R',
+ 'MB76R', 'ZV40R', 'MB77R', # 'ZH38R',
+ 'MB78R', 'ZH41R', 'MB79R', 'ZV39R', # 'ZH42R',
+ 'MB80R', # 'ZV43R',
+ 'ZH40R', 'MB81R','MB82R', 'ZV44R', 'ZH41R', 'MB83R', 'ZV45R', 'MB84R', 'ZH42R', 'MB85R', 'MB86R',
  'ZV46R', 'ZH43R', 'MB87R', 'MB88R', 'ZV47R', 'ZH44R', 'MB89R', 'MB90R',
  'ZV48R', 'ZH45R', 'MB91R', 'MB92R', 'ZV49R', 'ZH46R', 'MB93R', 'MB94R',
- 'ZV50R', 'ZH47R', 'MB95R', 'MB96R', 'ZV51R', 'ZH48R', 'MB97R', 'MB98R'
+ 'ZV50R', 'ZH47R', 'MB95R', 'MB96R', 'ZV51R', # 'ZH48R',
+ 'MB97R', 'MB98R'
         ]
 
+        
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         monitors = [
@@ -46,7 +53,7 @@ class InterfaceATF2_DR:
 'MB34R', 'MB35R', 'MB36R', 'MB37R','MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 
 'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R','MB54R', 'MB55R', 'MB56R', 'MB57R', 'MB58R', 'MB59R', 'MB60R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB70R', 'MB71R', 'MB72R', 'MB73R', 'MB74R', 'MB76R', 'MB77R', 'MB78R', 'MB79R', 'MB80R', 'MB81R','MB82R', 'MB83R', 'MB84R', 'MB85R', 'MB86R', 'MB87R', 'MB88R', 'MB89R', 'MB90R','MB91R', 'MB92R', 'MB93R', 'MB94R','MB95R', 'MB96R', 'MB97R', 'MB98R'
         ]
-        monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB71R']
+        monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R' ] #, 'MB71R']
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
         # Check if the bpms in the config files are known to Epics
@@ -60,6 +67,10 @@ class InterfaceATF2_DR:
         self.sequence = sequence_filtered
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
+        
+        even_corrs = [name for name in self.corrs if (int(name[-2]) % 2 == 0)]
+        self.corrs = even_corrs
+
         # Index of the selected BPMs in the Epics PV ATF2:monitors
         self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
@@ -74,9 +85,16 @@ class InterfaceATF2_DR:
         PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)
 
-        PV('RAMP:PL4:ONOFF_SW').put(1)
         # PV('RAMP:MI2:ONOFF_SW').put(1)
+        PV('RAMP:PL4:ONOFF_SW').put(1)
+        delta_freq = 4
         time.sleep(2)
+
+        DR_freq = 714e3; # 714 MHz in kHz
+        DR_momentum_compaction = 2.1e-3
+
+        dP_P = -delta_freq / DR_freq / DR_momentum_compaction
+        return dP_P
 
     def reset_energy(self,**kwargs):
         PV('RAMP:CONTROL_OFF_SW').put(0)
@@ -113,6 +131,29 @@ class InterfaceATF2_DR:
 
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
+
+    def get_target_dispersion(self, names=None):
+        with open('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws', "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+
+        DX_column = columns.index("DX")
+        DY_column = columns.index("DY")
+        elements_names = columns.index("NAME")
+
+        target_disp_x, target_disp_y = [], []
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            bpms_name = data[elements_names].strip('"')
+
+            if names == None or bpms_name in names:
+                target_disp_x.append(float(data[DX_column]))
+                target_disp_y.append(float(data[DY_column]))
+
+        return target_disp_x, target_disp_y
 
     def get_icts(self):
         print("Reading ict's...")

@@ -43,14 +43,25 @@ class State:
         return self.vcorrectors_names
 
     def get_bpms(self, names=None):
+        print('get_bpms = ', names)
         if names is not None:
+            print('get_bpms => ', self.bpms['names'])
             bpm_indexes = np.array([index for index, string in enumerate(self.bpms['names']) if string in names])
-            bpms = {
-                "names": np.array(self.bpms['names'])[bpm_indexes],
-                "x": np.array(self.bpms['x'])[:,bpm_indexes],
-                "y": np.array(self.bpms['y'])[:,bpm_indexes],
-                "tmit": np.array(self.bpms['tmit'])[:,bpm_indexes],
-            }
+            if len(bpm_indexes)>0:
+                print('get_bpms = ', names)
+                print('names = ', np.array(self.bpms['names'])[bpm_indexes])
+                print('x = ', np.array(self.bpms['x']))
+                print('y = ', np.array(self.bpms['y'])[:,bpm_indexes])
+                print('tmit = ', np.array(self.bpms['tmit'])[:,bpm_indexes])
+                bpms = {
+                    "names": np.array(self.bpms['names'])[bpm_indexes],
+                    "x": np.array(self.bpms['x'])[:,bpm_indexes],
+                    "y": np.array(self.bpms['y'])[:,bpm_indexes],
+                    "tmit": np.array(self.bpms['tmit'])[:,bpm_indexes],
+                }
+                print(bpms)
+            else:
+                print('State::get_bpms(): name list empty')
         else:
             bpms = self.bpms
         return bpms         
@@ -66,16 +77,27 @@ class State:
         return icts         
 
     def get_orbit(self, names=None):
+        print('State::get_orbit0')
         bpms = self.get_bpms(names)
+        print('State::get_orbit1')
         x = np.mean(bpms['x'],axis=0) # mm
+        print('State::get_orbit2')
         y = np.mean(bpms['y'],axis=0) # mm
+        print('State::get_orbit3')
         stdx = np.std(bpms['x'],axis=0) # mm #standard deviation
+        print('State::get_orbit4')
         stdy = np.std(bpms['y'],axis=0) # mm
+        print('State::get_orbit5')
         tmit = np.mean(bpms['tmit'],axis=0)
+        print('State::get_orbit6')
         faulty = (x == 0.0) & (y == 0.0)
+        print('State::get_orbit7')
         x[faulty] = np.nan
+        print('State::get_orbit8')
         y[faulty] = np.nan
+        print('State::get_orbit9')
         orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names) }
+        print('State::get_orbit1')
         return orbit
 
     """"

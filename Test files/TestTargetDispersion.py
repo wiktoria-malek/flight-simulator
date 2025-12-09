@@ -20,7 +20,7 @@ project_name = I.get_name()
 print(f"Selected interface: {project_name}")
 
 # TEST 1 - Read one bpm
-mb1x_disp_x, mb1x_disp_y = I.get_target_dispersion("MB1X")
+mb1x_disp_x, mb1x_disp_y = I.get_target_dispersion("MB21R")
 print('disp x @ MB1X = ', mb1x_disp_x, ' m')
 print('disp y @ MB1X = ', mb1x_disp_y, ' m')
 

@@ -345,7 +345,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             # grad = self._read_change_energy()
             # dP_P = grad - 1
 
-            # TO DO target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
+            target_disp_x, target_disp_y = self.interface.get_target_dispersion(bpms)
+
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
 
@@ -355,21 +356,24 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 return max(-max_val, min(val, max_val))
 
             for it in range(iters):
+                print(f'Iteration = {it}')
                 if self._cancel:
                     break
                 self._step = False
                 # nominal
-                print("Measuring orbit")
-                self.log("Measuring orbit")
-                self.S.pull(self.interface)
-                print('State::pull done')
-                O0 = self.S.get_orbit(bpms)
-                O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
-                O0y = O0['y'].reshape(-1, 1)
-                
-                if it == 0:
-                    B0x = O0x
-                    B0y = O0y
+                if w1>0:
+                    print("Measuring orbit")
+                    self.log("Measuring orbit")
+                    self.S.pull(self.interface)
+                    print('State::pull done')
+                    O0 = self.S.get_orbit(bpms)
+                    print('State::get_orbit done')
+                    O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
+                    O0y = O0['y'].reshape(-1, 1)
+                    print('Reshape done')
+                    if it == 0:
+                        B0x = O0x
+                        B0y = O0y
 
                 # dfs
                 if w2>0:
@@ -377,14 +381,18 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self.log("Measuring dispersion")
                     dfs_params_change = self._read_change_energy()
                     dfs_params_reset = self._read_reset_energy()
-                    self.interface.change_energy(**dfs_params_change)
+                    dP_P = self.interface.change_energy(**dfs_params_change)
                     self.S.pull(self.interface)
                     self.interface.reset_energy(**dfs_params_reset)
                     O1 = self.S.get_orbit(bpms)
                     O1x = O1['x'].reshape(-1, 1)
                     O1y = O1['y'].reshape(-1, 1)
+                    B1x = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1,1)
+                    B1y = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1,1)
+                    print('B1x = ', B1x)
                 else:
                     O1x=O1y=None
+                    B1x=B1y=None
 
                 # wfs
                 if w3>0:
@@ -408,8 +416,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 print(Bx[-1].shape)
                 if w2>0 and O1x is not None:
-                    Bx.append(wgt_dfs*(O1x-O0x))
-                    By.append(wgt_dfs*(O1y-O0y))
+                    #Bx.append(wgt_dfs*((O1x-O0x) - (B1x-B0x)))
+                    #By.append(wgt_dfs*((O1y-O0y) - (B1y-B0y)))
+                    Bx.append(wgt_dfs*((O1x-O0x)))
+                    By.append(wgt_dfs*((O1y-O0y)))
 
                 print(Bx[-1].shape)
                 if w3>0 and O2x is not None:
