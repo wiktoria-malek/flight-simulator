@@ -349,6 +349,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if self._cancel:
                     break
                 self._step = False
+
                 # nominal
                 print("Measuring orbit")
                 self.log("Measuring orbit")
