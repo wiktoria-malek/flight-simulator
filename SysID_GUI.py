@@ -393,7 +393,7 @@ class MainWindow(QMainWindow):
             with open(filename, 'w') as f:
                 for item in selected_bpms:
                     f.write(f"{item.text()}\n")
-
+#
     def __load_bpms_button_clicked(self):
         dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
