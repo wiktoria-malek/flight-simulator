@@ -89,6 +89,7 @@ class Worker(QObject):
         for iter in range(self.Niter):
             if self.running == False:
                 break
+
             for icorr, corrector in enumerate(self.correctors):
                 if self.running == False:
                     break
@@ -99,37 +100,50 @@ class Worker(QObject):
                 if not self.running:
                     break
 
+                corr_changed = False
+
                 print(f"Corrector {corrector} '+' excitation...")
-                curr_p = corr['bdes'] + kick
-                if corrector in S.get_hcorrectors_names():
-                    curr_p = clamp(curr_p, self.max_curr_h)
+                filename_p=f'DATA_{corrector}_p{iter:04d}.pkl'
+                if not os.path.isfile(filename_p):
+                    curr_p = corr['bdes'] + kick
+                    if corrector in S.get_hcorrectors_names():
+                        curr_p = clamp(curr_p, self.max_curr_h)
+                    else:
+                        curr_p = clamp(curr_p, self.max_curr_v)
+                    I.push(corrector, curr_p)
+                    corr_changed = True
+
+                    if not self.running:
+                        break
+
+                    S.pull(I)
+                    S.save(filename=filename_p)
                 else:
-                    curr_p = clamp(curr_p, self.max_curr_v)
-                I.push(corrector, curr_p)
-
-                if not self.running:
-                    break
-
-                S.pull(I)
-                S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
+                    S.load(filename_p)
                 Op = S.get_orbit(self.bpms)
 
                 print(f"Corrector {corrector} '-' excitation...")
-                curr_m = corr['bdes'] - kick
-                if corrector in S.get_hcorrectors_names():
-                    curr_m = clamp(curr_m, self.max_curr_h)
+                filename_m=f'DATA_{corrector}_m{iter:04d}.pkl'
+                if not os.path.isfile(filename_m):
+                    curr_m = corr['bdes'] - kick
+                    if corrector in S.get_hcorrectors_names():
+                        curr_m = clamp(curr_m, self.max_curr_h)
+                    else:
+                        curr_m = clamp(curr_m, self.max_curr_v)
+                    I.push(corrector, curr_m)
+                    corr_changed = True
+
+                    if not self.running:
+                        break
+
+                    S.pull(I)
+                    S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
                 else:
-                    curr_m = clamp(curr_m, self.max_curr_v)
-                I.push(corrector, curr_m)
-
-                if not self.running:
-                    break
-
-                S.pull(I)
-                S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
+                    S.load(filename_m)
                 Om = S.get_orbit(self.bpms)
 
-                I.push(corrector, corr['bdes'])
+                if corr_changed:
+                    I.push(corrector, corr['bdes'])
 
                 Diff_x = (Op['x'] - Om['x']) / 2.0
                 Diff_y = (Op['y'] - Om['y']) / 2.0
