@@ -69,7 +69,7 @@ class InterfaceATF2_Ext:
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
-        self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
+        self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
 
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
@@ -89,8 +89,8 @@ class InterfaceATF2_Ext:
         time.sleep(2)
 
     def change_intensity(self):
-        print(f'Changing laser intensity to {laserintensity}...')
         new_laser_intensity = 0.15 # 0..1
+        print(f'Changing laser intensity to {new_laser_intensity}...')
         laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
@@ -169,11 +169,11 @@ class InterfaceATF2_Ext:
     
     def get_bpms(self):
         print('Reading bpms...')
-        p = PV('LINAC:monitors')
+        p = PV('ATF2:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
             print(f'Sample = {sample}')
-            a = p.get().reshape((-1, 20))
+            a = p.get().reshape((-1, 10))
             status = a[self.bpm_indexes, 0]
             # Set elements that are not equal to 1 to zero
             status[status != 1] = 0

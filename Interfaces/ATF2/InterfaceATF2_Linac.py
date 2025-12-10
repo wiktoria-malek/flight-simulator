@@ -71,7 +71,7 @@ class InterfaceATF2_Linac:
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
         self.phase_kl1 = PV('CM1L:phaseRead').get()
-        self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
+        self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
 
     def change_energy(self):
         pv = PV('CM1L:phaseWrite')
