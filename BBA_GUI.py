@@ -119,22 +119,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         else:
             self._step = True
 
-    def _read_all_parameters(self,text):
-        text = text.strip()
-        params = {}
-        for p in text.split(","):
-            p = p.strip()
-            if not p:
-                continue
-            k,v = p.split("=",1)
-            k = k.strip()
-            v = v.strip()
-            try:
-                params[k] = float(v)
-            except ValueError:
-                raise ValueError(f"Not a number encountered in {p}")
-        return params
-
     def _expand_data_path(self,path):
         home=os.path.expanduser("~")
         if path.startswith(home+os.sep): #the character used by the operating system to separate pathname components
@@ -254,22 +238,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         iters = geti("lineEdit_5", 10)
         gain = getf("lineEdit_6", 0.4)
         return orbit_w, disp_w, wake_w, rcond, iters, gain
-
-    def _read_reset_intensity(self):
-        text = self.wfs_reset_3.text()
-        return self._read_all_parameters(text)
-
-    def _read_change_intensity(self):
-        text = self.wfs_change_3.text()
-        return self._read_all_parameters(text)
-
-    def _read_change_energy(self):
-        text = self.dfs_change_3.text()
-        return self._read_all_parameters(text)
-
-    def _read_reset_energy(self):
-        text = self.dfs_reset_3.text()
-        return self._read_all_parameters(text)
 
     def _start_correction(self):
         try:
