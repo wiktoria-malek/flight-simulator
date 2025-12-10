@@ -419,12 +419,12 @@ class MainWindow(QMainWindow):
         elif self.mode==Mode.Dispersion:
             print("Dispersion mode active.")
             dfs_params_change = self._read_change_energy()
-            self.interface.change_energy(**dfs_params_change)
+            self.interface.change_energy()
 
         elif self.mode==Mode.Wakefield:
             print("Wakefield mode active.")
             wfs_params_change = self._read_change_intensity()
-            self.interface.change_intensity(**wfs_params_change)
+            self.interface.change_intensity()
 
         self.progressBar.setValue(0)
         if self.thread and self.thread.isRunning():

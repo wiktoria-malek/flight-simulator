@@ -73,27 +73,30 @@ class InterfaceATF2_Linac:
         self.phase_kl1 = PV('CM1L:phaseRead').get()
         self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
-    def change_energy(self,rel_phase=5, **kwargs):
+    def change_energy(self):
         pv = PV('CM1L:phaseWrite')
-        pv.put(self.phase_kl1+rel_phase)
+        rel_phase = 5
+        pv.put(self.phase_kl1+ref_phase)
         time.sleep(1)
+        dP_P = 0.0 # we don't really know it
+        return dP_P
         
-    def reset_energy(self,**kwargs):
+    def reset_energy(self):
         pv = PV('CM1L:phaseWrite')
         pv.put(self.phase_kl1)
         time.sleep(1)
 
-    def change_intensity(self, laserintensity,**kwargs):
+    def change_intensity(self):
         print(f'Changing laser intensity to {laserintensity}...')
-        self.laser_intensity = float(PV('RFGun:LaserIntensity1:Read').get())
-        laser_intensity = laserintensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
+        new_laser_intensity = 0.15 # 0..1
+        laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
         return self
 
-    def reset_intensity(self,**kwargs):
+    def reset_intensity(self):
         print('Resetting laser intensity...')
-        self.change_intensity(laserintensity=self.laser_intensity / 500)
+        PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity)
         return self
 
     def get_sequence(self, *args):

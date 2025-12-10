@@ -71,30 +71,32 @@ class InterfaceATF2_Ext:
         ]
         self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
-    def change_energy(self, delta_freq=None, **kwargs):
-      
+    def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)
-
-        # PV('RAMP:MI2:ONOFF_SW').put(1)
-        PV('RAMP:PL4:ONOFF_SW').put(1)
+        PV('RAMP:MI2:ONOFF_SW').put(1)
+        # PV('RAMP:PL4:ONOFF_SW').put(1)
         time.sleep(2)
+        DR_freq = 714e3; # 714 MHz in kHz
+        DR_momentum_compaction = 2.1e-3
+        dP_P = -delta_freq / DR_freq / DR_momentum_compaction
+        return dP_P
 
-    def reset_energy(self,**kwargs):
+    def reset_energy(self):
         PV('RAMP:CONTROL_OFF_SW').put(0)
         time.sleep(2)
 
-    def change_intensity(self, laserintensity,**kwargs):
+    def change_intensity(self):
         print(f'Changing laser intensity to {laserintensity}...')
-        self.laser_intensity = float(PV('RFGun:LaserIntensity1:Read').get())
-        laser_intensity = laserintensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
+        new_laser_intensity = 0.15 # 0..1
+        laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
         return self
 
-    def reset_intensity(self,**kwargs):
+    def reset_intensity(self):
         print('Resetting laser intensity...')
-        self.change_intensity(laserintensity=self.laser_intensity / 500)
+        PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity)
         return self
     
     def get_sequence(self):

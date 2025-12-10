@@ -24,6 +24,8 @@ class InterfaceATF2_Ext_RFTrack():
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples
+        self.dfs_test_energy = 0.98
+        self.wfs_test_charge = 0.90
         self.__setup_beam0()
         self.__track_bunch()
 
@@ -40,13 +42,12 @@ class InterfaceATF2_Ext_RFTrack():
         T.alpha_y = -1.907222942
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        Nparticles = 10000 # number of macroparticles
+        Nparticles = 1000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, Nparticles)
         
-    def __setup_beam1(self,scale):
+    def __setup_beam1(self):
         # Beam for DFS - Reduced energy
-        Pref= scale * self.Pref
-        #Pref = 0.98 * self.Pref # 98% of nominal energy
+        Pref = self.dfs_test_energy * self.Pref
         T = rft.Bunch6d_twiss()
         T.emitt_x = 5.2 # mm.mrad normalised emittance
         T.emitt_y = 0.03 # mm.mrad
@@ -56,13 +57,12 @@ class InterfaceATF2_Ext_RFTrack():
         T.alpha_y = -1.907222942
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        Nparticles = 10000 # number of macroparticles
+        Nparticles = 1000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
 
-    def __setup_beam2(self,scale):
+    def __setup_beam2(self):
         # Beam for WFS - Reduced bunch charge
-        population= scale * self.population
-        #population = 0.90 * self.population # 90% of nominal charge
+        population = self.wfs_test_charge * self.population
         T = rft.Bunch6d_twiss()
         T.emitt_x = 5.2 # mm.mrad normalised emittance
         T.emitt_y = 0.03 # mm.mrad
@@ -72,7 +72,7 @@ class InterfaceATF2_Ext_RFTrack():
         T.alpha_y = -1.907222942
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        Nparticles = 10000 # number of macroparticles
+        Nparticles = 1000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, Nparticles)
 
     def __track_bunch(self):
@@ -95,19 +95,21 @@ class InterfaceATF2_Ext_RFTrack():
         self.log(f"εy = {I.emitt_y}[mm.rad]")
         self.log(f"εz = {I.emitt_z}[mm.permille]")
 
-    def change_energy(self, grad=None, **kwargs):
-        self.__setup_beam1(grad)
+    def change_energy(self):
+        self.__setup_beam1()
+        self.__track_bunch()
+        dP_P = self.dfs_test_energy - 1.0
+        return dP_P
+
+    def reset_energy(self):
+        self.__setup_beam0()
         self.__track_bunch()
 
-    def reset_energy(self, grad=1,**kwargs):
-        self.__setup_beam0( )
+    def change_intensity(self): #reduced charge
+        self.__setup_beam2()
         self.__track_bunch()
 
-    def change_intensity(self, grad=None, **kwargs): #reduced charge
-        self.__setup_beam2(grad)
-        self.__track_bunch()
-
-    def reset_intensity(self, grad=1,**kwargs):
+    def reset_intensity(self):
         self.__setup_beam0()
         self.__track_bunch()
 
