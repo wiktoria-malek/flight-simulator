@@ -336,15 +336,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
             self.setWindowTitle("BBA_GUI - [Correction running]")
 
-            # DR_freq = 714e3; # 714 MHz in kHz
-            # DR_momentum_compaction = 2.1e-3
-
-            # dP_P = -deltafreq / DR_freq / DR_momentum_compaction
-            # if self._machine_settings==Machine.ATF2_LINAC:
-            #     cont
-            # grad = self._read_change_energy()
-            # dP_P = grad - 1
-
             # TO DO target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
@@ -420,7 +411,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
 
-                print(' AAAA ')
                 Axx[np.isnan(Axx)] = 0
                 Ayy[np.isnan(Ayy)] = 0
                 Axx[np.isnan(Bx.ravel()),:] =0
@@ -453,6 +443,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     Bx[np.isnan(Bx)] = 0
                     #By[np.isnan(By)] = 0
                     return float(np.linalg.norm(Ox - Bx))
+
                 def filtering_norm_y(Oy,By):
                     #Ox[np.isnan(Ox)] = 0
                     Oy[np.isnan(Oy)] = 0
@@ -460,18 +451,16 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     By[np.isnan(By)] = 0
                     return float(np.linalg.norm(Oy - By))
 
-                print(' AAAA1 ')
                 if w1>0:
                     self._hist_orbit_x.append(filtering_norm_x(O0x,B0x))
                     self._hist_orbit_y.append(filtering_norm_y(O0y,B0y))
                     self._hist_orbit.append(filtering_norm_x(O0x,B0x) + filtering_norm_y(O0y,B0y))
 
-                print(' AAAA2 ')
                 if w2>0 and O1x is not None:
                     self._hist_disp_x.append(filtering_norm_x(O0x,O1x))
                     self._hist_disp_y.append(filtering_norm_y(O0y,O1y))
                     self._hist_disp.append(filtering_norm_x(O0x,O1x) + filtering_norm_y(O0y,O1y))
-                print(' AAAA3 ')
+
                 if w3>0 and O2x is not None:
                     self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
                     self._hist_wake_y.append(filtering_norm_y(O0y,O2y))

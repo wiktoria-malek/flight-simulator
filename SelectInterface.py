@@ -110,17 +110,17 @@ class InterfaceSelectionDialog(QDialog):
                 case 'InterfaceATF2_DR_RFTrack':
                     from Interfaces.ATF2.InterfaceATF2_DR_RFTrack import InterfaceATF2_DR_RFTrack
                     globals()['InterfaceATF2_DR_RFTrack'] = InterfaceATF2_DR_RFTrack
-                    self.selected_interface = InterfaceATF2_DR_RFTrack(jitter=0.0, bpm_resolution=0.00, nsamples=1)
+                    self.selected_interface = InterfaceATF2_DR_RFTrack(jitter=0.0, bpm_resolution=0.1, nsamples=1)
+                    self.selected_interface.align_everything()
+                    self.selected_interface.misalign_quadrupoles()
+                    self.selected_interface.misalign_bpms()
 
                 case 'InterfaceATF2_Ext_RFTrack':
                     from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
                     globals()['InterfaceATF2_Ext_RFTrack'] = InterfaceATF2_Ext_RFTrack
-                    self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.00, nsamples=1)
-
-                    #TESTS:
-
+                    self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.0, bpm_resolution=0.1, nsamples=1)
                     self.selected_interface.align_everything()
-                    #self.selected_interface.misalign_quadrupoles()
+                    self.selected_interface.misalign_quadrupoles()
                     self.selected_interface.misalign_bpms()
 
 
