@@ -11,6 +11,12 @@ class InterfaceATF2_DR_RFTrack():
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.log = print
         self.lattice = rft.Lattice('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws')
+        for i,q in enumerate(self.lattice.get_quadrupoles()):
+            cx, cy = rft.Corrector(), rft.Corrector()
+            cx.set_name(f'ZH{i}R')
+            cy.set_name(f'ZV{i}R')
+            q.insert(cx)
+            q.insert(cy)
         self.lattice.set_bpm_resolution(bpm_resolution)
         for s in self.lattice['*OTR*']:
             screen = rft.Screen()

@@ -31,6 +31,7 @@ class Machine(Enum):
     ATF2_DR = "ATF2_DR"
     ATF2_EXT = "ATF2_Ext"
     ATF2_LINAC = "ATF2_Linac"
+    ATF2_DR_RFT = "ATF2_DR_RFT"
     ATF2_EXT_RFT = "ATF2_Ext_RFT"
 
 @dataclass()
@@ -160,6 +161,7 @@ class Worker(QObject):
 
         self.running = False
         self.finished.emit()
+        self.__set_status_in_title("[Idle]")
 
     def stop(self):
         self.running = False
@@ -260,6 +262,12 @@ class MainWindow(QMainWindow):
                 reset_e="rel_phase=0.0",
                 reset_ch="laserintensity=0.1",
             ),
+            Machine.ATF2_DR_RFT: MachineSettings(
+                energy="grad=0.98",
+                intensity="grad=0.90",
+                reset_e="grad=0",
+                reset_ch="grad=0",
+            ),
             Machine.ATF2_EXT_RFT: MachineSettings(
                 energy="grad=0.98",
                 intensity="grad=0.90",
@@ -273,7 +281,7 @@ class MainWindow(QMainWindow):
         self.appropriate_settings_reset_e=None
         self.appropriate_settings_reset_ch=None
         interface_name=interface.get_name()
-        machine=Machine(interface_name)
+        machine = Machine(interface_name)
         settings=self._machine_settings[machine]
         self.appropriate_settings_energy=settings.energy
         self.appropriate_settings_intensity=settings.intensity
@@ -387,6 +395,9 @@ class MainWindow(QMainWindow):
         # if self.mode == Mode.All:
         #     for mode in (Mode.Orbit, Mode.Dispersion, Mode.Wakefield):
         #
+        dir_name = self.working_directory_input.text()
+        os.makedirs (dir_name, exist_ok=True)
+        os.chdir (dir_name)
         self.S = State(interface=self.interface)
         self.S.save(basename='machine_status')
         if self.mode==Mode.Orbit:
