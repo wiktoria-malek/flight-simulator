@@ -45,14 +45,17 @@ class Worker(QObject):
     progress=pyqtSignal(int)
     finished = pyqtSignal()
 
-    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,output_dir):
+    def __init__(self, interface, state, correctors, bpms, hkicks,vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,output_dir):
         super().__init__()
         self.output_dir=output_dir
         self.interface = interface
         self.S = state
         self.correctors = correctors
+        self.hcorrs = I.get_hcorrectors_names()
+        self.vcorrs = I.get_vcorrectors_names()
         self.bpms = bpms
-        self.kicks = kicks
+        self.hkicks = hkicks
+        self.vkicks = vkicks
         self.max_osc_h = max_osc_h
         self.max_osc_v = max_osc_v
         self.max_curr_h = max_curr_h
@@ -72,7 +75,8 @@ class Worker(QObject):
         self.progress_value=0
         I = self.interface
         S = self.S
-        kicks = self.kicks
+        vkicks = self.vkicks
+        hkicks = self.hkicks
 
         def clamp(val, max_val):
             if max_val == 0.0:
@@ -83,37 +87,38 @@ class Worker(QObject):
             if self.running == False:
                 break
             for icorr, corrector in enumerate(self.correctors):
+                corr = S.get_correctors(corrector)
                 if self.running == False:
                     break
-
-                corr = S.get_correctors(corrector)
-                kick = kicks[icorr]
+                if corrector in S.get_hcorrectors_names():
+                    max_curr=self.max_curr_h
+                    kick=hkicks[icorr]
+                elif corrector in S.get_vcorrectors_names():
+                    max_curr=self.max_curr_v
+                    kick=vkicks[icorr]
 
                 if not self.running:
                     break
 
                 print(f"Corrector {corrector} '+' excitation...")
-                curr_p = corr['bdes'] + kick
-                if corrector in S.get_hcorrectors_names():
-                    curr_p = clamp(curr_p, self.max_curr_h)
-                else:
-                    curr_p = clamp(curr_p, self.max_curr_v)
+
+                #curr_p = corr['bdes'] + kick
+                #if corrector in S.get_hcorrectors_names():
+                curr_p = clamp(corr['bdes']+kick, max_curr)
+                #else:
+                #curr_p = clamp(curr_p, self.max_curr_v)
                 I.push(corrector, curr_p)
-
-                if not self.running:
-                    break
-
                 S.pull(I)
                 filename=os.path.join(self.output_dir,f'DATA_{corrector}_p{iter:04d}.pkl')
                 S.save(filename=filename)
                 Op = S.get_orbit(self.bpms)
 
                 print(f"Corrector {corrector} '-' excitation...")
-                curr_m = corr['bdes'] - kick
-                if corrector in S.get_hcorrectors_names():
-                    curr_m = clamp(curr_m, self.max_curr_h)
-                else:
-                    curr_m = clamp(curr_m, self.max_curr_v)
+                #curr_m = corr['bdes'] - kick
+                #if corrector in S.get_hcorrectors_names():
+                curr_m = clamp(corr['bdes']-kick, max_curr)
+                #else:
+                    #curr_m = clamp(curr_m, self.max_curr_v)
                 I.push(corrector, curr_m)
 
                 if not self.running:
@@ -140,18 +145,19 @@ class Worker(QObject):
                 if corrector in S.get_hcorrectors_names():
                     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
                     if np.max(np.abs(Diff_x_clean)) != 0.0:
-                        kicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
+                        hkicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
+                    hkicks[icorr] = 0.8 * hkicks[icorr] + 0.2 * kick
+
                 else:
                     Diff_y_clean = Diff_y[~np.isnan(Diff_y)]
                     if np.max(np.abs(Diff_y_clean)) != 0.0:
-                        kicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
+                        vkicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
+                    vkicks[icorr] = 0.8 * vkicks[icorr] + 0.2 * kick
 
-                kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
 
                 with open(os.path.join(self.output_dir,'kicks.txt'), 'w') as f:
-                    for c, k in zip(self.correctors, kicks):
-                        f.write(f'{c} {k}\n')
-
+                    for i, c in enumerate(self.correctors):
+                        f.write(f'{c} {hkicks[i]} {vkicks[i]}\n')
                 time.sleep(1)
 
         self.running = False
@@ -217,6 +223,7 @@ class MainWindow(QMainWindow):
         self.mode=Mode.Orbit
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
         self.initial_hkick_settings.setText("0.1")
+        self.initial_vkick_settings.setText("0.1")
 
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
@@ -252,7 +259,7 @@ class MainWindow(QMainWindow):
     def _start_next_mode(self):
         initial_hkick=self._read_initial_kicks()
         #selected_correctors = self.interface.get_correctors()['names']
-        kicks=initial_hkick*np.ones(len(self.selected_correctors),dtype=float)
+        #kicks=initial_hkick*np.ones(len(self.selected_correctors),dtype=float)
         if self.counter>=len(self.modes_to_do):
             self.__set_status_in_title("[Idle]")
             self.progressBar.setValue(100)
@@ -391,8 +398,10 @@ class MainWindow(QMainWindow):
         self._start_next_mode()
 
         # kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
-        initial_hkick=self._read_initial_kicks()
-        kicks=initial_hkick*np.ones(len(selected_correctors), dtype=float)
+        initial_hkick=float(self.initial_hkick_settings.text())
+        initial_vkick=float(self.initial_vkick_settings.text())
+        hkicks=initial_hkick*np.ones(len(selected_correctors), dtype=float)
+        vkicks=initial_vkick*np.ones(len(selected_correctors), dtype=float)
 
         max_osc_h = self.horizontal_excursion_spinbox.value()
         max_osc_v = self.vertical_excursion_spinbox.value()
@@ -402,7 +411,7 @@ class MainWindow(QMainWindow):
         print(f"Niter: {Niter}")
 
         self.thread = QThread()
-        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
+        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks,vkicks ,max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.run)
@@ -438,7 +447,8 @@ class MainWindow(QMainWindow):
                 self.working_directory_input.setText(dir_name)
 
                 initial_hkick = self._read_initial_kicks()
-                kicks = initial_hkick * np.ones(len(selected_correctors), dtype=float)
+                hkicks = initial_hkick * np.ones(len(selected_correctors), dtype=float)
+                vkicks = initial_vkick * np.ones(len(selected_correctors), dtype=float)
                 max_osc_h = self.horizontal_excursion_spinbox.value()
                 max_osc_v = self.vertical_excursion_spinbox.value()
                 max_curr_h = self.max_horizontal_current_spinbox.value()
@@ -446,7 +456,7 @@ class MainWindow(QMainWindow):
                 Niter = int(self.niter_number.text())
                 print(f"Niter: {Niter}")
                 self.thread = QThread()
-                self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
+                self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks, vkicks,max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
                 self.worker.moveToThread(self.thread)
 
                 self.thread.started.connect(self.worker.run)
