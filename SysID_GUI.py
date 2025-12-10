@@ -8,7 +8,6 @@ import signal
 import time
 import sys
 import os
-from dataclasses import dataclass
 from PyQt6 import uic
 from PyQt6.QtGui import QPixmap, QIcon, QPainter
 from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressBar
@@ -34,13 +33,6 @@ class Machine(Enum):
     ATF2_DR_RFT = "ATF2_DR_RFT"
     ATF2_EXT_RFT = "ATF2_Ext_RFT"
 
-@dataclass()
-class MachineSettings:
-    energy: str
-    intensity: str
-    reset_e: str
-    reset_ch: str
-
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
         fig = Figure(tight_layout=True)
@@ -53,8 +45,9 @@ class Worker(QObject):
     progress=pyqtSignal(int)
     finished = pyqtSignal()
 
-    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter):
+    def __init__(self, interface, state, correctors, bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,output_dir):
         super().__init__()
+        self.output_dir=output_dir
         self.interface = interface
         self.S = state
         self.correctors = correctors
@@ -111,7 +104,8 @@ class Worker(QObject):
                     break
 
                 S.pull(I)
-                S.save(filename=f'DATA_{corrector}_p{iter:04d}.pkl')
+                filename=os.path.join(self.output_dir,f'DATA_{corrector}_p{iter:04d}.pkl')
+                S.save(filename=filename)
                 Op = S.get_orbit(self.bpms)
 
                 print(f"Corrector {corrector} '-' excitation...")
@@ -126,7 +120,8 @@ class Worker(QObject):
                     break
 
                 S.pull(I)
-                S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
+                filename=os.path.join(self.output_dir,f'DATA_{corrector}_m{iter:04d}.pkl')
+                S.save(filename=filename)
                 Om = S.get_orbit(self.bpms)
 
                 I.push(corrector, corr['bdes'])
@@ -153,7 +148,7 @@ class Worker(QObject):
 
                 kicks[icorr] = 0.8 * kicks[icorr] + 0.2 * kick
 
-                with open('kicks.txt', 'w') as f:
+                with open(os.path.join(self.output_dir,'kicks.txt'), 'w') as f:
                     for c, k in zip(self.correctors, kicks):
                         f.write(f'{c} {k}\n')
 
@@ -240,51 +235,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, "working_directory_dialog"):
             self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
         self.__set_status_in_title("[Idle]")
-
-        self._machine_settings={
-            Machine.ATF2_DR: MachineSettings(
-                energy="rel_phase=5",
-                intensity="laserintensity=0.1, ang_offset=2.0",
-                reset_e="rel_phase=0",
-                reset_ch="laserintensity=0.1",
-            ),
-            Machine.ATF2_EXT: MachineSettings(
-                energy="delta_freq=-2",
-                intensity="laserintensity=0.15",
-                reset_e="rel_phase=0",
-                reset_ch="laserintensity=0.1",
-            ),
-            Machine.ATF2_LINAC: MachineSettings(
-                energy="rel_phase=5.0",
-                intensity="laserintensity=0.15",
-                reset_e="rel_phase=0.0",
-                reset_ch="laserintensity=0.1",
-            ),
-            Machine.ATF2_DR_RFT: MachineSettings(
-                energy="grad=0.98",
-                intensity="grad=0.90",
-                reset_e="grad=0",
-                reset_ch="grad=0",
-            ),
-            Machine.ATF2_EXT_RFT: MachineSettings(
-                energy="grad=0.98",
-                intensity="grad=0.90",
-                reset_e="grad=0",
-                reset_ch="grad=0",
-            ),
-        }
-
-        self.appropriate_settings_energy=None
-        self.appropriate_settings_intensity=None
-        self.appropriate_settings_reset_e=None
-        self.appropriate_settings_reset_ch=None
         interface_name=interface.get_name()
         machine = Machine(interface_name)
-        settings=self._machine_settings[machine]
-        self.appropriate_settings_energy=settings.energy
-        self.appropriate_settings_intensity=settings.intensity
-        self.appropriate_settings_reset_e=settings.reset_e
-        self.appropriate_settings_reset_ch=settings.reset_ch
+
         self.modes_to_do=[]
         self.counter=0
         self.current_mode=None
@@ -312,12 +265,11 @@ class MainWindow(QMainWindow):
         self.S.push(self.interface)
 
         if mode==Mode.Dispersion:
-            print("CIAO0")
-            dfs_params_change=self._get_change_energy_params()
-            self.interface.change_energy(**dfs_params_change)
+            self.interface.change_energy()
+            print("Energy changed")
         elif mode==Mode.Wakefield:
-            wfs_params_change=self._get_change_intensity_params()
-            self.interface.change_intensity(**wfs_params_change)
+            self.interface.change_intensity()
+            print("Intensity changed")
         self.progressBar.setValue(0)
 
     def _read_all_parameters(self,text):
@@ -335,18 +287,6 @@ class MainWindow(QMainWindow):
             except ValueError:
                 raise ValueError(f"Not a number encountered in {p}")
         return params
-
-    def _get_change_energy_params(self):
-        return self._read_all_parameters(self.appropriate_settings_energy)
-
-    def _get_reset_energy_params(self):
-        return self._read_all_parameters(self.appropriate_settings_reset_e)
-
-    def _get_change_intensity_params(self):
-        return self._read_all_parameters(self.appropriate_settings_intensity)
-
-    def _get_reset_intensity_params(self):
-        return self._read_all_parameters(self.appropriate_settings_reset_ch)
 
     def _choose_the_correction_mode(self):
         data_mode=self.choose_mode.currentText()
@@ -462,7 +402,7 @@ class MainWindow(QMainWindow):
         print(f"Niter: {Niter}")
 
         self.thread = QThread()
-        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter)
+        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.run)
@@ -476,11 +416,9 @@ class MainWindow(QMainWindow):
                 if self.current_mode==Mode.Orbit:
                     print("Orbit mode active.")
                 elif self.current_mode==Mode.Dispersion:
-                    dfs_params_reset = self._get_reset_energy_params()
-                    self.interface.reset_energy(**dfs_params_reset)
+                    self.interface.reset_energy()
                 elif self.current_mode==Mode.Wakefield:
-                    wfs_params_reset = self._get_reset_intensity_params()
-                    self.interface.reset_intensity(**wfs_params_reset)
+                    self.interface.reset_intensity()
             except Exception as e:
                 print(e)
             print("Restoring initial correctors' settings...")
@@ -492,19 +430,23 @@ class MainWindow(QMainWindow):
             self.counter+=1
             if self.counter< len(self.modes_to_do):
                 self._start_next_mode()
+                project_name = self.interface.get_name()
+                time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
+                dir_name = os.path.expanduser(os.path.expandvars(dir_name))
+                os.makedirs(dir_name, exist_ok=True)
+                self.working_directory_input.setText(dir_name)
+
                 initial_hkick = self._read_initial_kicks()
                 kicks = initial_hkick * np.ones(len(selected_correctors), dtype=float)
-
                 max_osc_h = self.horizontal_excursion_spinbox.value()
                 max_osc_v = self.vertical_excursion_spinbox.value()
                 max_curr_h = self.max_horizontal_current_spinbox.value()
                 max_curr_v = self.max_vertical_current_spinbox.value()
                 Niter = int(self.niter_number.text())
                 print(f"Niter: {Niter}")
-
                 self.thread = QThread()
-                self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h,
-                                     max_osc_v, max_curr_h, max_curr_v, Niter)
+                self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, kicks, max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
                 self.worker.moveToThread(self.thread)
 
                 self.thread.started.connect(self.worker.run)
@@ -515,8 +457,6 @@ class MainWindow(QMainWindow):
                 self.worker.plot_data.connect(self.__update_plot)
                 self.worker.progress.connect(self._update_progress)
                 self.thread.start()
-
-                #self.__start_button_clicked()
             else:
                 self.__set_status_in_title("[Idle]")
 
