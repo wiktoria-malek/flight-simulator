@@ -179,6 +179,7 @@ class InterfaceATF2_Ext:
             status[status != 1] = 0
             x.append(a[self.bpm_indexes, 1])
             y.append(a[self.bpm_indexes, 2])
+            print('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
             tmit.append(status * a[self.bpm_indexes, 3])
             time.sleep(1)
         names = [ self.bpms ] if type(self.bpms) == str else self.bpms
