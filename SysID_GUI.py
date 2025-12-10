@@ -222,8 +222,8 @@ class MainWindow(QMainWindow):
         self.choose_mode.setCurrentText(Mode.Orbit.value)
         self.mode=Mode.Orbit
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
-        self.initial_hkick_settings.setText("0.1")
-        self.initial_vkick_settings.setText("0.1")
+        self.initial_hkick_settings.setText("0.01")
+        self.initial_vkick_settings.setText("0.01")
 
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
@@ -486,10 +486,17 @@ class MainWindow(QMainWindow):
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()
-        self.plot_widget.axes.errorbar(range(Op['nbpms']), Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
-        self.plot_widget.axes.errorbar(range(Op['nbpms']), Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
+        selected_bpms = [item.text() for item in self.bpms_list.selectedItems()]
+        #nbpms=Op['nbpms']
+        l_bpms=len(selected_bpms)
+        scale=np.arange(l_bpms)
+        #bpms_names=Op['names']
+        self.plot_widget.axes.errorbar(scale, Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
+        self.plot_widget.axes.errorbar(scale, Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
         self.plot_widget.axes.legend(loc='upper left')
-        self.plot_widget.axes.set_xlabel('Bpm [#]')
+        self.plot_widget.axes.set_xticks(scale)
+        self.plot_widget.axes.set_xticklabels(selected_bpms,rotation=90,fontsize=5)
+        self.plot_widget.axes.set_xlabel('Bpms names')
         self.plot_widget.axes.set_ylabel('Orbit [mm]')
         self.plot_widget.axes.set_title(f"Corrector '{corrector}'")
         self.plot_widget.axes.grid()
