@@ -72,8 +72,10 @@ class InterfaceATF2_DR:
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)
-        PV('RAMP:MI2:ONOFF_SW').put(1)
-        # PV('RAMP:PL4:ONOFF_SW').put(1)
+        ### delta_freq MUST MATCH :MI2: to EPICS --> means "MINUS2"
+        delta_freq = +4 # kHz
+        # PV('RAMP:MI2:ONOFF_SW').put(1)
+        PV('RAMP:PL4:ONOFF_SW').put(1)
         time.sleep(2)
         DR_freq = 714e3; # 714 MHz in kHz
         DR_momentum_compaction = 2.1e-3

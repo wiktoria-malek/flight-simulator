@@ -15,6 +15,9 @@ from SaveOrLoad_BBA import SaveOrLoad_BBA
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 from ChangeBpmsWeights_BBA import ChangeBpmsWeights_BBA
 
+import matplotlib.pyplot as plt
+
+
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
     ATF2_EXT = "ATF2_Ext"
@@ -336,7 +339,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
             self.setWindowTitle("BBA_GUI - [Correction running]")
 
-            # TO DO target_disp_x, target_disp_y = self._get_dispersion_from_twiss_file()
+            target_disp_x, target_disp_y = self.interface.get_target_dispersion(bpms)
+
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
 
@@ -344,6 +348,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if max_val == 0.0:
                     return val
                 return max(-max_val, min(val, max_val))
+
+            plt.ion()
 
             for it in range(iters):
                 if self._cancel:
@@ -368,14 +374,19 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self.log("Measuring dispersion")
                     dfs_params_change = self._read_change_energy()
                     dfs_params_reset = self._read_reset_energy()
-                    self.interface.change_energy()
+                    dP_P = self.interface.change_energy()
                     self.S.pull(self.interface)
                     self.interface.reset_energy()
                     O1 = self.S.get_orbit(bpms)
                     O1x = O1['x'].reshape(-1, 1)
                     O1y = O1['y'].reshape(-1, 1)
+                    Dx = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1,1)
+                    Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1,1)
+                    plt.clf()
+                    plt.plot(Dx, label='nominal')
                 else:
                     O1x=O1y=None
+                    Dx=Dy=None
 
                 # wfs
                 if w3>0:
@@ -391,6 +402,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     O2y = O2['y'].reshape(-1, 1)
                 else:
                     O2x=O2y=None
+
                 Bx=[]
                 By=[]
                 if w1>0:
@@ -399,15 +411,17 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 print(Bx[-1].shape)
                 if w2>0 and O1x is not None:
-                    Bx.append(wgt_dfs*(O1x-O0x))
-                    By.append(wgt_dfs*(O1y-O0y))
+                    plt.plot((O1x-O0x), label='measured')
+                    plt.show()
+
+                    Bx.append(wgt_dfs*((O1x-O0x) - Dx))
+                    By.append(wgt_dfs*((O1y-O0y) - Dy))
 
                 print(Bx[-1].shape)
                 if w3>0 and O2x is not None:
                     By.append(wgt_wfs*(O2y-O0y))
                     Bx.append(wgt_wfs*(O2x-O0x))
 
-                print(Bx[-1].shape)
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
 
@@ -457,9 +471,9 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self._hist_orbit.append(filtering_norm_x(O0x,B0x) + filtering_norm_y(O0y,B0y))
 
                 if w2>0 and O1x is not None:
-                    self._hist_disp_x.append(filtering_norm_x(O0x,O1x))
-                    self._hist_disp_y.append(filtering_norm_y(O0y,O1y))
-                    self._hist_disp.append(filtering_norm_x(O0x,O1x) + filtering_norm_y(O0y,O1y))
+                    self._hist_disp_x.append(filtering_norm_x(O0x,O1x-Dx))
+                    self._hist_disp_y.append(filtering_norm_y(O0y,O1y-Dy))
+                    self._hist_disp.append(filtering_norm_x(O0x-Dx,O1x) + filtering_norm_y(O0y,O1y))
 
                 if w3>0 and O2x is not None:
                     self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
