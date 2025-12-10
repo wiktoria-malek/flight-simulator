@@ -433,8 +433,6 @@ class MainWindow(QMainWindow):
         if self.thread and self.thread.isRunning():
             return  # already running
 
-        #self.__set_status_in_title("[Running...]")
-
         selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
         self.selected_correctors = selected_correctors
         if not selected_correctors:
