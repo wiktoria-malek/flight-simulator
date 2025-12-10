@@ -25,13 +25,6 @@ class Machine(Enum):
     ATF2_DR_RFT = "ATF2_DR_RFT"
     ATF2_EXT_RFT = "ATF2_Ext_RFT"
 
-@dataclass()
-class MachineSettings:
-    energy: str
-    intensity: str
-    reset_e: str
-    reset_ch: str
-
 class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def __init__(self, interface, dir_name):
         super().__init__()
@@ -68,52 +61,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             self.pushButton_11.clicked.connect(self.load_session_settings)
 
         self.modes= [ 'Orbit', 'Dispersion', 'Wakefield']
-#
-        self._machine_settings={
-            Machine.ATF2_DR: MachineSettings(
-                energy="delta_freq=5",
-                intensity="laserintensity=0.15",
-                reset_e="delta_freq=0",
-                reset_ch="laserintensity=0.1",
-            ),
-            Machine.ATF2_EXT: MachineSettings(
-                energy="delta_freq=-2",
-                intensity="laserintensity=0.15",
-                reset_e="delta_freq=0",
-                reset_ch="laserintensity=0.1",
-            ),
-            Machine.ATF2_LINAC: MachineSettings(
-                energy="rel_phase=5.0",
-                intensity="laserintensity=0.15",
-                reset_e="rel_phase=0.0",
-                reset_ch="laserintensity=0.1",
-            ),
-            Machine.ATF2_DR_RFT: MachineSettings(
-                energy="grad=0.98",
-                intensity="grad=0.90",
-                reset_e="grad=0",
-                reset_ch="grad=0",
-            ),
-            Machine.ATF2_EXT_RFT: MachineSettings(
-                energy="grad=0.98",
-                intensity="grad=0.90",
-                reset_e="grad=0",
-                reset_ch="grad=0",
-            ),
-        }
-
         self._running = False
         self.appropriate_settings_energy=None
         self.appropriate_settings_intensity=None
         self.appropriate_settings_reset_e=None
         self.appropriate_settings_reset_ch=None
         interface_name=interface.get_name()
-        machine=Machine(interface_name)
-        settings=self._machine_settings[machine]
-        self.appropriate_settings_energy=settings.energy
-        self.appropriate_settings_intensity=settings.intensity
-        self.appropriate_settings_reset_e=settings.reset_e
-        self.appropriate_settings_reset_ch=settings.reset_ch
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
         self.corrs = self.S.get_correctors()["names"]
@@ -124,10 +77,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.lineEdit_4.setText("0.001")
         self.lineEdit_5.setText("10")
         self.lineEdit_6.setText("0.4")
-        self.dfs_reset_3.setText(self.appropriate_settings_reset_e)
-        self.dfs_change_3.setText(self.appropriate_settings_energy)
-        self.wfs_reset_3.setText(self.appropriate_settings_reset_ch)
-        self.wfs_change_3.setText(self.appropriate_settings_intensity)
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
 
         correctors = self.interface.get_correctors()
@@ -373,8 +322,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if w2>0:
                     print("Measuring dispersion")
                     self.log("Measuring dispersion")
-                    dfs_params_change = self._read_change_energy()
-                    dfs_params_reset = self._read_reset_energy()
                     dP_P = self.interface.change_energy()
                     self.S.pull(self.interface)
                     self.interface.reset_energy()
@@ -393,8 +340,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if w3>0:
                     print("Measuring wakefield")
                     self.log("Measuring wakefield")
-                    wfs_params_change = self._read_change_intensity()
-                    wfs_params_reset = self._read_reset_intensity()
                     self.interface.change_intensity()
                     self.S.pull(self.interface)
                     self.interface.reset_intensity()
