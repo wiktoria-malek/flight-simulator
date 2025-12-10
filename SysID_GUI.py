@@ -161,7 +161,6 @@ class Worker(QObject):
 
         self.running = False
         self.finished.emit()
-        self.__set_status_in_title("[Idle]")
 
     def stop(self):
         self.running = False
@@ -461,6 +460,7 @@ class MainWindow(QMainWindow):
             self.S.load('machine_status')
             self.S.push(self.interface)
             self.progressBar.setValue(100)
+            self.__set_status_in_title("[Idle]")
 
         self.thread.finished.connect(clear_thread)
         self.worker.plot_data.connect(self.__update_plot)
