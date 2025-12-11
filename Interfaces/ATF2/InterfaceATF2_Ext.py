@@ -24,7 +24,6 @@ class InterfaceATF2_Ext:
         ]
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
-        '''
         monitors = ['MB1X', 'MB2X', 'MQF1X', 'MQD2X', 'MQF3X', 'MQF4X',
                     'MQD5X', 'MQF6X', 'MQF7X', 'MQD8X', 'MQF9X', 'MQD10X', 'MQF11X',
                     'MQD12X', 'MQF13X', 'MQD14X', 'MQF15X', 'MQD16X', 'MQF17X', 'MQD18X',
@@ -36,6 +35,7 @@ class InterfaceATF2_Ext:
                     'MQD2BFF', 'MQD2AFF', 'MSF1FF', 'MQF1FF', 'MSD0FF', 'MQD0FF',
                     'M1&2IP', 'MPIP', 'MDUMP', 'ICT1X', 'ICTDUMP', 'MW1X', 'MW1IP',
                     'MPREIP', 'MIPA', 'MIPB']
+
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]

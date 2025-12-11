@@ -158,7 +158,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         if values_y:
             ax.plot(range(1, len(values_y) + 1), values_y, marker="o",color='blue',label="y")
         if vals:
-            ax.plot(range(1, len(vals) + 1), vals, marker="o",color='black',label="combined norm")
+            ax.plot(range(1, len(vals) + 1), vals, marker="--",color='black',label="combined norm")
         if values_x or values_y:
             ax.legend(fontsize=7)
         if title is not None:
@@ -392,7 +392,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if w2>0 and O1x is not None:
                     self._hist_disp_x.append(filtering_norm_x(O0x,O1x-Dx))
                     self._hist_disp_y.append(filtering_norm_y(O0y,O1y-Dy))
-                    self._hist_disp.append(filtering_norm_x(O0x-Dx,O1x) + filtering_norm_y(O0y,O1y))
+                    self._hist_disp.append(filtering_norm_x(O0x,O1x-Dx) + filtering_norm_y(O0y,O1y-Dy))
 
                 if w3>0 and O2x is not None:
                     self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
