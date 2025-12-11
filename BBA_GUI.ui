@@ -336,6 +336,13 @@
                  </item>
                 </layout>
                </item>
+               <item>
+                <widget class="QPushButton" name="load_correctors_button">
+                 <property name="text">
+                  <string>Load...</string>
+                 </property>
+                </widget>
+               </item>
               </layout>
              </widget>
             </item>
@@ -367,6 +374,13 @@
                   </widget>
                  </item>
                 </layout>
+               </item>
+               <item>
+                <widget class="QPushButton" name="load_bpms_button">
+                 <property name="text">
+                  <string>Load...</string>
+                 </property>
+                </widget>
                </item>
               </layout>
              </widget>

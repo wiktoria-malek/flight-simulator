@@ -6,9 +6,7 @@
 # remember to put sato sans screenshots for the clic presentation
 # create 3 panels inside bba gui for the plots
 # display test orbits
-# keep the load... button in the second tab of bba
 # Rxy matrix
-# three lines on the plots with a black line if this is a sum in bba plots
 # add red button to reset the reference orbit in the gui
 # get target dispersion should work like this: first, get the bpms and return target dispersion at those bpms,
     it should basically parse a madx file, read the data and return target dispersion - in the damping ring?? or everywhere?
@@ -46,6 +44,5 @@ Done:
 # when i extend bba window it makes the buttons etc look weird
 # target dispersion should not be hard coded, but there should be a method called get target dispersion
 # when i close a console log it crashes
-
-
-
+# three lines on the plots with a black line if this is a sum in bba plots
+# keep the load... button in the second tab of bba

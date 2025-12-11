@@ -46,6 +46,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._setup_canvases()
         self._populate_lists()
         self._procs=[]
+        self.load_correctors_button.clicked.connect(self._load_correctors)
+        self.load_bpms_button.clicked.connect(self._load_bpms)
         self.radio_buttons=[self.mode_orbit,self.mode_dispersion, self.mode_wakefield]
         self.pushButton_log.clicked.connect(self._show_console_log)
         self.session_database_3.setText(dir_name)
