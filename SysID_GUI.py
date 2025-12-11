@@ -86,10 +86,12 @@ class Worker(QObject):
         for iter in range(self.Niter):
             if self.running == False:
                 break
+
             for icorr, corrector in enumerate(self.correctors):
                 corr = S.get_correctors(corrector)
                 if self.running == False:
                     break
+
                 if corrector in S.get_hcorrectors_names():
                     max_curr=self.max_curr_h
                     kick=hkicks[icorr]
@@ -100,36 +102,50 @@ class Worker(QObject):
                 if not self.running:
                     break
 
-                print(f"Corrector {corrector} '+' excitation...")
+                corr_changed = False
 
-                #curr_p = corr['bdes'] + kick
-                #if corrector in S.get_hcorrectors_names():
-                curr_p = clamp(corr['bdes']+kick, max_curr)
-                #else:
-                #curr_p = clamp(curr_p, self.max_curr_v)
-                I.push(corrector, curr_p)
-                S.pull(I)
-                filename=os.path.join(self.output_dir,f'DATA_{corrector}_p{iter:04d}.pkl')
-                S.save(filename=filename)
+                print(f"Corrector {corrector} '+' excitation...")
+                filename_p=f'DATA_{corrector}_p{iter:04d}.pkl'
+                if not os.path.isfile(filename_p):
+                    curr_p = corr['bdes'] + kick
+                    if corrector in S.get_hcorrectors_names():
+                        curr_p = clamp(curr_p, self.max_curr_h)
+                    else:
+                        curr_p = clamp(curr_p, self.max_curr_v)
+                    I.push(corrector, curr_p)
+                    corr_changed = True
+
+                    if not self.running:
+                        break
+
+                    S.pull(I)
+                    S.save(filename=filename_p)
+                else:
+                    S.load(filename_p)
                 Op = S.get_orbit(self.bpms)
 
                 print(f"Corrector {corrector} '-' excitation...")
-                #curr_m = corr['bdes'] - kick
-                #if corrector in S.get_hcorrectors_names():
-                curr_m = clamp(corr['bdes']-kick, max_curr)
-                #else:
-                    #curr_m = clamp(curr_m, self.max_curr_v)
-                I.push(corrector, curr_m)
+                filename_m=f'DATA_{corrector}_m{iter:04d}.pkl'
+                if not os.path.isfile(filename_m):
+                    curr_m = corr['bdes'] - kick
+                    if corrector in S.get_hcorrectors_names():
+                        curr_m = clamp(curr_m, self.max_curr_h)
+                    else:
+                        curr_m = clamp(curr_m, self.max_curr_v)
+                    I.push(corrector, curr_m)
+                    corr_changed = True
 
-                if not self.running:
-                    break
+                    if not self.running:
+                        break
 
-                S.pull(I)
-                filename=os.path.join(self.output_dir,f'DATA_{corrector}_m{iter:04d}.pkl')
-                S.save(filename=filename)
+                    S.pull(I)
+                    S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
+                else:
+                    S.load(filename_m)
                 Om = S.get_orbit(self.bpms)
 
-                I.push(corrector, corr['bdes'])
+                if corr_changed:
+                    I.push(corrector, corr['bdes'])
 
                 Diff_x = (Op['x'] - Om['x']) / 2.0
                 Diff_y = (Op['y'] - Om['y']) / 2.0
@@ -147,17 +163,16 @@ class Worker(QObject):
                     if np.max(np.abs(Diff_x_clean)) != 0.0:
                         hkicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
                     hkicks[icorr] = 0.8 * hkicks[icorr] + 0.2 * kick
-
                 else:
                     Diff_y_clean = Diff_y[~np.isnan(Diff_y)]
                     if np.max(np.abs(Diff_y_clean)) != 0.0:
                         vkicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
                     vkicks[icorr] = 0.8 * vkicks[icorr] + 0.2 * kick
 
-
                 with open(os.path.join(self.output_dir,'kicks.txt'), 'w') as f:
                     for i, c in enumerate(self.correctors):
                         f.write(f'{c} {hkicks[i]} {vkicks[i]}\n')
+
                 time.sleep(1)
 
         self.running = False
