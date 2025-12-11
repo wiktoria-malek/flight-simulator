@@ -122,7 +122,7 @@ class InterfaceATF2_DR:
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None):
-        with open('Interfaces/ATF2/DR/ATF_DR_twiss_file.tws', "r") as file:
+        with open('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws', "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
