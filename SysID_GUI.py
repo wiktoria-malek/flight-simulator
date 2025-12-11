@@ -498,7 +498,7 @@ class MainWindow(QMainWindow):
         self.plot_widget.axes.set_xticklabels(selected_bpms,rotation=90,fontsize=8)
         self.plot_widget.axes.set_ylabel('Orbit [mm]')
         self.plot_widget.axes.set_title(f"Corrector '{corrector}'")
-        self.plot_widget.axes.grid()
+        self.plot_widget.axes.grid(color='#EEEEEE')
         self.plot_widget.draw()
         self.plot_widget.repaint()
 
