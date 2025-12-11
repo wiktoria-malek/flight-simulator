@@ -25,29 +25,17 @@ class InterfaceATF2_Ext:
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         '''
-        monitors = [
-            "MB1X", "MB2X", "MQF1X", "MQD2X", "MQF3X", "MQF4X", "MQD5X", "MQF6X",
-            "MQF7X", "MQD8X", "MQF9X", "MQD10X", "MQF11X", "MQD12X", "MQF13X",
-            "MQD14X", "MQF15X", "MQD16X", "MQF17X", "MQD18X", "MQF19X", "MQD20X",
-            "MQF21X", "IPBPM1", "IPBPM2", "nBPM1", "nBPM2", "nBPM3", "MQM16FF",
-            "MQM15FF", "MQM14FF", "MFB2FF", "MQM13FF", "MQM12FF", "MFB1FF",
-            "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9BFF", "MSF6FF", "MQF9AFF",
-            "MQD8FF", "MQF7FF", "MQD6FF", "MQF5BFF", "MSF5FF", "MQF5AFF",
-            "MQD4BFF", "MSD4FF", "MQD4AFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
-            "MSF1FF", "MQF1FF", "MSD0FF", "MQD0FF", "M1&2IP", "MPIP", "MDUMP",
-            "ICT1X", "ICTDUMP", "MW1X", "MW1IP", "MPREIP", "MIPA", "MIPB"
-        ]
-        '''
-        monitors = [
-            "MB1X", "MB2X", "MQF1X", "MQD2X", "MQF3X", "MQF4X", "MQD5X", "MQF6X",
-            "MQF7X", "MQD8X", "MQF9X", "MQD10X", "MQF11X", "MQD12X", "MQF13X",
-            "MQD14X", "MQF15X", "MQD16X", "MQF17X", "MQD18X", "MQF19X",
-            "MQF21X", "MQM16FF",
-            "MQM15FF", "MQM14FF",
-            "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9AFF",
-            "MQD8FF", "MQF7FF", "MQF5BFF", "MQD4BFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
-            "MSF1FF", "MPREIP", "MIPB"
-            ]
+        monitors = ['MB1X', 'MB2X', 'MQF1X', 'MQD2X', 'MQF3X', 'MQF4X',
+                    'MQD5X', 'MQF6X', 'MQF7X', 'MQD8X', 'MQF9X', 'MQD10X', 'MQF11X',
+                    'MQD12X', 'MQF13X', 'MQD14X', 'MQF15X', 'MQD16X', 'MQF17X', 'MQD18X',
+                    'MQF19X', 'MQD20X', 'MQF21X', 'IPBPM1', 'IPBPM2', 'nBPM1', 'nBPM2',
+                    'nBPM3', 'MQM16FF', 'MQM15FF', 'MQM14FF', 'MFB2FF', 'MQM13FF',
+                    'MQM12FF', 'MFB1FF', 'MQM11FF', 'MQD10BFF', 'MQD10AFF', 'MQF9BFF',
+                    'MSF6FF', 'MQF9AFF', 'MQD8FF', 'MQF7FF', 'MQD6FF', 'MQF5BFF',
+                    'MSF5FF', 'MQF5AFF', 'MQD4BFF', 'MSD4FF', 'MQD4AFF', 'MQF3FF',
+                    'MQD2BFF', 'MQD2AFF', 'MSF1FF', 'MQF1FF', 'MSD0FF', 'MQD0FF',
+                    'M1&2IP', 'MPIP', 'MDUMP', 'ICT1X', 'ICTDUMP', 'MW1X', 'MW1IP',
+                    'MPREIP', 'MIPA', 'MIPB']
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
