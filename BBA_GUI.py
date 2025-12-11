@@ -158,7 +158,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         if values_y:
             ax.plot(range(1, len(values_y) + 1), values_y, marker="o",color='blue',label="y")
         if vals:
-            ax.plot(range(1, len(vals) + 1), vals, marker="--",color='black',label="combined norm")
+            ax.plot(range(1, len(vals) + 1), vals, linestyle="dashed",color='black',label="combined norm")
         if values_x or values_y:
             ax.legend(fontsize=7)
         if title is not None:
