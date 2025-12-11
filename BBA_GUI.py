@@ -370,6 +370,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 vals = np.array(vals_x + vals_y)
                 self.interface.vary_correctors(Cx + Cy, vals)
 
+                print(f'vals = {vals}')
+                print(f'Cx = {Cx}')
+                print(f'Cy = {Cy}')
+
                 def filtering_norm_x(Ox,Bx):
                     Ox[np.isnan(Ox)] = 0
                     #Oy[np.isnan(Oy)] = 0
