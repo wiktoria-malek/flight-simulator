@@ -147,7 +147,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.disp_fig, self.disp_canvas,self.disp_ax = install(self.plot_widget_4)
         self.wake_fig, self.wake_canvas, self.wake_ax = install(self.plot_widget_5)
 
-    def _plot_series(self, ax, canvas, values_x,values_y, title=None,ylabel="[mm]"):
+    def _plot_series(self, ax, canvas, values_x,values_y, vals,title=None,ylabel="[mm]"):
         if canvas is None or ax is None:
             return
         ax.clear()
@@ -155,6 +155,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             ax.plot(range(1, len(values_x) + 1), values_x, marker="o",color='red',label="x")
         if values_y:
             ax.plot(range(1, len(values_y) + 1), values_y, marker="o",color='blue',label="y")
+        if vals:
+            ax.plot(range(1, len(vals) + 1), vals, marker="o",color='black',label="combined norm")
         if values_x or values_y:
             ax.legend(fontsize=7)
         if title is not None:
@@ -275,6 +277,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 # nominal
                 print("Measuring orbit")
+
                 self.log("Measuring orbit")
                 self.S.pull(self.interface)
                 print('State::pull done')
@@ -394,9 +397,9 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self._hist_wake_y.append(filtering_norm_y(O0y,O2y))
                     self._hist_wake.append(filtering_norm_x(O0x,O2x) + filtering_norm_y(O0y,O2y))
 
-                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y , title=None,ylabel="[mm]")
-                self._plot_series(ax=self.disp_ax,canvas= self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,title=None,ylabel="[mm]")
-                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,title=None,ylabel="[mm]")
+                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y, vals=self._hist_orbit, title=None,ylabel="[mm]")
+                self._plot_series(ax=self.disp_ax,canvas= self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,title=None,ylabel="[mm]")
+                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,title=None,ylabel="[mm]")
                 QApplication.processEvents()
 
             self.setWindowTitle("BBA_GUI")
@@ -436,9 +439,9 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._hist_disp_x.clear(),self._hist_disp_y.clear()
         self._hist_wake_x.clear(),self._hist_wake_y.clear()
         self._hist_orbit.clear(),self._hist_disp.clear(),self._hist_wake.clear()
-        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],title=None,ylabel="[mm]")
-        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
-        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], title=None,ylabel="[mm]")
+        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],vals=[],title=None,ylabel="[mm]")
+        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None,ylabel="[mm]")
+        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None,ylabel="[mm]")
 
     def handling(self, app_name,cwd=None, args=None):
         try:

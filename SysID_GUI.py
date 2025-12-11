@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-#
+
 class Mode(Enum):
     Orbit = "Orbit Correction"
     Dispersion = "Changed energy"
