@@ -8,7 +8,7 @@ class InterfaceATF2_Ext_RFTrack():
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
+    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1,nparticles=1000):
         self.log = print
         self.lattice = rft.Lattice('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
         self.lattice.set_bpm_resolution(bpm_resolution)
@@ -21,6 +21,7 @@ class InterfaceATF2_Ext_RFTrack():
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [ e.get_name() for e in self.lattice.get_screens()]
         self.Pref = 1.2999999e3 # 1.3 GeV/c
+        self.nparticles = nparticles
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples
@@ -42,8 +43,7 @@ class InterfaceATF2_Ext_RFTrack():
         T.alpha_y = -1.907222942
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        Nparticles = 1000 # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, Nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, self.nparticles)
         
     def __setup_beam1(self):
         # Beam for DFS - Reduced energy
@@ -58,7 +58,7 @@ class InterfaceATF2_Ext_RFTrack():
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 1000 # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, self.nparticles)
 
     def __setup_beam2(self):
         # Beam for WFS - Reduced bunch charge
@@ -73,7 +73,7 @@ class InterfaceATF2_Ext_RFTrack():
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 1000 # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, Nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, self.nparticles)
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
@@ -195,24 +195,27 @@ class InterfaceATF2_Ext_RFTrack():
         bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
         return bpms
 
-    def get_screens(self):
+    def get_screens(self, names=None):
         #print('Reading screens...')
         self.log('Reading screens...')
         nscreens = len(self.screens)
-        hpixel = np.ones(nscreens) * 0.1 # mm, horizonatl size of a pixel
-        vpixel = np.ones(nscreens) * 0.1 # mm, vertical size of a pixel
+        hpixel = np.ones(nscreens) * 0.001 # mm, horizonatl size of a pixel
+        vpixel = np.ones(nscreens) * 0.001 # mm, vertical size of a pixel
         images = []
         hedges_all = []
         vedges_all = []
+        screen_names = []
         for i,s in enumerate(self.lattice.get_screens()):
-            m = s.get_bunch().get_phase_space('%x %y')
-            nx = np.ptp(m[:,0]) / hpixel[i]
-            ny = np.ptp(m[:,1]) / vpixel[i]
-            image, hedges, vedges = np.histogram2d(m[:,0], m[:,1], bins=(nx,ny))
-            images.append(image)
-            hedges_all.append(hedges)
-            vedges_all.append(vedges)
-        screens = { "names": self.screens,
+            if names==None or (s.get_name() in names):
+                screen_names.append(s.get_name())
+                m = s.get_bunch().get_phase_space('%x %y')
+                nx = int(np.ceil(np.ptp(m[:,0]) / hpixel[i]))
+                ny = int(np.ceil(np.ptp(m[:,1]) / vpixel[i]))
+                image, hedges, vedges = np.histogram2d(m[:,0], m[:,1], bins=(nx,ny))
+                images.append(image)
+                hedges_all.append(hedges)
+                vedges_all.append(vedges)
+        screens = { "names": screen_names,
                     "hpixel": hpixel,
                     "vpixel": vpixel,
                     "hedges" : hedges_all,

@@ -16,6 +16,7 @@ class State:
         self.sequence = interface.get_sequence()
         self.hcorrectors_names = interface.get_hcorrectors_names()
         self.vcorrectors_names = interface.get_vcorrectors_names()
+        self.screens = interface.get_screens()
         self.timestamp = datetime.now()
 
     def push(self, interface):
@@ -75,9 +76,12 @@ class State:
         faulty = (x == 0.0) & (y == 0.0)
         x[faulty] = np.nan
         y[faulty] = np.nan
-        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names) }
+        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(x) }
         return orbit
 
+    def get_screens(self):
+        return self.screens
+    
     """"
     def change_energy(self, interface, *args):
         interface.change_energy(*args)
