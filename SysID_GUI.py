@@ -107,6 +107,7 @@ class Worker(QObject):
                 print(f"Corrector {corrector} '+' excitation...")
                 filename_p=f'DATA_{corrector}_p{iter:04d}.pkl'
                 if not os.path.isfile(filename_p):
+                    print('corr[bds] =', corr['bdes'], ' also kick = ', kick) 
                     curr_p = corr['bdes'] + kick
                     if corrector in S.get_hcorrectors_names():
                         curr_p = clamp(curr_p, self.max_curr_h)

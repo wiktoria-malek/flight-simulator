@@ -7,7 +7,7 @@ class InterfaceATF2_DR:
     def get_name(self):
         return 'ATF2_DR'
 
-    def __init__(self, nsamples=1, nominal_intensity=0.1, wfs_intensity=0.05):
+    def __init__(self, nsamples=1, nominal_intensity=0.1, wfs_intensity=0.125):
         self.nsamples = nsamples
         # Bpms and correctors in beamline order
         sequence = [
