@@ -94,7 +94,7 @@ class InterfaceATF2_DR_RFTrack():
         I0 = self.B0.get_info()
         dx = self.jitter*I0.sigma_x
         dy = self.jitter*I0.sigma_y
-        dz, roll, dt = 0.0, 0.0
+        dz, roll, dt = 0.0, 0.0, 0.0
         pitch = self.jitter*I0.sigma_py
         yaw   = self.jitter*I0.sigma_px
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
