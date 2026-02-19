@@ -189,6 +189,14 @@ class MainWindow(QMainWindow):
     def _update_progress(self,value):
         self.progressBar.setValue(value)
 
+    def _update_folder_path(self):
+        base = os.path.expanduser(os.path.expandvars("~/flight-simulator-data"))
+        project_name=self.interface.get_name()
+        mode=self.mode
+        time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        folder_path=os.path.join(base,f"{project_name}_{time_str}_{mode.name}")
+        self.working_directory_input.setText(folder_path)
+
     def __init__(self, interface, dir_name):
         super().__init__()
 
@@ -234,8 +242,8 @@ class MainWindow(QMainWindow):
         self.start_button.clicked.connect(self.__start_button_clicked)
         self.stop_button.clicked.connect(self.__stop_button_clicked)
 
-        self.choose_mode.setCurrentText(Mode.Orbit.value)
         self.mode=Mode.Orbit
+        self._update_folder_path()
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
         self.initial_hkick_settings.setText("0.01")
         self.initial_vkick_settings.setText("0.01")
@@ -244,7 +252,7 @@ class MainWindow(QMainWindow):
         self.correctors_list.insertItems(0, correctors_list)
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.bpms_list.insertItems(0, bpms_list)
-        self.working_directory_input.setText(dir_name)
+        self.working_directory_input.setText(dir_name+'_Orbit')
         self.max_horizontal_current_spinbox.setValue(max_curr_h)
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
@@ -281,9 +289,18 @@ class MainWindow(QMainWindow):
             return
         mode=self.modes_to_do[self.counter]
         self.current_mode=mode
+
+        mode=self.modes_to_do[self.counter]
+        self.current_mode=mode
+
+        dir_name=self.mode_dirs[mode]
+        os.chdir(dir_name)
+        self.working_directory_input.setText(dir_name)
+
         print(f"Currently at mode: {mode.name}")
         self.__set_status_in_title(f"[Running {mode.name} mode]")
-        self.S.load('machine_status')
+        self.progressBar.setValue(0)
+        self.S.load(os.path.join(dir_name,'machine_status.pkl'))
         self.S.push(self.interface)
 
         if mode==Mode.Dispersion:
@@ -292,7 +309,7 @@ class MainWindow(QMainWindow):
         elif mode==Mode.Wakefield:
             self.interface.change_intensity()
             print("Intensity changed")
-        self.progressBar.setValue(0)
+        #self.progressBar.setValue(0)
 
     def _read_all_parameters(self,text):
         text = text.strip()
@@ -313,11 +330,12 @@ class MainWindow(QMainWindow):
     def _choose_the_correction_mode(self):
         data_mode=self.choose_mode.currentText()
         self.mode=Mode(data_mode)
+        self._update_folder_path()
 
     def __save_correctors_button_clicked(self):
         dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
-        os.chdir (dir_name)
+        os.chdir(dir_name)
         selected_correctors = self.correctors_list.selectedItems()
         dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
@@ -385,11 +403,11 @@ class MainWindow(QMainWindow):
             return 0.1
 
     def __start_button_clicked(self):
-        dir_name = self.working_directory_input.text()
-        os.makedirs (dir_name, exist_ok=True)
-        os.chdir (dir_name)
-        self.S = State(interface=self.interface)
-        self.S.save(basename='machine_status')
+        # dir_name = self.working_directory_input.text()
+        # os.makedirs (dir_name, exist_ok=True)
+        # os.chdir (dir_name)
+        # self.S = State(interface=self.interface)
+        # self.S.save(basename='machine_status')
 
         self.progressBar.setValue(0)
         if self.thread and self.thread.isRunning():
@@ -410,6 +428,22 @@ class MainWindow(QMainWindow):
             selected_bpms = self.interface.get_bpms()['names']
 
         self._current_measuring_mode()
+
+        self.mode_dirs={}
+        project_name = self.interface.get_name()
+        base = os.path.expanduser(os.path.expandvars("~/flight-simulator-data"))
+
+        for mode in self.modes_to_do:
+            time_str=datetime.now().strftime("%Y%m%d_%H%M%S")
+            d = os.path.join(base, f"{project_name}_{time_str}_{mode.name}")
+            os.makedirs(d, exist_ok=True)
+            self.mode_dirs[mode] = d
+
+        self.S=State(interface=self.interface)
+        for mode,d in self.mode_dirs.items():
+            self.S.save(filename=os.path.join(d,"machine_status.pkl"))
+
+        self.counter=0
         self._start_next_mode()
 
         # kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
@@ -426,7 +460,8 @@ class MainWindow(QMainWindow):
         print(f"Niter: {Niter}")
 
         self.thread = QThread()
-        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks,vkicks ,max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
+        out_dir=self.mode_dirs[self.current_mode]
+        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks,vkicks ,max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.run)
@@ -446,7 +481,9 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print(e)
             print("Restoring initial correctors' settings...")
-            self.S.load('machine_status')
+            #self.S.load('machine_status')
+            current_dir=self.mode_dirs[self.current_mode]
+            self.S.load(filename=os.path.join(current_dir, "machine_status.pkl"))
             self.S.push(self.interface)
             self.progressBar.setValue(100)
             self.thread = None
@@ -454,13 +491,6 @@ class MainWindow(QMainWindow):
             self.counter+=1
             if self.counter< len(self.modes_to_do):
                 self._start_next_mode()
-                project_name = self.interface.get_name()
-                time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-                dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
-                dir_name = os.path.expanduser(os.path.expandvars(dir_name))
-                os.makedirs(dir_name, exist_ok=True)
-                self.working_directory_input.setText(dir_name)
-
                 initial_hkick = self._read_initial_kicks()
                 hkicks = initial_hkick * np.ones(len(selected_correctors), dtype=float)
                 vkicks = initial_vkick * np.ones(len(selected_correctors), dtype=float)
@@ -471,7 +501,8 @@ class MainWindow(QMainWindow):
                 Niter = int(self.niter_number.text())
                 print(f"Niter: {Niter}")
                 self.thread = QThread()
-                self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks, vkicks,max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,dir_name)
+                out_dir = self.mode_dirs[self.current_mode]
+                self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks, vkicks,max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
                 self.worker.moveToThread(self.thread)
 
                 self.thread.started.connect(self.worker.run)

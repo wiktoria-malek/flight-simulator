@@ -1,54 +1,125 @@
 import os, pickle, re, matplotlib, glob
 import numpy as np
 matplotlib.use("QtAgg")
+from State import State
+
+'''
+Uses the same approach as Compute Response Matrix GUI.
+'''
 
 class DFS_WFS_Correction_BBA():
     def _find_useful_files(self, directory):
-        p_files = glob.glob(os.path.join(directory, "DATA_*_p*.pkl"))
-        m_files = glob.glob(os.path.join(directory, "DATA_*_m*.pkl"))
+        datafiles=sorted(glob.glob(os.path.join(directory, 'DATA*.pkl')))
+        pairs=[]
 
-        regex = re.compile(r"DATA_(.+)_(p|m)(\d+)\.pkl$")  # 3 groups - name corr, plus or minus, iteration
-        p_index = {}
-        m_index = {}
+        for fp in datafiles:
+            basename=os.path.basename(fp)
+            if "_p" not in basename:
+                continue
+            fm=fp.replace("_p","_m")
+            if os.path.exists(fm):
+                pairs.append((fp, fm))
 
-        for p in p_files:
-            r = regex.search(os.path.basename(p))
-            if r:
-                corr, pm, iter = r.group(1), r.group(2), r.group(3)
-                p_index[(corr, iter)] = p
+        return {"ok":bool(pairs), "dir":directory, "pairs":pairs}
 
-        for m in m_files:
-            r = regex.search(os.path.basename(m))
-            if r:
-                corr, pm, iter = r.group(1), r.group(2), r.group(3)
-                m_index[(corr, iter)] = m
+    def _compute_response_matrix(self,pairs,correctors,bpms,triangular=False):
+        if not hasattr(self, 'sequence'): #is self.sequence already initialixed
+            file=pairs[0][0]
+            #self.datafiles = glob.glob('DATA*.pkl')
+            S = State(filename=file)
+            self.sequence = S.get_sequence()
 
-        valid_pairs = {}
+        hcorrs = [string for string in correctors if (string.lower().startswith('zh') or string.lower().startswith('zx'))]
+        vcorrs = [string for string in correctors if string.lower().startswith('zv')]
 
-        for (corr, iter), fp in p_index.items():
-            fm = m_index.get((corr, iter))
-            if fm:
-                valid_pairs.setdefault(corr, []).append((fp, fm))  # dict for each corrector
+        hcorrs = [ corr for corr in hcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1]) ]
+        vcorrs = [ corr for corr in vcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1]) ]
 
-        return {
-            "ok": bool(valid_pairs),
-            "dir": directory,
-            "pairs": valid_pairs,
-            "p_files": p_files,
-            "m_files": m_files,
-        }
+        if hcorrs:
+            bpms = [ bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(hcorrs[0]) ]
 
-    def _heaviside_function_for_checkbox(self, bpms, correctors):
-        bpms_position = self.interface.get_elements_position(bpms)
-        corrs_position = self.interface.get_elements_position(correctors)
+        if vcorrs:
+            bpms = [ bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(vcorrs[0]) ]
 
-        M = np.zeros((len(bpms), len(correctors)), dtype=bool)
+        # Read all orbits
+        Bx = np.empty((0,len(bpms)))
+        By = np.empty((0,len(bpms)))
+        Cx = np.empty((0,len(hcorrs)))
+        Cy = np.empty((0,len(vcorrs)))
 
-        for j, cj in enumerate(corrs_position):
-            for i, bi in enumerate(bpms_position):
-                M[i, j] = (bi >= cj)
+        for fp, fm in pairs:
+            Sp=State(filename=fp)
+            Sm=State(filename=fm)
 
-        return M
+            Op = Sp.get_orbit(bpms)
+            Om = Sm.get_orbit(bpms)
+
+            Cx_p = Sp.get_correctors(hcorrs)['bact']
+            Cy_p = Sp.get_correctors(vcorrs)['bact']
+            Cx_m = Sm.get_correctors(hcorrs)['bact']
+            Cy_m = Sm.get_correctors(vcorrs)['bact']
+
+            if 0:
+                O_x = Op['x'] - Om['x']
+                O_y = Op['y'] - Om['y']
+                C_x = Cx_p - Cx_m
+                C_y = Cy_p - Cy_m
+                Bx = np.vstack((Bx, O_x))
+                By = np.vstack((By, O_y))
+                Cx = np.vstack((Cx, C_x))
+                Cy = np.vstack((Cy, C_y))
+                print(Cx, Bx)
+
+            else:
+                Bx = np.vstack((Bx, Op['x']))
+                Bx = np.vstack((Bx, Om['x']))
+                By = np.vstack((By, Op['y']))
+                By = np.vstack((By, Om['y']))
+                Cx = np.vstack((Cx, Cx_p))
+                Cx = np.vstack((Cx, Cx_m))
+                Cy = np.vstack((Cy, Cy_p))
+                Cy = np.vstack((Cy, Cy_m))
+
+        # Compute the response matrices
+        ones_column_x = np.ones((Cx.shape[0], 1))
+        ones_column_y = np.ones((Cy.shape[0], 1))
+
+        # Add the column of ones to the matrix
+        Cx = np.hstack((Cx, ones_column_x))
+        Cy = np.hstack((Cy, ones_column_y))
+
+        Rxx = np.transpose(np.linalg.lstsq(Cx, Bx, rcond=None)[0])
+        Rxy = np.transpose(np.linalg.lstsq(Cy, Bx, rcond=None)[0])
+        Ryx = np.transpose(np.linalg.lstsq(Cx, By, rcond=None)[0])
+        Ryy = np.transpose(np.linalg.lstsq(Cy, By, rcond=None)[0])
+
+        # Reference trajectory
+
+        Bx = np.mean(Bx,axis=0).reshape(-1,1)
+        By = np.mean(By,axis=0).reshape(-1,1)
+
+        # Response matrices
+        Rxx = Rxx[:,:-1]
+        Rxy = Rxy[:,:-1]
+        Ryx = Ryx[:,:-1]
+        Ryy = Ryy[:,:-1]
+
+        # Zero the response of all bpms preceeding the correctors
+        if triangular:
+            for corr in hcorrs:
+                 bpm_indexes = [ bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr) ]
+
+                 Rxx[bpm_indexes, hcorrs.index(corr)] = 0
+                 Ryx[bpm_indexes, hcorrs.index(corr)] = 0
+
+            for corr in vcorrs:
+                 bpm_indexes = [ bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr) ]
+
+                 Rxy[bpm_indexes, vcorrs.index(corr)] = 0
+                 Ryy[bpm_indexes, vcorrs.index(corr)] = 0
+
+        return Rxx,Ryy,Rxy,Ryx,Bx,By, hcorrs,vcorrs
+
 
     def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, _force_triangular=False):
 
@@ -59,157 +130,13 @@ class DFS_WFS_Correction_BBA():
         if not (info_traj and info_traj["ok"] and info_dfs and info_dfs["ok"] and info_wfs and info_wfs["ok"]):
             raise RuntimeError("Please select all data directories")
 
-        hcorrs = [string for string in selected_corrs if
-                  (string.lower().startswith('zh') or ("DHG" in string) or (string.lower().startswith('zx')))]
-        vcorrs = [string for string in selected_corrs if
-                  (string.lower().startswith('zv') or (("SDV" in string) or ("DHJ" in string)))]
+        triangular = bool(self._force_triangular() or _force_triangular)
 
-        pairs0 = info_traj["pairs"]
-        pairs1 = info_dfs["pairs"]
-        pairs2 = info_wfs["pairs"]
+        R0xx,R0yy,R0xy,R0yx,B0x,B0y,hcorrs,vcorrs=self._compute_response_matrix(pairs=info_traj["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
+        R1xx,R1yy,R1xy,R1yx,B1x,B1y,hcorrs,vcorrs=self._compute_response_matrix(pairs=info_dfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
+        R2xx,R2yy,R2xy,R2yx,B2x,B2y,hcorrs,vcorrs=self._compute_response_matrix(pairs=info_wfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
 
-        R0xx = np.full((len(selected_bpms), len(hcorrs)), np.nan, dtype=float)
-        R0yy = np.full((len(selected_bpms), len(vcorrs)), np.nan, dtype=float)
-        R0xy = np.zeros((len(selected_bpms), len(vcorrs)))
-        R0yx = np.zeros((len(selected_bpms), len(hcorrs)))
-
-        R1xx = np.full((len(selected_bpms), len(hcorrs)), np.nan, dtype=float)
-        R1yy = np.full((len(selected_bpms), len(vcorrs)), np.nan, dtype=float)
-        R1xy = np.zeros((len(selected_bpms), len(vcorrs)))
-        R1yx = np.zeros((len(selected_bpms), len(hcorrs)))
-
-        R2xx = np.full((len(selected_bpms), len(hcorrs)), np.nan, dtype=float)
-        R2yy = np.full((len(selected_bpms), len(vcorrs)), np.nan, dtype=float)
-        R2xy = np.zeros((len(selected_bpms), len(vcorrs)))
-        R2yx = np.zeros((len(selected_bpms), len(hcorrs)))
-        rows_B0x, rows_B0y = [], []
-
-        pos = {b: i for i, b in enumerate(selected_bpms)}
-        nb = len(selected_bpms)
-
-        def _calculating_Rxx_or_Ryy(which_matrix, corrs_type, plane, pairs):
-
-            for j, corr in enumerate(corrs_type):  # j is a column
-                if corr not in pairs:
-                    continue
-                cols = []  # one column per plus/minus iteration
-                for fp, fm in pairs[corr]:
-                    with open(fp, "rb") as f:
-                        plus_file = pickle.load(f)
-                    with open(fm, "rb") as f:
-                        minus_file = pickle.load(f)
-
-                    bxp = np.asarray(plus_file["bpms"]["x"])  # turns into a vector (N,) instead of (N,1)
-                    byp = np.asarray(plus_file["bpms"]["y"])
-                    bxm = np.asarray(minus_file["bpms"]["x"])
-                    bym = np.asarray(minus_file["bpms"]["y"])
-
-                    bact_p = np.asarray(plus_file["correctors"]["bact"]).squeeze()  # bact is an actual corrector value/kick that was applied
-                    bact_m = np.asarray(minus_file["correctors"]["bact"]).squeeze()
-
-                    if bxp.ndim>1:
-                        bxp=bxp.mean(axis=0)
-                        bxm=bxm.mean(axis=0)
-                        byp=byp.mean(axis=0)
-                        bym=bym.mean(axis=0)
-
-                    bpms_names_real = plus_file["bpms"]["names"]
-                    if isinstance(bpms_names_real, list):
-                        if len(bpms_names_real) > 0 and isinstance(bpms_names_real[0], list):
-                            bpms_names = [str(b) for b in bpms_names_real[0]]
-                        else:
-                            bpms_names = [str(b) for b in bpms_names_real]
-                    else:
-                        bpms_names = [str(bpms_names_real)]
-                    present=[b for b in selected_bpms if b in bpms_names]
-                    if not present:
-                        continue
-                    indeces = [bpms_names.index(b) for b in present]
-                    max_idx=max(indeces)
-                    if plane=="x":
-                        if max_idx >= len(bxp):
-                            continue
-                        plus_value = bxp[indeces]
-                        minus_value = bxm[indeces]
-                    elif plane == "y":
-                        if max_idx >= len(byp):
-                            continue
-                        plus_value = byp[indeces]
-                        minus_value = bym[indeces]
-
-                    corrs_names_real = plus_file["correctors"]["names"]
-                    if isinstance(corrs_names_real, list):
-                        if len(corrs_names_real) > 0 and isinstance(corrs_names_real[0], list):
-                            corrs_names = [str(c) for c in corrs_names_real[0]]
-                        else:
-                            corrs_names = [str(c) for c in corrs_names_real]
-                    else:
-                        corrs_names = [str(corrs_names_real)]
-
-                    if corr not in corrs_names:
-                        continue
-
-                    i_corr = corrs_names.index(corr)
-                    k_plus = float(bact_p[i_corr])
-                    k_minus = float(bact_m[i_corr])
-
-                    if pairs == pairs0 and plane == "x":
-                        px = bxp[indeces]
-                        mx = bxm[indeces]
-                        B0_x = (px + mx) / 2  # golden orbit
-                        rowx = np.full(nb, np.nan)
-                        for k, b in enumerate(present):
-                            rowx[pos[b]] = B0_x[k]
-                        rows_B0x.append(rowx)
-
-                        py = byp[indeces]
-                        my = bym[indeces]
-                        B0_y = (py + my) / 2
-                        rowy = np.full(nb, np.nan)
-                        for k, b in enumerate(present):
-                            rowy[pos[b]] = B0_y[k]
-                        rows_B0y.append(rowy)
-
-                    if k_plus - k_minus == 0:
-                        continue
-                    column_value = np.full(len(selected_bpms), np.nan, dtype=float)
-                    for k, b in enumerate(present):
-                        column_value[pos[b]] = (plus_value[k] - minus_value[k]) / (k_plus - k_minus)  # (bpm plus - bpm minus) /(kick plus - kick minus0
-                    cols.append(column_value)
-
-                if cols:
-                    which_matrix[:, j] = np.nanmean(np.vstack(cols), axis=0)
-            return which_matrix
-
-        R0xx = _calculating_Rxx_or_Ryy(which_matrix=R0xx, corrs_type=hcorrs, plane="x", pairs=pairs0)
-        R0yy = _calculating_Rxx_or_Ryy(which_matrix=R0yy, corrs_type=vcorrs, plane="y", pairs=pairs0)
-
-        B0x = np.nanmean(np.vstack(rows_B0x), axis=0).reshape(-1, 1)
-        B0y = np.nanmean(np.vstack(rows_B0y), axis=0).reshape(-1, 1)
-
-        R1xx = _calculating_Rxx_or_Ryy(which_matrix=R1xx, corrs_type=hcorrs, plane="x", pairs=pairs1)
-        R1yy = _calculating_Rxx_or_Ryy(which_matrix=R1yy, corrs_type=vcorrs, plane="y", pairs=pairs1)
-
-        R2xx = _calculating_Rxx_or_Ryy(which_matrix=R2xx, corrs_type=hcorrs, plane="x", pairs=pairs2)
-        R2yy = _calculating_Rxx_or_Ryy(which_matrix=R2yy, corrs_type=vcorrs, plane="y", pairs=pairs2)
-
-        if self._force_triangular() or _force_triangular:
-            corrs, bpms = selected_corrs, selected_bpms
-            Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower().startswith('zx')))]
-            Cy = [s for s in corrs if (s.lower().startswith('zv') or (("SDV" in s) or ("DHJ" in s)))]
-
-            Mx = self._heaviside_function_for_checkbox(correctors=Cx, bpms=bpms)
-            My = self._heaviside_function_for_checkbox(correctors=Cy, bpms=bpms)
-
-            R0xx = np.where(Mx, R0xx, 0.0)  # builds new array, R0xx shape, if Mx is true otherwise 0.0
-            R1xx = np.where(Mx, R1xx, 0.0)
-            R2xx = np.where(Mx, R2xx, 0.0)
-
-            R0yy = np.where(My, R0yy, 0.0)
-            R1yy = np.where(My, R1yy, 0.0)
-            R2yy = np.where(My, R2yy, 0.0)
-
-        return R0xx, R0yy, R0xy, R0yx, R1xx, R1yy, R1xy, R1yx, R2xx, R2yy, R2xy, R2yx, B0x, B0y
+        return R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs,vcorrs
 
     def _creating_response_matrices(self):
 
@@ -217,40 +144,35 @@ class DFS_WFS_Correction_BBA():
         wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
         corrs, bpms = self._get_selection()
-        R0xx, R0yy, R0xy, R0yx, R1xx, R1yy, R1xy, R1yx, R2xx, R2yy, R2xy, R2yx, B0x, B0y = self._get_data_from_loaded_directories(
-            selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular())
 
-        # R0 = np.block([
-        #     [R0xx, R0xy],
-        #     [R0yx, R0yy],
-        # ])
-        #
-        # R1 = np.block([
-        #     [R1xx, R1xy],
-        #     [R1yx, R1yy],
-        # ])
-        #
-        # R2 = np.block([
-        #     [R2xx, R2xy],
-        #     [R2yx, R2yy],
-        # ])
+        R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs,vcorrs  = self._get_data_from_loaded_directories(selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular())
 
         Axx=[]
         Ayy=[]
+        Axy=[]
+        Ayx=[]
 
         if wgt_orb > 0:
             Axx.append(wgt_orb * R0xx)
             Ayy.append(wgt_orb * R0yy)
+            Axy.append(wgt_orb * R0xy)
+            Ayx.append(wgt_orb * R0yx)
 
         if wgt_dfs > 0:
             Axx.append(wgt_dfs * (R1xx - R0xx))
             Ayy.append(wgt_dfs * (R1yy - R0yy))
+            Axy.append(wgt_dfs * (R1xy - R0xy))
+            Ayx.append(wgt_dfs * (R1yx - R0yx))
 
         if wgt_wfs > 0:
             Axx.append(wgt_wfs * (R2xx - R0xx))
             Ayy.append(wgt_wfs * (R2yy - R0yy))
+            Axy.append(wgt_wfs * (R2xy - R0xy))
+            Ayx.append(wgt_wfs * (R2yx - R0yx))
 
         Axx = np.vstack(Axx)
         Ayy = np.vstack(Ayy)
+        Axy = np.vstack(Axy)
+        Ayx = np.vstack(Ayx)
 
-        return Axx, Ayy, B0x, B0y
+        return Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs

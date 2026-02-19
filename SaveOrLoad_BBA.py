@@ -116,8 +116,7 @@ class SaveOrLoad_BBA():
         __save_graph_data(os.path.join(save_session_dir, "wakefield_y_after_correction.txt"), self._hist_wake_y)
 
         corrs, bpms = self._get_selection()
-        R0xx, R0yy, R0xy, R0yx, R1xx, R1yy, R1xy, R1yx, R2xx, R2yy, R2xy, R2yx, B0x, B0y = self._get_data_from_loaded_directories(
-            selected_corrs=corrs, selected_bpms=bpms)
+        R0xx, R0yy, R0xy, R0yx, B0x, B0y, R1xx, R1yy, R1xy, R1yx, B1x, B1y,R2xx, R2yy, R2xy, R2yx, B2x, B2y,hcorrs, vcorrs = self._get_data_from_loaded_directories(selected_corrs=corrs, selected_bpms=bpms)
 
         correction_matrices = {
             "Axx": Axx, "Ayy": Ayy, "B0x": B0x, "B0y": B0y,

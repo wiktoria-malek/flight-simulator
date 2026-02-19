@@ -113,13 +113,14 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
         # Reconstruct lattice positions
         s = 0.0
         lattice = self.simulation_atf2.lattice
-        start=lattice[-1].get_name()
-        end=lattice[0].get_name()
+        element_descriptions = self.simulation_atf2.element_descriptions
+
+        start=lattice["ATF2$END"]
+        end=lattice["ATF2$START"]
         names = list(self.simulation_atf2.lattice.keys())
         start_index = names.index(start)
         end_index = names.index(end) + 1
         names_in_lattice = names[start_index:end_index]
-
         for name in names_in_lattice:
             elem = element_descriptions[name]
             L = elem['L']
@@ -200,15 +201,6 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
         self._plot_series(canvas=self.sigma_x_canvas, fig= self.sigma_x_fig, x=self._lattice_s,y=self._lattice_sigma_x, title="Horizontal Beam Size", ylabel=r"$\sigma_y$ [mm]",xlabel="S [m]")
         self._plot_phase_space(plane_for_M='%x %xp',xlabel = "x [mm]", ylabel = "x' [mrad]",fig = self.x_phase_space_fig)
         self._plot_phase_space(plane_for_M='%y %yp',xlabel = "y [mm]", ylabel = "y' [mrad]",fig = self.y_phase_space_fig)
-
-    # def _clear_graphs(self):
-    #     self._cancel = True
-    #     self._hist_orbit.clear()
-    #     self._hist_disp.clear()
-    #     self._hist_wake.clear()
-    #     self._plot_series(self.traj_canvas, self.traj_fig, [], None, "[mm]")
-    #     self._plot_series(self.disp_canvas, self.disp_fig, [], None, "[mm]")
-    #     self._plot_series(self.wake_canvas, self.wake_fig, [], None, "[mm]")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

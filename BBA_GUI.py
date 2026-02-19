@@ -13,10 +13,7 @@ from matplotlib.figure import Figure
 from LogConsole_BBA import LogConsole
 from SaveOrLoad_BBA import SaveOrLoad_BBA
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
-from ChangeBpmsWeights_BBA import ChangeBpmsWeights_BBA
-
 import matplotlib.pyplot as plt
-
 
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
@@ -68,7 +65,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.appropriate_settings_intensity=None
         self.appropriate_settings_reset_e=None
         self.appropriate_settings_reset_ch=None
-        interface_name=interface.get_name()
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
         self.corrs = self.S.get_correctors()["names"]
@@ -80,7 +76,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.lineEdit_5.setText("10")
         self.lineEdit_6.setText("0.4")
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
-
+        self.bpms_list.itemDoubleClicked.connect(self._edit_bpm_weights)
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
 
@@ -250,13 +246,13 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
             self._cancel = False
             w1, w2, w3, rcond, iters, gain = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
-
             corrs, bpms = self._get_selection()
 
             Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower().startswith('zx')))]
+
             Cy = [s for s in corrs if (s.lower().startswith('zv') or (("SDV" in s) or ("DHJ" in s)))]
 
-            Axx, Ayy, B0x, B0y = self._creating_response_matrices()
+            Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs = self._creating_response_matrices()
 
             self.setWindowTitle("BBA_GUI - [Correction running]")
 
@@ -290,7 +286,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 if it == 0:
                     B0x = O0x
                     B0y = O0y
-
                 # dfs
                 if w2>0:
                     print("Measuring dispersion")
@@ -346,8 +341,14 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 Axx[np.isnan(Axx)] = 0
                 Ayy[np.isnan(Ayy)] = 0
-                Axx[np.isnan(Bx.ravel()),:] =0
+                Axy[np.isnan(Axy)] = 0
+                Ayx[np.isnan(Ayx)] = 0
+
+                Axx[np.isnan(Bx.ravel()),:] =0 #flattens an array into 1d
+                Axy[np.isnan(Bx.ravel()),:] =0 #flattens an array into 1d
+
                 Ayy[np.isnan(By.ravel()),:] = 0
+                Ayx[np.isnan(By.ravel()),:] = 0
 
                 Bx[np.isnan(Bx)] = 0
                 By[np.isnan(By)] = 0
@@ -359,16 +360,36 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 filter_corr_y=np.all(np.isfinite(Ayy),axis=0)
 
                 Axx=Axx[:,filter_corr_x]
-                Ayy=Ayy[:,filter_corr_y]
+                Ayx=Ayx[:,filter_corr_x]
 
-                corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx)  # theta = - gain * Axx^+ *Bx
-                corrY = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By)
+                Ayy=Ayy[:,filter_corr_y]
+                Axy=Axy[:,filter_corr_y]
+
+                Cy_cut=[corr for corr,true in zip(vcorrs,filter_corr_y) if true]
+                Cx_cut=[corr for corr,true in zip(hcorrs,filter_corr_x) if true]
+
+                A = np.block([[Axx,Axy],
+                              [Ayx,Ayy]])
+
+                B=np.vstack([Bx,By])
+
+                A[np.isnan(A)] = 0
+                B[np.isnan(B)] = 0
+
+                # corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx)  # theta = - gain * Axx^+ *Bx
+                # corrY = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By)
+
+                delta = -gain * (np.linalg.pinv(A, rcond=rcond) @ B)
+                print(f"Delta is {delta}")
+                nh=len(Cx_cut)
+                corrX=delta[:nh] # horizontal changes
+                corrY=delta[nh:] # vertical changes
 
                 vals_x = [clamp(v,max_curr_h) for v in corrX.ravel()]
                 vals_y = [clamp(v,max_curr_v) for v in corrY.ravel()] # flattens an array
 
                 vals = np.array(vals_x + vals_y)
-                self.interface.vary_correctors(Cx + Cy, vals)
+                self.interface.vary_correctors(Cx_cut + Cy_cut, vals)
 
                 def filtering_norm_x(Ox,Bx):
                     Ox[np.isnan(Ox)] = 0
@@ -468,7 +489,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
         except Exception as e:
             self.log(f"Error: {e}")
-            print(e)
+            print(f"Error in handling: {e}")
 
     def _display_response_matrix(self):
         orbit_dir=self.trajectory_response_3.text()
