@@ -1,12 +1,11 @@
 # restore button
 # when you substract matrices, if a corrector is missing, you should ignore it
 # threshold doesnt work
+# Rxy and Ryx matrices - how to wire them in BBA?
 # maybe instead of golden orbit, correct from current orbit
 # error bars on the graphs - not a standard error, but something else instead
-# remember to put sato sans screenshots for the clic presentation
 # create 3 panels inside bba gui for the plots
 # display test orbits
-# Rxy matrix
 # add red button to reset the reference orbit in the gui
 # get target dispersion should work like this: first, get the bpms and return target dispersion at those bpms,
     it should basically parse a madx file, read the data and return target dispersion - in the damping ring?? or everywhere?
@@ -21,28 +20,20 @@
 # sysid after hitting 100% should close automatically
 # we can try to make the scripts executable via shell not inputting every time
 # readback set value until it reaches the exact value, it would be faster than sleeping 1 second while doing bba i think
+# add abstract classes to state.py
+# delete state.py completely if not needed, or reformulate this
+# in sysid, you have to click stop several times when in all modes mode in order to stop the gui
 
-Done:
+#
+Now I was thinking: To clarify whether or not we need a State class, I suggest making a table with:
 
-# it would be good to have a log console
-# dont change the table with device names in sysid while extending thw window
-# improve the laser stability
-# make log console also print in the real terminal
-# append points after end of correction, because right now it's just clearing it
-# chi should have a norm (sum)
-# add progress bar to sysid 0-100
-# add session to the tab with response matrices
-# add response matrix in the gui right below correctors and bpms etc and remove their buttons
-# remove chi squared
-# put names of bpms in the sysid x axis to see which one is faulty
-# Linac RFT Simulation
-# DR cycle => 400 000 turns
-# make a proposed name in the session settings, just like in sysid when you want to save a file
-# i think we also need filtering cx and cy in the bba gui
-# it would be nice if sysid do all the modes available
-# add the option in sys id to choose mode orbit/dispersion/wakefield
-# when i extend bba window it makes the buttons etc look weird
-# target dispersion should not be hard coded, but there should be a method called get target dispersion
-# when i close a console log it crashes
-# three lines on the plots with a black line if this is a sum in bba plots
-# keep the load... button in the second tab of bba
+Columns: State — Interface_whatever — Interface_whatever_RFTrack ( three columns is enough: State itself, an interface to a real machine, and an interface to the simulated one)
+Rows: All Methods we need from State and Interfaces. Both those already implemented and those to be implemented (e.g., the screens)
+This will show us which methods need a dedicated implementation in the interfaces (pretty much all of them, I would say) and which methods make sense to be in the state (i.e. common to all interfaces since they are inherited).
+
+In the table cell corresponding to a "method" x "column" combination, you could briefly describe the purpose of the method.
+
+I mean, yesterday we kind of concluded that "State" was possibly redundant. But now I have some second thoughts.
+
+Remember that one of the objectives of the 'State' class is also to store the acquired data on disk. Ultimately, it is just thanks to the State class and its standardised structure we store on disk, that we can use our BBA tools with both simulated and real data identically. We should not underestimate this function of the State class... !
+#
