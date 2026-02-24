@@ -11,7 +11,6 @@ class LogConsole(QDialog):
         self.setMinimumSize(520, 320)
         self.resize(700, 420)
         self.setSizeGripEnabled(True)
-        self.setSizeGripEnabled(True)
         self._title=None
         self.text=QPlainTextEdit(self)
         self.text.setReadOnly(True)

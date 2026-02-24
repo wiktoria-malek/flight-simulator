@@ -1,22 +1,15 @@
 from State import State
 from datetime import datetime
-from functools import partial
-from collections import deque
 import numpy as np
-import threading
-import signal
 import time
 import sys
 import os
 from PyQt6 import uic
-from PyQt6.QtGui import QPixmap, QIcon, QPainter
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressBar
-from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
 from enum import Enum
 import matplotlib
 matplotlib.use('QtAgg')
-import matplotlib.pyplot as plt
-
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -569,12 +562,6 @@ if dialog is None:
     print("Selection cancelled.")
     sys.exit(1)
 
-# if dialog.exec():
-#     print(f"Selected interface: {dialog.selected_interface_name}")
-#     I = dialog.selected_interface
-# else:
-#     print("Selection cancelled.")
-#     sys.exit(1)
 I=dialog
 project_name=I.get_name()
 print(f"Selected interface: {project_name}")

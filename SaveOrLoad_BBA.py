@@ -76,7 +76,7 @@ class SaveOrLoad_BBA():
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
 
 
-    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy, Bx, By):
+    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir = f"~/flight-simulator-data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
@@ -116,12 +116,14 @@ class SaveOrLoad_BBA():
         __save_graph_data(os.path.join(save_session_dir, "wakefield_y_after_correction.txt"), self._hist_wake_y)
 
         corrs, bpms = self._get_selection()
-        R0xx, R0yy, R0xy, R0yx, B0x, B0y, R1xx, R1yy, R1xy, R1yx, B1x, B1y,R2xx, R2yy, R2xy, R2yx, B2x, B2y,hcorrs, vcorrs = self._get_data_from_loaded_directories(selected_corrs=corrs, selected_bpms=bpms)
+        R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs0,vcorrs0,hcorrs1,vcorrs1,hcorrs2,vcorrs2 = self._get_data_from_loaded_directories(selected_corrs=corrs, selected_bpms=bpms)
 
         correction_matrices = {
-            "Axx": Axx, "Ayy": Ayy, "B0x": B0x, "B0y": B0y,
+            "Axx": Axx, "Ayy": Ayy, "Axy":Axy, "Ayx":Ayx, "B0x": B0x, "B0y": B0y,
             "R0xx": R0xx, "R1xx": R1xx, "R2xx": R2xx,
             "R0yy": R0yy, "R1yy": R1yy, "R2yy": R2yy,
+            "R0xy": R0xy, "R0yx": R0yx, "R1xy": R1xy, "R1yx": R1yx,
+            "R2xy": R2xy, "R2yx": R2yx,
             "Bx": Bx, "By": By,
         }
         with open(os.path.join(save_session_dir, "correction_matrices.pkl"), "wb") as f:

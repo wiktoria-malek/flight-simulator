@@ -85,11 +85,6 @@ class InterfaceATF2_Ext_RFTrack():
         B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
         self.lattice.track(B0_offset)
         I=B0_offset.get_info()
-        # print("Emittance after tracking:")
-        # print(f"εx = {I.emitt_x}[mm.rad]")
-        # print(f"εy = {I.emitt_y}[mm.rad]")
-        # print(f"εz = {I.emitt_z}[mm.permille]")
-
         self.log("Emittance after tracking:")
         self.log(f"εx = {I.emitt_x}[mm.rad]")
         self.log(f"εy = {I.emitt_y}[mm.rad]")
@@ -135,30 +130,41 @@ class InterfaceATF2_Ext_RFTrack():
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None):
+        if names is None:
+            names = self.get_bpms_names()
         with open('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
         dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
         columns = lines[star_symbol].lstrip("*").split()
-
-        DX_column = columns.index("DX")
-        DY_column = columns.index("DY")
-        elements_names = columns.index("NAME")
-
+        try:
+            DX_column = columns.index("DX")
+            DY_column = columns.index("DY")
+            elements_names = columns.index("NAME")
+        except ValueError as e:
+            raise RuntimeError("There are no such columns in the twiss file")
+        disp_values={}
         target_disp_x, target_disp_y = [], []
         for line in lines[dollar_sign + 1:]:
             data = line.split()
+            if len(data) <= max(DX_column, DY_column, elements_names): #if a line has less column than needed, it is omitted
+                continue
             bpms_name = data[elements_names].strip('"')
-
-            if names == None or bpms_name in names:
-                target_disp_x.append(float(data[DX_column]))
-                target_disp_y.append(float(data[DY_column]))
-
+            try:
+                disp_values[bpms_name] = (float(data[DX_column]),float(data[DY_column]))
+            except ValueError:
+                continue
+        for bpm in names:
+            if bpm in disp_values:
+                dx,dy = disp_values[bpm]
+            else:
+                dx,dy = float("nan"), float("nan")
+            target_disp_x.append(dx)
+            target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
     def get_icts(self):
-        #print("Reading ict's...")
         self.log("Reading ict's...")
         charge = [ bpm.get_total_charge() for bpm in self.lattice.get_bpms() ]
         icts = {
@@ -180,7 +186,6 @@ class InterfaceATF2_Ext_RFTrack():
         return correctors
     
     def get_bpms(self):
-        #print('Reading bpms...')
         self.log('Reading bpms...')
         x = np.zeros((self.nsamples, len(self.bpms)))
         y = np.zeros(x.shape)
@@ -196,7 +201,6 @@ class InterfaceATF2_Ext_RFTrack():
         return bpms
 
     def get_screens(self, names=None):
-        #print('Reading screens...')
         self.log('Reading screens...')
         nscreens = len(self.screens)
         hpixel = np.ones(nscreens) * 0.001 # mm, horizonatl size of a pixel

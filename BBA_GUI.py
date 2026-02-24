@@ -11,10 +11,11 @@ from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from LogConsole_BBA import LogConsole
+from TestOrbits_BBA import TestOrbits
 from SaveOrLoad_BBA import SaveOrLoad_BBA
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 import matplotlib.pyplot as plt
-
+from BPM_weights import BPM_weights
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
     ATF2_EXT = "ATF2_Ext"
@@ -38,8 +39,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._hist_orbit_x,self._hist_orbit_y = [],[]
         self._hist_disp_x,self._hist_disp_y = [],[]
         self._hist_wake_x,self._hist_wake_y = [],[]
+        self._hist_orbit_x_err,self._hist_orbit_y_err, self._hist_orbit_err = [],[],[]
+        self._hist_disp_x_err,self._hist_disp_y_err,self._hist_disp_err = [],[],[]
+        self._hist_wake_x_err,self._hist_wake_y_err,self._hist_wake_err = [],[],[]
         self.log_console=None
         self.show_response_matrix=None
+        self.test_orbits=None
         self._setup_canvases()
         self._populate_lists()
         self._procs=[]
@@ -47,6 +52,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.load_bpms_button.clicked.connect(self._load_bpms)
         self.radio_buttons=[self.mode_orbit,self.mode_dispersion, self.mode_wakefield]
         self.pushButton_log.clicked.connect(self._show_console_log)
+        self.pushButton_testorb.clicked.connect(self._show_test_orbits)
         self.session_database_3.setText(dir_name)
         if hasattr(self, "pushButton_8"):  # traj
             self.pushButton_8.clicked.connect(self._pick_and_load_traj_data)
@@ -75,8 +81,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.lineEdit_4.setText("0.001")
         self.lineEdit_5.setText("10")
         self.lineEdit_6.setText("0.4")
+        self.lineEdit_beta.setText("0")
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
         self.bpms_list.itemDoubleClicked.connect(self._edit_bpm_weights)
+        self.bpm_weights={}
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
 
@@ -101,6 +109,16 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
+    def _edit_bpm_weights(self,bpm):
+        bpm_name=bpm.text()
+        bpm_window=BPM_weights(bpm_name=bpm_name,parent=self)
+        if bpm_name in self.bpm_weights:
+            w_orb,w_dfs,w_wfs=self.bpm_weights[bpm_name]
+            bpm_window.set_values(w_orb,w_dfs,w_wfs)
+
+        if bpm_window.exec()==QDialog.DialogCode.Accepted:
+            self.bpm_weights[bpm_name] = bpm_window.get_values()
 
 
     def _on_start_click(self):
@@ -145,18 +163,22 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.disp_fig, self.disp_canvas,self.disp_ax = install(self.plot_widget_4)
         self.wake_fig, self.wake_canvas, self.wake_ax = install(self.plot_widget_5)
 
-    def _plot_series(self, ax, canvas, values_x,values_y, vals,title=None,ylabel="[mm]"):
+    def _plot_series(self, ax, canvas, values_x,values_y, vals,title=None,ylabel="Residual norm [mm]", error_x=None,error_y=None,error_all=None):
         if canvas is None or ax is None:
             return
         ax.clear()
+
         if values_x:
-            ax.plot(range(1, len(values_x) + 1), values_x, marker="o",color='red',label="x")
+            err_x=error_x if error_x is not None else None
+            ax.errorbar(range(1, len(values_x) + 1), values_x,yerr=err_x, marker="o",color='red',label="x",capsize=6, elinewidth=2, capthick=2, markersize=4) #yerr - height of the error bar on the plot, capsize - size of the top line on the error bar
         if values_y:
-            ax.plot(range(1, len(values_y) + 1), values_y, marker="o",color='blue',label="y")
+            err_y=error_y if error_y is not None else None
+            ax.errorbar(range(1, len(values_y) + 1), values_y, yerr=err_y,marker="o",color='blue',label="y", capsize=6, elinewidth=2, capthick=2, markersize=4)
         if vals:
-            ax.plot(range(1, len(vals) + 1), vals, linestyle="dashed",color='black',label="combined norm")
+            err_all=error_all if error_all is not None else None
+            ax.errorbar(range(1, len(vals) + 1), vals, yerr=err_all,linestyle="dashed",color='black',label="combined norm",capsize=6, elinewidth=2, capthick=2, markersize=4)
         if values_x or values_y:
-            ax.legend(fontsize=7)
+            ax.legend(fontsize=7,loc="upper right")
         if title is not None:
             ax.set_title(title)
         ax.set_xlabel("Iteration", fontsize=8)
@@ -202,6 +224,49 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
         return prog, cb
 
+    def _calc_error(self,x_meas,y_meas,ref_x,ref_y, disp_x=None,disp_y=None):
+        x_val=np.asarray(x_meas,dtype=float)
+        y_val=np.asarray(y_meas,dtype=float)
+        meanx=np.mean(x_val,axis=0)
+        meany=np.mean(y_val,axis=0)
+        faulty=(meanx==0.0) & (meany==0.0)
+        if np.any(faulty):
+            x_val[:,faulty]=np.nan
+            y_val[:,faulty]=np.nan
+        ref_x = np.asarray(ref_x, dtype=float).reshape(1, -1)
+        ref_y = np.asarray(ref_y, dtype=float).reshape(1, -1)
+
+        if disp_x is None:
+            disp_x=0
+        if disp_y is None:
+            disp_y=0
+
+        disp_x=np.asarray(disp_x,dtype=float).reshape(1,-1)
+        disp_y=np.asarray(disp_y,dtype=float).reshape(1,-1)
+
+        dx=x_val-ref_x-disp_x
+        dy=y_val-ref_y-disp_y
+
+        dx=np.nan_to_num(dx,nan=0,posinf=0,neginf=0)
+        dy=np.nan_to_num(dy,nan=0,posinf=0,neginf=0)
+
+        x_norm=np.linalg.norm(dx,axis=1)
+        y_norm=np.linalg.norm(dy,axis=1)
+        all_norm=x_norm+y_norm
+
+        def std_calc(a):
+            a=np.asarray(a,dtype=float)
+            a=a[np.isfinite(a)]
+            if a.size==0:
+                return float("nan"), float("nan")
+            if a.size==1:
+                return float(a[0]), 0
+            return float(np.mean(a)),float(np.std(a,ddof=1))
+        mean_x,std_x=std_calc(x_norm)
+        mean_y,std_y=std_calc(y_norm)
+        mean_all,std_all=std_calc(all_norm)
+        return mean_x,mean_y,std_x,std_y,mean_all,std_all
+
     def _read_params(self):
         def getf(name, default):  # gets the text value and turns it into a float
             w = getattr(self, name, None)
@@ -237,16 +302,37 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         rcond = getf("lineEdit_4", 0.001)
         iters = geti("lineEdit_5", 10)
         gain = getf("lineEdit_6", 0.4)
-        return orbit_w, disp_w, wake_w, rcond, iters, gain
+        beta = getf("lineEdit_beta", 0.0)
+        return orbit_w, disp_w, wake_w, rcond, iters, gain,beta
 
     def _start_correction(self):
         try:
             print("Starting correction...")
             self.log("Starting correction...")
             self._cancel = False
-            w1, w2, w3, rcond, iters, gain = self._read_params()
+            w1, w2, w3, rcond, iters, gain,beta = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
             corrs, bpms = self._get_selection()
+            n=len(bpms)
+            wbpm_orb_vec,wbpm_dfs_vec,wbpm_wfs_vec=[],[],[]
+            for bpm in bpms:
+                wbpm_orb,wbpm_dfs,wbpm_wfs = self.bpm_weights.get(bpm,(1.0,1.0,1.0))
+                wbpm_orb_vec.append(wbpm_orb)
+                wbpm_dfs_vec.append(wbpm_dfs)
+                wbpm_wfs_vec.append(wbpm_wfs)
+            wbpm_orb_vec=np.array(wbpm_orb_vec,dtype=float).reshape(n,1)
+            wbpm_dfs_vec=np.array(wbpm_dfs_vec,dtype=float).reshape(n,1)
+            wbpm_wfs_vec=np.array(wbpm_wfs_vec,dtype=float).reshape(n,1)
+
+            w_parts=[]
+            if w1>0: w_parts.append(wbpm_orb_vec)
+            if w2>0: w_parts.append(wbpm_dfs_vec)
+            if w3>0: w_parts.append(wbpm_wfs_vec)
+
+            W_x=np.vstack(w_parts)
+            W_xy=np.vstack([W_x,W_x]) #because the weights are the same, B=vstack(bx,by)
+            #W_xy=np.clip(W_xy, 0, 25) #idk, maybe later there's a need for clamp
+            w_xy_bpms=np.sqrt(W_xy)
 
             Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower().startswith('zx')))]
 
@@ -275,15 +361,22 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
                 # nominal
                 print("Measuring orbit")
-
                 self.log("Measuring orbit")
                 self.S.pull(self.interface)
                 print('State::pull done')
-                O0 = self.S.get_orbit(bpms)
-                O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
-                O0y = O0['y'].reshape(-1, 1)
+                O0 = self.S.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
+                O0x=np.asarray(O0['x'],dtype=float).reshape(-1,1)
+                O0y=np.asarray(O0['y'],dtype=float).reshape(-1,1)
+
+                bpms0=self.S.get_bpms(bpms)
+                x0_vals=np.asarray(bpms0['x'],dtype=float)
+                y0_vals=np.asarray(bpms0['y'],dtype=float)
+
+                # O0 = self.S.get_orbit(bpms)
+                # O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
+                # O0y = O0['y'].reshape(-1, 1)
                 
-                if it == 0:
+                if it == 0: #instead of golden orbit, correct from current orbit
                     B0x = O0x
                     B0y = O0y
                 # dfs
@@ -294,8 +387,11 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self.S.pull(self.interface)
                     self.interface.reset_energy()
                     O1 = self.S.get_orbit(bpms)
-                    O1x = O1['x'].reshape(-1, 1)
-                    O1y = O1['y'].reshape(-1, 1)
+                    O1x=np.asarray(O1['x'],dtype=float).reshape(-1,1)
+                    O1y=np.asarray(O1['y'],dtype=float).reshape(-1,1)
+                    bpms1 = self.S.get_bpms(bpms)
+                    x1_vals = np.asarray(bpms1["x"], dtype=float)
+                    y1_vals = np.asarray(bpms1["y"], dtype=float)
                     Dx = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1,1)
                     Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1,1)
                     plt.clf()
@@ -312,10 +408,22 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     self.S.pull(self.interface)
                     self.interface.reset_intensity()
                     O2 = self.S.get_orbit(bpms)
-                    O2x = O2['x'].reshape(-1, 1)
-                    O2y = O2['y'].reshape(-1, 1)
+                    O2x = np.asarray(O2['x'], dtype=float).reshape(-1, 1)
+                    O2y = np.asarray(O2['y'], dtype=float).reshape(-1, 1)
+                    bpms2 = self.S.get_bpms(bpms)
+                    x2_vals = np.asarray(bpms2["x"], dtype=float)
+                    y2_vals = np.asarray(bpms2["y"], dtype=float)
                 else:
                     O2x=O2y=None
+                self.test_orbits_data={
+                    "selected_bpms": list(bpms),
+                    "O0x": np.asarray(O0x).reshape(-1), # because np.array is creating a copy
+                    "O1x": None if O1x is None else np.asarray(O1x).reshape(-1),
+                    "O2x": None if O2x is None else np.asarray(O2x).reshape(-1),
+                    "O0y": np.asarray(O0y).reshape(-1),
+                    "O1y": None if O1y is None else np.asarray(O1y).reshape(-1),
+                    "O2y": None if O2y is None else np.asarray(O2y).reshape(-1),
+                }
 
                 Bx=[]
                 By=[]
@@ -323,15 +431,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     Bx.append(wgt_orb*(O0x-B0x))
                     By.append(wgt_orb*(O0y-B0y))
 
-                print(Bx[-1].shape)
                 if w2>0 and O1x is not None:
                     plt.plot((O1x-O0x), label='measured')
                     plt.show()
-
                     Bx.append(wgt_dfs*((O1x-O0x) - Dx))
                     By.append(wgt_dfs*((O1y-O0y) - Dy))
 
-                print(Bx[-1].shape)
                 if w3>0 and O2x is not None:
                     By.append(wgt_wfs*(O2y-O0y))
                     Bx.append(wgt_wfs*(O2x-O0x))
@@ -344,8 +449,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 Axy[np.isnan(Axy)] = 0
                 Ayx[np.isnan(Ayx)] = 0
 
-                Axx[np.isnan(Bx.ravel()),:] =0 #flattens an array into 1d
-                Axy[np.isnan(Bx.ravel()),:] =0 #flattens an array into 1d
+                Axx[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
+                Axy[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
 
                 Ayy[np.isnan(By.ravel()),:] = 0
                 Ayx[np.isnan(By.ravel()),:] = 0
@@ -356,8 +461,8 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 # A = U * Sigma * V^
                 # A^+ = V * Sigma^+ * U^T
 
-                filter_corr_x=np.all(np.isfinite(Axx),axis=0) #corrs
-                filter_corr_y=np.all(np.isfinite(Ayy),axis=0)
+                filter_corr_x=np.all(np.isfinite(Axx),axis=0) & np.all(np.isfinite(Ayx),axis=0) #corrs
+                filter_corr_y=np.all(np.isfinite(Ayy),axis=0) & np.all(np.isfinite(Axy),axis=0)
 
                 Axx=Axx[:,filter_corr_x]
                 Ayx=Ayx[:,filter_corr_x]
@@ -379,7 +484,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 # corrX = -gain * (np.linalg.pinv(Axx, rcond=rcond) @ Bx)  # theta = - gain * Axx^+ *Bx
                 # corrY = -gain * (np.linalg.pinv(Ayy, rcond=rcond) @ By)
 
-                delta = -gain * (np.linalg.pinv(A, rcond=rcond) @ B)
+                A_weighted=w_xy_bpms*A
+                B_weighted=w_xy_bpms*B
+
+                delta = -gain * (np.linalg.pinv(A_weighted, rcond=rcond) @ B_weighted)
                 print(f"Delta is {delta}")
                 nh=len(Cx_cut)
                 corrX=delta[:nh] # horizontal changes
@@ -406,29 +514,45 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     return float(np.linalg.norm(Oy - By))
 
                 if w1>0:
-                    self._hist_orbit_x.append(filtering_norm_x(O0x,B0x))
-                    self._hist_orbit_y.append(filtering_norm_y(O0y,B0y))
-                    self._hist_orbit.append(filtering_norm_x(O0x,B0x) + filtering_norm_y(O0y,B0y))
+                    mean_orbit_x,mean_orbit_y,err_x_orbit,err_y_orbit,mean_orbit_all,err_orbit_all=self._calc_error(x0_vals,y0_vals,ref_x=B0x.ravel(),ref_y=B0y.ravel()) # ravel makes data a vector
+                    self._hist_orbit_x.append(mean_orbit_x)
+                    self._hist_orbit_y.append(mean_orbit_y)
+                    self._hist_orbit.append(mean_orbit_all)
+                    self._hist_orbit_x_err.append(err_x_orbit)
+                    self._hist_orbit_y_err.append(err_y_orbit)
+                    self._hist_orbit_err.append(err_orbit_all)
 
-                if w2>0 and O1x is not None:
-                    self._hist_disp_x.append(filtering_norm_x(O0x,O1x-Dx))
-                    self._hist_disp_y.append(filtering_norm_y(O0y,O1y-Dy))
-                    self._hist_disp.append(filtering_norm_x(O0x,O1x-Dx) + filtering_norm_y(O0y,O1y-Dy))
+                if w2>0 and O1x is not None and O1y is not None:
+                    dx_disp=x1_vals-x0_vals
+                    dy_disp=y1_vals-y0_vals
+                    mean_disp_x,mean_disp_y,err_disp_x,err_disp_y,mean_disp_all,err_disp_all=self._calc_error(dx_disp,dy_disp,ref_x=np.zeros(dx_disp.shape[1]), ref_y=np.zeros(dy_disp.shape[1]),disp_x=Dx.ravel(),disp_y=Dy.ravel())
+                    self._hist_disp_x.append(mean_disp_x)
+                    self._hist_disp_y.append(mean_disp_y)
+                    self._hist_disp.append(mean_disp_all)
+                    self._hist_disp_x_err.append(err_disp_x)
+                    self._hist_disp_y_err.append(err_disp_y)
+                    self._hist_disp_err.append(err_disp_all)
 
                 if w3>0 and O2x is not None:
-                    self._hist_wake_x.append(filtering_norm_x(O0x,O2x))
-                    self._hist_wake_y.append(filtering_norm_y(O0y,O2y))
-                    self._hist_wake.append(filtering_norm_x(O0x,O2x) + filtering_norm_y(O0y,O2y))
+                    dx_wake=x2_vals-x0_vals
+                    dy_wake=y2_vals-y0_vals
+                    mean_wake_x, mean_wake_y, err_wake_x, err_wake_y, mean_wake_all, err_wake_all = self._calc_error(dx_wake, dy_wake,ref_x=np.zeros(dx_wake.shape[1]), ref_y=np.zeros(dy_wake.shape[1]))
+                    self._hist_wake_x.append(mean_wake_x)
+                    self._hist_wake_y.append(mean_wake_y)
+                    self._hist_wake.append(mean_wake_all)
+                    self._hist_wake_x_err.append(err_wake_x)
+                    self._hist_wake_y_err.append(err_wake_y)
+                    self._hist_wake_err.append(err_wake_all)
 
-                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y, vals=self._hist_orbit, title=None,ylabel="[mm]")
-                self._plot_series(ax=self.disp_ax,canvas= self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,title=None,ylabel="[mm]")
-                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,title=None,ylabel="[mm]")
+                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y, vals=self._hist_orbit,error_x=self._hist_orbit_x_err, error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None,ylabel="Residual norm [mm]")
+                self._plot_series(ax=self.disp_ax,canvas= self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None,ylabel="Residual norm [mm]")
+                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,error_x=self._hist_wake_x_err, error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None,ylabel="Residual norm [mm]")
                 QApplication.processEvents()
 
             self.setWindowTitle("BBA_GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
             self.log("Correction finished.")
-            self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy, Bx, By)
+            self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By)
 
         except Exception as e:
             self.setWindowTitle("BBA_GUI")
@@ -439,6 +563,18 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._cancel = True
         QMessageBox.information(self, "Correction", "Stop requested. Finishing current iteration...")
         self.log("Stop requested. Finishing current iteration...")
+
+    def _show_test_orbits(self):
+        if self.test_orbits is None:
+            self.test_orbits=TestOrbits(self)
+        if not hasattr(self, "test_orbits_data") or self.test_orbits_data is None:
+            QMessageBox.information(self, "No test orbits available", "No test orbits available.")
+        else:
+            self.test_orbits._plot_test_orbits(selected_bpms=self.test_orbits_data["selected_bpms"],O0x=self.test_orbits_data["O0x"],O0y=self.test_orbits_data["O0y"],
+                                               O1x=self.test_orbits_data["O1x"],O1y=self.test_orbits_data["O1y"],O2x=self.test_orbits_data["O2x"],O2y=self.test_orbits_data["O2y"])
+        self.test_orbits.show()
+        self.test_orbits.raise_()
+        self.test_orbits.activateWindow()
 
     def _show_console_log(self):
         if self.log_console is None:
@@ -462,9 +598,12 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self._hist_disp_x.clear(),self._hist_disp_y.clear()
         self._hist_wake_x.clear(),self._hist_wake_y.clear()
         self._hist_orbit.clear(),self._hist_disp.clear(),self._hist_wake.clear()
-        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],vals=[],title=None,ylabel="[mm]")
-        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None,ylabel="[mm]")
-        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None,ylabel="[mm]")
+        self._hist_orbit_x_err.clear(), self._hist_orbit_y_err.clear(), self._hist_orbit_err.clear()
+        self._hist_disp_x_err.clear(), self._hist_disp_y_err.clear(), self._hist_disp_err.clear()
+        self._hist_wake_x_err.clear(), self._hist_wake_y_err.clear(), self._hist_wake_err.clear()
+        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],vals=[],title=None,ylabel="Residual norm [mm]")
+        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None,ylabel="Residual norm [mm]")
+        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None,ylabel="Residual norm [mm]")
 
     def handling(self, app_name,cwd=None, args=None):
         try:

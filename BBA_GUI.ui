@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>645</width>
-    <height>860</height>
+    <width>800</width>
+    <height>886</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -597,6 +597,27 @@
                </item>
               </layout>
              </item>
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_beta">
+               <item>
+                <widget class="QLabel" name="label_beta">
+                 <property name="text">
+                  <string>Beta parameter</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="lineEdit_beta">
+                 <property name="maximumSize">
+                  <size>
+                   <width>410</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
             </layout>
            </widget>
           </item>
@@ -623,20 +644,11 @@
              </widget>
             </item>
             <item>
-             <spacer name="before_current_spacer">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+             <widget class="QPushButton" name="pushButton_testorb">
+              <property name="text">
+               <string>Display test orbits</string>
               </property>
-              <property name="sizeType">
-               <enum>QSizePolicy::Expanding</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>180</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
+             </widget>
             </item>
             <item>
              <layout class="QHBoxLayout" name="current_layout">

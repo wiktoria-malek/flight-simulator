@@ -132,11 +132,11 @@ class DFS_WFS_Correction_BBA():
 
         triangular = bool(self._force_triangular() or _force_triangular)
 
-        R0xx,R0yy,R0xy,R0yx,B0x,B0y,hcorrs,vcorrs=self._compute_response_matrix(pairs=info_traj["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
-        R1xx,R1yy,R1xy,R1yx,B1x,B1y,hcorrs,vcorrs=self._compute_response_matrix(pairs=info_dfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
-        R2xx,R2yy,R2xy,R2yx,B2x,B2y,hcorrs,vcorrs=self._compute_response_matrix(pairs=info_wfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
+        R0xx,R0yy,R0xy,R0yx,B0x,B0y,hcorrs0,vcorrs0=self._compute_response_matrix(pairs=info_traj["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
+        R1xx,R1yy,R1xy,R1yx,B1x,B1y,hcorrs1,vcorrs1=self._compute_response_matrix(pairs=info_dfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
+        R2xx,R2yy,R2xy,R2yx,B2x,B2y,hcorrs2,vcorrs2=self._compute_response_matrix(pairs=info_wfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
 
-        return R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs,vcorrs
+        return R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs0,vcorrs0,hcorrs1,vcorrs1,hcorrs2,vcorrs2
 
     def _creating_response_matrices(self):
 
@@ -145,7 +145,35 @@ class DFS_WFS_Correction_BBA():
 
         corrs, bpms = self._get_selection()
 
-        R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs,vcorrs  = self._get_data_from_loaded_directories(selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular())
+        R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs0,vcorrs0,hcorrs1,vcorrs1,hcorrs2,vcorrs2  = self._get_data_from_loaded_directories(selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular())
+
+        def _handle_missing_corrector(R,corrs,corrs_ref):
+            if corrs== corrs_ref:
+                return R
+            else:
+                index={c: i for i, c in enumerate(corrs)}
+                final_matrix=np.zeros((R.shape[0],len(corrs_ref)), dtype=float)
+                for j,c in enumerate(corrs_ref):
+                    i=index.get(c)
+                    if i is not None:
+                        final_matrix[:,j] = R[:,i]
+                return final_matrix
+        #intersection
+        hcorrs=[c for c in hcorrs0 if (c in hcorrs1 and c in hcorrs2)]
+        vcorrs=[c for c in vcorrs0 if (c in vcorrs1 and c in vcorrs2)]
+
+        R0xx=_handle_missing_corrector(R0xx, hcorrs0,hcorrs)
+        R0yy=_handle_missing_corrector(R0yy, vcorrs0,vcorrs)
+        R0xy=_handle_missing_corrector(R0xy, vcorrs0,vcorrs)
+        R0yx=_handle_missing_corrector(R0yx, hcorrs0,hcorrs)
+        R1xx=_handle_missing_corrector(R1xx, hcorrs1,hcorrs)
+        R1yy=_handle_missing_corrector(R1yy, vcorrs1,vcorrs)
+        R1xy=_handle_missing_corrector(R1xy, vcorrs1,vcorrs)
+        R1yx=_handle_missing_corrector(R1yx, hcorrs1,hcorrs)
+        R2xx=_handle_missing_corrector(R2xx, hcorrs2,hcorrs)
+        R2yy=_handle_missing_corrector(R2yy, vcorrs2,vcorrs)
+        R2xy=_handle_missing_corrector(R2xy, vcorrs2,vcorrs)
+        R2yx=_handle_missing_corrector(R2yx, hcorrs2,hcorrs)
 
         Axx=[]
         Ayy=[]

@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import time, math
+from LogConsole_BBA import LogConsole
 
 from epics import PV, ca
 
@@ -9,6 +10,7 @@ class InterfaceATF2_Linac:
         return 'ATF2_Linac'
 
     def __init__(self, nsamples=1):
+        self.log = print
         self.nsamples = nsamples
         # Bpms and correctors in beamline order
         sequence = [ 
@@ -73,10 +75,13 @@ class InterfaceATF2_Linac:
         self.phase_kl1 = PV('CM1L:phaseRead').get()
         self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
 
+    def log_messages(self,console):
+        self.log=console or print
+
     def change_energy(self):
         pv = PV('CM1L:phaseWrite')
         rel_phase = 5
-        pv.put(self.phase_kl1+ref_phase)
+        pv.put(self.phase_kl1+rel_phase)
         time.sleep(1)
         dP_P = 0.0 # we don't really know it
         return dP_P
@@ -116,6 +121,9 @@ class InterfaceATF2_Linac:
 
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
+
+    def get_target_dispersion(self):
+        pass
 
     def get_icts(self):
         print("Reading ict's...")
@@ -170,6 +178,9 @@ class InterfaceATF2_Linac:
         tmit = np.vstack(tmit) if len(tmit) else []
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
+
+    def get_screens(self):
+        pass
 
     def push(self, names, corr_vals):
         if type(corr_vals) == float:

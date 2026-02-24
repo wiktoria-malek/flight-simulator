@@ -72,36 +72,12 @@ class State:
         stdx = np.std(bpms['x'],axis=0) # mm #standard deviation
         stdy = np.std(bpms['y'],axis=0) # mm
         tmit = np.mean(bpms['tmit'],axis=0)
+        nshots=int(np.shape(bpms['x'])[0])
         faulty = (x == 0.0) & (y == 0.0)
         x[faulty] = np.nan
         y[faulty] = np.nan
-        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names) }
+        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names),"nshots": nshots }
         return orbit
-
-    """"
-    def change_energy(self, interface, *args):
-        interface.change_energy(*args)
-        pass
-
-    def reset_energy(self, interface, *args):
-        interface.reset_energy(*args)
-        pass
-
-    def change_intensity(self, interface, *args):
-        interface.change_intensity(*args)
-        pass
-
-    def reset_intensity(self, interface, *args):
-        interface.reset_intensity(*args)
-        pass
-
-    def push(self, interface, names, corr_vals):
-        interface.push(names, corr_vals)
-    
-    def vary_correctors(self, interface, names, corr_vals):
-        interface.vary_correctors(names, corr_vals)
-    
-    """
 
     def load(self, filename):
         from glob import glob
@@ -168,6 +144,3 @@ class State:
         with open(filename, "wb") as file:
             pickle.dump(state, file)
         return filename
-            
-    def push(self, interface):
-        interface.push(self.correctors['names'], self.correctors['bdes']) #restores, because errors would add up i think
