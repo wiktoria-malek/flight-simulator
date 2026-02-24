@@ -94,10 +94,10 @@ class InterfaceATF2_DR_RFTrack():
         I0 = self.B0.get_info()
         dx = self.jitter*I0.sigma_x
         dy = self.jitter*I0.sigma_y
-        dz, roll = 0.0, 0.0
+        dz, roll, dt = 0.0, 0.0, 0.0
         pitch = self.jitter*I0.sigma_py
         yaw   = self.jitter*I0.sigma_px
-        B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
+        B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         self.lattice.track(B0_offset)
         I=B0_offset.get_info()
         # print("Emittance after tracking:")

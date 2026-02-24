@@ -1,13 +1,13 @@
 import numpy as np
 import time, math
 
-from epics import PV, ca
+from epics import PV, ca, caget
 
 class InterfaceATF2_DR:
     def get_name(self):
         return 'ATF2_DR'
 
-    def __init__(self, nsamples=1):
+    def __init__(self, nsamples=1, nominal_intensity=0.1, wfs_intensity=0.125):
         self.nsamples = nsamples
         # Bpms and correctors in beamline order
         sequence = [
@@ -30,7 +30,7 @@ class InterfaceATF2_DR:
  'MB66R', 'ZV34R', 'MB67R', 'ZH33R', 'MB68R', 'MB69R', 'ZH34R', 'ZV35R',
  'MB70R', 'ZV36R', 'MB71R', 'ZH35R', 'ZV37R', 'MB72R', 'ZH36R', 'MB73R', 'ZV38R',
  'MB74R', 'ZH37R', 'ZV39R', 'MB76R', 'ZV40R', 'MB77R', 'ZH38R',
- 'MB78R', 'ZH41R', 'MB79R', 'ZV39R', 'ZH42R', 'MB80R', 'ZV43R', 'ZH40R',
+ 'MB78R', 'ZV41R', 'MB79R', 'ZV39R', 'ZH42R', 'MB80R', 'ZV43R', 'ZH40R',
  'MB81R','MB82R', 'ZV44R', 'ZH41R', 'MB83R', 'ZV45R', 'MB84R', 'ZH42R', 'MB85R', 'MB86R',
  'ZV46R', 'ZH43R', 'MB87R', 'MB88R', 'ZV47R', 'ZH44R', 'MB89R', 'MB90R',
  'ZV48R', 'ZH45R', 'MB91R', 'MB92R', 'ZV49R', 'ZH46R', 'MB93R', 'MB94R',
@@ -46,7 +46,6 @@ class InterfaceATF2_DR:
 'MB34R', 'MB35R', 'MB36R', 'MB37R','MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 
 'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R','MB54R', 'MB55R', 'MB56R', 'MB57R', 'MB58R', 'MB59R', 'MB60R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB70R', 'MB71R', 'MB72R', 'MB73R', 'MB74R', 'MB76R', 'MB77R', 'MB78R', 'MB79R', 'MB80R', 'MB81R','MB82R', 'MB83R', 'MB84R', 'MB85R', 'MB86R', 'MB87R', 'MB88R', 'MB89R', 'MB90R','MB91R', 'MB92R', 'MB93R', 'MB94R','MB95R', 'MB96R', 'MB97R', 'MB98R'
         ]
-        monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB71R']
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
         # Check if the bpms in the config files are known to Epics
@@ -67,7 +66,9 @@ class InterfaceATF2_DR:
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
-        self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
+        self.nominal_laser_intensity = nominal_intensity
+        self.test_laser_intensity = wfs_intensity
+        #self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
@@ -85,18 +86,21 @@ class InterfaceATF2_DR:
     def reset_energy(self):
         PV('RAMP:CONTROL_OFF_SW').put(0)
         time.sleep(2)
-        
+
     def change_intensity(self):
-        print(f'Changing laser intensity to {laserintensity}...')
-        new_laser_intensity = 0.15 # 0..1
+        new_laser_intensity = self.test_laser_intensity
+        print(f'Changing laser intensity to {new_laser_intensity}...')
         laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
         return self
 
     def reset_intensity(self):
-        print('Resetting laser intensity...')
-        PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity)
+        new_laser_intensity = self.nominal_laser_intensity
+        print(f'Resetting laser intensity to {new_laser_intensity}...')
+        laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
+        PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
+        time.sleep(3)
         return self
 
     def get_sequence(self, *args):
@@ -116,6 +120,29 @@ class InterfaceATF2_DR:
 
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
+
+    def get_target_dispersion(self, names=None):
+        with open('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws', "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+
+        DX_column = columns.index("DX")
+        DY_column = columns.index("DY")
+        elements_names = columns.index("NAME")
+
+        target_disp_x, target_disp_y = [], []
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            bpms_name = data[elements_names].strip('"')
+
+            if names == None or bpms_name in names:
+                target_disp_x.append(float(data[DX_column]))
+                target_disp_y.append(float(data[DY_column]))
+
+        return target_disp_x, target_disp_y
 
     def get_icts(self):
         print("Reading ict's...")
@@ -151,21 +178,27 @@ class InterfaceATF2_DR:
 
     def get_bpms(self):
         print('Reading bpms...')
-        p = PV('DR:monitors')
+        #p = PV('ATF2:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
-            print(f'Sample = {sample}')
-            a = p.get().reshape((-1, 10))
-            a = a[a[:,0]==1,:]
-            a = a[a[:,3]>0,:]
-            x.append(a[:, 1])
-            y.append(a[:, 2])
-            tmit.append(a[:, 3])
-            time.sleep(1)
+            try:
+                print(f'Sample = {sample}')
+                m = caget('DR:monitors')
+                a = m.reshape((-1, 10))
+                status = a[self.bpm_indexes, 0]
+                # Set elements that are not equal to 1 to zero
+                status[status != 1] = 0
+                x.append(a[self.bpm_indexes, 1])
+                y.append(a[self.bpm_indexes, 2])
+                print('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
+                tmit.append(status * a[self.bpm_indexes, 3])
+                time.sleep(1)
+            except Exception as e:
+                print(f'An error occurred: {e}')
+                sample = sample-1
         names = [ self.bpms ] if type(self.bpms) == str else self.bpms
         x = np.vstack(x) / 1e3 # mm
         y = np.vstack(y) / 1e3 # mm
-
         tmit = np.vstack(tmit)
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms

@@ -1,12 +1,12 @@
 import sys, time, math,os
 import numpy as np
-from epics import PV, ca
+from epics import PV, ca, caget
 
 class InterfaceATF2_Ext:
     def get_name(self):
         return 'ATF2_Ext'
 
-    def __init__(self, nsamples=1):
+    def __init__(self, nsamples=1, nominal_intensity=0.15, wfs_intensity=0.1):
         self.nsamples = nsamples
         # Bpms and correctors in beamline order
         sequence = [
@@ -22,6 +22,7 @@ class InterfaceATF2_Ext:
             "MQF5AFF", "MQD4BFF", "MSD4FF", "MQD4AFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
             "MSF1FF", "MQF1FF", "MSD0FF", "MQD0FF", "PREIP", "IPA", "IPB", "IPC", "M-PIP"
         ]
+        sequence = [ 'MB1X', 'MB2X', 'ZV1X', 'MQF1X', 'ZV2X', 'MQD2X', 'MQF3X', 'ZH1X', 'ZV3X', 'MQF4X', 'ZH2X', 'MQD5X', 'ZV4X', 'ZV5X', 'MQF6X', 'MQF7X', 'ZVFB1X', 'ZHFB1X', 'ZH3X', 'MQD8X', 'ZV6X', 'ZHFB2X', 'MQF9X', 'ZH4X', 'ZVFB2X', 'ZV7X', 'MQD10X', 'ZH5X', 'MQF11X', 'ZV8X', 'MQD12X', 'ZH6X', 'MQF13X', 'MQD14X', 'ZH7X', 'MQF15X', 'ZV9X', 'MQD16X', 'ZH8X', 'MQF17X', 'ZV10X', 'MQD18X', 'ZH9X', 'MQF19X', 'ZV11X', 'MQD20X', 'ZVFB1FF', 'ZHFB1FF', 'ZH10X', 'MQF21X', 'MQM16FF', 'ZH1FF', 'ZV1FF', 'MQM15FF', 'MQM14FF', 'MQM12FF', 'MQM11FF', 'MQD10AFF', 'MQF9AFF', 'MQD8FF', 'MQF7FF', 'MQF5BFF', 'MQD4BFF', 'MQF3FF', 'MQD2BFF', 'MQD2AFF', 'MSF1FF', 'MPREIP', 'MW1IP', 'MPIP', 'MDUMP' ]
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         monitors = ['MB1X', 'MB2X', 'MQF1X', 'MQD2X', 'MQF3X', 'MQF4X',
@@ -57,7 +58,9 @@ class InterfaceATF2_Ext:
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
-        self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
+        self.nominal_laser_intensity = nominal_intensity
+        self.test_laser_intensity = wfs_intensity
+        #PV('RFGun:LaserIntensity1:Read').get()
 
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
@@ -77,7 +80,7 @@ class InterfaceATF2_Ext:
         time.sleep(2)
 
     def change_intensity(self):
-        new_laser_intensity = 0.15 # 0..1
+        new_laser_intensity = self.test_laser_intensity
         print(f'Changing laser intensity to {new_laser_intensity}...')
         laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
@@ -85,8 +88,11 @@ class InterfaceATF2_Ext:
         return self
 
     def reset_intensity(self):
-        print('Resetting laser intensity...')
-        PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity)
+        new_laser_intensity = self.nominal_laser_intensity
+        print(f'Resetting laser intensity to {new_laser_intensity}...')
+        laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
+        PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
+        time.sleep(3)
         return self
     
     def get_sequence(self):
@@ -157,19 +163,24 @@ class InterfaceATF2_Ext:
     
     def get_bpms(self):
         print('Reading bpms...')
-        p = PV('ATF2:monitors')
+        #p = PV('ATF2:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
-            print(f'Sample = {sample}')
-            a = p.get().reshape((-1, 10))
-            status = a[self.bpm_indexes, 0]
-            # Set elements that are not equal to 1 to zero
-            status[status != 1] = 0
-            x.append(a[self.bpm_indexes, 1])
-            y.append(a[self.bpm_indexes, 2])
-            print('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
-            tmit.append(status * a[self.bpm_indexes, 3])
-            time.sleep(1)
+            try:
+                print(f'Sample = {sample}')
+                m = caget('ATF2:monitors')
+                a = m.reshape((-1, 10))
+                status = a[self.bpm_indexes, 0]
+                # Set elements that are not equal to 1 to zero
+                status[status != 1] = 0
+                x.append(a[self.bpm_indexes, 1])
+                y.append(a[self.bpm_indexes, 2])
+                print('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
+                tmit.append(status * a[self.bpm_indexes, 3])
+                time.sleep(1)
+            except Exception as e:
+                print(f'An error occurred: {e}')
+                sample = sample-1
         names = [ self.bpms ] if type(self.bpms) == str else self.bpms
         x = np.vstack(x) / 1e3 # mm
         y = np.vstack(y) / 1e3 # mm
