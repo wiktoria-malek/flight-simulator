@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
+    <width>962</width>
     <height>886</height>
    </rect>
   </property>
@@ -647,6 +647,16 @@
              <widget class="QPushButton" name="pushButton_testorb">
               <property name="text">
                <string>Display test orbits</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_reset_ref_orbit">
+               <property name="styleSheet">
+               <string notr="true">background-color: red; color: white;</string>
+              </property>
+              <property name="text">
+               <string>Reset reference orbit</string>
               </property>
              </widget>
             </item>

@@ -3,8 +3,9 @@ from datetime import datetime
 import numpy as np
 from PyQt6 import uic
 from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
 from State import State
+from PyQt6.QtGui import QPainter
 matplotlib.use("QtAgg")
 from enum import Enum
 from dataclasses import dataclass
@@ -16,12 +17,42 @@ from SaveOrLoad_BBA import SaveOrLoad_BBA
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 import matplotlib.pyplot as plt
 from BPM_weights import BPM_weights
+
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
     ATF2_EXT = "ATF2_Ext"
     ATF2_LINAC = "ATF2_Linac"
     ATF2_DR_RFT = "ATF2_DR_RFT"
     ATF2_EXT_RFT = "ATF2_Ext_RFT"
+
+class BpmWeightsDelegate(QStyledItemDelegate):
+    WEIGHTS_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+
+    def paint(self, painter: QPainter, option, index):
+        painter.save()
+        try:
+            opt = option
+            self.initStyleOption(opt, index)
+            style = opt.widget.style() if opt.widget is not None else None
+            if style is not None:
+                opt_no_text = opt
+                opt_no_text.text = ""
+                style.drawControl(style.ControlElement.CE_ItemViewItem, opt_no_text, painter, opt.widget)
+            bpm_name = str(index.data(Qt.ItemDataRole.UserRole) or index.data(Qt.ItemDataRole.DisplayRole) or "")
+            weights = str(index.data(self.WEIGHTS_ROLE) or "")
+            r = opt.rect
+            margin = 6
+            painter.setFont(opt.font)
+            fm = painter.fontMetrics()
+            w_w = fm.horizontalAdvance(weights) if weights else 0
+            left_rect = r.adjusted(margin, 0, -(w_w + 2 * margin), 0)
+            right_rect = r.adjusted(margin, 0, (-margin-15), 0)
+            painter.setPen(opt.palette.color(opt.palette.ColorRole.Text))
+            painter.drawText(left_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), bpm_name)
+            if weights:
+                painter.drawText(right_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight), weights)
+        finally:
+            painter.restore()
 
 class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
     def __init__(self, interface, dir_name):
@@ -34,6 +65,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.S = State(interface=self.interface)
         ui_path = os.path.join(os.path.dirname(__file__), "BBA_GUI.ui")
         uic.loadUi(ui_path, self)
+        self.bpms_list.setItemDelegate(BpmWeightsDelegate(self.bpms_list))
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
         self._hist_orbit, self._hist_disp,self._hist_wake=[],[],[]
         self._hist_orbit_x,self._hist_orbit_y = [],[]
@@ -46,6 +78,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.show_response_matrix=None
         self.test_orbits=None
         self._setup_canvases()
+        self.bpm_weights={}
         self._populate_lists()
         self._procs=[]
         self.load_correctors_button.clicked.connect(self._load_correctors)
@@ -74,7 +107,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
         self.corrs = self.S.get_correctors()["names"]
-        self.setWindowTitle("BBA_GUI")
+        self.setWindowTitle("BBA GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
         self.lineEdit_3.setText("10")
@@ -83,8 +116,9 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.lineEdit_6.setText("0.4")
         self.lineEdit_beta.setText("0")
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
+        self.pushButton_reset_ref_orbit.clicked.connect(self._reset_reference_orbit)
+        self.reset_ref_orb=False
         self.bpms_list.itemDoubleClicked.connect(self._edit_bpm_weights)
-        self.bpm_weights={}
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
 
@@ -111,7 +145,9 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         self.max_vertical_current_spinbox.setSingleStep(0.01)
 
     def _edit_bpm_weights(self,bpm):
-        bpm_name=bpm.text()
+        bpm_name = bpm.data(Qt.ItemDataRole.UserRole) or (bpm.text() or "")
+        if not bpm_name:
+            bpm_name=(bpm.text() or "").split("    [",1)[0]
         bpm_window=BPM_weights(bpm_name=bpm_name,parent=self)
         if bpm_name in self.bpm_weights:
             w_orb,w_dfs,w_wfs=self.bpm_weights[bpm_name]
@@ -119,7 +155,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
         if bpm_window.exec()==QDialog.DialogCode.Accepted:
             self.bpm_weights[bpm_name] = bpm_window.get_values()
-
+            self._update_bpm_weights(bpm)
 
     def _on_start_click(self):
         print("Starting button clicked...")
@@ -127,7 +163,6 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         if not self._running:
             self._running = True
             self._step = True
-
             try:
                 self._start_correction()
             finally:
@@ -189,19 +224,31 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         ax.grid(True, alpha=0.3)
         canvas.draw_idle()
 
+    def _get_bpm_weights_text(self,bpm_name):
+        wbpm_orb, wbpm_dfs, wbpm_wfs = self.bpm_weights.get(bpm_name, (1.0, 1.0, 1.0))
+        return f"[w1 = {wbpm_orb:g}, w2 = {wbpm_dfs:g}, w3 = {wbpm_wfs:g}]" # general format, removes reduntant zeros at the end etc.
+
+    def _update_bpm_weights(self, item):
+        bpm_name=item.data(Qt.ItemDataRole.UserRole) or (item.text() or "") # it gives a clean name of the item, even if there is another text (like weights)
+        item.setData(BpmWeightsDelegate.WEIGHTS_ROLE, self._get_bpm_weights_text(bpm_name))
+        item.setText(bpm_name)
+
     def _populate_lists(self):
         corrs = self.S.get_correctors()["names"]
         bpms = self.S.get_bpms()["names"]
-        self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, corrs)
-        self.bpms_list.insertItems(0, bpms)  # at the top of the list
+        for bpm_name in bpms:
+            bpm_name=str(bpm_name)
+            item=QListWidgetItem(bpm_name)
+            item.setData(Qt.ItemDataRole.UserRole, bpm_name)
+            item.setData(BpmWeightsDelegate.WEIGHTS_ROLE, self._get_bpm_weights_text(bpm_name))
+            self.bpms_list.addItem(item)
 
     def _get_selection(self):
         corrs_all = self.S.get_correctors()["names"]
         bpms_all = self.S.get_bpms()["names"]
         corrs = [it.text() for it in self.correctors_list.selectedItems()] or corrs_all
-        bpms = [it.text() for it in self.bpms_list.selectedItems()] or bpms_all
+        bpms = [it.data(Qt.ItemDataRole.UserRole) for it in self.bpms_list.selectedItems()] or bpms_all
         return corrs, bpms
 
     def _force_triangular(self) -> bool:
@@ -305,6 +352,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         beta = getf("lineEdit_beta", 0.0)
         return orbit_w, disp_w, wake_w, rcond, iters, gain,beta
 
+    def _reset_reference_orbit(self):
+        self.reset_ref_orb=True
+        self.log("Resetting reference orbit")
+
     def _start_correction(self):
         try:
             print("Starting correction...")
@@ -340,7 +391,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
 
             Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs = self._creating_response_matrices()
 
-            self.setWindowTitle("BBA_GUI - [Correction running]")
+            self.setWindowTitle("BBA GUI - [Correction running]")
 
             target_disp_x, target_disp_y = self.interface.get_target_dispersion(bpms)
 
@@ -372,13 +423,16 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 x0_vals=np.asarray(bpms0['x'],dtype=float)
                 y0_vals=np.asarray(bpms0['y'],dtype=float)
 
-                # O0 = self.S.get_orbit(bpms)
-                # O0x = O0['x'].reshape(-1, 1)  # turns an array into a column vector
-                # O0y = O0['y'].reshape(-1, 1)
-                
                 if it == 0: #instead of golden orbit, correct from current orbit
                     B0x = O0x
                     B0y = O0y
+
+                if self.reset_ref_orb==True:
+                    B0x = O0x.copy()
+                    B0y=O0y.copy()
+                    self.reset_ref_orb=False
+                    self.log("Reference orbit reset to current orbit")
+
                 # dfs
                 if w2>0:
                     print("Measuring dispersion")
@@ -424,6 +478,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                     "O1y": None if O1y is None else np.asarray(O1y).reshape(-1),
                     "O2y": None if O2y is None else np.asarray(O2y).reshape(-1),
                 }
+
 
                 Bx=[]
                 By=[]
@@ -487,7 +542,10 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 A_weighted=w_xy_bpms*A
                 B_weighted=w_xy_bpms*B
 
-                delta = -gain * (np.linalg.pinv(A_weighted, rcond=rcond) @ B_weighted)
+                if beta>0: # with beta, A.T@A+beta*I is always reversible, so we use solve, matrix is square and reversible
+                    delta=-gain*np.linalg.solve(A_weighted.T@A_weighted+beta*np.eye(A_weighted.shape[1]),A_weighted.T@B_weighted) # without pinv, because we add beta so that singular values will not be near zero
+                else: # np.eye(n) singular matrix with shape= number of columns
+                    delta = -gain * (np.linalg.pinv(A_weighted, rcond=rcond) @ B_weighted)
                 print(f"Delta is {delta}")
                 nh=len(Cx_cut)
                 corrX=delta[:nh] # horizontal changes
@@ -553,13 +611,13 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
                 self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,error_x=self._hist_wake_x_err, error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None,ylabel="Residual norm [mm]")
                 QApplication.processEvents()
 
-            self.setWindowTitle("BBA_GUI")
+            self.setWindowTitle("BBA GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
             self.log("Correction finished.")
             self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By)
 
         except Exception as e:
-            self.setWindowTitle("BBA_GUI")
+            self.setWindowTitle("BBA GUI")
             QMessageBox.critical(self, "Correction error", str(e))
             self.log(f"Correction error: {e}")
 

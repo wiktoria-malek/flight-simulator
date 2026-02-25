@@ -140,7 +140,7 @@ class DFS_WFS_Correction_BBA():
 
     def _creating_response_matrices(self):
 
-        w1, w2, w3, rcond, iters, gain = self._read_params()
+        w1, w2, w3, rcond, iters, gain,beta = self._read_params()
         wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
         corrs, bpms = self._get_selection()
