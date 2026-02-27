@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
         if not latest:
             QMessageBox.warning(self, "No data available", "No data available")
 
-        self.handling("ComputeResponseMatrix_GUI.py", cwd=latest, args=[latest])
+        self.handling("ComputeResponseMatrix_GUI_OLD_VERSION.py", cwd=latest, args=[latest])
 
 if __name__ == "__main__":
     app = QApplication([])

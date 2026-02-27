@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
                              QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 
-class SaveOrLoad_BBA():
+class SaveOrLoad():
     def _saving_func(self, elements_list, filename, saving_name, *, use_dialog=True,base_dir=None):  # * - must be passed by keyword
         items = elements_list.selectedItems()
         if not items:
@@ -74,7 +74,6 @@ class SaveOrLoad_BBA():
 
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
-
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")

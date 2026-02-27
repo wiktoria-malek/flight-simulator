@@ -13,7 +13,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from LogConsole_BBA import LogConsole
 from TestOrbits_BBA import TestOrbits
-from SaveOrLoad_BBA import SaveOrLoad_BBA
+from SaveOrLoad import SaveOrLoad
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 import matplotlib.pyplot as plt
 from BPM_weights import BPM_weights
@@ -54,7 +54,7 @@ class BpmWeightsDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
-class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
+class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
     def __init__(self, interface, dir_name):
         super().__init__()
         self.cwd = os.getcwd()
@@ -252,10 +252,7 @@ class MainWindow(QMainWindow, SaveOrLoad_BBA, DFS_WFS_Correction_BBA):
         return corrs, bpms
 
     def _force_triangular(self) -> bool:
-        try:
-            return bool(self.checkBox.isChecked())
-        except Exception:
-            return False
+        self._is_checked(self.triangular_checkbox)
 
     def _with_progress(self, total, title):
         prog = QProgressDialog(title, "Cancel", 0, total, self)
