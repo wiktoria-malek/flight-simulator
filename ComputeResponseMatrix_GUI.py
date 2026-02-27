@@ -2,20 +2,16 @@ from State import State
 from Response import Response
 from PyQt6 import uic
 import numpy as np
-import glob
-import sys
-import os
+import glob,sys,os,argparse,matplotlib
 from SaveOrLoad import SaveOrLoad
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout,
     QLineEdit, QListWidget, QPushButton,
     QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
 )
-from PyQt6.QtCore import Qt
-import matplotlib
+from PyQt6.QtCore import Qt,QTimer
 from SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
-
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -27,11 +23,15 @@ class MatplotlibWidget(FigureCanvas):
         self.axes = fig.add_subplot(111)
 
 class MainWindow(QMainWindow, SaveOrLoad):
-    def __init__(self):
+    def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
         uic.loadUi("ComputeResponseMatrix_GUI.ui", self)
         self.cwd = os.getcwd()
         self.R=None
+        self.data_dir_1=data_dir_1
+        self.data_dir_2=data_dir_2
+        self.comp_difference=comp_difference
+        self.auto_click_compute=auto_click_compute
         self.setWindowTitle("Compute Response Matrix Tool")
         self.setGeometry(100, 100, 600, 700)
         self.data_directory_1.setText(self.cwd)
@@ -39,10 +39,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.choose_directory_2.clicked.connect(lambda:self._pick_directory_with_data(self.data_directory_2))
         self.compute_button.clicked.connect(self.__compute_button_clicked)
         self.save_as_button.clicked.connect(self.__save_as_button_clicked)
-
-        if hasattr(self,"diff_checkbox"):
-            self.diff_checkbox.toggled.connect(self._compute_difference_clicked)
-            self._compute_difference_clicked(self.diff_checkbox.isChecked())
+        self.diff_checkbox.toggled.connect(self._compute_difference_clicked)
+        self._compute_difference_clicked(self.diff_checkbox.isChecked())
 
         layout = self.plot_widget.layout()
         if layout is None:
@@ -51,14 +49,27 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.plot)
 
+        if self.data_dir_1:
+            self.data_directory_1.setText(self.data_dir_1)
+            self._load_lists_from_directory(self.data_dir_1)
+        if self.comp_difference==True:
+            self.diff_checkbox.setChecked(True)
+            self._compute_difference_clicked(checked=True)
+        if self.data_dir_2:
+            self.data_directory_2.setText(self.data_dir_2)
+            self._load_lists_from_directory(self.data_dir_2)
+        if self.auto_click_compute:
+            QTimer.singleShot(0, self.__compute_button_clicked)
+
+
+
+
+
     def _compute_difference_clicked(self,checked):
         checked=bool(checked)
-        if hasattr(self,"label_dir_2"):
-            self.label_dir_2.setEnabled(checked)
-        if hasattr(self,"choose_directory_2"):
-            self.choose_directory_2.setEnabled(checked)
-        if hasattr(self,"data_directory_2"):
-            self.data_directory_2.setEnabled(checked)
+        self.label_dir_2.setEnabled(checked)
+        self.choose_directory_2.setEnabled(checked)
+        self.data_directory_2.setEnabled(checked)
 
     def _pick_directory_with_data(self,line_edit):
         base=(line_edit.text() or self.cwd).strip()
@@ -303,7 +314,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 return
             R1=self._compute_response_of_one_data_directory(directory_1)
 
-            if hasattr(self,"diff_checkbox") and self.diff_checkbox.isChecked():
+            if self.diff_checkbox.isChecked():
                 directory_2 = (self.data_directory_2.text() or "").strip()
                 if not directory_2:
                     QMessageBox.warning(self, "Error", "No second data directory specified")
@@ -324,12 +335,21 @@ class MainWindow(QMainWindow, SaveOrLoad):
         if filename:
             self.R.save(filename)
 
-## MAIN
-app = QApplication(sys.argv)
+if __name__ == '__main__':
+    parser=argparse.ArgumentParser(description='Compute Response Matrix GUI')
+    parser.add_argument("--dir1",default=None,help="First data directory")
+    parser.add_argument("--dir2",default=None,help="Second data directory")
+    parser.add_argument("--diff",action="store_true",help="Difference between responses")
+    parser.add_argument("--compute",action="store_true",help="Auto-click Compute button")
+    args=parser.parse_args()
 
-## Inspect directory
+    dir1=args.dir1
+    dir2=args.dir2
 
-## Main Window
-window = MainWindow()
-window.show()
-sys.exit(app.exec())
+    app = QApplication(sys.argv)
+    window = MainWindow(data_dir_1=args.dir1,
+        data_dir_2=args.dir2,
+        comp_difference=args.diff,
+        auto_click_compute=args.compute,)
+    window.show()
+    sys.exit(app.exec())

@@ -87,16 +87,11 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.pushButton_log.clicked.connect(self._show_console_log)
         self.pushButton_testorb.clicked.connect(self._show_test_orbits)
         self.session_database_3.setText(dir_name)
-        if hasattr(self, "pushButton_8"):  # traj
-            self.pushButton_8.clicked.connect(self._pick_and_load_traj_data)
-        if hasattr(self, "pushButton_9"):  # dfs
-            self.pushButton_9.clicked.connect(self._pick_and_load_disp_data)
-        if hasattr(self, "pushButton_10"):  # wfs
-            self.pushButton_10.clicked.connect(self._pick_and_load_wake_data)
-        if hasattr(self, "clear_graphs_button"):
-            self.clear_graphs_button.clicked.connect(self._clear_graphs)
-        if hasattr(self, "pushButton_11"):
-            self.pushButton_11.clicked.connect(self.load_session_settings)
+        self.pushButton_8.clicked.connect(self._pick_and_load_traj_data)
+        self.pushButton_9.clicked.connect(self._pick_and_load_disp_data)
+        self.pushButton_10.clicked.connect(self._pick_and_load_wake_data)
+        self.clear_graphs_button.clicked.connect(self._clear_graphs)
+        self.pushButton_11.clicked.connect(self.load_session_settings)
 
         self.modes= [ 'Orbit', 'Dispersion', 'Wakefield']
         self._running = False
@@ -676,7 +671,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             env = QProcessEnvironment.systemEnvironment()
             proc.setProcessEnvironment(env)
 
-            argv = [path] + (args or [])
+            argv = [path] + list(args or [])
             proc.start(sys.executable, argv)
 
             proc.readyReadStandardOutput.connect(
@@ -694,22 +689,32 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         dispersion_dir=self.dfs_response_3.text()
         wakefield_dir=self.wfs_response_3.text()
         selected_mode=None
-
         for rb in self.radio_buttons:
             if rb.isChecked():
                 selected_mode = rb.text()
                 break
-
         if selected_mode is None:
             selected_mode = self.modes[0]
 
         if selected_mode==self.modes[0]:
-            data_dir=orbit_dir
+            mode = "orbit"
+            args = ["--dir1",orbit_dir,"--compute"]
+
         elif selected_mode==self.modes[1]:
-            data_dir=dispersion_dir
+            mode = "dispersion"
+            if not dispersion_dir:
+                QMessageBox.warning(self, "Warning", "No dispersion directory selected")
+                return
+            args = ["--dir1",dispersion_dir,"--dir2",orbit_dir,"--diff","--compute"]
+
         elif selected_mode==self.modes[2]:
-            data_dir=wakefield_dir
-        self.handling('ComputeResponseMatrix_GUI.py', cwd=data_dir,args=[data_dir])
+            mode = "wakefield"
+            if not wakefield_dir:
+                QMessageBox.warning(self, "Warning", "No wakefield directory selected")
+                return
+            args = ["--dir1",wakefield_dir,"--dir2",orbit_dir,"--diff","--compute"]
+
+        self.handling('ComputeResponseMatrix_GUI.py', cwd=self.cwd,args=args) # args = arguments passed to the second program
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
