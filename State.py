@@ -25,6 +25,8 @@ class State:
         return self.sequence #from rf track
 
     def get_correctors(self, names=None):
+        if isinstance(names, str):
+            names = [names]
         if names is not None:
             corr_indexes = np.array([index for index, string in enumerate(self.correctors['names']) if string in names])
             correctors = {
@@ -35,12 +37,6 @@ class State:
         else:
             correctors = self.correctors
         return correctors
-
-    def get_hcorrectors_names(self):
-        return self.hcorrectors_names
-
-    def get_vcorrectors_names(self):
-        return self.vcorrectors_names
 
     def get_bpms(self, names=None):
         if names is not None:

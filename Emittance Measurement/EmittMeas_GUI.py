@@ -12,7 +12,7 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
     def __init__(self):
         super().__init__()
         here = os.path.dirname(os.path.abspath(__file__))
-        ui_path = os.path.join(here, "EmittMeas_GUI.ui")
+        ui_path = os.path.join(here, "../UI files/EmittMeas_GUI.ui")
         uic.loadUi(ui_path, self)
         self.simulation_atf2 = Emitt_Meas_Simulation()
         self.screensListWidget.addItems(["OTR0X", "OTR1X", "OTR2X", "OTR3X"])

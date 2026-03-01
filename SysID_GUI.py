@@ -44,8 +44,8 @@ class Worker(QObject):
         self.interface = interface
         self.S = state
         self.correctors = correctors
-        self.hcorrs = I.get_hcorrectors_names()
-        self.vcorrs = I.get_vcorrectors_names()
+        self.hcorrs = self.interface.get_hcorrectors_names()
+        self.vcorrs = self.interface.get_vcorrectors_names()
         self.bpms = bpms
         self.hkicks = hkicks
         self.vkicks = vkicks
@@ -85,10 +85,10 @@ class Worker(QObject):
                 if self.running == False:
                     break
 
-                if corrector in S.get_hcorrectors_names():
+                if corrector in self.hcorrs:
                     max_curr=self.max_curr_h
                     kick=hkicks[icorr]
-                elif corrector in S.get_vcorrectors_names():
+                elif corrector in self.vcorrs:
                     max_curr=self.max_curr_v
                     kick=vkicks[icorr]
 
@@ -102,7 +102,7 @@ class Worker(QObject):
                 if not os.path.isfile(filename_p):
                     print('corr[bds] =', corr['bdes'], ' also kick = ', kick) 
                     curr_p = corr['bdes'] + kick
-                    if corrector in S.get_hcorrectors_names():
+                    if corrector in self.hcorrs:
                         curr_p = clamp(curr_p, self.max_curr_h)
                     else:
                         curr_p = clamp(curr_p, self.max_curr_v)
@@ -122,7 +122,7 @@ class Worker(QObject):
                 filename_m=f'DATA_{corrector}_m{iter:04d}.pkl'
                 if not os.path.isfile(filename_m):
                     curr_m = corr['bdes'] - kick
-                    if corrector in S.get_hcorrectors_names():
+                    if corrector in self.hcorrs:
                         curr_m = clamp(curr_m, self.max_curr_h)
                     else:
                         curr_m = clamp(curr_m, self.max_curr_v)
@@ -152,7 +152,7 @@ class Worker(QObject):
                 percent = int(self.progress_value / total_steps * 100)
                 self.progress.emit(percent)
 
-                if corrector in S.get_hcorrectors_names():
+                if corrector in self.hcorrs:
                     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
                     if np.max(np.abs(Diff_x_clean)) != 0.0:
                         hkicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
@@ -218,7 +218,7 @@ class MainWindow(QMainWindow):
             max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
 
         # Load the interface
-        uic.loadUi("SysID_GUI.ui", self)
+        uic.loadUi("UI files/SysID_GUI.ui", self)
 
         # Replace the placeholder with your real widget
         self.right_layout.removeWidget(self.plot_widget)
@@ -241,7 +241,6 @@ class MainWindow(QMainWindow):
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
         self.initial_hkick_settings.setText("0.01")
         self.initial_vkick_settings.setText("0.01")
-
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
@@ -303,7 +302,6 @@ class MainWindow(QMainWindow):
         elif mode==Mode.Wakefield:
             self.interface.change_intensity()
             print("Intensity changed")
-        #self.progressBar.setValue(0)
 
     def _read_all_parameters(self,text):
         text = text.strip()
@@ -549,7 +547,6 @@ class MainWindow(QMainWindow):
         if not folder:
             return
         self.working_directory_input.setText(folder)
-
 
 ## MAIN
 app = QApplication(sys.argv)

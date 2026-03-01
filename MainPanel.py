@@ -11,18 +11,14 @@ class MainWindow(QMainWindow):
         self.cwd = os.getcwd()
         self._cancel = False
 
-        ui_path = os.path.join(os.path.dirname(__file__), "MainPanel.ui")
+        ui_path = os.path.join(os.path.dirname(__file__), "UI files/MainPanel.ui")
         uic.loadUi(ui_path, self)
         self.application_choice=None
-
-        #self.sysid_interface_button.clicked.connect(self.handle_sysid_click)
         self.compute_matrix_button.clicked.connect(self.handle_compute_response_matrix_click)
         self.bba_interface_button.clicked.connect(self.handle_bba_click)
         self.emittance_interface_button.clicked.connect(self.handle_emittance_click)
         self.knobs_interface_button.clicked.connect(self.handle_knobs_click)
-        self.sysid_interface_orbit_button.clicked.connect(self.handle_sysid_orbit_click)
-        self.sysid_interface_dispersion_button.clicked.connect(self.handle_sysid_dispersion_click)
-        self.sysid_interface_wakefield_button.clicked.connect(self.handle_sysid_wakefield_click)
+        self.sysid_interface_button.clicked.connect(self.handle_sysid_click)
 
         self._procs=[]
         self.setWindowTitle("Choose the application")
@@ -68,19 +64,9 @@ class MainWindow(QMainWindow):
         pass
     def handle_knobs_click(self):
         pass
-    def handle_sysid_orbit_click(self):
-        pass
-    def handle_sysid_dispersion_click(self):
-        pass
-    def handle_sysid_wakefield_click(self):
-        pass
 
     def handle_compute_response_matrix_click(self):
-        latest=self._latest_response_file()
-        if not latest:
-            QMessageBox.warning(self, "No data available", "No data available")
-
-        self.handling("ComputeResponseMatrix_GUI_OLD_VERSION.py", cwd=latest, args=[latest])
+        self.handling("ComputeResponseMatrix_GUI.py")
 
 if __name__ == "__main__":
     app = QApplication([])

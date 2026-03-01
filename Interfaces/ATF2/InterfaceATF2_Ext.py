@@ -188,18 +188,22 @@ class InterfaceATF2_Ext:
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
 
+    # Instead time.sleep(1) : setpoint :currentWrite -> readback :currentRead -> until readback reaches setpoint
+    # It might be faster than 1s
+
     def push(self, names, corr_vals):
         if type(corr_vals) == float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:
             names = [names]
         if len(names) != corr_vals.size:
-            print('Error: len(names) != len(corr_vals) in push(names, corr_vals)') 
+            print('Error: len(names) != len(corr_vals) in push(names, corr_vals)')
+
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
         time.sleep(1)
-    
+
     def vary_correctors(self, names, corr_vals):
         if type(corr_vals) is float:
             corr_vals = np.array([corr_vals])

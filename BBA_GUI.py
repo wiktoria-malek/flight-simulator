@@ -62,8 +62,10 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.dir_name = dir_name
         self._cancel = False
         self._number_re = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
-        self.S = State(interface=self.interface)
-        ui_path = os.path.join(os.path.dirname(__file__), "BBA_GUI.ui")
+        self.S0 = State(interface=self.interface) # initial, for restoring
+        self.S=State(interface=self.interface) # for latter use
+        self.reset_reference_orbit=False
+        ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
         uic.loadUi(ui_path, self)
         self.bpms_list.setItemDelegate(BpmWeightsDelegate(self.bpms_list))
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
@@ -92,7 +94,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.pushButton_10.clicked.connect(self._pick_and_load_wake_data)
         self.clear_graphs_button.clicked.connect(self._clear_graphs)
         self.pushButton_11.clicked.connect(self.load_session_settings)
-
+        self.restore_initial_settings.clicked.connect(self._restore_initial_settings)
         self.modes= [ 'Orbit', 'Dispersion', 'Wakefield']
         self._running = False
         self.appropriate_settings_energy=None
@@ -138,6 +140,17 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
+    def _restore_initial_settings(self):
+        self.log("Restoring initial settings...")
+        self._cancel=True
+        self._running=False
+        self.interface.reset_energy()
+        self.interface.reset_intensity()
+        self.S0.push(self.interface)
+        self.reset_ref_orb=True
+        self._clear_graphs()
+        self.log("Machine initial settings restored.")
 
     def _edit_bpm_weights(self,bpm):
         bpm_name = bpm.data(Qt.ItemDataRole.UserRole) or (bpm.text() or "")
@@ -247,7 +260,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         return corrs, bpms
 
     def _force_triangular(self) -> bool:
-        self._is_checked(self.triangular_checkbox)
+        return bool(self.triangular_checkbox.isChecked())
 
     def _with_progress(self, total, title):
         prog = QProgressDialog(title, "Cancel", 0, total, self)
@@ -471,7 +484,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                     "O2y": None if O2y is None else np.asarray(O2y).reshape(-1),
                 }
 
-
                 Bx=[]
                 By=[]
                 if w1>0:
@@ -534,6 +546,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 A_weighted=w_xy_bpms*A
                 B_weighted=w_xy_bpms*B
 
+                #adding the (Aw.T*Aw+beta*I)-1
                 if beta>0: # with beta, A.T@A+beta*I is always reversible, so we use solve, matrix is square and reversible
                     delta=-gain*np.linalg.solve(A_weighted.T@A_weighted+beta*np.eye(A_weighted.shape[1]),A_weighted.T@B_weighted) # without pinv, because we add beta so that singular values will not be near zero
                 else: # np.eye(n) singular matrix with shape= number of columns

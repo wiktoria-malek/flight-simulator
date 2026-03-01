@@ -7,7 +7,7 @@ matplotlib.use("QtAgg")
 class BPM_weights(QDialog):
     def __init__(self, bpm_name, parent=None):
         super().__init__(parent)
-        uic.loadUi('BPM_weights.ui', self)
+        uic.loadUi('UI files/BPM_weights.ui', self)
         self.setWindowTitle(f"BPM weights - {bpm_name}")
         self.button_apply.clicked.connect(self.accept)
         self.button_cancel.clicked.connect(self.reject)

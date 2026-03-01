@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>962</width>
+    <width>1107</width>
     <height>886</height>
    </rect>
   </property>
@@ -276,7 +276,7 @@
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_2">
              <item alignment="Qt::AlignHCenter">
-              <widget class="QCheckBox" name="checkBox">
+              <widget class="QCheckBox" name="triangular_checkbox">
                <property name="text">
                 <string>Force triangular matrix</string>
                </property>
@@ -651,8 +651,15 @@
              </widget>
             </item>
             <item>
+             <widget class="QPushButton" name="restore_initial_settings">
+              <property name="text">
+               <string>Restore initial settings</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QPushButton" name="pushButton_reset_ref_orbit">
-               <property name="styleSheet">
+              <property name="styleSheet">
                <string notr="true">background-color: red; color: white;</string>
               </property>
               <property name="text">

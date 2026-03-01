@@ -25,7 +25,7 @@ class MatplotlibWidget(FigureCanvas):
 class MainWindow(QMainWindow, SaveOrLoad):
     def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
-        uic.loadUi("ComputeResponseMatrix_GUI.ui", self)
+        uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)
         self.cwd = os.getcwd()
         self.R=None
         self.data_dir_1=data_dir_1
@@ -50,20 +50,23 @@ class MainWindow(QMainWindow, SaveOrLoad):
         layout.addWidget(self.plot)
 
         if self.data_dir_1:
+            self.data_dir_1=self._expand_path(self.data_dir_1)
             self.data_directory_1.setText(self.data_dir_1)
             self._load_lists_from_directory(self.data_dir_1)
         if self.comp_difference==True:
             self.diff_checkbox.setChecked(True)
             self._compute_difference_clicked(checked=True)
         if self.data_dir_2:
+            self.data_dir_2=self._expand_path(self.data_dir_2)
             self.data_directory_2.setText(self.data_dir_2)
             self._load_lists_from_directory(self.data_dir_2)
         if self.auto_click_compute:
             QTimer.singleShot(0, self.__compute_button_clicked)
 
-
-
-
+    def _expand_path(self,path):
+        expanded_path=(path or "").strip()
+        expanded_path=os.path.expandvars(os.path.expanduser(expanded_path))
+        return os.path.abspath(os.path.normpath(expanded_path))
 
     def _compute_difference_clicked(self,checked):
         checked=bool(checked)
@@ -72,7 +75,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.data_directory_2.setEnabled(checked)
 
     def _pick_directory_with_data(self,line_edit):
-        base=(line_edit.text() or self.cwd).strip()
+        base=self._expand_path(line_edit.text() or self.cwd) or self.cwd
         folder=QFileDialog.getExistingDirectory(self,"Select data directory",base)
         if not folder:
             return
@@ -81,6 +84,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self._load_lists_from_directory(folder)
 
     def _load_lists_from_directory(self,folder):
+        folder=self._expand_path(folder)
         datafiles=sorted(glob.glob(os.path.join(folder,"DATA*.pkl")))
         if not datafiles:
             return
@@ -96,6 +100,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.bpms_list.addItems([str(b) for b in self.bpms])
 
     def _compute_response_of_one_data_directory(self,directory):
+        directory=self._expand_path(directory)
         datafiles=sorted(glob.glob(os.path.join(directory, "DATA*.pkl")))
         if not datafiles:
             QMessageBox.warning(self,"No DATA files found.","No valid data found")
@@ -308,13 +313,14 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
     def __compute_button_clicked(self):
         try:
-            directory_1=(self.data_directory_1.text() or "").strip()
+            directory_1=self._expand_path(self.data_directory_1.text())
             if not directory_1:
                 QMessageBox.warning(self, "Error", "No data directory specified")
                 return
             R1=self._compute_response_of_one_data_directory(directory_1)
 
             if self.diff_checkbox.isChecked():
+                self._expand_path(self.data_directory_2.text())
                 directory_2 = (self.data_directory_2.text() or "").strip()
                 if not directory_2:
                     QMessageBox.warning(self, "Error", "No second data directory specified")

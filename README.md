@@ -1,3 +1,17 @@
+## Installation
+Requires: Python >= 3.12 and Poetry.
+
+```bash
+poetry install --no-root
+```
+
+## Run
+
+```bash
+make BBA
+make CRM
+make SysID
+```
 # FlightSimulator's `Interface` description
 
 This class defines how the user interacts with the real or simulated machine when reading beam instrumentation and steering devices and for writing corrector set-points in a control system for the specific accelerator facility. It wraps common operations on BPMs, ICTs, and corrector magnets.
