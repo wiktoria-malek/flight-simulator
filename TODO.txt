@@ -1,0 +1,13 @@
+# remove the choice of the atf2/clear and maybe see if theres a directory called ATF2 and Clear -
+    if not, display only choice of the inetrfaces
+# why does sometimes it works and sometimes doesn't? what happens when there's nothing to correct
+# saving session settings after appending points to the gui, and saving bpm weights too
+# in state there will be also quadrupole strength getting, for emittance measurement/scan etc
+# emittance tracking also in the real interface
+# maybe move all the buttons from bba gui to the right side so that plots are bigger
+
+Regarding State and reformulation of the code:
+    # add abstract classes to state.py
+    # remove the redundancy
+    # we need to do something like -> interface(state) and then so it can directly call pull, not to just reference a state
+    # we can delete those return get bpms names etc because maybe there is a way to actually access them
