@@ -17,11 +17,11 @@ install:
 check: install
 	poetry run python -c "import numpy, matplotlib; import PyQt6;"
 
-BBA_GUI: install
+BBA: install
 	poetry run python BBA_GUI.py
 
-ComputeResponseMatrix_GUI: install
+CRM: install
 	poetry run python ComputeResponseMatrix_GUI.py
 
-SysID_GUI: install
+SysID: install
 	poetry run python SysID_GUI.py

@@ -1,16 +1,27 @@
-## Installation
+# Installation
 Requires: Python >= 3.12 and Poetry.
 
+### Install Poetry (if not yet installed)
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+### Install project dependencies
 ```bash
 poetry install --no-root
-```
-
-## Run
+````
+### Run
 
 ```bash
 make BBA
 make CRM
 make SysID
+```
+
+### Alternatively:
+```bash
+poetry run python BBA_GUI.py
+poetry run python ComputeResponseMatrix_GUI.py
+poetry run python SysID_GUI.py
 ```
 # FlightSimulator's `Interface` description
 

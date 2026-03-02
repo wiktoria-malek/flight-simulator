@@ -10,7 +10,8 @@ class InterfaceATF2_DR_RFTrack():
 
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.log = print
-        self.lattice = rft.Lattice('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws')
+        twiss_path=os.path.join(os.path.dirname(__file__),'Ext_ATF2','ATF2_EXT_FF_v5.2.twiss')
+        self.lattice = rft.Lattice(twiss_path)
         for i,q in enumerate(self.lattice.get_quadrupoles()):
             if i%3 == 0:
                 cx, cy = rft.Corrector(), rft.Corrector()
@@ -208,26 +209,67 @@ class InterfaceATF2_DR_RFTrack():
         bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
         return bpms
 
-    def get_screens(self):
-        #print('Reading screens...')
+    def get_screens(self, names=None):
         self.log('Reading screens...')
-        nscreens = len(self.screens)
-        hpixel = np.ones(nscreens) * 0.1 # mm, horizonatl size of a pixel
-        vpixel = np.ones(nscreens) * 0.1 # mm, vertical size of a pixel
+        if isinstance(names, str):
+            names = [names] # allows passing a single screen name
+        hpixel =  0.001 # mm, horizontal size of a pixel
+        vpixel =  0.001 # mm, vertical size of a pixel
+        hpixel_list = []
+        vpixel_list = []
+        xb_list = []
+        yb_list = []
+        sigx_list = []
+        sigy_list = []
+        sum_list = []
         images = []
         hedges_all = []
         vedges_all = []
-        for i,s in enumerate(self.lattice.get_screens()):
+        screen_names = []
+
+        for s in self.lattice.get_screens():
+            screen_name=s.get_name()
+            if names is not None and screen_name not in names:
+                continue
+            screen_names.append(screen_name)
+            hpixel_list.append(hpixel)
+            vpixel_list.append(vpixel)
             m = s.get_bunch().get_phase_space('%x %y')
-            nx = np.ptp(m[:,0]) / hpixel[i]
-            ny = np.ptp(m[:,1]) / vpixel[i]
-            image, hedges, vedges = np.histogram2d(m[:,0], m[:,1], bins=(nx,ny))
+            if m is None or len(m) == 0: #empty bunch
+                xb_list.append(np.nan)
+                yb_list.append(np.nan)
+                sigx_list.append(np.nan)
+                sigy_list.append(np.nan)
+                sum_list.append(0)
+                images.append(np.zeros((1,1)))
+                hedges_all.append(np.array([0,hpixel]))
+                vedges_all.append(np.array([0,vpixel]))
+                continue
+
+            sumw=len(m[:,0])
+            xb_list.append(np.mean(m[:,0]))
+            yb_list.append(np.mean(m[:,1]))
+            sigx_list.append(np.std(m[:,0]))
+            sigy_list.append(np.std(m[:,1]))
+            sum_list.append(sumw)
+
+            nx = int(np.ceil(np.ptp(m[:,0]) / hpixel)) if np.ptp(m[:,0]) > 0 else 1
+            ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
+            nx=int(np.clip(nx,10,400))
+            ny=int(np.clip(ny,10,400))
+            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx, ny))
             images.append(image)
             hedges_all.append(hedges)
             vedges_all.append(vedges)
-        screens = { "names": self.screens,
-                    "hpixel": hpixel,
-                    "vpixel": vpixel,
+
+        screens = { "names": screen_names,
+                    "hpixel": np.array(hpixel_list,dtype=float),
+                    "vpixel": np.array(vpixel_list,dtype=float),
+                    "x": np.array(xb_list, dtype=float),
+                    "y": np.array(yb_list, dtype=float),
+                    "sigx": np.array(sigx_list, dtype=float),
+                    "sigy": np.array(sigy_list, dtype=float),
+                    "sum": np.array(sum_list, dtype=float),
                     "hedges" : hedges_all,
                     "vedges" : vedges_all,
                     "images": images }

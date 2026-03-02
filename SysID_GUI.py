@@ -167,7 +167,9 @@ class Worker(QObject):
                     for i, c in enumerate(self.correctors):
                         f.write(f'{c} {hkicks[i]} {vkicks[i]}\n')
 
-                time.sleep(1)
+                t0=time.monotonic() #saves current time
+                while self.running and (time.monotonic() -t0) <1:
+                    time.sleep(0.05)
 
         self.running = False
         self.finished.emit()
@@ -198,7 +200,7 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.thread = None
         self._activate_mode=None
-
+        self.stop_requested = False
         self.cwd = os.getcwd()
         self.interface = interface
         bpms_list = interface.get_bpms()['names']
@@ -402,6 +404,7 @@ class MainWindow(QMainWindow):
         # self.S.save(basename='machine_status')
 
         self.progressBar.setValue(0)
+        self.stop_requested=False
         if self.thread and self.thread.isRunning():
             return  # already running
 
@@ -481,6 +484,9 @@ class MainWindow(QMainWindow):
             self.thread = None
             self.worker = None
             self.counter+=1
+            if self.stop_requested:
+                self.__set_status_in_title("[Idle]")
+                return
             if self.counter< len(self.modes_to_do):
                 self._start_next_mode()
                 initial_hkick = self._read_initial_kicks()
@@ -515,6 +521,7 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def __stop_button_clicked(self):
+        self.stop_requested = True
         if self.worker:
             self.__set_status_in_title("[Stopping...]")
             self.worker.stop()

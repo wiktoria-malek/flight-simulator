@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1107</width>
+    <width>1141</width>
     <height>886</height>
    </rect>
   </property>
@@ -632,7 +632,7 @@
                </sizepolicy>
               </property>
               <property name="text">
-               <string>Clear</string>
+               <string>Clear plots</string>
               </property>
              </widget>
             </item>

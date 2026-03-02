@@ -65,6 +65,9 @@ class InterfaceATF2_Linac:
         self.sequence = sequence_filtered
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
+
+        #screens??
+
         # Index of the selected BPMs in the Epics PV ATF2:monitors
         self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
@@ -118,6 +121,9 @@ class InterfaceATF2_Linac:
 
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
+
+    def get_screens_names(self):
+        return self.screens
 
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]

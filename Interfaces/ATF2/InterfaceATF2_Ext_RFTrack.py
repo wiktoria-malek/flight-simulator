@@ -1,6 +1,6 @@
 import RF_Track as rft
 import numpy as np
-import time
+import time,os
 from LogConsole_BBA import LogConsole
 from datetime import datetime
 class InterfaceATF2_Ext_RFTrack():
@@ -10,7 +10,8 @@ class InterfaceATF2_Ext_RFTrack():
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1,nparticles=1000):
         super().__init__()
         self.log = print
-        self.lattice = rft.Lattice('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss')
+        twiss_path=os.path.join(os.path.dirname(__file__),'Ext_ATF2','ATF2_EXT_FF_v5.2.twiss')
+        self.lattice = rft.Lattice(twiss_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
         for s in self.lattice['*OTR*']:
             screen = rft.Screen()
@@ -132,7 +133,8 @@ class InterfaceATF2_Ext_RFTrack():
     def get_target_dispersion(self, names=None):
         if names is None:
             names = self.get_bpms_names()
-        with open('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
+        twiss_path=os.path.join(os.path.dirname(__file__),'Ext_ATF2','ATF2_EXT_FF_v5.2.twiss')
+        with open(twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
@@ -201,26 +203,65 @@ class InterfaceATF2_Ext_RFTrack():
 
     def get_screens(self, names=None):
         self.log('Reading screens...')
-        nscreens = len(self.screens)
-        hpixel = np.ones(nscreens) * 0.001 # mm, horizonatl size of a pixel
-        vpixel = np.ones(nscreens) * 0.001 # mm, vertical size of a pixel
+        if isinstance(names, str):
+            names = [names] # allows passing a single screen name
+        hpixel =  0.001 # mm, horizontal size of a pixel
+        vpixel =  0.001 # mm, vertical size of a pixel
+        hpixel_list = []
+        vpixel_list = []
+        xb_list = []
+        yb_list = []
+        sigx_list = []
+        sigy_list = []
+        sum_list = []
         images = []
         hedges_all = []
         vedges_all = []
         screen_names = []
-        for i,s in enumerate(self.lattice.get_screens()):
-            if names==None or (s.get_name() in names):
-                screen_names.append(s.get_name())
-                m = s.get_bunch().get_phase_space('%x %y')
-                nx = int(np.ceil(np.ptp(m[:,0]) / hpixel[i]))
-                ny = int(np.ceil(np.ptp(m[:,1]) / vpixel[i]))
-                image, hedges, vedges = np.histogram2d(m[:,0], m[:,1], bins=(nx,ny))
-                images.append(image)
-                hedges_all.append(hedges)
-                vedges_all.append(vedges)
+
+        for s in self.lattice.get_screens():
+            screen_name=s.get_name()
+            if names is not None and screen_name not in names:
+                continue
+            screen_names.append(screen_name)
+            hpixel_list.append(hpixel)
+            vpixel_list.append(vpixel)
+            m = s.get_bunch().get_phase_space('%x %y')
+            if m is None or len(m) == 0: #empty bunch
+                xb_list.append(np.nan)
+                yb_list.append(np.nan)
+                sigx_list.append(np.nan)
+                sigy_list.append(np.nan)
+                sum_list.append(0)
+                images.append(np.zeros((1,1)))
+                hedges_all.append(np.array([0,hpixel]))
+                vedges_all.append(np.array([0,vpixel]))
+                continue
+
+            sumw=len(m[:,0]) # number of particles in the screen; intensity
+            xb_list.append(np.mean(m[:,0])) # mean x of particles
+            yb_list.append(np.mean(m[:,1])) # mean y of particles
+            sigx_list.append(np.std(m[:,0])) # RMS x beam size
+            sigy_list.append(np.std(m[:,1])) # RMS y beam size
+            sum_list.append(sumw)
+
+            nx = int(np.ceil(np.ptp(m[:,0]) / hpixel)) if np.ptp(m[:,0]) > 0 else 1 # ceil rounds up, so it can take the whole range
+            ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
+            nx=int(np.clip(nx,10,400))
+            ny=int(np.clip(ny,10,400))
+            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx, ny)) # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
+            images.append(image) # image[i,j] = nparticles in bin i on x axis and nparticles in bin j on y axis
+            hedges_all.append(hedges) # bin edges in x (nx + 1)
+            vedges_all.append(vedges) # bin edges in y (ny + 1)
+
         screens = { "names": screen_names,
-                    "hpixel": hpixel,
-                    "vpixel": vpixel,
+                    "hpixel": np.array(hpixel_list,dtype=float),
+                    "vpixel": np.array(vpixel_list,dtype=float),
+                    "x": np.array(xb_list, dtype=float),
+                    "y": np.array(yb_list, dtype=float),
+                    "sigx": np.array(sigx_list, dtype=float),
+                    "sigy": np.array(sigy_list, dtype=float),
+                    "sum": np.array(sum_list, dtype=float),
                     "hedges" : hedges_all,
                     "vedges" : vedges_all,
                     "images": images }

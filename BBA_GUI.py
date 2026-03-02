@@ -224,9 +224,9 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             ax.legend(fontsize=7,loc="upper right")
         if title is not None:
             ax.set_title(title)
-        ax.set_xlabel("Iteration", fontsize=8)
+        ax.set_xlabel("Iteration", fontsize=6)
         if ylabel is not None:
-            ax.set_ylabel(ylabel, fontsize=7)
+            ax.set_ylabel(ylabel, fontsize=6)
         ax.tick_params(axis="both", which="major", labelsize=7)
         ax.yaxis.get_offset_text().set_fontsize(7)
         ax.grid(True, alpha=0.3)
