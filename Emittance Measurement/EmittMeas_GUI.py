@@ -1,7 +1,7 @@
 import sys, os, pickle, re, matplotlib, glob, time,json
-from PyQt6 import uic
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+from PyQt5 import uic
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 matplotlib.use("QtAgg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -83,7 +83,7 @@ class EmittMeasGUI(QMainWindow,Emitt_Meas_Simulation):
             canvas = FigureCanvas(fig)
             layout = host.layout()
             if layout is None:
-                from PyQt6.QtWidgets import QVBoxLayout
+                from PyQt5.QtWidgets import QVBoxLayout
                 layout = QVBoxLayout(host)
                 layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(canvas)

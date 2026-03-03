@@ -1,11 +1,11 @@
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
-from PyQt6 import uic
-from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+from PyQt5 import uic
+from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
+from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
 from State import State
-from PyQt6.QtGui import QPainter
+from PyQt5.QtGui import QPainter
 matplotlib.use("QtAgg")
 from enum import Enum
 from dataclasses import dataclass
@@ -195,7 +195,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             canvas = FigureCanvas(fig)
             layout = host.layout()
             if layout is None:
-                from PyQt6.QtWidgets import QVBoxLayout
+                from PyQt5.QtWidgets import QVBoxLayout
                 layout = QVBoxLayout(host)
                 layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(canvas)

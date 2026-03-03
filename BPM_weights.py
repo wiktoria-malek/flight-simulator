@@ -1,7 +1,7 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QVBoxLayout, QDialog, QLabel, QPlainTextEdit)
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QVBoxLayout, QDialog, QLabel, QPlainTextEdit)
 import matplotlib
-from PyQt6 import uic
+from PyQt5 import uic
 matplotlib.use("QtAgg")
 
 class BPM_weights(QDialog):

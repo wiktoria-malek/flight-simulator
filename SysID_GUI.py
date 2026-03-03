@@ -4,9 +4,10 @@ import numpy as np
 import time
 import sys
 import os
-from PyQt6 import uic
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
-from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+from PyQt5 import uic
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtTest import QTest
 from enum import Enum
 import matplotlib
 matplotlib.use('QtAgg')
@@ -20,11 +21,8 @@ class Mode(Enum):
     All = "All modes at once"
 
 class Machine(Enum):
-    ATF2_DR = "ATF2_DR"
-    ATF2_EXT = "ATF2_Ext"
-    ATF2_LINAC = "ATF2_Linac"
-    ATF2_DR_RFT = "ATF2_DR_RFT"
-    ATF2_EXT_RFT = "ATF2_Ext_RFT"
+    FACET2_LINAC = "FACET2_Linac"
+    FACET2_RFT = "FACET2_RFT"
 
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
@@ -32,6 +30,7 @@ class MatplotlibWidget(FigureCanvas):
         super().__init__(fig)
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
+
 
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
@@ -55,6 +54,7 @@ class Worker(QObject):
         self.max_curr_v = max_curr_v
         self.Niter = Niter
         self.running = False
+        self.paused = False
         self.progress_value=0
 
         if hasattr(self, "working_directory_dialog"):
@@ -63,6 +63,7 @@ class Worker(QObject):
     @pyqtSlot()
     def run(self):
         self.running = True
+        self.paused = False
 
         total_steps=self.Niter*len(self.correctors)
         self.progress_value=0
@@ -77,13 +78,13 @@ class Worker(QObject):
             return max(-max_val, min(val, max_val))
 
         for iter in range(self.Niter):
-            if self.running == False:
-                break
+            if not self.running: break
+            if self.paused:      self._await_user()
 
             for icorr, corrector in enumerate(self.correctors):
                 corr = S.get_correctors(corrector)
-                if self.running == False:
-                    break
+                if not self.running: break
+                if self.paused:      self._await_user()
 
                 if corrector in self.hcorrs:
                     max_curr=self.max_curr_h
@@ -92,8 +93,8 @@ class Worker(QObject):
                     max_curr=self.max_curr_v
                     kick=vkicks[icorr]
 
-                if not self.running:
-                    break
+                if not self.running: break
+                if self.paused:      self._await_user()
 
                 corr_changed = False
 
@@ -109,8 +110,8 @@ class Worker(QObject):
                     I.push(corrector, curr_p)
                     corr_changed = True
 
-                    if not self.running:
-                        break
+                    if not self.running: break
+                    if self.paused:    self._await_user()
 
                     S.pull(I)
                     S.save(filename=filename_p)
@@ -129,8 +130,8 @@ class Worker(QObject):
                     I.push(corrector, curr_m)
                     corr_changed = True
 
-                    if not self.running:
-                        break
+                    if not self.running: break
+                    if self.paused:    self._await_user()
 
                     S.pull(I)
                     S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
@@ -140,6 +141,9 @@ class Worker(QObject):
 
                 if corr_changed:
                     I.push(corrector, corr['bdes'])
+
+                if not self.running: break
+                if self.paused:      self._await_user()
 
                 Diff_x = (Op['x'] - Om['x']) / 2.0
                 Diff_y = (Op['y'] - Om['y']) / 2.0
@@ -174,8 +178,19 @@ class Worker(QObject):
         self.running = False
         self.finished.emit()
 
-    def stop(self):
-        self.running = False
+    def stop(self): self.running = False
+
+    def pause(self): self.paused = True
+
+    def unpause(self): self.paused = False
+
+    def _await_user(self):
+        reminder = '  -> [ SCAN PAUSED ] Press "resume" button to continue'
+        while self.paused:
+            for j in range(4):
+                print(f'{reminder}{j*'.'}', end='\r')
+                QTest.qWait(500)
+
 
 class MainWindow(QMainWindow):
     def __set_status_in_title(self, status):
@@ -216,8 +231,8 @@ class MainWindow(QMainWindow):
                 a = np.array([0 if x is None else x for x in a], dtype=float)
                 a[np.isnan(a)] = 0
                 return a
-            max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
-            max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
+            max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'][hcorr_indexes]))))
+            max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'][vcorr_indexes]))))
 
         # Load the interface
         uic.loadUi("UI files/SysID_GUI.ui", self)
@@ -237,12 +252,14 @@ class MainWindow(QMainWindow):
         self.clear_bpms_button.clicked.connect(self.__clear_bpms_button_clicked)
         self.start_button.clicked.connect(self.__start_button_clicked)
         self.stop_button.clicked.connect(self.__stop_button_clicked)
+        # self.pause_button.clicked.connect(self.__start_button_clicked)
+        # self.resume_button.clicked.connect(self.__stop_button_clicked)
 
         self.mode=Mode.Orbit
         self._update_folder_path()
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
-        self.initial_hkick_settings.setText("0.01")
-        self.initial_vkick_settings.setText("0.01")
+        self.initial_hkick_settings.setText("0.0001")
+        self.initial_vkick_settings.setText("0.0001")
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
@@ -528,6 +545,16 @@ class MainWindow(QMainWindow):
             self.progressBar.setValue(0)
         self.__set_status_in_title("[Idle]")
         print('SysID stopped.')
+
+    def __pause_button_clicked(self):
+        if self.worker:
+            self.__set_status_in_title("[PAUSED]")
+            self.worker.pause()
+
+    def __unpause_button_clicked(self):
+        if self.worker:
+            self.__set_status_in_title(f"[Running {mode.name} mode]")
+            self.worker.unpause()
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()

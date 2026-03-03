@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QDialogButtonBox,
     QRadioButton, QLabel
 )
@@ -11,7 +11,7 @@ class SelectAcc(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose one of the following accelerators:"))
-        accs= [ 'ATF2', 'CLEAR']
+        accs= [ 'FACET2', 'CLEAR']
 
         self.radio_buttons = []
         for f in accs:
@@ -20,7 +20,7 @@ class SelectAcc(QDialog):
             layout.addWidget(rb)
 
         if self.radio_buttons:
-            self.radio_buttons[0].setChecked(True) #default ATF2
+            self.radio_buttons[0].setChecked(True) #default FACET2
 
         buttons = QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         self.button_box = QDialogButtonBox(buttons)
@@ -39,7 +39,7 @@ class SelectAcc(QDialog):
         super().accept()
 
     def eventFilter(self, obj, event):
-        from PyQt6.QtCore import QEvent, Qt
+        from PyQt5.QtCore import QEvent, Qt
 
         if event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -59,8 +59,8 @@ class InterfaceSelectionDialog(QDialog):
         self.selected_acc = selected_acc
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose one of the following Interfaces:"))
-        if selected_acc=='ATF2':
-            interfaces = ['InterfaceATF2_DR', 'InterfaceATF2_Ext', 'InterfaceATF2_Linac', 'InterfaceATF2_DR_RFTrack', 'InterfaceATF2_Ext_RFTrack']
+        if selected_acc=='FACET2':
+            interfaces = ['InterfaceFACET2_Linac', 'InterfaceFACET2_Linac_RFTrack']
         elif selected_acc=='CLEAR':
             interfaces = ['InterfaceCLEAR_RFTrack' , 'InterfaceCLEAR_real']
         self.radio_buttons = []
@@ -90,35 +90,17 @@ class InterfaceSelectionDialog(QDialog):
             super().accept()
             return
 
-        if self.selected_acc == 'ATF2':
+        if self.selected_acc == 'FACET2':
             match text:
-                case 'InterfaceATF2_DR':
-                    from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
-                    globals()['InterfaceATF2_DR'] = InterfaceATF2_DR
-                    self.selected_interface = InterfaceATF2_DR(nsamples=10)
+                case 'InterfaceFACET2_Linac':
+                    from Interfaces.FACET2.InterfaceFACET2_Linac import InterfaceFACET2_Linac
+                    globals()['InterfaceFACET2_Linac'] = InterfaceFACET2_Linac
+                    self.selected_interface = InterfaceFACET2_Linac(nsamples=3)
 
-                case 'InterfaceATF2_Ext':
-                    from Interfaces.ATF2.InterfaceATF2_Ext import InterfaceATF2_Ext
-                    globals()['InterfaceATF2_Ext'] = InterfaceATF2_Ext
-                    self.selected_interface = InterfaceATF2_Ext(nsamples=10)
-
-                case 'InterfaceATF2_Linac':
-                    from Interfaces.ATF2.InterfaceATF2_Linac import InterfaceATF2_Linac
-                    globals()['InterfaceATF2_Linac'] = InterfaceATF2_Linac
-                    self.selected_interface = InterfaceATF2_Linac(nsamples=3)
-
-                case 'InterfaceATF2_DR_RFTrack':
-                    from Interfaces.ATF2.InterfaceATF2_DR_RFTrack import InterfaceATF2_DR_RFTrack
-                    globals()['InterfaceATF2_DR_RFTrack'] = InterfaceATF2_DR_RFTrack
-                    self.selected_interface = InterfaceATF2_DR_RFTrack(jitter=0.0, bpm_resolution=0.0, nsamples=1)
-                    self.selected_interface.align_everything()
-                    self.selected_interface.misalign_quadrupoles()
-                    self.selected_interface.misalign_bpms()
-
-                case 'InterfaceATF2_Ext_RFTrack':
-                    from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
-                    globals()['InterfaceATF2_Ext_RFTrack'] = InterfaceATF2_Ext_RFTrack
-                    self.selected_interface = InterfaceATF2_Ext_RFTrack(jitter=0.2, bpm_resolution=0.1)
+                case 'InterfaceFACET2_Linac_RFTrack':
+                    from Interfaces.FACET2.InterfaceFACET2_Linac_RFTrack import InterfaceFACET2_Linac_RFTrack
+                    globals()['InterfaceFACET2_Linac_RFTrack'] = InterfaceFACET2_Linac_RFTrack
+                    self.selected_interface = InterfaceFACET2_Linac_RFTrack(jitter=0.2, bpm_resolution=0.1)
                     self.selected_interface.align_everything()
                     self.selected_interface.misalign_quadrupoles()
                     self.selected_interface.misalign_bpms()
@@ -146,7 +128,7 @@ class InterfaceSelectionDialog(QDialog):
         super().accept()
 
     def eventFilter(self, obj, event):
-        from PyQt6.QtCore import QEvent, Qt
+        from PyQt5.QtCore import QEvent, Qt
 
         if event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -164,7 +146,7 @@ def choose_acc_and_interface(parent=None):
     else:
         return None
     '''
-    accelerator = 'ATF2'
+    accelerator = 'FACET2'
     interface_dialog=InterfaceSelectionDialog(accelerator,parent)
     if interface_dialog.exec():
         return interface_dialog.selected_interface

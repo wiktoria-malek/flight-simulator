@@ -9,12 +9,12 @@ import glob
 import sys
 import os
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox, QDoubleSpinBox,
     QComboBox, QCheckBox, QAbstractItemView, QFileDialog, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal
 
 import matplotlib
 

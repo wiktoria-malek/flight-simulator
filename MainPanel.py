@@ -1,7 +1,7 @@
-from PyQt6 import uic
-from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment
+from PyQt5 import uic
+from PyQt5.QtCore import Qt, QProcess, QProcessEnvironment
 from datetime import datetime
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 import sys, time,os
 from pathlib import Path
 

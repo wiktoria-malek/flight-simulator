@@ -10,14 +10,14 @@ import time
 import sys
 import os
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox, QDoubleSpinBox,
     QComboBox, QCheckBox, QAbstractItemView, QFileDialog, QSizePolicy
 )
-from PyQt6.QtGui import QPixmap, QIcon
-from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QPainter, QPixmap, QBrush, QPainterPath, QImage, QPalette
+from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QPainter, QPixmap, QBrush, QPainterPath, QImage, QPalette
 
 import matplotlib
 matplotlib.use('QtAgg')

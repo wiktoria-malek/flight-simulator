@@ -156,26 +156,26 @@ class State:
             'charge': self.icts['charge'] #intensity
         }
 
-        screens={
-            'names': self.screens['names'],
-            'hpixel': self.screens['hpixel'],
-            'vpixel': self.screens['vpixel'],
-            'x': self.screens['x'],
-            'y': self.screens['y'],
-            'sigx': self.screens['sigx'],
-            'sigy': self.screens['sigy'],
-            'sum': self.screens['sum'],
-            'hedges': self.screens['hedges'],
-            'vedges': self.screens['vedges'],
-            'images': self.screens['images'],
-        }
+        # screens={
+        #     'names': self.screens['names'],
+        #     'hpixel': self.screens['hpixel'],
+        #     'vpixel': self.screens['vpixel'],
+        #     'x': self.screens['x'],
+        #     'y': self.screens['y'],
+        #     'sigx': self.screens['sigx'],
+        #     'sigy': self.screens['sigy'],
+        #     'sum': self.screens['sum'],
+        #     'hedges': self.screens['hedges'],
+        #     'vedges': self.screens['vedges'],
+        #     'images': self.screens['images'],
+        # }
 
         state = {
             "sequence": self.sequence,
             "correctors": correctors,
             "bpms": bpms,
             "icts": icts,
-            "screens": screens,
+            # "screens": screens,
             "hcorrectors_names": self.hcorrectors_names,
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
