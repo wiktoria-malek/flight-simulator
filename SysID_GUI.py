@@ -119,7 +119,7 @@ class Worker(QObject):
                     corr_changed = True
 
                     if not self.running: break
-                    if self.paused:    self._await_user()
+                    if self.paused:      self._await_user()
 
                     S.pull(I)
                     S.save(filename=filename_p)
@@ -139,7 +139,7 @@ class Worker(QObject):
                     corr_changed = True
 
                     if not self.running: break
-                    if self.paused:    self._await_user()
+                    if self.paused:      self._await_user()
 
                     S.pull(I)
                     S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
@@ -260,8 +260,8 @@ class MainWindow(QMainWindow):
         self.clear_bpms_button.clicked.connect(self.__clear_bpms_button_clicked)
         self.start_button.clicked.connect(self.__start_button_clicked)
         self.stop_button.clicked.connect(self.__stop_button_clicked)
-        # self.pause_button.clicked.connect(self.__start_button_clicked)
-        # self.resume_button.clicked.connect(self.__stop_button_clicked)
+        self.pause_button.clicked.connect(self.__pause_button_clicked)
+        self.resume_button.clicked.connect(self.__unpause_button_clicked)
 
         self.mode=Mode.Orbit
         self._update_folder_path()
@@ -561,6 +561,7 @@ class MainWindow(QMainWindow):
 
     def __unpause_button_clicked(self):
         if self.worker:
+            mode = self.modes_to_do[self.counter]
             self.__set_status_in_title(f"[Running {mode.name} mode]")
             self.worker.unpause()
 
