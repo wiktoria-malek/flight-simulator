@@ -4,10 +4,18 @@ import numpy as np
 import time
 import sys
 import os
-from PyQt5 import uic
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
-from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
-from PyQt5.QtTest import QTest
+try:
+    from PyQt6 import uic
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt6.QtTest import QTest
+    pyqt_version = 6
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt5.QtTest import QTest
+    pyqt_version = 5
 from enum import Enum
 import matplotlib
 matplotlib.use('QtAgg')
@@ -22,7 +30,7 @@ class Mode(Enum):
 
 class Machine(Enum):
     FACET2_LINAC = "FACET2_Linac"
-    FACET2_RFT = "FACET2_RFT"
+    FACET2_RFT = "FACET2_Linac_RFT"
 
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):

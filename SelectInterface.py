@@ -1,7 +1,15 @@
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QDialogButtonBox,
-    QRadioButton, QLabel
-)
+try:
+    from PyQt6.QtWidgets import (
+        QDialog, QVBoxLayout, QDialogButtonBox,
+        QRadioButton, QLabel
+        )
+    from PyQt6.QtCore import QEvent, Qt
+except ImportError:
+    from PyQt5.QtWidgets import (
+        QDialog, QVBoxLayout, QDialogButtonBox,
+        QRadioButton, QLabel
+        )
+    from PyQt5.QtCore import QEvent, Qt
 
 class SelectAcc(QDialog):
     def __init__(self,parent=None):
@@ -39,8 +47,6 @@ class SelectAcc(QDialog):
         super().accept()
 
     def eventFilter(self, obj, event):
-        from PyQt5.QtCore import QEvent, Qt
-
         if event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                 ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
@@ -128,8 +134,6 @@ class InterfaceSelectionDialog(QDialog):
         super().accept()
 
     def eventFilter(self, obj, event):
-        from PyQt5.QtCore import QEvent, Qt
-
         if event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                 ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
