@@ -13,20 +13,17 @@ class InterfaceFACET2_Linac_RFTrack():
     def get_name(self):
         return 'FACET2_Linac_RFT'
 
-    def __init__(self, population=rft.nC, jitter=0.0, bpm_resolution=0.0, nsamples=1,nparticles=1000):
+    def __init__(self, population=rft.nC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
         self.lattice = FACET2.load_FACET()
         self.lattice.set_bpm_resolution(bpm_resolution)
-        for s in self.lattice['*OTR*']:
-            screen = rft.Screen()
-            screen.set_name(s.get_name())
-            s.replace_with(screen)
         self.sequence = [ e.get_name() for e in self.lattice['*']]
         self.bpms = [ e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [ e.get_name() for e in self.lattice.get_screens()]
         self.Pref = np.sqrt(125.0**2 - rft.electronmass**2)
+        self.bunch_length_ps = 3
         self.nparticles = nparticles
         self.population = population
         self.jitter = jitter
@@ -40,13 +37,12 @@ class InterfaceFACET2_Linac_RFTrack():
         self.log=console or print
 
     def __setup_beam0(self):
-        bunch_length_ps = 3
         T = rft.Bunch6d_twiss()
         T.beta_x = 5.6
         T.alpha_x = -2.11
         T.beta_y = 2.9
         T.alpha_y = 0.0
-        T.sigma_t = bunch_length_ps * rft.ps
+        T.sigma_t = self.bunch_length_ps * rft.ps
         T.sigma_pt = 0.0
         T.emitt_x = 3.2
         T.emitt_y = 3.2
@@ -61,7 +57,7 @@ class InterfaceFACET2_Linac_RFTrack():
         T.alpha_x = -2.11
         T.beta_y = 2.9
         T.alpha_y = 0.0
-        T.sigma_t = bunch_length_ps * rft.ps
+        T.sigma_t = self.bunch_length_ps * rft.ps
         T.sigma_pt = 0.0
         T.emitt_x = 3.2
         T.emitt_y = 3.2
@@ -76,7 +72,7 @@ class InterfaceFACET2_Linac_RFTrack():
         T.alpha_x = -2.11
         T.beta_y = 2.9
         T.alpha_y = 0.0
-        T.sigma_t = bunch_length_ps * rft.ps
+        T.sigma_t = self.bunch_length_ps * rft.ps
         T.sigma_pt = 0.0
         T.emitt_x = 3.2
         T.emitt_y = 3.2
@@ -91,11 +87,11 @@ class InterfaceFACET2_Linac_RFTrack():
         pitch = self.jitter*I0.sigma_py
         yaw   = self.jitter*I0.sigma_px
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
-        self.lattice.track(B0_offset)
-        I=B0_offset.get_info()
+        B1 = self.lattice.track(B0_offset)
+        I = B1.get_info()
         self.log("Emittance after tracking:")
-        self.log(f"εx = {I.emitt_x}[mm.rad]")
-        self.log(f"εy = {I.emitt_y}[mm.rad]")
+        self.log(f"εx = {I.emitt_x}[mm.mrad]")
+        self.log(f"εy = {I.emitt_y}[mm.mrad]")
         self.log(f"εz = {I.emitt_z}[mm.permille]")
 
     def change_energy(self):
@@ -155,9 +151,9 @@ class InterfaceFACET2_Linac_RFTrack():
         self.log("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
-            if corrector[:2] == "X" or corrector[:2] == "ZX":
+            if corrector[:2] == "XC":
                 bdes[i] = (self.lattice[corrector].get_strength()[0]*10)  # gauss*m
-            elif corrector[:2] == "Y":
+            elif corrector[:2] == "YC":
                 bdes[i] = (self.lattice[corrector].get_strength()[1]*10)  # gauss*m
         correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
         return correctors
@@ -247,9 +243,9 @@ class InterfaceFACET2_Linac_RFTrack():
         if not isinstance(names, list):
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
-            if corr[:2] == "X":
+            if corr[:2] == "XC":
                 self.lattice[corr].set_strength(val/10, 0.0)  # T*mm
-            elif corr[:2] == "Y":
+            elif corr[:2] == "YC":
                 self.lattice[corr].set_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
     
@@ -257,9 +253,9 @@ class InterfaceFACET2_Linac_RFTrack():
         if not isinstance(names, list):
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
-            if corr[:2] == "X":
+            if corr[:2] == "XC":
                 self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
-            elif corr[:2] == "Y":
+            elif corr[:2] == "YC":
                 self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
 
