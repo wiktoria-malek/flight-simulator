@@ -1,13 +1,22 @@
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
-from PyQt5 import uic
-from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
-from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
-from State import State
-from PyQt5.QtGui import QPainter
+try:
+    from PyQt6 import uic
+    from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
+    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt6.QtGui import QPainter
+    pyqt_version = 6
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
+    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt5.QtGui import QPainter
+    pyqt_version = 5
+
 matplotlib.use("QtAgg")
 from enum import Enum
+from State import State
 from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -390,9 +399,9 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             #W_xy=np.clip(W_xy, 0, 25) #idk, maybe later there's a need for clamp
             w_xy_bpms=np.sqrt(W_xy)
 
-            Cx = [s for s in corrs if (s.lower().startswith('zh') or ("DHG" in s) or (s.lower().startswith('zx')))]
+            Cx = [s for s in corrs if (s.lower().startswith('xc') or ("DHG" in s) or (s.lower().startswith('zx')))]
 
-            Cy = [s for s in corrs if (s.lower().startswith('zv') or (("SDV" in s) or ("DHJ" in s)))]
+            Cy = [s for s in corrs if (s.lower().startswith('yc') or (("SDV" in s) or ("DHJ" in s)))]
 
             Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs = self._creating_response_matrices()
 
