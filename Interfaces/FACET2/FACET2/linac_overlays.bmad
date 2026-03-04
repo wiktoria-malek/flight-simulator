@@ -1,0 +1,10 @@
+!--------------
+! Linac phase and voltage overlay to change the absolute value of L1
+F2_L1: overlay = {
+  K11_1B[phi0]:phase_deg/360,
+  K11_1C[phi0]:phase_deg/360,
+  K11_1D[phi0]:phase_deg/360,
+  K11_2A[phi0]:phase_deg/360,
+  K11_2B[phi0]:phase_deg/360,
+  K11_2C[phi0]:phase_deg/360},
+  var = {phase_deg}
