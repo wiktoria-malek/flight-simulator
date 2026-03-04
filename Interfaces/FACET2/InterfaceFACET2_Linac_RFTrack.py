@@ -247,9 +247,9 @@ class InterfaceFACET2_Linac_RFTrack():
         if not isinstance(names, list):
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
-            if corr[:2] == "ZH" or corr[:2] == "ZX":
+            if corr[:2] == "X":
                 self.lattice[corr].set_strength(val/10, 0.0)  # T*mm
-            elif corr[:2] == "ZV":
+            elif corr[:2] == "Y":
                 self.lattice[corr].set_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
     
@@ -257,9 +257,9 @@ class InterfaceFACET2_Linac_RFTrack():
         if not isinstance(names, list):
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
-            if corr[:2] == "ZH" or corr[:2] == "ZX":
+            if corr[:2] == "X":
                 self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
-            elif corr[:2] == "ZV":
+            elif corr[:2] == "Y":
                 self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
 
