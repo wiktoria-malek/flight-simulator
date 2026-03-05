@@ -52,8 +52,21 @@ class MainWindow(QMainWindow,SaveOrLoad):
     def _get_selection(self):
         quadrupoles_all = self.S.get_quadrupoles()["names"]
         screens_all = self.S.get_screens()["names"]
-        quadrupoles = [it.text() for it in self.quadrupoles_list.selectedItems()] or quadrupoles_all
-        screens = [it.text() for it in self.screens_list.selectedItems()] or screens_all
+
+        selected_quadrupoles = []
+        for i in range(self.quadrupoles_list.count()):
+            it = self.quadrupoles_list.item(i)
+            if it.isSelected():
+                selected_quadrupoles.append(it.text())
+        quadrupoles = selected_quadrupoles or quadrupoles_all
+
+        selected_screens = []
+        for i in range(self.screens_list.count()):
+            it = self.screens_list.item(i)
+            if it.isSelected():
+                selected_screens.append(it.text())
+        screens = selected_screens or screens_all
+
         return quadrupoles, screens
 
     def _run_scan(self):

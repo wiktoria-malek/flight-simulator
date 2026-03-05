@@ -255,8 +255,21 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
     def _get_selection(self):
         corrs_all = self.S.get_correctors()["names"]
         bpms_all = self.S.get_bpms()["names"]
-        corrs = [it.text() for it in self.correctors_list.selectedItems()] or corrs_all
-        bpms = [it.data(Qt.ItemDataRole.UserRole) for it in self.bpms_list.selectedItems()] or bpms_all
+
+        selected_corrs = []
+        for i in range(self.correctors_list.count()):
+            it = self.correctors_list.item(i)
+            if it.isSelected():
+                selected_corrs.append(it.text())
+        corrs = selected_corrs or corrs_all
+
+        selected_bpms = []
+        for i in range(self.bpms_list.count()):
+            it = self.bpms_list.item(i)
+            if it.isSelected():
+                selected_bpms.append(it.data(Qt.ItemDataRole.UserRole))
+        bpms = selected_bpms or bpms_all
+
         return corrs, bpms
 
     def _force_triangular(self) -> bool:
