@@ -52,6 +52,12 @@ class SaveOrLoad():
     def _load_bpms(self):
         self._loading_func(loading_name="Load BPMs", filename="bpms.txt", elements_list=self.bpms_list)
 
+    def _load_quadrupoles(self):
+        self._loading_func(loading_name="Load Quadrupoles", filename="quadrupoles.txt", elements_list=self.quadrupoles_list)
+
+    def _load_screens(self):
+        self._loading_func(loading_name="Load Screens", filename="screens.txt", elements_list=self.screens_list)
+
     def _pick_and_load_data_dir(self, button_ui, button_name, oper):
         default_dir = f"~/flight-simulator-data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
@@ -74,6 +80,49 @@ class SaveOrLoad():
 
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
+
+    def _save_session_quad_scan(self, delta_min,delta_max,steps,nshots,quad_name, K1_0,sigx_mean,sigy_mean,sigx_std,sigy_std):
+        time_str = datetime.now().strftime("%y%m%d%H%M%S")
+        default_dir = f"~/flight-simulator-data/"
+        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
+        save_session_dir = os.path.join(default_dir, f"Quadrupole_scan_{self.interface.get_name()}_{time_str}_session_settings")
+        os.makedirs(save_session_dir, exist_ok=True)
+
+        self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt", saving_name="Save Quadrupoles",
+                          use_dialog=False, base_dir=save_session_dir)
+        self._saving_func(elements_list=self.screens_list, filename="screens.txt", saving_name="Save Screens", use_dialog=False,
+                          base_dir=save_session_dir)
+
+        scan_settings = {
+            "delta_min": delta_min,
+            "delta_max": delta_max,
+            "steps": steps,
+            "nshots": nshots,
+            "quad_name": quad_name,
+            "K1_0": K1_0,
+            "sigx_mean": sigx_mean.tolist(),
+            "sigy_mean": sigy_mean.tolist(),
+            "sigx_std": sigx_std.tolist(),
+            "sigy_std": sigy_std.tolist(),
+        }
+
+        with open(os.path.join(save_session_dir, "scan_settings.json"), "w") as f:
+            json.dump(scan_settings, f, indent=2)
+
+        def __save_graph_data(path, series):
+            with open(path, "w") as f:
+                f.write("Iteration\tvalue\n")
+                for i, v in enumerate(series, start=1):
+                    f.write(f"{i}\t{v}\n")
+
+        # __save_graph_data(os.path.join(save_session_dir, "trajectory_x_after_correction.txt"), self._hist_orbit_x)
+        # __save_graph_data(os.path.join(save_session_dir, "dispersion_x_after_correction.txt"), self._hist_disp_x)
+        # __save_graph_data(os.path.join(save_session_dir, "wakefield_x_after_correction.txt"), self._hist_wake_x)
+        # __save_graph_data(os.path.join(save_session_dir, "trajectory_y_after_correction.txt"), self._hist_orbit_y)
+        # __save_graph_data(os.path.join(save_session_dir, "dispersion_y_after_correction.txt"), self._hist_disp_y)
+        # __save_graph_data(os.path.join(save_session_dir, "wakefield_y_after_correction.txt"), self._hist_wake_y)
+
+        #quadrupoles, screens = self._get_selection()
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")

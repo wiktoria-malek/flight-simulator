@@ -3,7 +3,9 @@ import numpy as np
 import time,os
 from LogConsole_BBA import LogConsole
 from datetime import datetime
+
 class InterfaceATF2_Ext_RFTrack():
+
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
@@ -21,11 +23,13 @@ class InterfaceATF2_Ext_RFTrack():
         self.bpms = [ e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [ e.get_name() for e in self.lattice.get_screens()]
+        self.quadrupoles = [ e.get_name() for e in self.lattice.get_quadrupoles()]
         self.Pref = 1.2999999e3 # 1.3 GeV/c
         self.nparticles = nparticles
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples
+        self.Q=-1
         self.dfs_test_energy = 0.98
         self.wfs_test_charge = 0.90
         self.__setup_beam0()
@@ -44,7 +48,7 @@ class InterfaceATF2_Ext_RFTrack():
         T.alpha_y = -1.907222942
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
         
     def __setup_beam1(self):
         # Beam for DFS - Reduced energy
@@ -59,7 +63,7 @@ class InterfaceATF2_Ext_RFTrack():
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 1000 # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, Pref, T, self.nparticles)
 
     def __setup_beam2(self):
         # Beam for WFS - Reduced bunch charge
@@ -74,7 +78,7 @@ class InterfaceATF2_Ext_RFTrack():
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
         Nparticles = 1000 # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles)
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
@@ -120,6 +124,9 @@ class InterfaceATF2_Ext_RFTrack():
 
     def get_correctors_names(self):
         return self.corrs
+
+    def get_quadrupoles_names(self):
+        return self.quadrupoles
 
     def get_hcorrectors_names(self):
         return [string for string in self.corrs if (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
@@ -267,6 +274,36 @@ class InterfaceATF2_Ext_RFTrack():
                     "images": images }
         return screens
 
+    def get_quadrupoles(self): # returns quadrupole strengths
+        self.log("Reading quadrupoles' strengths...")
+        bdes=np.zeros(len(self.quadrupoles),dtype=float) # one value per each quadrupole
+
+        for i,quadrupole_name in enumerate(self.quadrupoles):
+            quadrupole = self.lattice[quadrupole_name]
+            quadrupole=quadrupole[0] if isinstance(quadrupole, list) else quadrupole
+            try:
+                strength=quadrupole.get_K1(self.Pref/self.Q) # 1/m2
+            except Exception:
+                strength=0.0
+            if isinstance(strength, (list,tuple,np.ndarray)):
+                bdes[i]=float(strength[0]) if len(strength)>0 else 0.0
+            else:
+                bdes[i]=float(strength)
+        return {"names": self.quadrupoles, "bdes": bdes,"bact": bdes.copy()}
+
+    def set_quadrupoles(self, names, values_range):
+        if isinstance(names, str):
+            names = [names]
+        if not (isinstance(values_range, list)):
+            values_range = [values_range]
+
+        for quadrupole_name, value in zip(names, values_range):
+            quadrupole = self.lattice[quadrupole_name]
+            quadrupole = quadrupole[0] if isinstance(quadrupole, list) else quadrupole
+            quadrupole.set_K1(self.Pref/self.Q,float(value))
+
+        self.__track_bunch()
+
     def push(self, names, corr_vals):
         if not isinstance(names, list):
             names = [ names ] # makes it a list
@@ -285,6 +322,19 @@ class InterfaceATF2_Ext_RFTrack():
                 self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
+        self.__track_bunch()
+
+    def vary_quadrupoles(self, names, delta_values):
+        if not isinstance(names, list):
+            names = [ names ]
+        if not isinstance(delta_values, (list,tuple,np.ndarray)):
+            delta_values = [ delta_values ]
+        for quadrupole_name, val in zip(names, delta_values):
+            quadrupole = self.lattice[quadrupole_name]
+            quadrupole=quadrupole[0] if isinstance(quadrupole, list) else quadrupole
+            current=quadrupole.get_K1(self.Pref/self.Q)
+            current=float(current[0]) if isinstance(current, (list,tuple,np.ndarray)) else float(current)
+            quadrupole.set_K1(self.Pref/self.Q,current+val)
         self.__track_bunch()
 
     def align_everything(self):

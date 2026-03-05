@@ -18,6 +18,7 @@ class State:
         self.vcorrectors_names = interface.get_vcorrectors_names()
         self.timestamp = datetime.now()
         self.screens=interface.get_screens() if hasattr(interface, 'get_screens') else {"names": []}
+        self.quadrupoles=interface.get_quadrupoles()
 
     def push(self, interface):
         interface.push(self.correctors['names'], self.correctors['bdes']) #sets the desired current for one or more correctors
@@ -61,6 +62,20 @@ class State:
                 "charge": np.array(self.icts['charge'])[ict_indexes]
             }
         return icts         
+
+    def get_quadrupoles(self, names=None):
+        if isinstance(names, str):
+            names = [names]
+        quadrupoles=self.quadrupoles
+        if names is not None:
+            quadrupole_indexes=np.array([index for index, string in enumerate(quadrupoles['names']) if string in names])
+            quadrupoles = {
+                "names": np.array(self.quadrupoles['names'])[quadrupole_indexes],
+                "bdes": np.array(self.quadrupoles['bdes'])[quadrupole_indexes],
+                "bact": np.array(self.quadrupoles['bact'])[quadrupole_indexes],
+            }
+        return quadrupoles
+
 
     def get_orbit(self, names=None):
         bpms = self.get_bpms(names)
@@ -113,6 +128,7 @@ class State:
                 self.bpms = data['bpms']
                 self.icts = data['icts']
                 self.screens = data.get('screens',{"names":[]})
+                self.quadrupoles = data.get('quadrupoles',{"names":[], "bdes": np.array([]), "bact": np.array([])})
                 """
                 self.correctors = {
                     "names": data['correctors']['names']
@@ -156,6 +172,12 @@ class State:
             'charge': self.icts['charge'] #intensity
         }
 
+        quadrupoles = {
+            'names': self.quadrupoles['names'],
+            "bact": self.quadrupoles['bact'],
+            "bdes": self.quadrupoles['bdes'],
+        }
+
         screens={
             'names': self.screens['names'],
             'hpixel': self.screens['hpixel'],
@@ -176,6 +198,7 @@ class State:
             "bpms": bpms,
             "icts": icts,
             "screens": screens,
+            "quadrupoles": quadrupoles,
             "hcorrectors_names": self.hcorrectors_names,
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")

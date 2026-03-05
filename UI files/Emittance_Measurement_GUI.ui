@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>EmittanceMainWindow</class>
+ <widget class="QMainWindow" name="EmittanceMainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1158</width>
+    <height>686</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Emittance Measurement</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QGroupBox" name="leftPanelGroup">
+      <property name="title">
+       <string/>
+      </property>
+      <layout class="QVBoxLayout" name="leftVBox">
+       <item>
+        <widget class="QGroupBox" name="elementsGroup">
+         <property name="title">
+          <string>Devices</string>
+         </property>
+         <layout class="QVBoxLayout" name="elementsVBox">
+          <item>
+           <layout class="QHBoxLayout" name="quadsScreensHBox">
+            <item>
+             <widget class="QGroupBox" name="quadsGroup">
+              <property name="title">
+               <string>Quadrupoles</string>
+              </property>
+              <layout class="QVBoxLayout" name="quadsVBox">
+               <item>
+                <widget class="QListWidget" name="quadrupoles_list">
+                 <property name="selectionMode">
+                  <enum>QAbstractItemView::ExtendedSelection</enum>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="load_quadrupoles_button">
+                 <property name="text">
+                  <string>Load...</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="screensGroup">
+              <property name="title">
+               <string>Screens</string>
+              </property>
+              <layout class="QVBoxLayout" name="screensVBox">
+               <item>
+                <widget class="QListWidget" name="screens_list">
+                 <property name="selectionMode">
+                  <enum>QAbstractItemView::ExtendedSelection</enum>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="load_screens_button">
+                 <property name="text">
+                  <string>Load...</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="firstScreenHBox">
+            <item>
+             <widget class="QLabel" name="labelFirstScreen">
+              <property name="text">
+               <string>First (reference) screen</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="first_screen_choice"/>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="scanGroup">
+         <property name="title">
+          <string>Quadrupole scan settings</string>
+         </property>
+         <layout class="QGridLayout" name="gridScan">
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="delta_min_scan">
+            <property name="decimals">
+             <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>-10.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>-0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="labelDeltaMax">
+            <property name="text">
+             <string>Delta max</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="delta_max_scan">
+            <property name="decimals">
+             <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>-10.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="labelSteps">
+            <property name="text">
+             <string>Steps</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="steps_settings">
+            <property name="minimum">
+             <number>3</number>
+            </property>
+            <property name="maximum">
+             <number>101</number>
+            </property>
+            <property name="value">
+             <number>10</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="labelShots">
+            <property name="text">
+             <string>Measurements per step</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="meas_per_step">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>200</number>
+            </property>
+            <property name="value">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>Delta min</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="actionsGroup">
+         <property name="title">
+          <string>Measurement</string>
+         </property>
+         <layout class="QGridLayout" name="gridActions">
+          <item row="0" column="1">
+           <widget class="QPushButton" name="pushButton">
+            <property name="text">
+             <string>Restore quadrupole settings</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QPushButton" name="fit_emm_twiss_button">
+            <property name="text">
+             <string>Fit emittance / Twiss</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QPushButton" name="load_session_button">
+            <property name="text">
+             <string>Load session...</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QTabWidget" name="tabs">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="scanTab">
+       <attribute name="title">
+        <string>Scan plots</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="scanVBox">
+        <item>
+         <layout class="QHBoxLayout" name="plotSelectorsHBox">
+          <item>
+           <widget class="QLabel" name="labelQuadPlot">
+            <property name="text">
+             <string>Quadrupole</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="quad_on_plot"/>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelScreenPlot">
+            <property name="text">
+             <string>Screen</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="screen_on_plot"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QWidget" name="plotPlaceholder" native="true"/>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="startStopHBox">
+          <item>
+           <widget class="QPushButton" name="start_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: red; color: white;</string>
+            </property>
+            <property name="text">
+             <string>START SCAN</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="stop_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: green; color: white;</string>
+            </property>
+            <property name="text">
+             <string>STOP</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="fitTab">
+       <attribute name="title">
+        <string>Fit summary</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="fitVBox">
+        <item>
+         <widget class="QTableWidget" name="resultsTable">
+          <property name="rowCount">
+           <number>2</number>
+          </property>
+          <property name="columnCount">
+           <number>5</number>
+          </property>
+          <row/>
+          <row/>
+          <column>
+           <property name="text">
+            <string>Plane</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>epsilon</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>beta</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>alpha</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>chi2</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionss">
+   <property name="text">
+    <string>ss</string>
+   </property>
+  </action>
+  <action name="actions">
+   <property name="text">
+    <string>s</string>
+   </property>
+  </action>
+  <action name="actions_2">
+   <property name="text">
+    <string>s</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
