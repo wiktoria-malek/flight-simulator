@@ -1,15 +1,28 @@
 from State import State
 from Response import Response
-from PyQt5 import uic
+try:
+    from PyQt6 import uic
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QVBoxLayout,
+        QLineEdit, QListWidget, QPushButton,
+        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+        )
+    from PyQt6.QtCore import Qt,QTimer
+    pyqt_version = 6
+
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtWidgets import (
+        QApplication, QMainWindow, QVBoxLayout,
+        QLineEdit, QListWidget, QPushButton,
+        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+        )
+    from PyQt5.QtCore import Qt,QTimer
+    pyqt_version = 5
+
 import numpy as np
 import glob,sys,os,argparse,matplotlib
 from SaveOrLoad import SaveOrLoad
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout,
-    QLineEdit, QListWidget, QPushButton,
-    QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
-)
-from PyQt5.QtCore import Qt,QTimer
 from SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
