@@ -1,8 +1,13 @@
 import os, pickle, json
 from datetime import datetime
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
-                             QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+try:
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
+                                QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+except ImportError:
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
+                                QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 
 class SaveOrLoad():
     def _saving_func(self, elements_list, filename, saving_name, *, use_dialog=True,base_dir=None):  # * - must be passed by keyword

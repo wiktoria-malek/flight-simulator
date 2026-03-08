@@ -440,12 +440,24 @@ class MainWindow(QMainWindow):
                 self.correctors_list.item(i).setSelected(True)
             selected_correctors = self.interface.get_correctors()['names']
 
+        filename = self.working_directory_input.text() + '/correctors.txt'
+        if filename:
+            with open(filename, 'w') as f:
+                for item in selected_correctors:
+                    f.write(f"{item.text()}\n")
+
         selected_bpms = [item.text() for item in self.bpms_list.selectedItems()]
         self.selected_bpms = selected_bpms
         if not selected_bpms:
             for i in range(self.bpms_list.count()):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
+
+        filename = self.working_directory_input.text() + '/bpms.txt'
+        if filename:
+            with open(filename, 'w') as f:
+                for item in selected_bpms:
+                    f.write(f"{item.text()}\n")
 
         self._current_measuring_mode()
 

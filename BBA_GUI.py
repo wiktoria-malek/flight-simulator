@@ -204,7 +204,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             canvas = FigureCanvas(fig)
             layout = host.layout()
             if layout is None:
-                from PyQt5.QtWidgets import QVBoxLayout
                 layout = QVBoxLayout(host)
                 layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(canvas)
@@ -429,9 +428,9 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 self.log("Measuring orbit")
                 self.S.pull(self.interface)
                 print('State::pull done')
-                O0 = self.S.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
-                O0x=np.asarray(O0['x'],dtype=float).reshape(-1,1)
-                O0y=np.asarray(O0['y'],dtype=float).reshape(-1,1)
+                O0 = self.S.get_orbit(bpms) # because axis=1 is mean from one whole measurement, not for 1 bpm
+                O0x = np.asarray(O0['x'],dtype=float).reshape(-1,1)
+                O0y = np.asarray(O0['y'],dtype=float).reshape(-1,1)
 
                 bpms0=self.S.get_bpms(bpms)
                 x0_vals=np.asarray(bpms0['x'],dtype=float)
@@ -443,7 +442,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
                 if self.reset_ref_orb==True:
                     B0x = O0x.copy()
-                    B0y=O0y.copy()
+                    B0y = O0y.copy()
                     self.reset_ref_orb=False
                     self.log("Reference orbit reset to current orbit")
 
@@ -517,8 +516,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 Axy[np.isnan(Axy)] = 0
                 Ayx[np.isnan(Ayx)] = 0
 
-                Axx[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
-                Axy[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
+                Axx[np.isnan(Bx.ravel()),:] = 0 # flattens an array into 1d
+                Axy[np.isnan(Bx.ravel()),:] = 0 # flattens an array into 1d
 
                 Ayy[np.isnan(By.ravel()),:] = 0
                 Ayx[np.isnan(By.ravel()),:] = 0
@@ -557,7 +556,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
                 #adding the (Aw.T*Aw+beta*I)-1
                 if beta>0: # with beta, A.T@A+beta*I is always reversible, so we use solve, matrix is square and reversible
-                    delta=-gain*np.linalg.solve(A_weighted.T@A_weighted+beta*np.eye(A_weighted.shape[1]),A_weighted.T@B_weighted) # without pinv, because we add beta so that singular values will not be near zero
+                    delta = -gain * np.linalg.solve(A_weighted.T@A_weighted+beta*np.eye(A_weighted.shape[1]),A_weighted.T@B_weighted) # without pinv, because we add beta so that singular values will not be near zero
                 else: # np.eye(n) singular matrix with shape= number of columns
                     delta = -gain * (np.linalg.pinv(A_weighted, rcond=rcond) @ B_weighted)
                 print(f"Delta is {delta}")
