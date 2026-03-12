@@ -147,6 +147,8 @@ class InterfaceATF2_Linac:
         return icts
     def get_quadrupoles(self):
         pass
+    def set_quadrupoles(self):
+        pass
 
     def get_correctors(self):
         print("Reading correctors' strengths...")
