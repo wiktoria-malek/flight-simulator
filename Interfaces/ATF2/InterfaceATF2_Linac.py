@@ -96,7 +96,7 @@ class InterfaceATF2_Linac:
 
     def change_intensity(self):
         new_laser_intensity = 0.15 # 0..1
-        laser_intensity = new_laser_intensity * 100 * 2 # Korysko dixit: 100 for percent, 5 convesion factor
+        laser_intensity = new_laser_intensity * 100 * 3 # Korysko dixit: 100 for percent, 5 convesion factor
         print(f'Changing laser intensity to {laser_intensity}...')
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
