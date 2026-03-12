@@ -145,6 +145,8 @@ class InterfaceATF2_Linac:
         charge = np.array(charge)
         icts = { "names": names, "charge": charge }
         return icts
+    def get_quadrupoles(self):
+        pass
 
     def get_correctors(self):
         print("Reading correctors' strengths...")
