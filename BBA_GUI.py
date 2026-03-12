@@ -390,6 +390,14 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             w1, w2, w3, rcond, iters, gain,beta = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
             corrs, bpms = self._get_selection()
+
+            Cx = [s for s in corrs if self._is_h_corrector(s)]
+
+            Cy = [s for s in corrs if self._is_v_corrector(s)]
+
+            Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs, bpms_common = self._creating_response_matrices()
+            bpms=list(bpms_common)
+
             n=len(bpms)
             wbpm_orb_vec,wbpm_dfs_vec,wbpm_wfs_vec=[],[],[]
             for bpm in bpms:
@@ -410,12 +418,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             W_xy=np.vstack([W_x,W_x]) #because the weights are the same, B=vstack(bx,by)
             #W_xy=np.clip(W_xy, 0, 25) #idk, maybe later there's a need for clamp
             w_xy_bpms=np.sqrt(W_xy)
-
-            Cx = [s for s in corrs if self._is_h_corrector(s)]
-
-            Cy = [s for s in corrs if self._is_v_corrector(s)]
-
-            Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs = self._creating_response_matrices()
 
             self.setWindowTitle("BBA GUI - [Correction running]")
 
@@ -523,6 +525,13 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
+
+                print("Axx shape:", Axx.shape)
+                print("Axy shape:", Axy.shape)
+                print("Ayx shape:", Ayx.shape)
+                print("Ayy shape:", Ayy.shape)
+                print("Bx shape:", Bx.shape)
+                print("By shape:", By.shape)
 
                 Axx[np.isnan(Axx)] = 0
                 Ayy[np.isnan(Ayy)] = 0

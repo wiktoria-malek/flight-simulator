@@ -118,8 +118,7 @@ class DFS_WFS_Correction_BBA():
                  Rxy[bpm_indexes, vcorrs.index(corr)] = 0
                  Ryy[bpm_indexes, vcorrs.index(corr)] = 0
 
-        return Rxx,Ryy,Rxy,Ryx,Bx,By, hcorrs,vcorrs
-
+        return Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms
 
     def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, _force_triangular=False):
 
@@ -132,12 +131,22 @@ class DFS_WFS_Correction_BBA():
 
         triangular = bool(self._force_triangular() or _force_triangular)
 
-        R0xx,R0yy,R0xy,R0yx,B0x,B0y,hcorrs0,vcorrs0=self._compute_response_matrix(pairs=info_traj["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
-        R1xx,R1yy,R1xy,R1yx,B1x,B1y,hcorrs1,vcorrs1=self._compute_response_matrix(pairs=info_dfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
-        R2xx,R2yy,R2xy,R2yx,B2x,B2y,hcorrs2,vcorrs2=self._compute_response_matrix(pairs=info_wfs["pairs"],correctors=selected_corrs, bpms=selected_bpms, triangular=triangular)
-
-        return R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs0,vcorrs0,hcorrs1,vcorrs1,hcorrs2,vcorrs2
-
+        R0xx, R0yy, R0xy, R0yx, B0x, B0y, hcorrs0, vcorrs0, bpms0 = self._compute_response_matrix(
+            pairs=info_traj["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
+        )
+        R1xx, R1yy, R1xy, R1yx, B1x, B1y, hcorrs1, vcorrs1, bpms1 = self._compute_response_matrix(
+            pairs=info_dfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
+        )
+        R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs2, vcorrs2, bpms2 = self._compute_response_matrix(
+            pairs=info_wfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
+        )
+        return (
+            R0xx, R0yy, R0xy, R0yx, B0x, B0y,
+            R1xx, R1yy, R1xy, R1yx, B1x, B1y,
+            R2xx, R2yy, R2xy, R2yx, B2x, B2y,
+            hcorrs0, vcorrs0, hcorrs1, vcorrs1, hcorrs2, vcorrs2,
+            bpms0, bpms1, bpms2,
+        )
     def _creating_response_matrices(self):
 
         w1, w2, w3, rcond, iters, gain,beta = self._read_params()
@@ -145,8 +154,15 @@ class DFS_WFS_Correction_BBA():
 
         corrs, bpms = self._get_selection()
 
-        R0xx,R0yy,R0xy,R0yx,B0x,B0y,R1xx,R1yy,R1xy,R1yx,B1x,B1y,R2xx,R2yy,R2xy,R2yx,B2x,B2y, hcorrs0,vcorrs0,hcorrs1,vcorrs1,hcorrs2,vcorrs2  = self._get_data_from_loaded_directories(selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular())
-
+        (
+            R0xx, R0yy, R0xy, R0yx, B0x, B0y,
+            R1xx, R1yy, R1xy, R1yx, B1x, B1y,
+            R2xx, R2yy, R2xy, R2yx, B2x, B2y,
+            hcorrs0, vcorrs0, hcorrs1, vcorrs1, hcorrs2, vcorrs2,
+            bpms0, bpms1, bpms2,
+        ) = self._get_data_from_loaded_directories(
+            selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular()
+        )
         def _handle_missing_corrector(R,corrs,corrs_ref):
             if corrs== corrs_ref:
                 return R
@@ -158,9 +174,26 @@ class DFS_WFS_Correction_BBA():
                     if i is not None:
                         final_matrix[:,j] = R[:,i]
                 return final_matrix
+
+        def _handle_missing_bpm(Rxx,Ryy,Rxy,Ryx,Bx,By,bpms,bpms_ref):
+            if bpms== bpms_ref:
+                return Rxx,Ryy,Rxy,Ryx,Bx,By
+            index = {b: i for i, b in enumerate(bpms)}
+            bpm_indexes=[index[b] for b in bpms_ref]
+
+            return (
+                Rxx[bpm_indexes, :],
+                Ryy[bpm_indexes, :],
+                Rxy[bpm_indexes, :],
+                Ryx[bpm_indexes, :],
+                Bx[bpm_indexes, :],
+                By[bpm_indexes, :],
+            )
+
         #intersection
         hcorrs=[c for c in hcorrs0 if (c in hcorrs1 and c in hcorrs2)]
         vcorrs=[c for c in vcorrs0 if (c in vcorrs1 and c in vcorrs2)]
+        bpms=[b for b in bpms0 if (b in bpms1 and b in bpms2)]
 
         R0xx=_handle_missing_corrector(R0xx, hcorrs0,hcorrs)
         R0yy=_handle_missing_corrector(R0yy, vcorrs0,vcorrs)
@@ -174,6 +207,10 @@ class DFS_WFS_Correction_BBA():
         R2yy=_handle_missing_corrector(R2yy, vcorrs2,vcorrs)
         R2xy=_handle_missing_corrector(R2xy, vcorrs2,vcorrs)
         R2yx=_handle_missing_corrector(R2yx, hcorrs2,hcorrs)
+
+        R0xx, R0yy, R0xy, R0yx, B0x, B0y = _handle_missing_bpm(R0xx, R0yy, R0xy, R0yx, B0x, B0y, bpms0, bpms)
+        R1xx, R1yy, R1xy, R1yx, B1x, B1y = _handle_missing_bpm(R1xx, R1yy, R1xy, R1yx, B1x, B1y, bpms1, bpms)
+        R2xx, R2yy, R2xy, R2yx, B2x, B2y = _handle_missing_bpm(R2xx, R2yy, R2xy, R2yx, B2x, B2y, bpms2, bpms)
 
         Axx=[]
         Ayy=[]
@@ -203,4 +240,4 @@ class DFS_WFS_Correction_BBA():
         Axy = np.vstack(Axy)
         Ayx = np.vstack(Ayx)
 
-        return Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs
+        return Axx, Ayy, Axy, Ayx, B0x, B0y, hcorrs, vcorrs, bpms
