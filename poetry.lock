@@ -575,6 +575,27 @@ tests = ["check-manifest", "coverage (>=7.4.2)", "defusedxml", "markdown2", "ole
 xmp = ["defusedxml"]
 
 [[package]]
+name = "pyepics"
+version = "3.5.9"
+description = "Epics Channel Access for Python"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "pyepics-3.5.9-py3-none-any.whl", hash = "sha256:b9863cc55a58542f0a28ad04621d4471f649e9cacfa4ccf346a58d6ba158640c"},
+    {file = "pyepics-3.5.9.tar.gz", hash = "sha256:78222c1a8aff55bc7a93bdcb6eea9cb544fa8b9122daed1e7ea5b5e87269d45c"},
+]
+
+[package.dependencies]
+numpy = ">=1.26"
+pyparsing = "*"
+
+[package.extras]
+all = ["pyepics[doc,test]"]
+doc = ["Sphinx", "numpydoc"]
+test = ["coverage", "psutil ; platform_system == \"Linux\"", "pytest", "pytest-cov"]
+
+[[package]]
 name = "pyparsing"
 version = "3.3.2"
 description = "pyparsing - Classes and methods to define and execute parsing grammars"
@@ -731,4 +752,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "aa634c5d516759e59fc49632cd808714a286345d48452c3505d6e08ed631089a"
+content-hash = "4df49aaa9f4b8cd77efc05ffaccfa89c1c17f36b8ce1dd9e1caf16d1dae797cb"
