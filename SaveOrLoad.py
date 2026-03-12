@@ -3,6 +3,7 @@ from datetime import datetime
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
                              QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+import numpy as np
 
 class SaveOrLoad():
     def _saving_func(self, elements_list, filename, saving_name, *, use_dialog=True,base_dir=None):  # * - must be passed by keyword
@@ -31,11 +32,18 @@ class SaveOrLoad():
         if fn and os.path.isfile(fn):
             with open(fn, "r") as f:
                 selected = [ln.strip() for ln in f]
-        if selected is None:
-            selected = (
-                self.S.get_bpms()["names"] if elements_list is self.bpms_list else self.S.get_correctors()["names"])
-
-        elements_list.clearSelection()
+        if not selected:
+            if elements_list is self.bpms_list:
+                selected = self.S.get_bpms()["names"]
+            elif elements_list is self.correctors_list:
+                selected = self.S.get_correctors()["names"]
+            elif elements_list is self.quadrupoles_list:
+                selected = self.S.get_quadrupoles()["names"]
+            elif elements_list is self.screens_list:
+                selected = self.S.get_screens()["names"]
+            else:
+                selected = [elements_list.item(i).text() for i in range(elements_list.count())]
+            elements_list.clearSelection()
         for name in selected:
             for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):
                 it.setSelected(True)
@@ -81,7 +89,7 @@ class SaveOrLoad():
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
 
-    def _save_session_quad_scan(self, delta_min,delta_max,steps,nshots,quad_name, K1_0,sigx_mean,sigy_mean,sigx_std,sigy_std):
+    def _save_session_quad_scan(self, delta_min,delta_max,steps,nshots,quad_name, K1_0,sigx_mean,sigy_mean,sigx_std,sigy_std, deltas=None,K1_values=None):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir = f"~/flight-simulator-data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
@@ -92,6 +100,11 @@ class SaveOrLoad():
                           use_dialog=False, base_dir=save_session_dir)
         self._saving_func(elements_list=self.screens_list, filename="screens.txt", saving_name="Save Screens", use_dialog=False,
                           base_dir=save_session_dir)
+
+        sigx_mean = np.asarray(sigx_mean, dtype=float)
+        sigy_mean = np.asarray(sigy_mean, dtype=float)
+        sigx_std = np.asarray(sigx_std, dtype=float)
+        sigy_std = np.asarray(sigy_std, dtype=float)
 
         scan_settings = {
             "delta_min": delta_min,
@@ -104,25 +117,13 @@ class SaveOrLoad():
             "sigy_mean": sigy_mean.tolist(),
             "sigx_std": sigx_std.tolist(),
             "sigy_std": sigy_std.tolist(),
+            "deltas": deltas.tolist() if deltas is not None else None,
+            "K1_values": K1_values.tolist() if K1_values is not None else None,
         }
 
         with open(os.path.join(save_session_dir, "scan_settings.json"), "w") as f:
             json.dump(scan_settings, f, indent=2)
-
-        def __save_graph_data(path, series):
-            with open(path, "w") as f:
-                f.write("Iteration\tvalue\n")
-                for i, v in enumerate(series, start=1):
-                    f.write(f"{i}\t{v}\n")
-
-        # __save_graph_data(os.path.join(save_session_dir, "trajectory_x_after_correction.txt"), self._hist_orbit_x)
-        # __save_graph_data(os.path.join(save_session_dir, "dispersion_x_after_correction.txt"), self._hist_disp_x)
-        # __save_graph_data(os.path.join(save_session_dir, "wakefield_x_after_correction.txt"), self._hist_wake_x)
-        # __save_graph_data(os.path.join(save_session_dir, "trajectory_y_after_correction.txt"), self._hist_orbit_y)
-        # __save_graph_data(os.path.join(save_session_dir, "dispersion_y_after_correction.txt"), self._hist_disp_y)
-        # __save_graph_data(os.path.join(save_session_dir, "wakefield_y_after_correction.txt"), self._hist_wake_y)
-
-        #quadrupoles, screens = self._get_selection()
+        self.session_database.setText(save_session_dir)
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
@@ -177,6 +178,38 @@ class SaveOrLoad():
         with open(os.path.join(save_session_dir, "correction_matrices.pkl"), "wb") as f:
             pickle.dump(correction_matrices, f)
 
+    def load_session_settings_quad_scan(self):
+        default_dir = f"~/flight-simulator-data/"
+        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
+        os.makedirs(default_dir, exist_ok=True)
+        folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
+        if not folder:
+            return
+        if hasattr(self, "load_session_button"):
+            self.session_database.setText(folder)
+        QMessageBox.information(self.session_database, "Data directory selected", "Loaded session")
+
+        # load quadrupoles
+        self._loading_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt",
+                           loading_name="Load Quadrupoles", use_dialog=False, base_dir=folder)
+        # load screens
+        self._loading_func(elements_list=self.screens_list, filename="screens.txt", loading_name="Load Screens",
+                           use_dialog=False, base_dir=folder)
+
+        scan_settings_path = os.path.join(folder, "scan_settings.json")
+        try:
+            with open(scan_settings_path, "r") as f:
+                settings = json.load(f)
+        except Exception as e:
+            QMessageBox.warning(self, "Load session", str(e))
+            settings = {}
+        self._quad_scan_session=settings
+
+        if "delta_min" in settings: self.delta_min_scan.setValue(float(settings["delta_min"]))
+        if "delta_max" in settings: self.delta_max_scan.setValue(float(settings["delta_max"]))
+        if "steps" in settings: self.steps_settings.setValue(float(settings["steps"]))
+        if "nshots" in settings: self.meas_per_step.setValue(float(settings["nshots"]))
+
     def load_session_settings(self):
         default_dir = f"~/flight-simulator-data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
@@ -224,5 +257,4 @@ class SaveOrLoad():
         if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
         if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")
         if hasattr(self, "wfs_response_3"): self.wfs_response_3.setText(settings["data_dirs"]["wfs"] or "")
-
 

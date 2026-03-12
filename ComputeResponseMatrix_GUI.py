@@ -41,6 +41,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.save_as_button.clicked.connect(self.__save_as_button_clicked)
         self.diff_checkbox.toggled.connect(self._compute_difference_clicked)
         self._compute_difference_clicked(self.diff_checkbox.isChecked())
+        self.hcorrector_prefixes=("zh", "zx")
+        self.vcorrector_prefixes=("zv")
 
         layout = self.plot_widget.layout()
         if layout is None:
@@ -48,7 +50,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot = MatplotlibWidget(self.plot_widget)
         self.plot.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.plot)
-
         if self.data_dir_1:
             self.data_dir_1=self._expand_path(self.data_dir_1)
             self.data_directory_1.setText(self.data_dir_1)
@@ -62,6 +63,14 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self._load_lists_from_directory(self.data_dir_2)
         if self.auto_click_compute:
             QTimer.singleShot(0, self.__compute_button_clicked)
+
+    def _is_h_corrector(self, s):
+        name=str(s).lower()
+        return name.startswith(self.hcorrector_prefixes)
+
+    def _is_v_corrector(self, s):
+        name=str(s).lower()
+        return name.startswith(self.vcorrector_prefixes)
 
     def _expand_path(self,path):
         expanded_path=(path or "").strip()
@@ -122,9 +131,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 self.bpms_list.item(i).setSelected(True)
             bpms = self.bpms
 
-        hcorrs = [string for string in correctors if
-                  (string.lower().startswith('zh') or string.lower().startswith('zx'))]
-        vcorrs = [string for string in correctors if string.lower().startswith('zv')]
+        hcorrs = [string for string in correctors if self._is_h_corrector(string)]
+        vcorrs = [string for string in correctors if self._is_v_corrector(string)]
 
         # Pick all correctors preceding the last bpm
         hcorrs = [corr for corr in hcorrs if sequence.index(corr) < sequence.index(bpms[-1])]

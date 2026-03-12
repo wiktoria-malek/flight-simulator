@@ -12,8 +12,8 @@ class InterfaceATF2_Ext_RFTrack():
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
-        twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
-        self.lattice = rft.Lattice(twiss_path)
+        self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
+        self.lattice = rft.Lattice(self.twiss_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
         for s in self.lattice['*OTR*']:
             screen = rft.Screen()
@@ -24,9 +24,10 @@ class InterfaceATF2_Ext_RFTrack():
         self.bpms = [e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [e.get_name() for e in self.lattice.get_screens()]
-        self.quadrupoles = [e.get_name() for e in self.lattice.get_quadrupoles()]
+        self.quadrupoles = list(dict.fromkeys(e.get_name() for e in self.lattice.get_quadrupoles()))
         self.Pref = 1.2999999e3  # 1.3 GeV/c
         self.nparticles = nparticles
+        self.electronmass = rft.electronmass
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples
@@ -90,11 +91,11 @@ class InterfaceATF2_Ext_RFTrack():
         yaw = self.jitter * I0.sigma_px
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         B1=self.lattice.track(B0_offset)
-        I = B1.get_info()
-        self.log("Emittance after tracking:")
-        self.log(f"εx = {I.emitt_x}[mm.rad]")
-        self.log(f"εy = {I.emitt_y}[mm.rad]")
-        self.log(f"εz = {I.emitt_z}[mm.permille]")
+        I = B0_offset.get_info()
+        # self.log("Emittance after tracking:")
+        # self.log(f"εx = {I.emitt_x}[mm.rad]")
+        # self.log(f"εy = {I.emitt_y}[mm.rad]")
+        # self.log(f"εz = {I.emitt_z}[mm.permille]")
 
     def change_energy(self):
         self.__setup_beam1()
@@ -228,12 +229,38 @@ class InterfaceATF2_Ext_RFTrack():
         hedges_all = []
         vedges_all = []
         screen_names = []
+        s_list=[]
+
+        # get S positions of screens
+        with open(self.twiss_path, "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+        try:
+            name_column = columns.index("NAME")
+            s_column = columns.index("S")
+        except ValueError as e:
+            raise RuntimeError("There are no such columns in the twiss file")
+
+        s_values = {}
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            if len(data) <= max(name_column, s_column):  # if a line has less column than needed, it is omitted
+                continue
+            screen_name = data[name_column].strip('"')
+            try:
+                s_values[screen_name] = (float(data[s_column]))
+            except ValueError:
+                continue
 
         for s in self.lattice.get_screens():
             screen_name = s.get_name()
             if names is not None and screen_name not in names:
                 continue
             screen_names.append(screen_name)
+            s_list.append(s_values.get(screen_name, np.nan))
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             m = s.get_bunch().get_phase_space('%x %y')
@@ -276,7 +303,8 @@ class InterfaceATF2_Ext_RFTrack():
                    "sum": np.array(sum_list, dtype=float),
                    "hedges": hedges_all,
                    "vedges": vedges_all,
-                   "images": images}
+                   "images": images,
+                   "S": np.array(s_list, dtype=float),}
         return screens
 
     def get_quadrupoles(self):  # returns quadrupole strengths
@@ -284,29 +312,35 @@ class InterfaceATF2_Ext_RFTrack():
         bdes = np.zeros(len(self.quadrupoles), dtype=float)  # one value per each quadrupole
 
         for i, quadrupole_name in enumerate(self.quadrupoles):
-            quadrupole = self.lattice[quadrupole_name]
-            quadrupole = quadrupole[0] if isinstance(quadrupole, list) else quadrupole
-            try:
-                strength = quadrupole.get_K1(self.Pref / self.Q)  # 1/m2
-            except Exception:
-                strength = 0.0
-            if isinstance(strength, (list, tuple, np.ndarray)):
-                bdes[i] = float(strength[0]) if len(strength) > 0 else 0.0
+            elements=self.lattice[quadrupole_name]
+            if not isinstance(elements, list):
+                elements = [elements]
+            k1_values=[]
+            for element in elements:
+                try:
+                    strength=element.get_K1(self.Pref / self.Q)  # 1/m2
+                except Exception:
+                    continue
+                if isinstance(strength, (list, tuple, np.ndarray)):
+                    if len(strength) > 0: k1_values.append(float(strength[0]))
+                else: k1_values.append(float(strength))
+            if len(k1_values) == 0: bdes[i]=0.0
             else:
-                bdes[i] = float(strength)
+                if not np.allclose(k1_values, k1_values[0],rtol=0.0, atol=1e-12):
+                    self.log(f"Parts of quadrupole {quadrupole_name} have different strengths")
+                bdes[i]=k1_values[0]
         return {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
 
     def set_quadrupoles(self, names, values_range):
         if isinstance(names, str):
             names = [names]
-        if not (isinstance(values_range, list)):
+        if not (isinstance(values_range, (list, tuple, np.ndarray))):
             values_range = [values_range]
-
         for quadrupole_name, value in zip(names, values_range):
-            quadrupole = self.lattice[quadrupole_name]
-            quadrupole = quadrupole[0] if isinstance(quadrupole, list) else quadrupole
-            quadrupole.set_K1(self.Pref / self.Q, float(value))
-
+            elements = self.lattice[quadrupole_name]
+            if not isinstance(elements, (list)): elements = [elements]
+            for element in elements:
+                element.set_K1(self.Pref / self.Q,float(value))
         self.__track_bunch()
 
     def push(self, names, corr_vals):
@@ -335,11 +369,20 @@ class InterfaceATF2_Ext_RFTrack():
         if not isinstance(delta_values, (list, tuple, np.ndarray)):
             delta_values = [delta_values]
         for quadrupole_name, val in zip(names, delta_values):
-            quadrupole = self.lattice[quadrupole_name]
-            quadrupole = quadrupole[0] if isinstance(quadrupole, list) else quadrupole
-            current = quadrupole.get_K1(self.Pref / self.Q)
-            current = float(current[0]) if isinstance(current, (list, tuple, np.ndarray)) else float(current)
-            quadrupole.set_K1(self.Pref / self.Q, current + val)
+            elements = self.lattice[quadrupole_name]
+            if not isinstance(elements, list):
+                elements = [elements]
+            current_values=[]
+            for element in elements:
+                current=element.get_K1(self.Pref / self.Q)
+                current=float(current[0]) if isinstance(current, (list, tuple,np.ndarray)) else float(current)
+                current_values.append(current)
+            if len(current_values)>1 and not np.allclose(current_values, current_values[0], rtol=0.0, atol=1e-12):
+                self.log(f"Parts of quadrupole {quadrupole_name} have different values")
+            target_value=(current_values[0] if len(current_values)>0 else 0.0) +float(val)
+            for element in elements:
+                element.set_K1(self.Pref / self.Q,target_value)
+
         self.__track_bunch()
 
     def __load_wake_data(self,path,trans_or_long,scale=1):
@@ -378,7 +421,7 @@ class InterfaceATF2_Ext_RFTrack():
             self.lattice[name].set_cfx_nsteps(int(nsteps))
 
         cbpm_file = os.path.join(wake_data_directory, "atfCbpmWakeTBL03.dat")
-        Wt, Wl, hz = self._load_wake_data(cbpm_file, trans_or_long="transverse", scale=wake_scale)
+        Wt, Wl, hz = self.__load_wake_data(cbpm_file, trans_or_long="transverse", scale=wake_scale)
         WF_cbpm = rft.Wakefield_1d(Wt, Wl, hz)
 
         attach_to_name = None
@@ -398,7 +441,7 @@ class InterfaceATF2_Ext_RFTrack():
             _attach(attach_to_name, WF_cbpm)
         bellow_file = os.path.join(wake_data_directory, "atfBellowLongWakeTBL7.dat")
         if os.path.isfile(bellow_file):
-            Wt, Wl, hz = self._load_wake_data(bellow_file, trans_or_long="transverse", scale=wake_scale)
+            Wt, Wl, hz = self.__load_wake_data(bellow_file, trans_or_long="transverse", scale=wake_scale)
             WF_bellow = rft.Wakefield_1d(Wt, Wl, hz)
 
             drifts = [n for n in self.sequence if n.upper().startswith("L")]
