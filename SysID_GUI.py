@@ -1,14 +1,11 @@
 from State import State
 from datetime import datetime
 import numpy as np
-import time
-import sys
-import os
+import time, sys, os,matplotlib
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
 from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
 from enum import Enum
-import matplotlib
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure

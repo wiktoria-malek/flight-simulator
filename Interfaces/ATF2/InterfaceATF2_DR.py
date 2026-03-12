@@ -173,9 +173,6 @@ class InterfaceATF2_DR:
         correctors = { "names": names, "bdes": bdes, "bact": bact }
         return correctors
 
-    def get_target_dispersion(self, names=None):
-        pass
-
     def get_bpms(self):
         print('Reading bpms...')
         #p = PV('ATF2:monitors')

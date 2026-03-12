@@ -158,9 +158,13 @@ class MainWindow(QMainWindow,SaveOrLoad):
                 if self._cancel:
                     break
                 screens=self.interface.get_screens(selected_screens)
+                name_to_index={name: index for index, name in enumerate(screens["names"])}
+
                 for k,sname in enumerate(selected_screens):
-                    sx_shots[j,k]=float(screens['sigx'][k])
+                    index=name_to_index[sname]
+                    sx_shots[j,k]=float(screens['sigx'][index])
                     sy_shots[j,k]=float(screens['sigy'][k])
+
             sigx_mean[i,:]=np.nanmean(sx_shots,axis=0)
             sigy_mean[i,:]=np.nanmean(sy_shots,axis=0)
             sigx_std[i,:]=np.nanstd(sx_shots,axis=0)
