@@ -128,8 +128,11 @@ class InterfaceATF2_Linac:
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
-    def get_target_dispersion(self):
-        pass
+    def get_target_dispersion(self, bpms=None):
+        if bpms is None:
+            bpms = self.bpms
+        n = len(bpms)
+        return np.zeros(n, dtype=float), np.zeros(n, dtype=float)
 
     def get_icts(self):
         print("Reading ict's...")
