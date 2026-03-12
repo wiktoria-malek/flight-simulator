@@ -17,7 +17,7 @@ class State:
         self.hcorrectors_names = interface.get_hcorrectors_names()
         self.vcorrectors_names = interface.get_vcorrectors_names()
         self.timestamp = datetime.now()
-        self.screens=interface.get_screens() if hasattr(interface, 'get_screens') else {"names": []}
+        #self.screens=interface.get_screens() if hasattr(interface, 'get_screens') else {"names": []}
         #self.quadrupoles=interface.get_quadrupoles()
 
     def push(self, interface):
@@ -91,30 +91,30 @@ class State:
         orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names),"nshots": nshots }
         return orbit
 
-    def get_screens(self,names=None):
-        if isinstance(names, str):
-            names = [names]
-        if names is not None:
-            screen_indexes = np.array([index for index, string in enumerate(self.screens['names']) if string in names])
-            screens = {"names": np.array(self.screens['names'])[screen_indexes],
-                       "hpixel": np.array(self.screens['hpixel'])[screen_indexes],
-                       "vpixel": np.array(self.screens['vpixel'])[screen_indexes],
-                       "x": np.array(self.screens['x'])[screen_indexes],
-                       "y": np.array(self.screens['y'])[screen_indexes],
-                       "sigx": np.array(self.screens['sigx'])[screen_indexes],
-                       "sigy": np.array(self.screens['sigy'])[screen_indexes],
-                       "sum": np.array(self.screens['sum'])[screen_indexes],
-
-                       "hedges": [self.screens['hedges'][i] for i in screen_indexes],
-                       "vedges": [self.screens['vedges'][i] for i in screen_indexes],
-                       "images": [self.screens['images'][i] for i in screen_indexes],
-                       }
-        else:
-            screens = self.screens
-        return screens
-        # for screeens: with bpms right now, it looks like we have name,data and it stacks with bpms, creating one big matrix.
-        # maybe it makes sense to - with screens, operate with data structures that is more divided? like, screen - images etc?
-
+    # def get_screens(self,names=None):
+    #     if isinstance(names, str):
+    #         names = [names]
+    #     if names is not None:
+    #         screen_indexes = np.array([index for index, string in enumerate(self.screens['names']) if string in names])
+    #         screens = {"names": np.array(self.screens['names'])[screen_indexes],
+    #                    "hpixel": np.array(self.screens['hpixel'])[screen_indexes],
+    #                    "vpixel": np.array(self.screens['vpixel'])[screen_indexes],
+    #                    "x": np.array(self.screens['x'])[screen_indexes],
+    #                    "y": np.array(self.screens['y'])[screen_indexes],
+    #                    "sigx": np.array(self.screens['sigx'])[screen_indexes],
+    #                    "sigy": np.array(self.screens['sigy'])[screen_indexes],
+    #                    "sum": np.array(self.screens['sum'])[screen_indexes],
+    #
+    #                    "hedges": [self.screens['hedges'][i] for i in screen_indexes],
+    #                    "vedges": [self.screens['vedges'][i] for i in screen_indexes],
+    #                    "images": [self.screens['images'][i] for i in screen_indexes],
+    #                    }
+    #     else:
+    #         screens = self.screens
+    #     return screens
+    #     # for screeens: with bpms right now, it looks like we have name,data and it stacks with bpms, creating one big matrix.
+    #     # maybe it makes sense to - with screens, operate with data structures that is more divided? like, screen - images etc?
+    #
 
     def load(self, filename):
         from glob import glob
@@ -127,7 +127,7 @@ class State:
                 self.correctors = data['correctors']
                 self.bpms = data['bpms']
                 self.icts = data['icts']
-                self.screens = data.get('screens',{"names":[]})
+                #self.screens = data.get('screens',{"names":[]})
                 #self.quadrupoles = data.get('quadrupoles',{"names":[], "bdes": np.array([]), "bact": np.array([])})
                 """
                 self.correctors = {
@@ -178,26 +178,26 @@ class State:
         #     "bdes": self.quadrupoles['bdes'],
         # }
 
-        screens={
-            'names': self.screens['names'],
-            'hpixel': self.screens['hpixel'],
-            'vpixel': self.screens['vpixel'],
-            'x': self.screens['x'],
-            'y': self.screens['y'],
-            'sigx': self.screens['sigx'],
-            'sigy': self.screens['sigy'],
-            'sum': self.screens['sum'],
-            'hedges': self.screens['hedges'],
-            'vedges': self.screens['vedges'],
-            'images': self.screens['images'],
-        }
+        # screens={
+        #     'names': self.screens['names'],
+        #     'hpixel': self.screens['hpixel'],
+        #     'vpixel': self.screens['vpixel'],
+        #     'x': self.screens['x'],
+        #     'y': self.screens['y'],
+        #     'sigx': self.screens['sigx'],
+        #     'sigy': self.screens['sigy'],
+        #     'sum': self.screens['sum'],
+        #     'hedges': self.screens['hedges'],
+        #     'vedges': self.screens['vedges'],
+        #     'images': self.screens['images'],
+        # }
 
         state = {
             "sequence": self.sequence,
             "correctors": correctors,
             "bpms": bpms,
             "icts": icts,
-            "screens": screens,
+            #"screens": screens,
             #"quadrupoles": quadrupoles,
             "hcorrectors_names": self.hcorrectors_names,
             "vcorrectors_names": self.vcorrectors_names,
