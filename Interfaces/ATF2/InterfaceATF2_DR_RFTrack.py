@@ -139,6 +139,9 @@ class InterfaceATF2_DR_RFTrack():
     def get_correctors_names(self):
         return self.corrs
 
+    def get_quadrupoles_names(self):
+        return self.quadrupoles
+
     def get_hcorrectors_names(self):
         return [string for string in self.corrs if (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
 
@@ -149,26 +152,40 @@ class InterfaceATF2_DR_RFTrack():
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None):
-        with open('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws', "r") as file:
+        if names is None:
+            names = self.get_bpms_names()
+        twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
+        with open(twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
         dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
         columns = lines[star_symbol].lstrip("*").split()
-
-        DX_column = columns.index("DX")
-        DY_column = columns.index("DY")
-        elements_names = columns.index("NAME")
-
+        try:
+            DX_column = columns.index("DX")
+            DY_column = columns.index("DY")
+            elements_names = columns.index("NAME")
+        except ValueError as e:
+            raise RuntimeError("There are no such columns in the twiss file")
+        disp_values = {}
         target_disp_x, target_disp_y = [], []
         for line in lines[dollar_sign + 1:]:
             data = line.split()
+            if len(data) <= max(DX_column, DY_column,
+                                elements_names):  # if a line has less column than needed, it is omitted
+                continue
             bpms_name = data[elements_names].strip('"')
-
-            if names == None or bpms_name in names:
-                target_disp_x.append(float(data[DX_column]))
-                target_disp_y.append(float(data[DY_column]))
-
+            try:
+                disp_values[bpms_name] = (float(data[DX_column]), float(data[DY_column]))
+            except ValueError:
+                continue
+        for bpm in names:
+            if bpm in disp_values:
+                dx, dy = disp_values[bpm]
+            else:
+                dx, dy = float("nan"), float("nan")
+            target_disp_x.append(dx)
+            target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
     def get_icts(self):
@@ -212,9 +229,9 @@ class InterfaceATF2_DR_RFTrack():
     def get_screens(self, names=None):
         self.log('Reading screens...')
         if isinstance(names, str):
-            names = [names] # allows passing a single screen name
-        hpixel =  0.001 # mm, horizontal size of a pixel
-        vpixel =  0.001 # mm, vertical size of a pixel
+            names = [names]  # allows passing a single screen name
+        hpixel = 0.001  # mm, horizontal size of a pixel
+        vpixel = 0.001  # mm, vertical size of a pixel
         hpixel_list = []
         vpixel_list = []
         xb_list = []
@@ -226,54 +243,119 @@ class InterfaceATF2_DR_RFTrack():
         hedges_all = []
         vedges_all = []
         screen_names = []
+        s_list=[]
+
+        # get S positions of screens
+        with open(self.twiss_path, "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+        try:
+            name_column = columns.index("NAME")
+            s_column = columns.index("S")
+        except ValueError as e:
+            raise RuntimeError("There are no such columns in the twiss file")
+
+        s_values = {}
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            if len(data) <= max(name_column, s_column):  # if a line has less column than needed, it is omitted
+                continue
+            screen_name = data[name_column].strip('"')
+            try:
+                s_values[screen_name] = (float(data[s_column]))
+            except ValueError:
+                continue
 
         for s in self.lattice.get_screens():
-            screen_name=s.get_name()
+            screen_name = s.get_name()
             if names is not None and screen_name not in names:
                 continue
             screen_names.append(screen_name)
+            s_list.append(s_values.get(screen_name, np.nan))
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             m = s.get_bunch().get_phase_space('%x %y')
-            if m is None or len(m) == 0: #empty bunch
+            if m is None or len(m) == 0:  # empty bunch
                 xb_list.append(np.nan)
                 yb_list.append(np.nan)
                 sigx_list.append(np.nan)
                 sigy_list.append(np.nan)
                 sum_list.append(0)
-                images.append(np.zeros((1,1)))
-                hedges_all.append(np.array([0,hpixel]))
-                vedges_all.append(np.array([0,vpixel]))
+                images.append(np.zeros((1, 1)))
+                hedges_all.append(np.array([0, hpixel]))
+                vedges_all.append(np.array([0, vpixel]))
                 continue
 
-            sumw=len(m[:,0])
-            xb_list.append(np.mean(m[:,0]))
-            yb_list.append(np.mean(m[:,1]))
-            sigx_list.append(np.std(m[:,0]))
-            sigy_list.append(np.std(m[:,1]))
+            sumw = len(m[:, 0])  # number of particles in the screen; intensity
+            xb_list.append(np.mean(m[:, 0]))  # mean x of particles
+            yb_list.append(np.mean(m[:, 1]))  # mean y of particles
+            sigx_list.append(np.std(m[:, 0]))  # RMS x beam size
+            sigy_list.append(np.std(m[:, 1]))  # RMS y beam size
             sum_list.append(sumw)
 
-            nx = int(np.ceil(np.ptp(m[:,0]) / hpixel)) if np.ptp(m[:,0]) > 0 else 1
+            nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(
+                m[:, 0]) > 0 else 1  # ceil rounds up, so it can take the whole range
             ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
-            nx=int(np.clip(nx,10,400))
-            ny=int(np.clip(ny,10,400))
-            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx, ny))
-            images.append(image)
-            hedges_all.append(hedges)
-            vedges_all.append(vedges)
+            nx = int(np.clip(nx, 10, 400))
+            ny = int(np.clip(ny, 10, 400))
+            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx,
+                                                                           ny))  # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
+            images.append(image)  # image[i,j] = nparticles in bin i on x axis and nparticles in bin j on y axis
+            hedges_all.append(hedges)  # bin edges in x (nx + 1)
+            vedges_all.append(vedges)  # bin edges in y (ny + 1)
 
-        screens = { "names": screen_names,
-                    "hpixel": np.array(hpixel_list,dtype=float),
-                    "vpixel": np.array(vpixel_list,dtype=float),
-                    "x": np.array(xb_list, dtype=float),
-                    "y": np.array(yb_list, dtype=float),
-                    "sigx": np.array(sigx_list, dtype=float),
-                    "sigy": np.array(sigy_list, dtype=float),
-                    "sum": np.array(sum_list, dtype=float),
-                    "hedges" : hedges_all,
-                    "vedges" : vedges_all,
-                    "images": images }
+        screens = {"names": screen_names,
+                   "hpixel": np.array(hpixel_list, dtype=float),
+                   "vpixel": np.array(vpixel_list, dtype=float),
+                   "x": np.array(xb_list, dtype=float),
+                   "y": np.array(yb_list, dtype=float),
+                   "sigx": np.array(sigx_list, dtype=float),
+                   "sigy": np.array(sigy_list, dtype=float),
+                   "sum": np.array(sum_list, dtype=float),
+                   "hedges": hedges_all,
+                   "vedges": vedges_all,
+                   "images": images,
+                   "S": np.array(s_list, dtype=float),}
         return screens
+
+    def get_quadrupoles(self):  # returns quadrupole strengths
+        self.log("Reading quadrupoles' strengths...")
+        bdes = np.zeros(len(self.quadrupoles), dtype=float)  # one value per each quadrupole
+
+        for i, quadrupole_name in enumerate(self.quadrupoles):
+            elements=self.lattice[quadrupole_name]
+            if not isinstance(elements, list):
+                elements = [elements]
+            k1_values=[]
+            for element in elements:
+                try:
+                    strength=element.get_K1(self.Pref / self.Q)  # 1/m2
+                except Exception:
+                    continue
+                if isinstance(strength, (list, tuple, np.ndarray)):
+                    if len(strength) > 0: k1_values.append(float(strength[0]))
+                else: k1_values.append(float(strength))
+            if len(k1_values) == 0: bdes[i]=0.0
+            else:
+                if not np.allclose(k1_values, k1_values[0],rtol=0.0, atol=1e-12):
+                    self.log(f"Parts of quadrupole {quadrupole_name} have different strengths")
+                bdes[i]=k1_values[0]
+        return {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
+
+    def set_quadrupoles(self, names, values_range):
+        if isinstance(names, str):
+            names = [names]
+        if not (isinstance(values_range, (list, tuple, np.ndarray))):
+            values_range = [values_range]
+        for quadrupole_name, value in zip(names, values_range):
+            elements = self.lattice[quadrupole_name]
+            if not isinstance(elements, (list)): elements = [elements]
+            for element in elements:
+                element.set_K1(self.Pref / self.Q,float(value))
+        self.__track_bunch()
 
     def push(self, names, corr_vals):
         if not isinstance(names, list):

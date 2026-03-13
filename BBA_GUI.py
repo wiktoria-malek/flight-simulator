@@ -1,11 +1,22 @@
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
-from PyQt6 import uic
-from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+import sys, os, pickle, re, matplotlib, glob, time,json
+from datetime import datetime
+import numpy as np
+try:
+    from PyQt6 import uic
+    from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
+    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt6.QtGui import QPainter
+    pyqt_version = 6
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
+    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt5.QtGui import QPainter
+    pyqt_version = 5
 from State import State
-from PyQt6.QtGui import QPainter
 matplotlib.use("QtAgg")
 from enum import Enum
 from dataclasses import dataclass

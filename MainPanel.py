@@ -1,7 +1,16 @@
-from PyQt6 import uic
-from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment
+try:
+    from PyQt6 import uic
+    from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
+    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt6.QtGui import QPainter
+    pyqt_version = 6
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
+    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt5.QtGui import QPainter
+    pyqt_version = 5
 from datetime import datetime
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
 import sys, time,os
 from pathlib import Path
 

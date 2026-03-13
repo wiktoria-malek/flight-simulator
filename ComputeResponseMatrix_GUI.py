@@ -1,19 +1,32 @@
 from State import State
 from Response import Response
-from PyQt6 import uic
+try:
+    from PyQt6 import uic
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QVBoxLayout,
+        QLineEdit, QListWidget, QPushButton,
+        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+        )
+    from PyQt6.QtCore import Qt,QTimer
+    pyqt_version = 6
+
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtWidgets import (
+        QApplication, QMainWindow, QVBoxLayout,
+        QLineEdit, QListWidget, QPushButton,
+        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+        )
+    from PyQt5.QtCore import Qt,QTimer
+    pyqt_version = 5
+
 import numpy as np
 import glob,sys,os,argparse,matplotlib
-from SaveOrLoad import SaveOrLoad
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout,
-    QLineEdit, QListWidget, QPushButton,
-    QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
-)
-from PyQt6.QtCore import Qt,QTimer
 from SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
@@ -147,6 +160,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         By = np.empty((0, len(bpms)))
         Cx = np.empty((0, len(hcorrs)))
         Cy = np.empty((0, len(vcorrs)))
+        B_mask = np.full((1, len(bpms)), True, dtype=bool)
         datafiles_p = [f for f in datafiles if f[-9] == 'p']
         for datafile_p in datafiles_p:
             datafile_m = datafile_p[:-9] + 'm' + datafile_p[-8:]
@@ -155,6 +169,14 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 Sm = State(filename=datafile_m)
                 Op = Sp.get_orbit(bpms)
                 Om = Sm.get_orbit(bpms)
+                all_not_finite  = not np.any(np.isfinite(Op['x']))
+                all_not_finite |= not np.any(np.isfinite(Om['x']))
+                all_not_finite |= not np.any(np.isfinite(Op['y']))
+                all_not_finite |= not np.any(np.isfinite(Om['y']))
+                if all_not_finite:
+                    print(f'Skipping all-Nan files {datafile_p[:-9] + '[m|p]' + datafile_p[-8:]}')
+                    continue
+                B_mask &= np.isfinite(Op['x']) & np.isfinite(Om['x']) & np.isfinite(Op['y']) & np.isfinite(Om['y'])
                 Cx_p = Sp.get_correctors(hcorrs)['bact']
                 Cy_p = Sp.get_correctors(vcorrs)['bact']
                 Cx_m = Sm.get_correctors(hcorrs)['bact']
@@ -168,7 +190,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
                     By = np.vstack((By, O_y))
                     Cx = np.vstack((Cx, C_x))
                     Cy = np.vstack((Cy, C_y))
-                    print(Cx, Bx)
                 else:
                     Bx = np.vstack((Bx, Op['x']))
                     Bx = np.vstack((Bx, Om['x']))
@@ -179,21 +200,47 @@ class MainWindow(QMainWindow, SaveOrLoad):
                     Cy = np.vstack((Cy, Cy_p))
                     Cy = np.vstack((Cy, Cy_m))
             else:
-                print(
-                    f"Data file '{datafile_m}' does not exist, ignoring counterpart '{datafile_p}' for response matrix computation")
+                print(f"Data file '{datafile_m}' does not exist, ignoring counterpart '{datafile_p}' for response matrix computation")
+
+        B_mask = B_mask.ravel()
 
         # Compute the response matrices
         ones_column_x = np.ones((Cx.shape[0], 1))
         ones_column_y = np.ones((Cy.shape[0], 1))
 
         # Add the column of ones to the matrix
-        Cx = np.hstack((Cx, ones_column_x))
-        Cy = np.hstack((Cy, ones_column_y))
+        Cx = np.hstack((Cx, ones_column_x)).astype('float')
+        Cy = np.hstack((Cy, ones_column_y)).astype('float')
 
-        Rxx = np.transpose(np.linalg.lstsq(Cx, Bx, rcond=None)[0])
-        Rxy = np.transpose(np.linalg.lstsq(Cy, Bx, rcond=None)[0])
-        Ryx = np.transpose(np.linalg.lstsq(Cx, By, rcond=None)[0])
-        Ryy = np.transpose(np.linalg.lstsq(Cy, By, rcond=None)[0])
+        Bx = Bx.astype('float')
+        By = By.astype('float')
+
+        def lstsq(C, B):
+            return np.transpose(np.linalg.lstsq(C, B[:,B_mask], rcond=None)[0])
+
+        Rxx_ = lstsq(Cx, Bx)
+        Rxy_ = lstsq(Cy, Bx)
+        Ryx_ = lstsq(Cx, By)
+        Ryy_ = lstsq(Cy, By)
+
+        # Response matrices
+        Rxx_ = Rxx_[:, :-1]
+        Rxy_ = Rxy_[:, :-1]
+        Ryx_ = Ryx_[:, :-1]
+        Ryy_ = Ryy_[:, :-1]
+
+        # Restore nan columns
+        k = B_mask.size
+
+        Rxx = np.full((k,Rxx_.shape[1]), np.nan)
+        Rxy = np.full((k,Rxy_.shape[1]), np.nan)
+        Ryx = np.full((k,Ryx_.shape[1]), np.nan)
+        Ryy = np.full((k,Ryy_.shape[1]), np.nan)
+
+        Rxx[B_mask,:] = Rxx_
+        Rxy[B_mask,:] = Rxy_
+        Ryx[B_mask,:] = Ryx_
+        Ryy[B_mask,:] = Ryy_
 
         # Reference trajectory
         '''
@@ -204,11 +251,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         Bx = np.mean(Bx, axis=0).reshape(-1, 1)
         By = np.mean(By, axis=0).reshape(-1, 1)
 
-        # Response matrices
-        Rxx = Rxx[:, :-1]
-        Rxy = Rxy[:, :-1]
-        Ryx = Ryx[:, :-1]
-        Ryy = Ryy[:, :-1]
 
         # Zero the response of all bpms preceeding the correctors
         if self.triangular_checkbox.isChecked():
@@ -234,7 +276,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         R.Bx = Bx
         R.By = By
         return R
-
     def _substract_matrices(self,R1,R2):
         if R1.Rxx.shape != R2.Rxx.shape or R1.Ryy.shape != R2.Ryy.shape:
             raise RuntimeError("Response matrices must have same shape")
@@ -340,7 +381,9 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self._plot_response_matrix(R=self.R)
 
         except Exception as e:
+            from traceback import print_exception
             QMessageBox.warning(self, "Error", str(e))
+            print_exception(e)
 
     def __save_as_button_clicked(self):
         dir_name = self.cwd + '/response2.pkl'

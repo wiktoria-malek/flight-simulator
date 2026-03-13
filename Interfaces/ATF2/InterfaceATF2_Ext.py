@@ -191,6 +191,28 @@ class InterfaceATF2_Ext:
     # Instead time.sleep(1) : setpoint :currentWrite -> readback :currentRead -> until readback reaches setpoint
     # It might be faster than 1s
 
+    def get_quadrupoles(self):
+        return {
+            "names": [],
+            "bdes": np.array([]),
+            "bact": np.array([])
+        }
+
+    def get_screens(self):
+        return {
+            "names": [],
+            "hpixel": np.array([]),
+            "vpixel": np.array([]),
+            "x": np.array([]),
+            "y": np.array([]),
+            "sigx": np.array([]),
+            "sigy": np.array([]),
+            "sum": np.array([]),
+            "hedges": [],
+            "vedges": [],
+            "images": []
+        }
+
     def push(self, names, corr_vals):
         if type(corr_vals) == float:
             corr_vals = np.array([corr_vals])

@@ -1,7 +1,16 @@
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QDialogButtonBox,
-    QRadioButton, QLabel
-)
+try:
+    from PyQt6.QtWidgets import (
+        QDialog, QVBoxLayout, QDialogButtonBox,
+        QRadioButton, QLabel
+        )
+    from PyQt6.QtCore import QEvent, Qt
+except ImportError:
+    from PyQt5.QtWidgets import (
+        QDialog, QVBoxLayout, QDialogButtonBox,
+        QRadioButton, QLabel
+        )
+    from PyQt5.QtCore import QEvent, Qt
+
 
 class SelectAcc(QDialog):
     def __init__(self,parent=None):

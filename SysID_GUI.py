@@ -2,9 +2,18 @@ from State import State
 from datetime import datetime
 import numpy as np
 import time, sys, os,matplotlib
-from PyQt6 import uic
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
-from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+try:
+    from PyQt6 import uic
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt6.QtTest import QTest
+    pyqt_version = 6
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt5.QtTest import QTest
+    pyqt_version = 5
 from enum import Enum
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -52,6 +61,7 @@ class Worker(QObject):
         self.max_curr_v = max_curr_v
         self.Niter = Niter
         self.running = False
+        self.paused = False
         self.progress_value=0
 
         if hasattr(self, "working_directory_dialog"):
@@ -60,7 +70,7 @@ class Worker(QObject):
     @pyqtSlot()
     def run(self):
         self.running = True
-
+        self.paused = False
         total_steps=self.Niter*len(self.correctors)
         self.progress_value=0
         I = self.interface
@@ -74,13 +84,17 @@ class Worker(QObject):
             return max(-max_val, min(val, max_val))
 
         for iter in range(self.Niter):
-            if self.running == False:
+            if not self.running:
                 break
+            if self.paused:
+                self._await_user()
 
             for icorr, corrector in enumerate(self.correctors):
                 corr = S.get_correctors(corrector)
-                if self.running == False:
+                if not self.running:
                     break
+                if self.paused:
+                    self._await_user()
 
                 if corrector in self.hcorrs:
                     max_curr=self.max_curr_h
@@ -89,8 +103,8 @@ class Worker(QObject):
                     max_curr=self.max_curr_v
                     kick=vkicks[icorr]
 
-                if not self.running:
-                    break
+                if self.paused:
+                    self._await_user()
 
                 corr_changed = False
 
@@ -106,8 +120,8 @@ class Worker(QObject):
                     I.push(corrector, curr_p)
                     corr_changed = True
 
-                    if not self.running:
-                        break
+                    if self.paused:
+                        self._await_user()
 
                     S.pull(I)
                     S.save(filename=filename_p)
@@ -174,6 +188,21 @@ class Worker(QObject):
     def stop(self):
         self.running = False
 
+    def pause(self):
+        self.paused = True
+
+    def unpause(self):
+        self.paused = False
+
+    def _await_user(self):
+        reminder = '  -> [ SCAN PAUSED ] Press "resume" button to continue'
+        while self.paused and self.running:
+            for j in range(4):
+                print(f"{reminder}{j * '.'}", end='\r')
+                QTest.qWait(500)
+                if not self.paused or not self.running:
+                    break
+
 class MainWindow(QMainWindow):
     def __set_status_in_title(self, status):
         self.setWindowTitle("SYSID - " + self.interface.__class__.__name__ + " " + status)
@@ -201,12 +230,12 @@ class MainWindow(QMainWindow):
         self.cwd = os.getcwd()
         self.interface = interface
         bpms_list = interface.get_bpms()['names']
-        correctors = I.get_correctors()
+        correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
 
         if correctors_list is not None:
-            hcorrs = I.get_hcorrectors_names()
-            vcorrs = I.get_vcorrectors_names()
+            hcorrs = self.interface.get_hcorrectors_names()
+            vcorrs = self.interface.get_vcorrectors_names()
             hcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in hcorrs])
             vcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in vcorrs])
             def clean_array(a):
@@ -234,7 +263,8 @@ class MainWindow(QMainWindow):
         self.clear_bpms_button.clicked.connect(self.__clear_bpms_button_clicked)
         self.start_button.clicked.connect(self.__start_button_clicked)
         self.stop_button.clicked.connect(self.__stop_button_clicked)
-
+        self.pause_button.clicked.connect(self.__pause_button_clicked)
+        self.resume_button.clicked.connect(self.__unpause_button_clicked)
         self.mode=Mode.Orbit
         self._update_folder_path()
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
@@ -333,7 +363,7 @@ class MainWindow(QMainWindow):
         if filename:
             with open(filename, 'w') as f:
                 for item in selected_correctors:
-                    f.write(f"{item.text()}\n")
+                    f.write(f"{item}\n")
 
     def __load_correctors_button_clicked(self):
         dir_name = self.working_directory_input.text() + '/correctors.txt'
@@ -363,7 +393,7 @@ class MainWindow(QMainWindow):
         if filename:
             with open(filename, 'w') as f:
                 for item in selected_bpms:
-                    f.write(f"{item.text()}\n")
+                    f.write(f"{item}\n")
 
     def __load_bpms_button_clicked(self):
         dir_name = self.working_directory_input.text() + '/bpms.txt'
@@ -411,6 +441,10 @@ class MainWindow(QMainWindow):
             for i in range(self.correctors_list.count()):
                 self.correctors_list.item(i).setSelected(True)
             selected_correctors = self.interface.get_correctors()['names']
+        filename = self.working_directory_input.text() + '/correctors.txt'
+        with open(filename, 'w') as f:
+            for item in selected_correctors:
+                f.write(f"{item}\n")
 
         selected_bpms = [item.text() for item in self.bpms_list.selectedItems()]
         self.selected_bpms = selected_bpms
@@ -418,6 +452,10 @@ class MainWindow(QMainWindow):
             for i in range(self.bpms_list.count()):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
+        filename = self.working_directory_input.text() + '/bpms.txt'
+        with open(filename, 'w') as f:
+            for item in selected_bpms:
+                f.write(f"{item}\n")
 
         self._current_measuring_mode()
 
@@ -525,6 +563,17 @@ class MainWindow(QMainWindow):
             self.progressBar.setValue(0)
         self.__set_status_in_title("[Idle]")
         print('SysID stopped.')
+
+    def __pause_button_clicked(self):
+        if self.worker:
+            self.__set_status_in_title("[PAUSED]")
+            self.worker.pause()
+
+    def __unpause_button_clicked(self):
+        if self.worker:
+            mode = self.modes_to_do[self.counter]
+            self.__set_status_in_title(f"[Running {mode.name} mode]")
+            self.worker.unpause()
 
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
         self.plot_widget.axes.clear()

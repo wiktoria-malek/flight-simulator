@@ -1,12 +1,17 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QVBoxLayout, QDialog, QLabel, QPlainTextEdit)
+try:
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import (QVBoxLayout, QDialog, QLabel, QPlainTextEdit)
+except ImportError:
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import (QVBoxLayout, QDialog, QLabel, QPlainTextEdit)
+
 import matplotlib
 matplotlib.use("QtAgg")
 
 class LogConsole(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Log Console")
+        self.setWindowTitle("UI files/Log Console")
         self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
         self.setMinimumSize(520, 320)
         self.resize(700, 420)
@@ -20,5 +25,3 @@ class LogConsole(QDialog):
     def log(self,message):
         self.text.appendPlainText(message)
         print(message)
-
-

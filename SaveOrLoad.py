@@ -1,8 +1,17 @@
 import os, pickle, json
 from datetime import datetime
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QApplication, QSizePolicy, QMainWindow, QFileDialog, QListWidget, QMessageBox,
-                             QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel)
+try:
+    from PyQt6.QtWidgets import (
+        QDialog, QVBoxLayout, QDialogButtonBox,
+        QRadioButton, QLabel
+        )
+    from PyQt6.QtCore import QEvent, Qt
+except ImportError:
+    from PyQt5.QtWidgets import (
+        QDialog, QVBoxLayout, QDialogButtonBox,
+        QRadioButton, QLabel
+        )
+    from PyQt5.QtCore import QEvent, Qt
 import numpy as np
 
 class SaveOrLoad():

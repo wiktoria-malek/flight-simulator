@@ -148,8 +148,14 @@ class InterfaceATF2_Linac:
         charge = np.array(charge)
         icts = { "names": names, "charge": charge }
         return icts
+
     def get_quadrupoles(self):
-        pass
+        return {
+            "names": [],
+            "bdes": np.array([]),
+            "bact": np.array([])
+        }
+
     def set_quadrupoles(self):
         pass
 
@@ -193,7 +199,19 @@ class InterfaceATF2_Linac:
         return bpms
 
     def get_screens(self):
-        pass
+        return {
+            "names": [],
+            "hpixel": np.array([]),
+            "vpixel": np.array([]),
+            "x": np.array([]),
+            "y": np.array([]),
+            "sigx": np.array([]),
+            "sigy": np.array([]),
+            "sum": np.array([]),
+            "hedges": [],
+            "vedges": [],
+            "images": []
+        }
 
     def push(self, names, corr_vals):
         if type(corr_vals) == float:

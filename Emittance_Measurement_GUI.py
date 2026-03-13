@@ -163,9 +163,11 @@ class MainWindow(QMainWindow,SaveOrLoad):
                 for k,sname in enumerate(selected_screens):
                     index=name_to_index[sname]
                     sx_shots[j,k]=float(screens['sigx'][index])
-                    sy_shots[j,k]=float(screens['sigy'][k])
+                    sy_shots[j,k]=float(screens['sigy'][index])
 
             sigx_mean[i,:]=np.nanmean(sx_shots,axis=0)
+            print("selected_screens:", selected_screens)
+            print("sigx_mean step", i, ":", sigx_mean[i, :])
             sigy_mean[i,:]=np.nanmean(sy_shots,axis=0)
             sigx_std[i,:]=np.nanstd(sx_shots,axis=0)
             sigy_std[i,:]=np.nanstd(sy_shots,axis=0)
