@@ -29,23 +29,23 @@ class DFS_WFS_Correction_BBA():
             S = State(filename=file)
             self.sequence = S.get_sequence()
 
-        hcorrs = [string for string in correctors if (string.lower().startswith('zh') or string.lower().startswith('zx'))]
-        vcorrs = [string for string in correctors if string.lower().startswith('zv')]
+        hcorrs = [string for string in correctors if string.lower().startswith('x')]
+        vcorrs = [string for string in correctors if string.lower().startswith('y')]
 
-        hcorrs = [ corr for corr in hcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1]) ]
-        vcorrs = [ corr for corr in vcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1]) ]
+        # Pick all correctors preceding the last bpm
+        hcorrs = [corr for corr in hcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1])]
+        vcorrs = [corr for corr in vcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1])]
 
-        if hcorrs:
-            bpms = [ bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(hcorrs[0]) ]
-
-        if vcorrs:
-            bpms = [ bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(vcorrs[0]) ]
+        # Pick all bpms following the first corrector
+        bpms = [bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(hcorrs[0])]
+        bpms = [bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(vcorrs[0])]
 
         # Read all orbits
-        Bx = np.empty((0,len(bpms)))
-        By = np.empty((0,len(bpms)))
-        Cx = np.empty((0,len(hcorrs)))
-        Cy = np.empty((0,len(vcorrs)))
+        Bx = np.empty((0, len(bpms)))
+        By = np.empty((0, len(bpms)))
+        Cx = np.empty((0, len(hcorrs)))
+        Cy = np.empty((0, len(vcorrs)))
+        B_mask = np.full((1, len(bpms)), True, dtype=bool)
 
         for fp, fm in pairs:
             Sp=State(filename=fp)
@@ -53,12 +53,18 @@ class DFS_WFS_Correction_BBA():
 
             Op = Sp.get_orbit(bpms)
             Om = Sm.get_orbit(bpms)
-
+            all_not_finite  = not np.any(np.isfinite(Op['x']))
+            all_not_finite |= not np.any(np.isfinite(Om['x']))
+            all_not_finite |= not np.any(np.isfinite(Op['y']))
+            all_not_finite |= not np.any(np.isfinite(Om['y']))
+            if all_not_finite:
+                print(f'Skipping all-Nan files {datafile_p[:-9] + '[m|p]' + datafile_p[-8:]}')
+                continue
+            B_mask &= np.isfinite(Op['x']) & np.isfinite(Om['x']) & np.isfinite(Op['y']) & np.isfinite(Om['y'])
             Cx_p = Sp.get_correctors(hcorrs)['bact']
             Cy_p = Sp.get_correctors(vcorrs)['bact']
             Cx_m = Sm.get_correctors(hcorrs)['bact']
             Cy_m = Sm.get_correctors(vcorrs)['bact']
-
             if 0:
                 O_x = Op['x'] - Om['x']
                 O_y = Op['y'] - Om['y']
@@ -68,8 +74,6 @@ class DFS_WFS_Correction_BBA():
                 By = np.vstack((By, O_y))
                 Cx = np.vstack((Cx, C_x))
                 Cy = np.vstack((Cy, C_y))
-                print(Cx, Bx)
-
             else:
                 Bx = np.vstack((Bx, Op['x']))
                 Bx = np.vstack((Bx, Om['x']))
@@ -80,43 +84,67 @@ class DFS_WFS_Correction_BBA():
                 Cy = np.vstack((Cy, Cy_p))
                 Cy = np.vstack((Cy, Cy_m))
 
+        B_mask = B_mask.ravel()
+
         # Compute the response matrices
         ones_column_x = np.ones((Cx.shape[0], 1))
         ones_column_y = np.ones((Cy.shape[0], 1))
 
         # Add the column of ones to the matrix
-        Cx = np.hstack((Cx, ones_column_x))
-        Cy = np.hstack((Cy, ones_column_y))
+        Cx = np.hstack((Cx, ones_column_x)).astype('float')
+        Cy = np.hstack((Cy, ones_column_y)).astype('float')
 
-        Rxx = np.transpose(np.linalg.lstsq(Cx, Bx, rcond=None)[0])
-        Rxy = np.transpose(np.linalg.lstsq(Cy, Bx, rcond=None)[0])
-        Ryx = np.transpose(np.linalg.lstsq(Cx, By, rcond=None)[0])
-        Ryy = np.transpose(np.linalg.lstsq(Cy, By, rcond=None)[0])
+        Bx = Bx.astype('float')
+        By = By.astype('float')
 
-        # Reference trajectory
+        def lstsq(C, B):
+            return np.transpose(np.linalg.lstsq(C, B[:,B_mask], rcond=None)[0])
 
-        Bx = np.mean(Bx,axis=0).reshape(-1,1)
-        By = np.mean(By,axis=0).reshape(-1,1)
+        Rxx_ = lstsq(Cx, Bx)
+        Rxy_ = lstsq(Cy, Bx)
+        Ryx_ = lstsq(Cx, By)
+        Ryy_ = lstsq(Cy, By)
 
         # Response matrices
-        Rxx = Rxx[:,:-1]
-        Rxy = Rxy[:,:-1]
-        Ryx = Ryx[:,:-1]
-        Ryy = Ryy[:,:-1]
+        Rxx_ = Rxx_[:, :-1]
+        Rxy_ = Rxy_[:, :-1]
+        Ryx_ = Ryx_[:, :-1]
+        Ryy_ = Ryy_[:, :-1]
+
+        # Restore nan columns
+        k = B_mask.size
+
+        Rxx = np.full((k,Rxx_.shape[1]), np.nan)
+        Rxy = np.full((k,Rxy_.shape[1]), np.nan)
+        Ryx = np.full((k,Ryx_.shape[1]), np.nan)
+        Ryy = np.full((k,Ryy_.shape[1]), np.nan)
+
+        Rxx[B_mask,:] = Rxx_
+        Rxy[B_mask,:] = Rxy_
+        Ryx[B_mask,:] = Ryx_
+        Ryy[B_mask,:] = Ryy_
+
+        # Reference trajectory
+        '''
+        Bx = Rxx[:,-1]
+        By = Ryy[:,-1]
+        '''
+
+        Bx = np.mean(Bx, axis=0).reshape(-1, 1)
+        By = np.mean(By, axis=0).reshape(-1, 1)
+
 
         # Zero the response of all bpms preceeding the correctors
         if triangular:
             for corr in hcorrs:
-                 bpm_indexes = [ bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr) ]
-
-                 Rxx[bpm_indexes, hcorrs.index(corr)] = 0
-                 Ryx[bpm_indexes, hcorrs.index(corr)] = 0
+                bpm_indexes = [bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]
+                Rxx[bpm_indexes, hcorrs.index(corr)] = 0
+                Ryx[bpm_indexes, hcorrs.index(corr)] = 0
 
             for corr in vcorrs:
-                 bpm_indexes = [ bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr) ]
-
-                 Rxy[bpm_indexes, vcorrs.index(corr)] = 0
-                 Ryy[bpm_indexes, vcorrs.index(corr)] = 0
+                bpm_indexes = [bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]
+                Rxy[bpm_indexes, vcorrs.index(corr)] = 0
+                Ryy[bpm_indexes, vcorrs.index(corr)] = 0
 
         return Rxx,Ryy,Rxy,Ryx,Bx,By, hcorrs,vcorrs
 

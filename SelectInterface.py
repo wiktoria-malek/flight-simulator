@@ -101,12 +101,12 @@ class InterfaceSelectionDialog(QDialog):
                 case 'InterfaceFACET2_Linac':
                     from Interfaces.FACET2.InterfaceFACET2_Linac import InterfaceFACET2_Linac
                     globals()['InterfaceFACET2_Linac'] = InterfaceFACET2_Linac
-                    self.selected_interface = InterfaceFACET2_Linac(nsamples=3)
+                    self.selected_interface = InterfaceFACET2_Linac(nsamples=30)
 
                 case 'InterfaceFACET2_Linac_RFTrack':
                     from Interfaces.FACET2.InterfaceFACET2_Linac_RFTrack import InterfaceFACET2_Linac_RFTrack
                     globals()['InterfaceFACET2_Linac_RFTrack'] = InterfaceFACET2_Linac_RFTrack
-                    self.selected_interface = InterfaceFACET2_Linac_RFTrack(jitter=0.01, bpm_resolution=0.050)
+                    self.selected_interface = InterfaceFACET2_Linac_RFTrack(jitter=0.05, bpm_resolution=0.1)
                     self.selected_interface.align_everything()
                     self.selected_interface.misalign_quadrupoles()
                     self.selected_interface.misalign_bpms()

@@ -1,22 +1,13 @@
 import sys, os, pickle, re, matplotlib, glob, time,json
 from datetime import datetime
 import numpy as np
-try:
-    from PyQt6 import uic
-    from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
-    from PyQt6.QtGui import QPainter
-    pyqt_version = 6
-except ImportError:
-    from PyQt5 import uic
-    from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
-    from PyQt5.QtGui import QPainter
-    pyqt_version = 5
-
+from PyQt5 import uic
+from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
+from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+from State import State
+from PyQt5.QtGui import QPainter
 matplotlib.use("QtAgg")
 from enum import Enum
-from State import State
 from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -26,6 +17,8 @@ from SaveOrLoad import SaveOrLoad
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 import matplotlib.pyplot as plt
 from BPM_weights import BPM_weights
+from traceback import print_exception
+
 
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
@@ -72,6 +65,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self._cancel = False
         self._number_re = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
         self.S0 = State(interface=self.interface) # initial, for restoring
+        self.S0bdes = []
         self.S=State(interface=self.interface) # for latter use
         self.reset_reference_orbit=False
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
@@ -156,7 +150,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self._running=False
         self.interface.reset_energy()
         self.interface.reset_intensity()
-        self.S0.push(self.interface)
+        self.interface.push(self.selected_correctors, self.S0bdes)
+        # self.S0.push(self.interface)
         self.reset_ref_orb=True
         self._clear_graphs()
         self.log("Machine initial settings restored.")
@@ -204,6 +199,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             canvas = FigureCanvas(fig)
             layout = host.layout()
             if layout is None:
+                from PyQt5.QtWidgets import QVBoxLayout
                 layout = QVBoxLayout(host)
                 layout.setContentsMargins(0, 0, 0, 0)
             layout.addWidget(canvas)
@@ -262,10 +258,15 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
     def _get_selection(self):
         corrs_all = self.S.get_correctors()["names"]
-        bpms_all = self.S.get_bpms()["names"]
-        corrs = [it.text() for it in self.correctors_list.selectedItems()] or corrs_all
-        bpms = [it.data(Qt.ItemDataRole.UserRole) for it in self.bpms_list.selectedItems()] or bpms_all
-        return corrs, bpms
+        bpms_all =  self.S.get_bpms()["names"]
+        corrs_fromGUI = [it.text() for it in self.correctors_list.selectedItems()] or corrs_all
+        bpm_fromGUI =   [it.data(Qt.ItemDataRole.UserRole) for it in self.bpms_list.selectedItems()] or bpms_all
+        selected_corrs, selected_bpms = [],[]
+        for cname in corrs_all:
+            if cname in corrs_fromGUI: selected_corrs.append(cname)
+        for bpmname in bpms_all:
+            if bpmname in bpm_fromGUI: selected_bpms.append(bpmname)
+        return selected_corrs, selected_bpms
 
     def _force_triangular(self) -> bool:
         return bool(self.triangular_checkbox.isChecked())
@@ -371,12 +372,23 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
     def _start_correction(self):
         try:
+            self.S0bdes = []
+            corrs, bpms = self._get_selection()
+            print(f'debuug1: corrs = {corrs}')
+            print(f'debuug1: bpms = {bpms}')
+            self.selected_correctors = []
+            # save list of initial bdes for reset
+            for cname,bdes in zip(self.S0.correctors['names'],self.S0.correctors['bdes']):
+                if cname in corrs:
+                    self.S0bdes.append(bdes)
+                    self.selected_correctors.append(cname)
+    
             print("Starting correction...")
             self.log("Starting correction...")
             self._cancel = False
             w1, w2, w3, rcond, iters, gain,beta = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
-            corrs, bpms = self._get_selection()
+            # corrs, bpms = self._get_selection()
             n=len(bpms)
             wbpm_orb_vec,wbpm_dfs_vec,wbpm_wfs_vec=[],[],[]
             for bpm in bpms:
@@ -399,7 +411,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             w_xy_bpms=np.sqrt(W_xy)
 
             Cx = [s for s in corrs if (s.lower().startswith('xc') or ("DHG" in s) or (s.lower().startswith('zx')))]
-
             Cy = [s for s in corrs if (s.lower().startswith('yc') or (("SDV" in s) or ("DHJ" in s)))]
 
             Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs = self._creating_response_matrices()
@@ -418,6 +429,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
             plt.ion()
 
+            print('debug3')
             for it in range(iters):
                 if self._cancel:
                     break
@@ -428,9 +440,9 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 self.log("Measuring orbit")
                 self.S.pull(self.interface)
                 print('State::pull done')
-                O0 = self.S.get_orbit(bpms) # because axis=1 is mean from one whole measurement, not for 1 bpm
-                O0x = np.asarray(O0['x'],dtype=float).reshape(-1,1)
-                O0y = np.asarray(O0['y'],dtype=float).reshape(-1,1)
+                O0 = self.S.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
+                O0x=np.asarray(O0['x'],dtype=float).reshape(-1,1)
+                O0y=np.asarray(O0['y'],dtype=float).reshape(-1,1)
 
                 bpms0=self.S.get_bpms(bpms)
                 x0_vals=np.asarray(bpms0['x'],dtype=float)
@@ -442,7 +454,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
                 if self.reset_ref_orb==True:
                     B0x = O0x.copy()
-                    B0y = O0y.copy()
+                    B0y=O0y.copy()
                     self.reset_ref_orb=False
                     self.log("Reference orbit reset to current orbit")
 
@@ -516,8 +528,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 Axy[np.isnan(Axy)] = 0
                 Ayx[np.isnan(Ayx)] = 0
 
-                Axx[np.isnan(Bx.ravel()),:] = 0 # flattens an array into 1d
-                Axy[np.isnan(Bx.ravel()),:] = 0 # flattens an array into 1d
+                Axx[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
+                Axy[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
 
                 Ayy[np.isnan(By.ravel()),:] = 0
                 Ayx[np.isnan(By.ravel()),:] = 0
@@ -620,19 +632,21 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                     self._hist_wake_err.append(err_wake_all)
 
                 self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y, vals=self._hist_orbit,error_x=self._hist_orbit_x_err, error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None,ylabel="Residual norm [mm]")
-                self._plot_series(ax=self.disp_ax,canvas= self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None,ylabel="Residual norm [mm]")
+                self._plot_series(ax=self.disp_ax, canvas=self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None,ylabel="Residual norm [mm]")
                 self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,error_x=self._hist_wake_x_err, error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None,ylabel="Residual norm [mm]")
                 QApplication.processEvents()
 
             self.setWindowTitle("BBA GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
             self.log("Correction finished.")
+            #self.interface.push(self.selected_correctors, self.S0bdes)
             self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By)
 
         except Exception as e:
             self.setWindowTitle("BBA GUI")
             QMessageBox.critical(self, "Correction error", str(e))
             self.log(f"Correction error: {e}")
+            print_exception(e)
 
     def _stop_correction(self):
         self._cancel = True

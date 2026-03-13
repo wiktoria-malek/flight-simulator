@@ -1,28 +1,15 @@
 from State import State
 from Response import Response
-try:
-    from PyQt6 import uic
-    from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QVBoxLayout,
-        QLineEdit, QListWidget, QPushButton,
-        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
-        )
-    from PyQt6.QtCore import Qt,QTimer
-    pyqt_version = 6
-
-except ImportError:
-    from PyQt5 import uic
-    from PyQt5.QtWidgets import (
-        QApplication, QMainWindow, QVBoxLayout,
-        QLineEdit, QListWidget, QPushButton,
-        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
-        )
-    from PyQt5.QtCore import Qt,QTimer
-    pyqt_version = 5
-
+from PyQt5 import uic
 import numpy as np
 import glob,sys,os,argparse,matplotlib
 from SaveOrLoad import SaveOrLoad
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QVBoxLayout,
+    QLineEdit, QListWidget, QPushButton,
+    QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+)
+from PyQt5.QtCore import Qt,QTimer
 from SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -55,6 +42,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.save_as_button.clicked.connect(self.__save_as_button_clicked)
         self.diff_checkbox.toggled.connect(self._compute_difference_clicked)
         self._compute_difference_clicked(self.diff_checkbox.isChecked())
+        self.plot_singular_values_button.clicked.connect(self._plot_singular_values)
         self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
         self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
 
@@ -89,6 +77,21 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.label_dir_2.setEnabled(checked)
         self.choose_directory_2.setEnabled(checked)
         self.data_directory_2.setEnabled(checked)
+
+    def _plot_singular_values(self):
+        def get_SV(R):
+            R = R.copy()
+            R[np.isnan(R)] = 0 
+            U, S, Vh = np.linalg.svd(R)
+            return S
+        plt.semilogy(get_SV(self.R.Rxx), label='Rxx')
+        plt.semilogy(get_SV(self.R.Rxy), label='Rxy', linestyle='dashed')
+        plt.semilogy(get_SV(self.R.Ryx), label='Ryx', linestyle='dashed')
+        plt.semilogy(get_SV(self.R.Ryy), label='Ryy')
+        plt.xlabel('Singular Value')
+        plt.ylabel('Value')
+        plt.legend()
+        plt.show()
 
     def _pick_directory_with_data(self,line_edit):
         base=self._expand_path(line_edit.text() or self.cwd) or self.cwd
@@ -245,7 +248,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         Bx = np.mean(Bx, axis=0).reshape(-1, 1)
         By = np.mean(By, axis=0).reshape(-1, 1)
 
-
         # Zero the response of all bpms preceeding the correctors
         if self.triangular_checkbox.isChecked():
             for corr in hcorrs:
@@ -269,6 +271,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         R.Ryy = Ryy
         R.Bx = Bx
         R.By = By
+        R.B_mask = B_mask
         return R
 
     def _substract_matrices(self,R1,R2):

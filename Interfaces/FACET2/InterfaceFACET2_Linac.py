@@ -40,8 +40,10 @@ class InterfaceFACET2_Linac:
         self.nsamples = nsamples
         if livemodel:
             self.f2m = BmadLiveModel(instanced=True, init_filename=tao_initfile)
+            # Brho = self.f2m.live.Brho
         else:
             self.f2m = BmadLiveModel(design_only=True)
+            # Brho = self.f2m.design.Brho
         _ix = self.f2m.ix
         self.sequence = list(self.f2m.elements[np.sort(np.append(_ix['BPMS'], _ix['COR']))])
         self.bpms =     list(self.f2m.elements[_ix['BPMS']])
@@ -61,6 +63,7 @@ class InterfaceFACET2_Linac:
         self.xcorrs_s = [self.f2m.S[_ix[xcor]] for xcor in self.xcorrs]
         self.ycorrs_s = [self.f2m.S[_ix[ycor]] for ycor in self.ycorrs]
         self.corrs_s =  [self.f2m.S[_ix[cor]]  for cor  in self.corrs]
+        # self.Brho =     [Brho[ix[elem]] for elem in self.sequence]
         self.PVs = {
             'Q_setpoint':     get_pv('SIOC:SYS1:ML03:AO518'),
             'Q_readback':     get_pv('TORO:IN10:431:TMIT_PC'),
@@ -93,21 +96,24 @@ class InterfaceFACET2_Linac:
 
     def change_energy(self):
         """ set beam to -2MeV at DL10 and disable downstream feedbacks """
-        print('Lowering beam energy at DL10 by 2MeV, disabling feedbacks')
-        for fbloop in ['BC11E', 'BC14E', 'BC20E']:
-            get_pv(f'PHYS:SYS1:1:F2LFB_{fbloop}').put(0)
-        self.PVs['dl10e_setpoint'].put(-2.0)
-        time.sleep(3.0)
-        return self
+        print('Lowering beam energy starting from BC11')
+        get_pv(f'PHYS:SYS1:1:F2LFB_BC11E_VERN').put(-3.0)
+        get_pv(f'PHYS:SYS1:1:F2LFB_BC14E_VERN').put(-40.0)
+        get_pv(f'PHYS:SYS1:1:F2LFB_BC20E_VERN').put(-40.0)
+        # get_pv(f'PHYS:SYS1:1:F2LFB_BC11BL_TARGET').put(4400)
+        # get_pv(f'PHYS:SYS1:1:F2LFB_BC14BL_TARGET').put(5000)
+        time.sleep(5.0)
+        return -(3.0/335.0)
 
     def reset_energy(self):
         """ zero dl10 setpoint, re-enable feedbacks """
-        print('Restoring beam energy at DL10, re-enabling feedbacks')
-        self.PVs[f'dl10e_setpoint'].put(0)
-        for fbloop in ['BC11E', 'BC14E', 'BC20E']:
-            get_pv(f'PHYS:SYS1:1:F2LFB_{fbloop}').put(1)
-        time.sleep(3.0)
-        return self
+        print('Restoring beam energy at BC11, re-enabling feedbacks')
+        get_pv(f'PHYS:SYS1:1:F2LFB_BC11E_VERN').put(0)
+        get_pv(f'PHYS:SYS1:1:F2LFB_BC14E_VERN').put(0)
+        get_pv(f'PHYS:SYS1:1:F2LFB_BC20E_VERN').put(0)
+        # get_pv(f'PHYS:SYS1:1:F2LFB_BC11BL_TARGET').put(5000)
+        # get_pv(f'PHYS:SYS1:1:F2LFB_BC14BL_TARGET').put(8000)
+        time.sleep(5.0)
 
     def change_intensity(self):
         """ lowers bunch charge by ~200pC (2.5deg UV WP angle adjustment) """
@@ -145,6 +151,8 @@ class InterfaceFACET2_Linac:
 
     def get_elements_position(self, names): return [self.f2m.S[self.f2m.ix[name]] for name in names]
 
+    def get_target_dispersion(self, names): return [0. for _ in names], [0. for _ in names]
+
     def get_correctors(self):
         print("Reading correctors' strengths...")
         bdes, bact = [], []
@@ -169,26 +177,20 @@ class InterfaceFACET2_Linac:
                 itry += 1
         else:
             print(f'unable to get BPMs after {itry} tries')
-            return _dummy_bpmdata()
+            return self._dummy_bpmdata()
     
     def _dummy_bpmdata(self):
         """ mock BPM data, all nans """
-        N, M = len(bpm_buffer.devicelist), bpm_buffer.EPICS_Npts
+        N, M = len(self.bpm_buffer.devicelist), self.bpm_buffer.EPICS_Npts
         xraw, yraw, qraw = ndarray((N,M)), ndarray((N,M)), ndarray((N,M))
         xraw.fill(nan)
         yraw.fill(nan)
         qraw.fill(nan)
         return {
-            'names':   bpm_buffer.devicelist,
-            'x':       nanmean(xraw, axis=1),
-            'y':       nanmean(yraw, axis=1),
-            'tmit':    nanmean(qraw, axis=1),
-            'xraw':    xraw,
-            'yraw':    yraw,
-            'tmitraw': qraw,
-            'xstd':    nanstd(xraw, axis=1),
-            'ystd':    nanstd(yraw, axis=1),
-            'tmitstd': nanstd(qraw, axis=1),
+            'names':   self.bpm_buffer.elemlist,
+            'x':       xraw.transpose(),
+            'y':       xraw.transpose(),
+            'tmit':    qraw.transpose(),
             }
 
     def push(self, names, corr_vals):

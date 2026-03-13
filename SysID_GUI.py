@@ -115,6 +115,7 @@ class Worker(QObject):
                         curr_p = clamp(curr_p, self.max_curr_h)
                     else:
                         curr_p = clamp(curr_p, self.max_curr_v)
+                    print(corrector, curr_p)
                     I.push(corrector, curr_p)
                     corr_changed = True
 
@@ -196,7 +197,7 @@ class Worker(QObject):
         reminder = '  -> [ SCAN PAUSED ] Press "resume" button to continue'
         while self.paused:
             for j in range(4):
-                print(f'{reminder}{j*'.'}', end='\r')
+                print(f'{reminder}{j*'.'}    ', end='\r')
                 QTest.qWait(500)
 
 
@@ -355,20 +356,21 @@ class MainWindow(QMainWindow):
         dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir(dir_name)
-        selected_correctors = self.correctors_list.selectedItems()
+        selected_correctors = self._sort_elements([j.text() for j in self.correctors_list.selectedItems()], which='corrs')
+
         dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
-                for item in selected_correctors:
-                    f.write(f"{item.text()}\n")
+                for cname in selected_correctors:
+                    f.write(f"{cname}\n")
 
     def __load_correctors_button_clicked(self):
         dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
-                selected_correctors = [line.strip() for line in f]
+                selected_correctors = self._sort_elements([line.strip() for line in f], which='corrs')
         else:
             selected_correctors = self.interface.get_correctors()['names']
 
@@ -385,20 +387,20 @@ class MainWindow(QMainWindow):
         dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
-        selected_bpms = self.bpms_list.selectedItems()
+        selected_bpms = self._sort_elements([j.text() for j in self.bpms_list.selectedItems()], which='bpms')
         dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
-                for item in selected_bpms:
-                    f.write(f"{item.text()}\n")
+                for bpmname in selected_bpms:
+                    f.write(f"{bpmname}\n")
 
     def __load_bpms_button_clicked(self):
         dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
-                selected_bpms = [line.strip() for line in f]
+                selected_bpms = self._sort_elements([line.strip() for line in f], which='bmps')
         else:
             selected_bpms = self.interface.get_bpms()['names']
 
@@ -421,6 +423,17 @@ class MainWindow(QMainWindow):
             print(e)
             return 0.1
 
+    def _sort_elements(self, unsorted_names, which='corrs'):
+        """
+        sorts a list of correctors or BPMs in machine (s) order
+        meant to handle the selection-order-sorted results of QTableWidget.SelectedItems()
+        """
+        sorted_names = []
+        reference_namelist = self.interface.corrs if (which == 'corrs') else self.interface.bpms
+        for name in reference_namelist:
+            if name in unsorted_names: sorted_names.append(str(name))
+        return sorted_names
+
     def __start_button_clicked(self):
         # dir_name = self.working_directory_input.text()
         # os.makedirs (dir_name, exist_ok=True)
@@ -433,18 +446,13 @@ class MainWindow(QMainWindow):
         if self.thread and self.thread.isRunning():
             return  # already running
 
-        selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        selected_correctors = self._sort_elements([item.text() for item in self.correctors_list.selectedItems()], which='corrs')
+
         self.selected_correctors = selected_correctors
         if not selected_correctors:
             for i in range(self.correctors_list.count()):
                 self.correctors_list.item(i).setSelected(True)
             selected_correctors = self.interface.get_correctors()['names']
-
-        filename = self.working_directory_input.text() + '/correctors.txt'
-        if filename:
-            with open(filename, 'w') as f:
-                for item in selected_correctors:
-                    f.write(f"{item.text()}\n")
 
         selected_bpms = [item.text() for item in self.bpms_list.selectedItems()]
         self.selected_bpms = selected_bpms
@@ -452,12 +460,6 @@ class MainWindow(QMainWindow):
             for i in range(self.bpms_list.count()):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
-
-        filename = self.working_directory_input.text() + '/bpms.txt'
-        if filename:
-            with open(filename, 'w') as f:
-                for item in selected_bpms:
-                    f.write(f"{item.text()}\n")
 
         self._current_measuring_mode()
 
