@@ -452,9 +452,8 @@ class MainWindow(QMainWindow,SaveOrLoad):
         }
         pprint.pp(self.fit_result_twiss_emit)
 
-
-
-
+    def _measure_optics(self):
+        pass
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
