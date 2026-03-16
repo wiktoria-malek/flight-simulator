@@ -3,25 +3,19 @@ import numpy as np
 import pickle
 
 class State:
-    def __init__(self, interface=None, filename=None):
+    def __init__(self, correctors=None,bpms=None, icts=None,sequence=None,hcorrectors_names=None,vcorrectors_names=None,screens=None,quadrupoles=None,timestamp=None,filename=None):
         if filename is not None:
             self.load(filename)
-        elif interface is not None:
-            self.pull(interface)
-
-    def pull (self, interface):
-        self.correctors = interface.get_correctors()
-        self.bpms = interface.get_bpms()
-        self.icts = interface.get_icts()
-        self.sequence = interface.get_sequence()
-        self.hcorrectors_names = interface.get_hcorrectors_names()
-        self.vcorrectors_names = interface.get_vcorrectors_names()
-        self.timestamp = datetime.now()
-        self.screens=interface.get_screens() if hasattr(interface, 'get_screens') else {"names": []}
-        self.quadrupoles=interface.get_quadrupoles()
-
-    def push(self, interface):
-        interface.push(self.correctors['names'], self.correctors['bdes']) #sets the desired current for one or more correctors
+            return
+        self.correctors = correctors if correctors is not None else {"names": [], "bdes": np.array([]), "bact": np.array([])}
+        self.bpms = bpms if bpms is not None else {"names": [], "x": np.empty((0, 0)), "y": np.empty((0, 0)), "tmit": np.empty((0, 0))}
+        self.icts = icts if icts is not None else {"names": [], "charge": np.array([])}
+        self.sequence = sequence if sequence is not None else []
+        self.hcorrectors_names = hcorrectors_names if hcorrectors_names is not None else []
+        self.vcorrectors_names = vcorrectors_names if vcorrectors_names is not None else []
+        self.screens = screens if screens is not None else {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])}
+        self.quadrupoles = quadrupoles if quadrupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([])}
+        self.timestamp = timestamp if timestamp is not None else datetime.now()
 
     def get_sequence(self):
         return self.sequence #from rf track
@@ -41,6 +35,8 @@ class State:
         return correctors
 
     def get_bpms(self, names=None):
+        if isinstance(names, str):
+            names = [names]
         if names is not None:
             bpm_indexes = np.array([index for index, string in enumerate(self.bpms['names']) if string in names])
             bpms = {
@@ -54,6 +50,8 @@ class State:
         return bpms         
 
     def get_icts(self, names=None):
+        if isinstance(names, str):
+            names = [names]
         icts = self.icts
         if names is not None:
             ict_indexes = np.array([index for index, string in enumerate(icts['names']) if string in names])
@@ -76,7 +74,6 @@ class State:
             }
         return quadrupoles
 
-
     def get_orbit(self, names=None):
         bpms = self.get_bpms(names)
         x = np.mean(bpms['x'],axis=0) # mm
@@ -88,7 +85,7 @@ class State:
         faulty = (x == 0.0) & (y == 0.0)
         x[faulty] = np.nan
         y[faulty] = np.nan
-        orbit = { "names": names, "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(names),"nshots": nshots }
+        orbit = { "names": bpms["names"], "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(bpms["names"]),"nshots": nshots }
         return orbit
 
     def get_screens(self,names=None):
@@ -104,7 +101,7 @@ class State:
                        "sigx": np.array(self.screens['sigx'])[screen_indexes],
                        "sigy": np.array(self.screens['sigy'])[screen_indexes],
                        "sum": np.array(self.screens['sum'])[screen_indexes],
-
+                        "S": np.array(self.screens['S'])[screen_indexes],
                        "hedges": [self.screens['hedges'][i] for i in screen_indexes],
                        "vedges": [self.screens['vedges'][i] for i in screen_indexes],
                        "images": [self.screens['images'][i] for i in screen_indexes],
@@ -112,9 +109,6 @@ class State:
         else:
             screens = self.screens
         return screens
-        # for screeens: with bpms right now, it looks like we have name,data and it stacks with bpms, creating one big matrix.
-        # maybe it makes sense to - with screens, operate with data structures that is more divided? like, screen - images etc?
-
 
     def load(self, filename):
         from glob import glob
@@ -127,25 +121,8 @@ class State:
                 self.correctors = data['correctors']
                 self.bpms = data['bpms']
                 self.icts = data['icts']
-                self.screens = data.get('screens',{"names":[]})
+                self.screens = data.get('screens',{"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])})
                 self.quadrupoles = data.get('quadrupoles',{"names":[], "bdes": np.array([]), "bact": np.array([])})
-                """
-                self.correctors = {
-                    "names": data['correctors']['names']
-                    "bdes": data['correctors']['bdes']
-                    "bact": data['correctors']['bact']
-                }
-                self.bpms = {
-                    "names": data['bpms']['names'],
-                    "x": data['bpms']['x'],
-                    "y": data['bpms']['y'],
-                    "tmit": data['bpms']['tmit']
-                }
-                self.icts = {
-                    "names": data['icts']['names'],
-                    "charge": data['icts']['charge']
-                }
-                """
                 self.hcorrectors_names = data['hcorrectors_names']
                 self.vcorrectors_names = data['vcorrectors_names']
                 self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
@@ -190,6 +167,7 @@ class State:
             'hedges': self.screens['hedges'],
             'vedges': self.screens['vedges'],
             'images': self.screens['images'],
+            'S': self.screens['S'],
         }
 
         state = {
@@ -203,6 +181,8 @@ class State:
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
         }
+        if filename is None and basename is None:
+            raise ValueError("Either filename or basename is required")
         with open(filename, "wb") as file:
             pickle.dump(state, file)
         return filename

@@ -1,7 +1,7 @@
 import numpy as np
 import time, os
 from datetime import datetime
-
+from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 import RF_Track as rft
 import sys
 
@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from FACET2 import FACET2
 
 
-class InterfaceFACET2_Linac_RFTrack():
+class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'FACET2_Linac_RFT'
 

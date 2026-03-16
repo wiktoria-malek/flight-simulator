@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import time, math
 from epics import get_pv
+from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 # must run on SLAC controls network
 sys.path.append('/usr/local/facet/tools/python/F2_live_model/')
@@ -31,7 +32,7 @@ def devname_swap_micro_primary(device):
     return f'{ds[1]}:{ds[0]}:{ds[2]}'
 
 
-class InterfaceFACET2_Linac:
+class InterfaceFACET2_Linac(AbstractMachineInterface):
     def get_name(self):
         return 'FACET2_Linac'
 

@@ -3,8 +3,9 @@ import numpy as np
 import time, os
 from LogConsole_BBA import LogConsole
 from datetime import datetime
+from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
-class InterfaceATF2_Ext_RFTrack():
+class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def get_name(self):
         return 'ATF2_Ext_RFT'
@@ -343,9 +344,11 @@ class InterfaceATF2_Ext_RFTrack():
                 element.set_K1(self.Pref / self.Q,float(value))
         self.__track_bunch()
 
-    def push(self, names, corr_vals):
-        if not isinstance(names, list):
-            names = [names]  # makes it a list
+    def set_correctors(self, names, corr_vals):
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH" or corr[:2] == "ZX":
                 self.lattice[corr].set_strength(val / 10, 0.0)  # T*mm
@@ -354,8 +357,10 @@ class InterfaceATF2_Ext_RFTrack():
         self.__track_bunch()
 
     def vary_correctors(self, names, corr_vals):
-        if not isinstance(names, list):
-            names = [names]  # makes it a list
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH" or corr[:2] == "ZX":
                 self.lattice[corr].vary_strength(val / 10, 0.0)  # T*mm
@@ -450,6 +455,64 @@ class InterfaceATF2_Ext_RFTrack():
                     attach_to(n, WF_bellow)
                 except Exception:
                     pass
+
+    def _get_optics_from_twiss_file(self,names=None):
+        with open(self.twiss_path, "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+
+        cols=["NAME","S","BETX","ALFX","BETY","ALFY","MUX","MUY","L"]
+        index={}
+        for col in cols:
+            try:
+                index[col]=columns.index(col)
+            except ValueError:
+                raise RuntimeError(f"Column {col} not found in twiss file")
+        result={k: [] for k in cols}
+
+
+        duplicated={}
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            if len(data) <= max(index.values()):  # if a line has less column than needed, it is omitted
+                continue
+            name = data[index["NAME"]].strip('"')
+            result["NAME"].append(name)
+
+            if name not in duplicated:
+                duplicated[name]={col:[] for col in cols[1:]}
+            for col in cols[1:]:
+                try:
+                    duplicated[name][col].append(float(data[index[col]]))
+                except ValueError:
+                    duplicated[name][col].append(float("nan"))
+        result_names=list(duplicated.keys())
+        result={col:[] for col in cols[1:]}
+
+        for name in result_names:
+            vals=duplicated[name]
+            result["S"].append(vals["S"][0])
+            result["BETX"].append(vals["BETX"][0])
+            result["ALFX"].append(vals["ALFX"][0])
+            result["MUX"].append(vals["MUX"][0])
+            result["L"].append(sum(vals["L"]))
+            result["BETY"].append(vals["BETY"][0])
+            result["ALFY"].append(vals["ALFY"][0])
+            result["MUY"].append(vals["MUY"][0])
+        return {
+            "names":result_names,
+            "S": np.array(result["S"]),
+            "betx": np.array(result["BETX"]),
+            "alfx": np.array(result["ALFX"]),
+            "bety": np.array(result["BETY"]),
+            "alfy": np.array(result["ALFY"]),
+            "mux": np.array(result["MUX"]),
+            "muy": np.array(result["MUY"]),
+            "L": np.array(result["L"]),
+        }
 
     def align_everything(self):
         self.lattice.align_elements()

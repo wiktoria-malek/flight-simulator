@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1347</width>
+    <width>1512</width>
     <height>868</height>
    </rect>
   </property>
@@ -198,14 +198,38 @@
           <string>Measurement</string>
          </property>
          <layout class="QGridLayout" name="gridActions">
-          <item row="0" column="0">
+          <item row="1" column="0">
+           <widget class="QPushButton" name="measure_optics_button">
+            <property name="text">
+             <string>Measure Optics</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
            <widget class="QPushButton" name="fit_emm_twiss_button">
             <property name="text">
              <string>Fit emittance / Twiss</string>
             </property>
            </widget>
           </item>
-          <item row="0" column="1">
+          <item row="3" column="3">
+           <widget class="QPushButton" name="load_session_button">
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2">
+           <widget class="QLineEdit" name="session_database"/>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>Load session settings</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
            <widget class="QPushButton" name="pushButton">
             <property name="maximumSize">
              <size>
@@ -218,23 +242,6 @@
             </property>
             <property name="text">
              <string>Restore quadrupole settings</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QLineEdit" name="session_database"/>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_2">
-            <property name="text">
-             <string>Load session settings</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="2">
-           <widget class="QPushButton" name="load_session_button">
-            <property name="text">
-             <string>...</string>
             </property>
            </widget>
           </item>
@@ -279,7 +286,182 @@
          </layout>
         </item>
         <item>
-         <widget class="QWidget" name="plotPlaceholder" native="true"/>
+         <layout class="QHBoxLayout" name="plotAndResultsHBox">
+          <item>
+           <widget class="QWidget" name="plotPlaceholder" native="true">
+            <property name="minimumSize">
+             <size>
+              <width>500</width>
+              <height>350</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="fit_results_group">
+            <property name="title">
+             <string>Fit results</string>
+            </property>
+            <layout class="QGridLayout" name="fitResultsGrid">
+             <item row="8" column="0" colspan="2">
+              <spacer name="verticalSpacerFitResults">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_fit_result_quad_title">
+               <property name="text">
+                <string>Quadrupole</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLabel" name="result_reference_screen">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_fit_result_screen_title">
+               <property name="text">
+                <string>Reference screen</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QLabel" name="result_emit_x_norm">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLabel" name="result_quad">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="result_emit_x_title">
+               <property name="font">
+                <font>
+                 <pointsize>16</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>εₓ (normalised)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="label_alpha_x0_title">
+               <property name="font">
+                <font>
+                 <pointsize>16</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>αₓ₀</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QLabel" name="result_beta_x0">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QLabel" name="result_beta_y0">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QLabel" name="result_emit_y_norm">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_emit_y_title">
+               <property name="font">
+                <font>
+                 <pointsize>16</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>εᵧ (normalised)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="label_beta_x_title">
+               <property name="font">
+                <font>
+                 <pointsize>16</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>βₓ₀</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0">
+              <widget class="QLabel" name="label_alpha_y0_title">
+               <property name="font">
+                <font>
+                 <pointsize>16</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>αᵧ₀</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QLabel" name="label_beta_y0_title">
+               <property name="font">
+                <font>
+                 <pointsize>16</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>βᵧ₀</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <widget class="QLabel" name="result_alpha_x0">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1">
+              <widget class="QLabel" name="result_alpha_y0">
+               <property name="text">
+                <string>-</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item>
          <layout class="QHBoxLayout" name="startStopHBox">
@@ -304,50 +486,6 @@
            </widget>
           </item>
          </layout>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="fitTab">
-       <attribute name="title">
-        <string>Fit summary</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="fitVBox">
-        <item>
-         <widget class="QTableWidget" name="resultsTable">
-          <property name="rowCount">
-           <number>2</number>
-          </property>
-          <property name="columnCount">
-           <number>5</number>
-          </property>
-          <row/>
-          <row/>
-          <column>
-           <property name="text">
-            <string>Plane</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>epsilon</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>beta</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>alpha</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>chi2</string>
-           </property>
-          </column>
-         </widget>
         </item>
        </layout>
       </widget>

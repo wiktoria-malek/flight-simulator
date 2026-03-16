@@ -3,8 +3,9 @@ import numpy as np
 import time
 from LogConsole_BBA import LogConsole
 from datetime import datetime
+from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
-class InterfaceATF2_DR_RFTrack():
+class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_DR_RFT'
 

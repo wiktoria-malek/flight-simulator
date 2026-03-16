@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import RF_Track as rft
 from scipy.optimize import minimize
 import re
+from Interfaces.AbstractMachineInterface import AbstractMachineInterface
+
 
 #not every monitor is a bpm
 #BTV are screens, ICT are charge monitors
@@ -24,7 +26,7 @@ def get_Quad_K_from_I(I, Lquad, Pref):
     K = get_Quad_K(G_0, Pref)
     return K
 
-class InterfaceCLEAR_RFTrack:
+class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'CLEAR_RFT'
 

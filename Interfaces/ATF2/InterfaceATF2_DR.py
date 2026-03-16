@@ -1,9 +1,10 @@
 import numpy as np
 import time, math
+from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 from epics import PV, ca, caget
 
-class InterfaceATF2_DR:
+class InterfaceATF2_DR(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_DR'
 
@@ -223,7 +224,7 @@ class InterfaceATF2_DR:
         }
 
 
-    def push(self, names, corr_vals):
+    def set_correctors(self, names, corr_vals):
         if type(corr_vals) == float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:

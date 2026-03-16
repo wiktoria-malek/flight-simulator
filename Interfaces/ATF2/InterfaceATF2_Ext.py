@@ -1,8 +1,9 @@
 import sys, time, math,os
 import numpy as np
 from epics import PV, ca, caget
+from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
-class InterfaceATF2_Ext:
+class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext'
 
