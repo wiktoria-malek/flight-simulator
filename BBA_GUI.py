@@ -131,7 +131,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.hcorrector_names=set(map(str, self.interface.get_hcorrectors_names() or []))
         self.vcorrector_names=set(map(str, self.interface.get_vcorrectors_names() or []))
 
-
         max_curr_h=0.0
         max_curr_v=0.0
 

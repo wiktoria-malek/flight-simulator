@@ -119,18 +119,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_sequence(self):
         return self.sequence
 
-    def get_bpms_names(self):
-        return self.bpms
-
-    def get_screens_names(self):
-        return self.screens
-
-    def get_correctors_names(self):
-        return self.corrs
-
-    def get_quadrupoles_names(self):
-        return self.quadrupoles
-
     def get_hcorrectors_names(self):
         return [string for string in self.corrs if
                 (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
@@ -143,7 +131,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def get_target_dispersion(self, names=None): # for DR too
         if names is None:
-            names = self.get_bpms_names()
+            names = self.get_bpms()["names"]
         twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
         with open(twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
@@ -452,7 +440,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             drifts = [n for n in self.sequence if n.upper().startswith("L")]
             for n in drifts[::25]:
                 try:
-                    attach_to(n, WF_bellow)
+                    _attach(n, WF_bellow)
                 except Exception:
                     pass
 
@@ -472,7 +460,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             except ValueError:
                 raise RuntimeError(f"Column {col} not found in twiss file")
         result={k: [] for k in cols}
-
 
         duplicated={}
         for line in lines[dollar_sign + 1:]:

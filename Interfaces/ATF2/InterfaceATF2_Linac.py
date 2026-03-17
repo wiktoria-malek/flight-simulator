@@ -111,20 +111,11 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
     def get_sequence(self, *args):
         return self.sequence
 
-    def get_bpms_names(self, *args):
-        return self.bpms
-
-    def get_correctors_names(self):
-        return self.corrs
-
     def get_hcorrectors_names(self):
         return [string for string in self.corrs if (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
 
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
-
-    def get_screens_names(self):
-        return self.screens
 
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]

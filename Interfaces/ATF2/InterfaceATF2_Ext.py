@@ -99,12 +99,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_sequence(self):
         return self.sequence
 
-    def get_bpms_names(self):
-        return self.bpms
-
-    def get_correctors_names(self):
-        return self.corrs
-
     def get_hcorrectors_names(self):
         return [string for string in self.corrs if (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
 
