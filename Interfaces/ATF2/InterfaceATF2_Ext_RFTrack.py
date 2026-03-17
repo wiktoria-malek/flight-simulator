@@ -141,7 +141,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_elements_position(self, names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
-    def get_target_dispersion(self, names=None):
+    def get_target_dispersion(self, names=None): # for DR too
         if names is None:
             names = self.get_bpms_names()
         twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')

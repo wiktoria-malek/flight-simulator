@@ -16,7 +16,6 @@ except ImportError:
     from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
     from PyQt5.QtGui import QPainter
     pyqt_version = 5
-from State import State
 matplotlib.use("QtAgg")
 from enum import Enum
 from dataclasses import dataclass
@@ -73,8 +72,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.dir_name = dir_name
         self._cancel = False
         self._number_re = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
-        self.S0 = State(interface=self.interface) # initial, for restoring
-        self.S=State(interface=self.interface) # for latter use
+        self.initial_state=interface.get_state() # initial, for restoring
+        self.state=interface.get_state() # for latter use
         self.reset_reference_orbit=False
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
         uic.loadUi(ui_path, self)
@@ -114,7 +113,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.appropriate_settings_reset_ch=None
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
-        self.corrs = self.S.get_correctors()["names"]
+        self.corrs = self.initial_state.get_correctors()["names"]
         self.setWindowTitle("BBA GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
@@ -161,7 +160,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self._running=False
         self.interface.reset_energy()
         self.interface.reset_intensity()
-        self.S0.push(self.interface)
+        self.interface.restore_correctors_state(self.initial_state)
         self.reset_ref_orb=True
         self._clear_graphs()
         self.log("Machine initial settings restored.")
@@ -261,8 +260,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         item.setText(bpm_name)
 
     def _populate_lists(self):
-        corrs = self.S.get_correctors()["names"]
-        bpms = self.S.get_bpms()["names"]
+        corrs = self.initial_state.get_correctors()["names"]
+        bpms = self.initial_state.get_bpms()["names"]
         self.correctors_list.insertItems(0, corrs)
         for bpm_name in bpms:
             bpm_name=str(bpm_name)
@@ -272,8 +271,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             self.bpms_list.addItem(item)
 
     def _get_selection(self):
-        corrs_all = self.S.get_correctors()["names"]
-        bpms_all = self.S.get_bpms()["names"]
+        corrs_all = self.initial_state.get_correctors()["names"]
+        bpms_all = self.initial_state.get_bpms()["names"]
 
         selected_corrs = []
         for i in range(self.correctors_list.count()):
@@ -452,13 +451,11 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 # nominal
                 print("Measuring orbit")
                 self.log("Measuring orbit")
-                self.S.pull(self.interface)
-                print('State::pull done')
-                O0 = self.S.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
+                state0=self.interface.get_state()
+                O0 = state0.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
                 O0x=np.asarray(O0['x'],dtype=float).reshape(-1,1)
                 O0y=np.asarray(O0['y'],dtype=float).reshape(-1,1)
-
-                bpms0=self.S.get_bpms(bpms)
+                bpms0=state0.get_bpms(bpms)
                 x0_vals=np.asarray(bpms0['x'],dtype=float)
                 y0_vals=np.asarray(bpms0['y'],dtype=float)
 
@@ -477,12 +474,12 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                     print("Measuring dispersion")
                     self.log("Measuring dispersion")
                     dP_P = self.interface.change_energy()
-                    self.S.pull(self.interface)
+                    state1=self.interface.get_state()
                     self.interface.reset_energy()
-                    O1 = self.S.get_orbit(bpms)
+                    O1 = state1.get_orbit(bpms)
                     O1x=np.asarray(O1['x'],dtype=float).reshape(-1,1)
                     O1y=np.asarray(O1['y'],dtype=float).reshape(-1,1)
-                    bpms1 = self.S.get_bpms(bpms)
+                    bpms1 = state1.get_bpms(bpms)
                     x1_vals = np.asarray(bpms1["x"], dtype=float)
                     y1_vals = np.asarray(bpms1["y"], dtype=float)
                     Dx = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1,1)
@@ -498,12 +495,12 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                     print("Measuring wakefield")
                     self.log("Measuring wakefield")
                     self.interface.change_intensity()
-                    self.S.pull(self.interface)
+                    state2=self.interface.get_state()
                     self.interface.reset_intensity()
-                    O2 = self.S.get_orbit(bpms)
+                    O2 = state2.get_orbit(bpms)
                     O2x = np.asarray(O2['x'], dtype=float).reshape(-1, 1)
                     O2y = np.asarray(O2['y'], dtype=float).reshape(-1, 1)
-                    bpms2 = self.S.get_bpms(bpms)
+                    bpms2 = state2.get_bpms(bpms)
                     x2_vals = np.asarray(bpms2["x"], dtype=float)
                     y2_vals = np.asarray(bpms2["y"], dtype=float)
                 else:
@@ -609,15 +606,11 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
                 def filtering_norm_x(Ox,Bx):
                     Ox[np.isnan(Ox)] = 0
-                    #Oy[np.isnan(Oy)] = 0
                     Bx[np.isnan(Bx)] = 0
-                    #By[np.isnan(By)] = 0
                     return float(np.linalg.norm(Ox - Bx))
 
                 def filtering_norm_y(Oy,By):
-                    #Ox[np.isnan(Ox)] = 0
                     Oy[np.isnan(Oy)] = 0
-                    #Bx[np.isnan(Bx)] = 0
                     By[np.isnan(By)] = 0
                     return float(np.linalg.norm(Oy - By))
 

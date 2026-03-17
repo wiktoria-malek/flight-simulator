@@ -150,16 +150,6 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         icts = { "names": names, "charge": charge }
         return icts
 
-    def get_quadrupoles(self):
-        return {
-            "names": [],
-            "bdes": np.array([]),
-            "bact": np.array([])
-        }
-
-    def set_quadrupoles(self):
-        pass
-
     def get_correctors(self):
         print("Reading correctors' strengths...")
         bdes, bact = [], []
@@ -199,22 +189,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
 
-    def get_screens(self):
-        return {
-            "names": [],
-            "hpixel": np.array([]),
-            "vpixel": np.array([]),
-            "x": np.array([]),
-            "y": np.array([]),
-            "sigx": np.array([]),
-            "sigy": np.array([]),
-            "sum": np.array([]),
-            "hedges": [],
-            "vedges": [],
-            "images": []
-        }
-
-    def push(self, names, corr_vals):
+    def set_correctors(self, names, corr_vals):
         if type(corr_vals) == float:
             corr_vals = np.array([corr_vals])
         if type(names) == str:

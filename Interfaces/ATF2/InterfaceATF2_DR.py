@@ -201,31 +201,8 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
         return bpms
 
-    def get_quadrupoles(self):
-        return {
-            "names": [],
-            "bdes": np.array([]),
-            "bact": np.array([])
-        }
-
-    def get_screens(self):
-        return {
-            "names": [],
-            "hpixel": np.array([]),
-            "vpixel": np.array([]),
-            "x": np.array([]),
-            "y": np.array([]),
-            "sigx": np.array([]),
-            "sigy": np.array([]),
-            "sum": np.array([]),
-            "hedges": [],
-            "vedges": [],
-            "images": []
-        }
-
-
     def set_correctors(self, names, corr_vals):
-        if type(corr_vals) == float:
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = np.array([corr_vals])
         if type(names) == str:
             names = [names]
@@ -248,3 +225,4 @@ class InterfaceATF2_DR(AbstractMachineInterface):
             curr_val = pv_des.get()
             pv_des.put(curr_val + corr_val)
         time.sleep(2)
+

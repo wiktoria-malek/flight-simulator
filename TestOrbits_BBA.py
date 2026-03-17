@@ -49,21 +49,20 @@ class TestOrbits(QDialog):
 
         if O0x is None or O0y is None:
             return
-        n=int(O0x.size)
-        xn=np.arange(1,n+1)
+        xpos=np.arange(len(selected_bpms))
 
         self.axes_x.clear()
         self.axes_y.clear()
 
         if O1x is not None:
-            self.axes_x.plot(xn, (O1x-O0x),label="DFS (O1-O0)")
+            self.axes_x.plot(xpos, (O1x-O0x),label="DFS (O1-O0)")
         if O2x is not None:
-            self.axes_x.plot(xn, (O2x-O0x),label="WFS (O2-O0)")
+            self.axes_x.plot(xpos, (O2x-O0x),label="WFS (O2-O0)")
 
         if O1y is not None:
-            self.axes_y.plot(xn, (O1y-O0y),label="DFS (O1-O0)")
+            self.axes_y.plot(xpos, (O1y-O0y),label="DFS (O1-O0)")
         if O2y is not None:
-            self.axes_y.plot(xn, (O2y-O0y),label="WFS (O2-O0)")
+            self.axes_y.plot(xpos, (O2y-O0y),label="WFS (O2-O0)")
 
         self.axes_x.set_xlabel("BPM index") #change to names
         self.axes_x.set_ylabel("Horizontal orbit difference [mm]")
@@ -71,8 +70,8 @@ class TestOrbits(QDialog):
         self.axes_y.set_xlabel("BPM index") #change to names
         self.axes_x.grid(True,alpha=0.3)
         self.axes_y.grid(True,alpha=0.3)
-        self.axes_x.set_xticks(scale)
-        self.axes_y.set_xticks(scale)
+        self.axes_x.set_xticks(xpos)
+        self.axes_y.set_xticks(xpos)
         self.axes_x.set_xticklabels(selected_bpms,rotation=90,fontsize=8)
         self.axes_y.set_xticklabels(selected_bpms,rotation=90,fontsize=8)
 

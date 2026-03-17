@@ -237,12 +237,13 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
                    "sigx": np.array(sigx_list, dtype=float),
                    "sigy": np.array(sigy_list, dtype=float),
                    "sum": np.array(sum_list, dtype=float),
+                   "S": np.array([], dtype=float),
                    "hedges": hedges_all,
                    "vedges": vedges_all,
                    "images": images}
         return screens
 
-    def push(self, names, corr_vals):
+    def set_correctors(self, names, corr_vals):
         if not isinstance(names, list):
             names = [names]  # makes it a list
         for corr, val in zip(names, corr_vals):

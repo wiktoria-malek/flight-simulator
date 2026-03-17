@@ -19,7 +19,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.cwd = os.getcwd()
         self._cancel = False
-
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/MainPanel.ui")
         uic.loadUi(ui_path, self)
         self.application_choice=None

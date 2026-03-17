@@ -3,13 +3,13 @@ from datetime import datetime
 try:
     from PyQt6.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel
+        QRadioButton, QLabel,QFileDialog, QMessageBox
         )
     from PyQt6.QtCore import QEvent, Qt
 except ImportError:
     from PyQt5.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel
+        QRadioButton, QLabel,QFileDialog, QMessageBox
         )
     from PyQt5.QtCore import QEvent, Qt
 import numpy as np
@@ -42,16 +42,18 @@ class SaveOrLoad():
             with open(fn, "r") as f:
                 selected = [ln.strip() for ln in f]
         if not selected:
-            if elements_list is self.bpms_list:
-                selected = self.S.get_bpms()["names"]
-            elif elements_list is self.correctors_list:
-                selected = self.S.get_correctors()["names"]
-            elif elements_list is self.quadrupoles_list:
-                selected = self.S.get_quadrupoles()["names"]
-            elif elements_list is self.screens_list:
-                selected = self.S.get_screens()["names"]
-            else:
-                selected = [elements_list.item(i).text() for i in range(elements_list.count())]
+            State=getattr(self,"initial_state",None)
+            if State is not None:
+                if elements_list is self.bpms_list:
+                    selected = State.get_bpms()["names"]
+                elif elements_list is self.correctors_list:
+                    selected = State.get_correctors()["names"]
+                elif elements_list is self.quadrupoles_list:
+                    selected = State.get_quadrupoles()["names"]
+                elif elements_list is self.screens_list:
+                    selected = State.get_screens()["names"]
+                else:
+                    selected = [elements_list.item(i).text() for i in range(elements_list.count())]
             elements_list.clearSelection()
         for name in selected:
             for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):

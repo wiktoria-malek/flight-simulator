@@ -1,4 +1,3 @@
-from State import State
 from datetime import datetime
 import numpy as np
 import time, sys, os,matplotlib
@@ -90,7 +89,7 @@ class Worker(QObject):
                 self._await_user()
 
             for icorr, corrector in enumerate(self.correctors):
-                corr = S.get_correctors(corrector)
+                corr = self.interface.get_state().get_correctors(corrector)
                 if not self.running:
                     break
                 if self.paused:
@@ -117,17 +116,17 @@ class Worker(QObject):
                         curr_p = clamp(curr_p, self.max_curr_h)
                     else:
                         curr_p = clamp(curr_p, self.max_curr_v)
-                    I.push(corrector, curr_p)
+                    I.set_correctors(corrector, curr_p)
                     corr_changed = True
 
                     if self.paused:
                         self._await_user()
 
-                    S.pull(I)
-                    S.save(filename=filename_p)
+                    state_p=I.get_state()
+                    state_p.save(filename=filename_p)
                 else:
-                    S.load(filename_p)
-                Op = S.get_orbit(self.bpms)
+                    state_p=self.interface.get_state().__class__(filename=filename_p)
+                Op = state_p.get_orbit(self.bpms)
 
                 print(f"Corrector {corrector} '-' excitation...")
                 filename_m=f'DATA_{corrector}_m{iter:04d}.pkl'
@@ -137,20 +136,20 @@ class Worker(QObject):
                         curr_m = clamp(curr_m, self.max_curr_h)
                     else:
                         curr_m = clamp(curr_m, self.max_curr_v)
-                    I.push(corrector, curr_m)
+                    I.set_correctors(corrector, curr_m)
                     corr_changed = True
 
                     if not self.running:
                         break
 
-                    S.pull(I)
-                    S.save(filename=f'DATA_{corrector}_m{iter:04d}.pkl')
+                    state_m=I.get_state()
+                    state_m.save(filename=filename_m)
                 else:
-                    S.load(filename_m)
-                Om = S.get_orbit(self.bpms)
+                    state_m=self.interface.get_state().__class__(filename=filename_m)
+                Om = state_m.get_orbit(self.bpms)
 
                 if corr_changed:
-                    I.push(corrector, corr['bdes'])
+                    I.set_correctors(corrector, corr['bdes'])
 
                 Diff_x = (Op['x'] - Om['x']) / 2.0
                 Diff_y = (Op['y'] - Om['y']) / 2.0
@@ -158,7 +157,6 @@ class Worker(QObject):
                 Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
                 self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
-
                 self.progress_value=self.progress_value + 1
                 percent = int(self.progress_value / total_steps * 100)
                 self.progress.emit(percent)
@@ -322,8 +320,8 @@ class MainWindow(QMainWindow):
         print(f"Currently at mode: {mode.name}")
         self.__set_status_in_title(f"[Running {mode.name} mode]")
         self.progressBar.setValue(0)
-        self.S.load(os.path.join(dir_name,'machine_status.pkl'))
-        self.S.push(self.interface)
+        machine_state=self.interface.get_state().__class__(filename=os.path.join(dir_name,'machine_status.pkl'))
+        self.interface.restore_correctors_state(machine_state)
 
         if mode==Mode.Dispersion:
             self.interface.change_energy()
@@ -469,9 +467,9 @@ class MainWindow(QMainWindow):
             os.makedirs(d, exist_ok=True)
             self.mode_dirs[mode] = d
 
-        self.S=State(interface=self.interface)
+        machine_state=self.interface.get_state()
         for mode,d in self.mode_dirs.items():
-            self.S.save(filename=os.path.join(d,"machine_status.pkl"))
+            machine_state.save(filename=os.path.join(d,"machine_status.pkl"))
 
         self.counter=0
         self._start_next_mode()
@@ -491,9 +489,8 @@ class MainWindow(QMainWindow):
 
         self.thread = QThread()
         out_dir=self.mode_dirs[self.current_mode]
-        self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks,vkicks ,max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
+        self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks,vkicks ,max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
         self.worker.moveToThread(self.thread)
-
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
@@ -513,8 +510,8 @@ class MainWindow(QMainWindow):
             print("Restoring initial correctors' settings...")
             #self.S.load('machine_status')
             current_dir=self.mode_dirs[self.current_mode]
-            self.S.load(filename=os.path.join(current_dir, "machine_status.pkl"))
-            self.S.push(self.interface)
+            machine_state=self.interface.get_state().__class__(filename=os.path.join(current_dir,"machine_status.pkl"))
+            self.interface.restore_correctors_state(machine_state)
             self.progressBar.setValue(100)
             self.thread = None
             self.worker = None
@@ -535,9 +532,8 @@ class MainWindow(QMainWindow):
                 print(f"Niter: {Niter}")
                 self.thread = QThread()
                 out_dir = self.mode_dirs[self.current_mode]
-                self.worker = Worker(self.interface, self.S, selected_correctors, selected_bpms, hkicks, vkicks,max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
+                self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks,max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
                 self.worker.moveToThread(self.thread)
-
                 self.thread.started.connect(self.worker.run)
                 self.worker.finished.connect(self.thread.quit)
                 self.worker.finished.connect(self.worker.deleteLater)

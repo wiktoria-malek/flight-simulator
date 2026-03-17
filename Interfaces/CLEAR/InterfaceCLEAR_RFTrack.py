@@ -1,10 +1,13 @@
+'''
+Needs corrections too...
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
 import RF_Track as rft
 from scipy.optimize import minimize
 import re
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
-
 
 #not every monitor is a bpm
 #BTV are screens, ICT are charge monitors
@@ -156,7 +159,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.mass=rft.electronmass
         self.lattice,self.element_descriptions,self.start,self.end=self.obtaining_the_lattice(filename="Interfaces/CLEAR/CLEAR_Beamline_Survey.txt")
         self.lattice.set_bpm_resolution(bpm_resolution)
-
+        self.log = print
         elements_in_lattice=list(self.lattice['*'])
         names_all=list(self.element_descriptions.keys())
         i0=names_all.index(self.start)
@@ -202,12 +205,14 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         Nparticles = 10000 # number of macroparticles
         self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population, 1, self.Pref, T, Nparticles) # reference particle
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, - 1, self.Pref, T, Nparticles) # reference bunch
+        self.dfs_test_energy = 0.98
+        self.wfs_test_charge = 0.90
         # self.P0 = rft.Bunch6d(self.mass, self.population, self.Q, np.array([0,0,0,0,0,self.Pref]).T)
         # self.B0 = rft.Bunch6d(self.mass, self.population, self.Q, self.Pref, T, N)
 
-    def __setup_beam1(self,scale):
+    def __setup_beam1(self):
         # Beam for DFS - Reduced energy
-        Pref= scale * self.Pref
+        Pref = self.dfs_test_energy * self.Pref
         T = rft.Bunch6d_twiss()
         T.emitt_x = 7.04 # mm.mrad normalised emittance
         T.emitt_y = 3.39  # 0.727 # mm.mrad
@@ -223,9 +228,9 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
         self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population,  1, Pref, T, Nparticles)
 
-    def __setup_beam2(self,scale):
+    def __setup_beam2(self):
         # Beam for WFS - Reduced bunch charge
-        population= scale * self.population
+        population = self.wfs_test_charge * self.population
         T = rft.Bunch6d_twiss()
         T.emitt_x = 7.04 # mm.mrad normalised emittance
         T.emitt_y = 3.39  # 0.727 # mm.mrad
@@ -241,7 +246,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, Nparticles)
         self.P0 = rft.Bunch6d_QR(rft.electronmass, population,  1, self.Pref, T, Nparticles)
 
-    def _get_screens(self):
+    def get_screens(self): # NEEDS TO BE CORRECTED FIRST
         lattice,element_descriptions,start,end=self.obtaining_the_lattice(filename='CLEAR_Beamline_Survey.txt')
         highlight_filter = ['BTV390', 'BTV620', 'BTV730', 'BTV810', 'BTV910']  # <- short names
         highlight_positions = []
@@ -272,6 +277,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             if elem['element_type'] == 'Screen':
                 print(name, "->", name.split('.')[-1], "at", elem['s_start'])
 
+        return None
+
+
+
     def __track_bunch(self):
         I0 = self.B0.get_info()
         dx = self.jitter*I0.sigma_x
@@ -282,19 +291,21 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
         self.lattice.track(B0_offset)
 
-    def change_energy(self, scale):
-        self.__setup_beam1(scale)
+    def change_energy(self):
+        self.__setup_beam1()
+        self.__track_bunch()
+        dP_P = self.dfs_test_energy - 1.0
+        return dP_P
+
+    def reset_energy(self):
+        self.__setup_beam0()
         self.__track_bunch()
 
-    def reset_energy(self, scale=1):
-        self.__setup_beam0( )
+    def change_intensity(self): #reduced charge
+        self.__setup_beam2()
         self.__track_bunch()
 
-    def change_intensity(self, scale): #reduced charge
-        self.__setup_beam2(scale)
-        self.__track_bunch()
-
-    def reset_intensity(self, scale=1):
+    def reset_intensity(self):
         self.__setup_beam0()
         self.__track_bunch()
 
@@ -317,12 +328,12 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_icts(self):
-        print("Reading ict's...")
-        charge = [ bpm.get_total_charge() for bpm in self.lattice.get_bpms() ]
+        self.log("Reading ict's...")
+        charge = [bpm.get_total_charge() for bpm in self.lattice.get_bpms()]
         icts = {
             "names": self.bpms,
             "charge": charge
-        }        
+        }
         return icts
 
     def get_correctors(self):
@@ -340,18 +351,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
     
     def get_bpms(self):
         print('Reading bpms...')
-        nb=len(self.bpms)+len(self.screens)
+        nb = len(self.screens)
         x = np.zeros((self.nsamples, nb))
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
         for i in range(self.nsamples):
-            # for j,name in enumerate(self.bpms):
-            #     b=self.bpm_elements[name]
-            #     reading = b.get_reading()
-            #     x[i,j] = reading[0]
-            #     y[i,j] = reading[1]
-            #     tmit[i,j] = b.get_total_charge()
-
             for j,name in enumerate(self.screens):
                 s=self.screen_elements[name]
                 B=s.get_bunch()
@@ -363,7 +367,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         bpms = { "names": self.screens, "x": x, "y": y, "tmit": tmit }
         return bpms
 
-    def push(self, names, corr_vals):
+    def set_correctors(self, names, corr_vals):
         if not isinstance(names, list):
             names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):  #iteration of tuples
@@ -385,20 +389,3 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 c.vary_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
 
-
-#func for screens, return image etc
-
-
-    #
-    # def align_everything(self):
-    #     self.lattice.align_elements()
-    #     self.__track_bunch()
-    #
-    # def misalign_quadrupoles(self,sigma_x=0.100,sigma_y=0.100):
-    #     self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-    #     self.__track_bunch()
-    #
-    # def misalign_bpms(self,sigma_x=0.100,sigma_y=0.100):
-    #     self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-    #     self.__track_bunch()
-    #

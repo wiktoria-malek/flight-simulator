@@ -1,5 +1,6 @@
 from State import State
 from Response import Response
+from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 try:
     from PyQt6 import uic
     from PyQt6.QtWidgets import (
@@ -35,7 +36,7 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
 
-class MainWindow(QMainWindow, SaveOrLoad):
+class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
     def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
         uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)
@@ -77,6 +78,41 @@ class MainWindow(QMainWindow, SaveOrLoad):
         if self.auto_click_compute:
             QTimer.singleShot(0, self.__compute_button_clicked)
 
+    def _compute_response_of_one_data_directory(self,directory):
+        directory=self._expand_path(directory)
+        datafiles=sorted(glob.glob(os.path.join(directory,"DATA*.pkl")))
+        if not datafiles:
+            QMessageBox.warning(self, "Error", "No data files found")
+            return
+        S=State(filename=datafiles[0])
+        self.sequence=S.get_sequence()
+        correctors = [self.correctors_list.item(i).text() for i in range(self.correctors_list.count()) if self.correctors_list.item(i).isSelected()]
+        bpms = [self.bpms_list.item(i).text() for i in range(self.bpms_list.count()) if self.bpms_list.item(i).isSelected()]
+
+        if not correctors:
+            for i in range(self.correctors_list.count()):
+                self.correctors_list.item(i).setSelected(True)
+            correctors=self.correctors
+
+        if not bpms:
+            for i in range(self.bpms_list.count()):
+                self.bpms_list.item(i).setSelected(True)
+            bpms=self.bpms
+
+        Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms=self._compute_response_matrix_from_directory(directory=directory, correctors=correctors, bpms=bpms, triangular=bool(self.triangular_checkbox.isChecked()))
+
+        R = Response()
+        R.bpms = bpms
+        R.hcorrs = hcorrs
+        R.vcorrs = vcorrs
+        R.Rxx = Rxx
+        R.Rxy = Rxy
+        R.Ryx = Ryx
+        R.Ryy = Ryy
+        R.Bx = Bx
+        R.By = By
+        return R
+
     def _is_h_corrector(self, s):
         name=str(s).lower()
         return name.startswith(self.hcorrector_prefixes)
@@ -111,7 +147,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         if not datafiles:
             return
         S=State(filename=datafiles[0])
-        self.sequence=S.sequence
+        self.sequence=S.get_sequence()
         self.correctors=list(S.get_correctors()["names"])
         self.bpms=list(S.get_bpms()["names"])
 
@@ -121,161 +157,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.bpms_list.clear()
         self.bpms_list.addItems([str(b) for b in self.bpms])
 
-    def _compute_response_of_one_data_directory(self,directory):
-        directory=self._expand_path(directory)
-        datafiles=sorted(glob.glob(os.path.join(directory, "DATA*.pkl")))
-        if not datafiles:
-            QMessageBox.warning(self,"No DATA files found.","No valid data found")
-            return
-
-        S = State(filename=datafiles[0])
-        sequence=S.sequence
-
-        correctors = [item.text() for item in self.correctors_list.selectedItems()]
-        bpms = [item.text() for item in self.bpms_list.selectedItems()]
-
-        if not correctors:
-            for i in range(self.correctors_list.count()):
-                self.correctors_list.item(i).setSelected(True)
-            correctors = self.correctors
-
-        if not bpms:
-            for i in range(self.bpms_list.count()):
-                self.bpms_list.item(i).setSelected(True)
-            bpms = self.bpms
-
-        hcorrs = [string for string in correctors if self._is_h_corrector(string)]
-        vcorrs = [string for string in correctors if self._is_v_corrector(string)]
-
-        # Pick all correctors preceding the last bpm
-        hcorrs = [corr for corr in hcorrs if sequence.index(corr) < sequence.index(bpms[-1])]
-        vcorrs = [corr for corr in vcorrs if sequence.index(corr) < sequence.index(bpms[-1])]
-
-        # Pick all bpms following the first corrector
-        bpms = [bpm for bpm in bpms if sequence.index(bpm) > sequence.index(hcorrs[0])]
-        bpms = [bpm for bpm in bpms if sequence.index(bpm) > sequence.index(vcorrs[0])]
-
-        # Read all orbits
-        Bx = np.empty((0, len(bpms)))
-        By = np.empty((0, len(bpms)))
-        Cx = np.empty((0, len(hcorrs)))
-        Cy = np.empty((0, len(vcorrs)))
-        B_mask = np.full((1, len(bpms)), True, dtype=bool)
-        datafiles_p = [f for f in datafiles if f[-9] == 'p']
-        for datafile_p in datafiles_p:
-            datafile_m = datafile_p[:-9] + 'm' + datafile_p[-8:]
-            if os.path.exists(datafile_m):
-                Sp = State(filename=datafile_p)
-                Sm = State(filename=datafile_m)
-                Op = Sp.get_orbit(bpms)
-                Om = Sm.get_orbit(bpms)
-                all_not_finite  = not np.any(np.isfinite(Op['x']))
-                all_not_finite |= not np.any(np.isfinite(Om['x']))
-                all_not_finite |= not np.any(np.isfinite(Op['y']))
-                all_not_finite |= not np.any(np.isfinite(Om['y']))
-                if all_not_finite:
-                    print(f'Skipping all-Nan files {datafile_p[:-9] + '[m|p]' + datafile_p[-8:]}')
-                    continue
-                B_mask &= np.isfinite(Op['x']) & np.isfinite(Om['x']) & np.isfinite(Op['y']) & np.isfinite(Om['y'])
-                Cx_p = Sp.get_correctors(hcorrs)['bact']
-                Cy_p = Sp.get_correctors(vcorrs)['bact']
-                Cx_m = Sm.get_correctors(hcorrs)['bact']
-                Cy_m = Sm.get_correctors(vcorrs)['bact']
-                if 0:
-                    O_x = Op['x'] - Om['x']
-                    O_y = Op['y'] - Om['y']
-                    C_x = Cx_p - Cx_m
-                    C_y = Cy_p - Cy_m
-                    Bx = np.vstack((Bx, O_x))
-                    By = np.vstack((By, O_y))
-                    Cx = np.vstack((Cx, C_x))
-                    Cy = np.vstack((Cy, C_y))
-                else:
-                    Bx = np.vstack((Bx, Op['x']))
-                    Bx = np.vstack((Bx, Om['x']))
-                    By = np.vstack((By, Op['y']))
-                    By = np.vstack((By, Om['y']))
-                    Cx = np.vstack((Cx, Cx_p))
-                    Cx = np.vstack((Cx, Cx_m))
-                    Cy = np.vstack((Cy, Cy_p))
-                    Cy = np.vstack((Cy, Cy_m))
-            else:
-                print(f"Data file '{datafile_m}' does not exist, ignoring counterpart '{datafile_p}' for response matrix computation")
-
-        B_mask = B_mask.ravel()
-
-        # Compute the response matrices
-        ones_column_x = np.ones((Cx.shape[0], 1))
-        ones_column_y = np.ones((Cy.shape[0], 1))
-
-        # Add the column of ones to the matrix
-        Cx = np.hstack((Cx, ones_column_x)).astype('float')
-        Cy = np.hstack((Cy, ones_column_y)).astype('float')
-
-        Bx = Bx.astype('float')
-        By = By.astype('float')
-
-        def lstsq(C, B):
-            return np.transpose(np.linalg.lstsq(C, B[:,B_mask], rcond=None)[0])
-
-        Rxx_ = lstsq(Cx, Bx)
-        Rxy_ = lstsq(Cy, Bx)
-        Ryx_ = lstsq(Cx, By)
-        Ryy_ = lstsq(Cy, By)
-
-        # Response matrices
-        Rxx_ = Rxx_[:, :-1]
-        Rxy_ = Rxy_[:, :-1]
-        Ryx_ = Ryx_[:, :-1]
-        Ryy_ = Ryy_[:, :-1]
-
-        # Restore nan columns
-        k = B_mask.size
-
-        Rxx = np.full((k,Rxx_.shape[1]), np.nan)
-        Rxy = np.full((k,Rxy_.shape[1]), np.nan)
-        Ryx = np.full((k,Ryx_.shape[1]), np.nan)
-        Ryy = np.full((k,Ryy_.shape[1]), np.nan)
-
-        Rxx[B_mask,:] = Rxx_
-        Rxy[B_mask,:] = Rxy_
-        Ryx[B_mask,:] = Ryx_
-        Ryy[B_mask,:] = Ryy_
-
-        # Reference trajectory
-        '''
-        Bx = Rxx[:,-1]
-        By = Ryy[:,-1]
-        '''
-
-        Bx = np.mean(Bx, axis=0).reshape(-1, 1)
-        By = np.mean(By, axis=0).reshape(-1, 1)
-
-
-        # Zero the response of all bpms preceeding the correctors
-        if self.triangular_checkbox.isChecked():
-            for corr in hcorrs:
-                bpm_indexes = [bpms.index(bpm) for bpm in bpms if sequence.index(bpm) < sequence.index(corr)]
-                Rxx[bpm_indexes, hcorrs.index(corr)] = 0
-                Ryx[bpm_indexes, hcorrs.index(corr)] = 0
-
-            for corr in vcorrs:
-                bpm_indexes = [bpms.index(bpm) for bpm in bpms if sequence.index(bpm) < sequence.index(corr)]
-                Rxy[bpm_indexes, vcorrs.index(corr)] = 0
-                Ryy[bpm_indexes, vcorrs.index(corr)] = 0
-
-        # Save on disk
-        R = Response()
-        R.bpms = bpms
-        R.hcorrs = hcorrs
-        R.vcorrs = vcorrs
-        R.Rxx = Rxx
-        R.Rxy = Rxy
-        R.Ryx = Ryx
-        R.Ryy = Ryy
-        R.Bx = Bx
-        R.By = By
-        return R
     def _substract_matrices(self,R1,R2):
         if R1.Rxx.shape != R2.Rxx.shape or R1.Ryy.shape != R2.Ryy.shape:
             raise RuntimeError("Response matrices must have same shape")
@@ -367,14 +248,18 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 QMessageBox.warning(self, "Error", "No data directory specified")
                 return
             R1=self._compute_response_of_one_data_directory(directory_1)
-
+            if R1 is None:
+                QMessageBox.warning(self, "Error", "No valid DATA pairs found in the first directory")
+                return
             if self.diff_checkbox.isChecked():
-                self._expand_path(self.data_directory_2.text())
-                directory_2 = (self.data_directory_2.text() or "").strip()
+                directory_2 = self._expand_path(self.data_directory_2.text())
                 if not directory_2:
                     QMessageBox.warning(self, "Error", "No second data directory specified")
                     return
                 R2 = self._compute_response_of_one_data_directory(directory_2)
+                if R2 is None:
+                    QMessageBox.warning(self, "Error", "No valid DATA pairs found in the second directory")
+                    return
                 self.R=self._substract_matrices(R1=R1,R2=R2)
             else:
                 self.R=R1

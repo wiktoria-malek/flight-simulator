@@ -23,7 +23,7 @@ class MainWindow(QMainWindow,SaveOrLoad):
         self.interface = interface
         self.dir_name = dir_name
         self._cancel = False
-        self.S = State(interface=self.interface)
+        self.initial_state = self.interface.get_state()
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
         self.setWindowTitle("Emittance Measurement GUI")
@@ -106,8 +106,8 @@ class MainWindow(QMainWindow,SaveOrLoad):
         QMessageBox.information(self, "Scan", "Stop requested. Finishing current iteration...")
 
     def _get_selection(self):
-        quadrupoles_all = self.S.get_quadrupoles()["names"]
-        screens_all = self.S.get_screens()["names"]
+        quadrupoles_all = self.initial_state.get_quadrupoles()["names"]
+        screens_all = self.initial_state.get_screens()["names"]
 
         selected_quadrupoles = []
         for i in range(self.quadrupoles_list.count()):

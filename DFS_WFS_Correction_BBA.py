@@ -4,10 +4,19 @@ matplotlib.use("QtAgg")
 from State import State
 
 '''
-Uses the same approach as Compute Response Matrix GUI.
+Mutual response matrix calculation algorithm.
 '''
 
 class DFS_WFS_Correction_BBA():
+
+    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False):
+        info=self._find_useful_files(directory)
+        if not info["ok"]:
+            raise RuntimeError(f"Could not find any valid DATA pairs in {directory}")
+
+        return self._compute_response_matrix(pairs=info["pairs"],correctors=correctors, bpms=bpms, triangular=triangular)
+
+
     def _find_useful_files(self, directory):
         datafiles=sorted(glob.glob(os.path.join(directory, 'DATA*.pkl')))
         pairs=[]

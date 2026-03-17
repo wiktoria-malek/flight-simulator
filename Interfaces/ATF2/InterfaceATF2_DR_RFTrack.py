@@ -1,6 +1,6 @@
 import RF_Track as rft
 import numpy as np
-import time
+import time,os
 from LogConsole_BBA import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
@@ -11,7 +11,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
 
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.log = print
-        twiss_path=os.path.join(os.path.dirname(__file__),'Ext_ATF2','ATF2_EXT_FF_v5.2.twiss')
+        self.twiss_path=os.path.join(os.path.dirname(__file__),'Ext_ATF2','ATF2_EXT_FF_v5.2.twiss')
         self.lattice = rft.Lattice(twiss_path)
         for i,q in enumerate(self.lattice.get_quadrupoles()):
             if i%3 == 0:
@@ -30,12 +30,14 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.bpms = [ e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [ e.get_name() for e in self.lattice.get_screens()]
+        self.quadrupoles = list(dict.fromkeys(e.get_name() for e in self.lattice.get_quadrupoles()))
         self.Pref = 1.2999999e3 # 1.3 GeV/c
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples
         self.dfs_test_energy = 0.98
         self.wfs_test_charge = 0.90
+        self.Q=-1
         self.__setup_beam0()
         self.__track_bunch()
 
@@ -115,6 +117,8 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
     def change_energy(self):
         self.__setup_beam1()
         self.__track_bunch()
+        dP_P = self.dfs_test_energy - 1.0
+        return dP_P
 
     def reset_energy(self):
         self.__setup_beam0()
@@ -358,14 +362,16 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                 element.set_K1(self.Pref / self.Q,float(value))
         self.__track_bunch()
 
-    def push(self, names, corr_vals):
-        if not isinstance(names, list):
-            names = [ names ] # makes it a list
+    def set_correctors(self, names, corr_vals):
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH" or corr[:2] == "ZX":
-                self.lattice[corr].set_strength(val/10, 0.0)  # T*mm
+                self.lattice[corr].set_strength(val / 10, 0.0)
             elif corr[:2] == "ZV":
-                self.lattice[corr].set_strength(0.0, val/10)  # T*mm
+                self.lattice[corr].set_strength(0.0, val / 10)
         self.__track_bunch()
     
     def vary_correctors(self, names, corr_vals):
