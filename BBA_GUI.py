@@ -27,6 +27,8 @@ from SaveOrLoad import SaveOrLoad
 from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 import matplotlib.pyplot as plt
 from BPM_weights import BPM_weights
+from traceback import print_exception
+
 
 class Machine(Enum):
     ATF2_DR = "ATF2_DR"
@@ -393,6 +395,17 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
     def _start_correction(self):
         try:
+            self.S0bdes = []
+            corrs, bpms = self._get_selection()
+            print(f'debuug1: corrs = {corrs}')
+            print(f'debuug1: bpms = {bpms}')
+            self.selected_correctors = []
+            # save list of initial bdes for reset
+            for cname,bdes in zip(self.S0.correctors['names'],self.S0.correctors['bdes']):
+                if cname in corrs:
+                    self.S0bdes.append(bdes)
+                    self.selected_correctors.append(cname)
+
             print("Starting correction...")
             self.log("Starting correction...")
             self._cancel = False
@@ -533,13 +546,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
 
-                print("Axx shape:", Axx.shape)
-                print("Axy shape:", Axy.shape)
-                print("Ayx shape:", Ayx.shape)
-                print("Ayy shape:", Ayy.shape)
-                print("Bx shape:", Bx.shape)
-                print("By shape:", By.shape)
-
                 Axx[np.isnan(Axx)] = 0
                 Ayy[np.isnan(Ayy)] = 0
                 Axy[np.isnan(Axy)] = 0
@@ -585,7 +591,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
                 #adding the (Aw.T*Aw+beta*I)-1
                 if beta>0: # with beta, A.T@A+beta*I is always reversible, so we use solve, matrix is square and reversible
-                    delta=-gain*np.linalg.solve(A_weighted.T@A_weighted+beta*np.eye(A_weighted.shape[1]),A_weighted.T@B_weighted) # without pinv, because we add beta so that singular values will not be near zero
+                    delta = -gain * np.linalg.solve(A_weighted.T@A_weighted+beta*np.eye(A_weighted.shape[1]),A_weighted.T@B_weighted) # without pinv, because we add beta so that singular values will not be near zero
                 else: # np.eye(n) singular matrix with shape= number of columns
                     delta = -gain * (np.linalg.pinv(A_weighted, rcond=rcond) @ B_weighted)
                 print(f"Delta is {delta}")
@@ -645,7 +651,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                     self._hist_wake_err.append(err_wake_all)
 
                 self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y, vals=self._hist_orbit,error_x=self._hist_orbit_x_err, error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None,ylabel="Residual norm [mm]")
-                self._plot_series(ax=self.disp_ax,canvas= self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None,ylabel="Residual norm [mm]")
+                self._plot_series(ax=self.disp_ax, canvas=self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None,ylabel="Residual norm [mm]")
                 self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,error_x=self._hist_wake_x_err, error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None,ylabel="Residual norm [mm]")
                 QApplication.processEvents()
 
@@ -658,6 +664,7 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             self.setWindowTitle("BBA GUI")
             QMessageBox.critical(self, "Correction error", str(e))
             self.log(f"Correction error: {e}")
+            print_exception(e)
 
     def _stop_correction(self):
         self._cancel = True

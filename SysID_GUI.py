@@ -24,13 +24,6 @@ class Mode(Enum):
     Wakefield = "Changed intensity"
     All = "All modes at once"
 
-class Machine(Enum):
-    ATF2_DR = "ATF2_DR"
-    ATF2_EXT = "ATF2_Ext"
-    ATF2_LINAC = "ATF2_Linac"
-    ATF2_DR_RFT = "ATF2_DR_RFT"
-    ATF2_EXT_RFT = "ATF2_Ext_RFT"
-
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
         fig = Figure(tight_layout=True)
@@ -83,17 +76,13 @@ class Worker(QObject):
             return max(-max_val, min(val, max_val))
 
         for iter in range(self.Niter):
-            if not self.running:
-                break
-            if self.paused:
-                self._await_user()
+            if not self.running: break
+            if self.paused:      self._await_user()
 
             for icorr, corrector in enumerate(self.correctors):
-                corr = self.interface.get_state().get_correctors(corrector)
-                if not self.running:
-                    break
-                if self.paused:
-                    self._await_user()
+                corr = S.get_correctors(corrector)
+                if not self.running: break
+                if self.paused:      self._await_user()
 
                 if corrector in self.hcorrs:
                     max_curr=self.max_curr_h
@@ -102,8 +91,8 @@ class Worker(QObject):
                     max_curr=self.max_curr_v
                     kick=vkicks[icorr]
 
-                if self.paused:
-                    self._await_user()
+                if not self.running: break
+                if self.paused:      self._await_user()
 
                 corr_changed = False
 
@@ -119,8 +108,8 @@ class Worker(QObject):
                     I.set_correctors(corrector, curr_p)
                     corr_changed = True
 
-                    if self.paused:
-                        self._await_user()
+                    if not self.running: break
+                    if self.paused:      self._await_user()
 
                     state_p=I.get_state()
                     state_p.save(filename=filename_p)
@@ -139,8 +128,8 @@ class Worker(QObject):
                     I.set_correctors(corrector, curr_m)
                     corr_changed = True
 
-                    if not self.running:
-                        break
+                    if not self.running: break
+                    if self.paused:      self._await_user()
 
                     state_m=I.get_state()
                     state_m.save(filename=filename_m)
@@ -150,6 +139,9 @@ class Worker(QObject):
 
                 if corr_changed:
                     I.set_correctors(corrector, corr['bdes'])
+
+                if not self.running: break
+                if self.paused:      self._await_user()
 
                 Diff_x = (Op['x'] - Om['x']) / 2.0
                 Diff_y = (Op['y'] - Om['y']) / 2.0
@@ -182,9 +174,6 @@ class Worker(QObject):
 
         self.running = False
         self.finished.emit()
-
-    def stop(self):
-        self.running = False
 
     def pause(self):
         self.paused = True
@@ -240,8 +229,8 @@ class MainWindow(QMainWindow):
                 a = np.array([0 if x is None else x for x in a], dtype=float)
                 a[np.isnan(a)] = 0
                 return a
-            max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
-            max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
+            max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'][hcorr_indexes]))))
+            max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'][vcorr_indexes]))))
 
         # Load the interface
         uic.loadUi("UI files/SysID_GUI.ui", self)
@@ -268,6 +257,11 @@ class MainWindow(QMainWindow):
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
         self.initial_hkick_settings.setText("0.01")
         self.initial_vkick_settings.setText("0.01")
+
+        #for FACET2:
+        # self.initial_hkick_settings.setText("0.0001")
+        # self.initial_vkick_settings.setText("0.0001")
+
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
@@ -286,8 +280,6 @@ class MainWindow(QMainWindow):
             self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
         self.__set_status_in_title("[Idle]")
         interface_name=interface.get_name()
-        machine = Machine(interface_name)
-
         self.modes_to_do=[]
         self.counter=0
         self.current_mode=None
@@ -355,20 +347,21 @@ class MainWindow(QMainWindow):
         dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir(dir_name)
-        selected_correctors = self.correctors_list.selectedItems()
+        selected_correctors = self._sort_elements([j.text() for j in self.correctors_list.selectedItems()], which='corrs')
+
         dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
-                for item in selected_correctors:
-                    f.write(f"{item}\n")
+                for cname in selected_correctors:
+                    f.write(f"{cname}\n")
 
     def __load_correctors_button_clicked(self):
         dir_name = self.working_directory_input.text() + '/correctors.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
-                selected_correctors = [line.strip() for line in f]
+                selected_correctors = self._sort_elements([line.strip() for line in f], which='corrs')
         else:
             selected_correctors = self.interface.get_correctors()['names']
 
@@ -385,20 +378,20 @@ class MainWindow(QMainWindow):
         dir_name = self.working_directory_input.text()
         os.makedirs (dir_name, exist_ok=True)
         os.chdir (dir_name)
-        selected_bpms = self.bpms_list.selectedItems()
+        selected_bpms = self._sort_elements([j.text() for j in self.bpms_list.selectedItems()], which='bpms')
         dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'w') as f:
-                for item in selected_bpms:
-                    f.write(f"{item}\n")
+                for bpmname in selected_bpms:
+                    f.write(f"{bpmname}\n")
 
     def __load_bpms_button_clicked(self):
         dir_name = self.working_directory_input.text() + '/bpms.txt'
         filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
         if filename:
             with open(filename, 'r') as f:
-                selected_bpms = [line.strip() for line in f]
+                selected_bpms = self._sort_elements([line.strip() for line in f], which='bmps')
         else:
             selected_bpms = self.interface.get_bpms()['names']
 
@@ -421,6 +414,17 @@ class MainWindow(QMainWindow):
             print(e)
             return 0.1
 
+    def _sort_elements(self, unsorted_names, which='corrs'):
+        """
+        sorts a list of correctors or BPMs in machine (s) order
+        meant to handle the selection-order-sorted results of QTableWidget.SelectedItems()
+        """
+        sorted_names = []
+        reference_namelist = self.interface.corrs if (which == 'corrs') else self.interface.bpms
+        for name in reference_namelist:
+            if name in unsorted_names: sorted_names.append(str(name))
+        return sorted_names
+
     def __start_button_clicked(self):
         # dir_name = self.working_directory_input.text()
         # os.makedirs (dir_name, exist_ok=True)
@@ -433,7 +437,8 @@ class MainWindow(QMainWindow):
         if self.thread and self.thread.isRunning():
             return  # already running
 
-        selected_correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        selected_correctors = self._sort_elements([item.text() for item in self.correctors_list.selectedItems()], which='corrs')
+
         self.selected_correctors = selected_correctors
         if not selected_correctors:
             for i in range(self.correctors_list.count()):

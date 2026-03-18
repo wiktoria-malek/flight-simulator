@@ -132,7 +132,7 @@
      </layout>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="content_layout">
+     <layout class="QHBoxLayout" name="content_layout" stretch="1,6">
       <item>
        <layout class="QVBoxLayout" name="left_layout">
         <property name="leftMargin">
@@ -291,6 +291,13 @@
             <width>450</width>
             <height>500</height>
            </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="plot_singular_values_button">
+          <property name="text">
+           <string>Plot Singular Values</string>
           </property>
          </widget>
         </item>

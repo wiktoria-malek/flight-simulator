@@ -56,7 +56,6 @@ class DFS_WFS_Correction_BBA():
         By = np.empty((0, len(bpms)))
         Cx = np.empty((0, len(hcorrs)))
         Cy = np.empty((0, len(vcorrs)))
-
         B_mask = np.full((1, len(bpms)), True, dtype=bool)
 
         for fp, fm in pairs:
@@ -75,13 +74,7 @@ class DFS_WFS_Correction_BBA():
                 print(f"Skipping all-NaN files: {os.path.basename(fp)} / {os.path.basename(fm)}")
                 continue
 
-            B_mask &= (
-                    np.isfinite(Op['x']) &
-                    np.isfinite(Om['x']) &
-                    np.isfinite(Op['y']) &
-                    np.isfinite(Om['y'])
-            )
-
+            B_mask &= np.isfinite(Op['x']) & np.isfinite(Om['x']) & np.isfinite(Op['y']) & np.isfinite(Om['y'])
             Cx_p = Sp.get_correctors(hcorrs)['bact']
             Cy_p = Sp.get_correctors(vcorrs)['bact']
             Cx_m = Sm.get_correctors(hcorrs)['bact']
@@ -102,6 +95,7 @@ class DFS_WFS_Correction_BBA():
         ones_column_x = np.ones((Cx.shape[0], 1))
         ones_column_y = np.ones((Cy.shape[0], 1))
 
+        # Add the column of ones to the matrix
         Cx = np.hstack((Cx, ones_column_x)).astype(float)
         Cy = np.hstack((Cy, ones_column_y)).astype(float)
 
@@ -122,24 +116,24 @@ class DFS_WFS_Correction_BBA():
         Ryx_ = Ryx_[:, :-1]
         Ryy_ = Ryy_[:, :-1]
 
-        # Restore NaN BPM columns
+        # Restore nan columns
         k = B_mask.size
 
-        Rxx = np.full((k, Rxx_.shape[1]), np.nan)
-        Rxy = np.full((k, Rxy_.shape[1]), np.nan)
-        Ryx = np.full((k, Ryx_.shape[1]), np.nan)
-        Ryy = np.full((k, Ryy_.shape[1]), np.nan)
+        Rxx = np.full((k,Rxx_.shape[1]), np.nan)
+        Rxy = np.full((k,Rxy_.shape[1]), np.nan)
+        Ryx = np.full((k,Ryx_.shape[1]), np.nan)
+        Ryy = np.full((k,Ryy_.shape[1]), np.nan)
 
-        Rxx[B_mask, :] = Rxx_
-        Rxy[B_mask, :] = Rxy_
-        Ryx[B_mask, :] = Ryx_
-        Ryy[B_mask, :] = Ryy_
+        Rxx[B_mask,:] = Rxx_
+        Rxy[B_mask,:] = Rxy_
+        Ryx[B_mask,:] = Ryx_
+        Ryy[B_mask,:] = Ryy_
 
         # Reference trajectory
         Bx = np.mean(Bx, axis=0).reshape(-1, 1)
         By = np.mean(By, axis=0).reshape(-1, 1)
 
-        # Zero the response of all bpms preceding the correctors
+        # Zero the response of all bpms preceeding the correctors
         if triangular:
             for corr in hcorrs:
                 bpm_indexes = [bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]

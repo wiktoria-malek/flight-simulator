@@ -15,12 +15,12 @@ from traceback import print_exception
 
 # missing/deffered elements in the model to ignore
 BPM_BLACKLIST = [
-    'BPM19851', 'BPM19871'
-]
+    'BPM19851','BPM19871'
+    ]
 CORRECTOR_BLACKLIST = [
-    'YC57145', 'YC57146',
-    'XCB2LE', 'XCB3RE', 'XCB3LE', 'XCB2RE', 'XC1EX',
-]
+    'YC57145','YC57146',
+    'XCB2LE','XCB3RE','XCB3LE','XCB2RE','XC1EX',
+    ]
 
 
 def devname_swap_micro_primary(device):
@@ -59,25 +59,25 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
             self.corrs.remove(corname)
             if corname.startswith('X'): self.xcorrs.remove(corname)
             if corname.startswith('Y'): self.ycorrs.remove(corname)
-        self.bpmdevs = [self.f2m.device_names[_ix[bpm]] for bpm in self.bpms]
-        self.bpms_s = [self.f2m.S[_ix[bpm]] for bpm in self.bpms]
+        self.bpmdevs =  [self.f2m.device_names[_ix[bpm]] for bpm in self.bpms]
+        self.bpms_s =   [self.f2m.S[_ix[bpm]]  for bpm  in self.bpms]
         self.xcorrs_s = [self.f2m.S[_ix[xcor]] for xcor in self.xcorrs]
         self.ycorrs_s = [self.f2m.S[_ix[ycor]] for ycor in self.ycorrs]
-        self.corrs_s = [self.f2m.S[_ix[cor]] for cor in self.corrs]
+        self.corrs_s =  [self.f2m.S[_ix[cor]]  for cor  in self.corrs]
         # self.Brho =     [Brho[ix[elem]] for elem in self.sequence]
         self.PVs = {
-            'Q_setpoint': get_pv('SIOC:SYS1:ML03:AO518'),
-            'Q_readback': get_pv('TORO:IN10:431:TMIT_PC'),
-            'UVWP_angle': get_pv('WPLT:LT10:150:WP_ANGLE'),
-            'dl10_en': get_pv('BEND:IN10:751:BDES'),
-            'bc11_en': get_pv('BEND:LI11:314:BDES'),
-            'bc14_en': get_pv('BEND:LI14:720:BDES'),
-            'bc20_en': get_pv('LI20:LGPS:1990:BDES'),
+            'Q_setpoint':     get_pv('SIOC:SYS1:ML03:AO518'),
+            'Q_readback':     get_pv('TORO:IN10:431:TMIT_PC'),
+            'UVWP_angle':     get_pv('WPLT:LT10:150:WP_ANGLE'),
+            'dl10_en':        get_pv('BEND:IN10:751:BDES'),
+            'bc11_en':        get_pv('BEND:LI11:314:BDES'),
+            'bc14_en':        get_pv('BEND:LI14:720:BDES'),
+            'bc20_en':        get_pv('LI20:LGPS:1990:BDES'),
             'dl10e_setpoint': get_pv('PHYS:SYS1:1:F2LFB_DL10E_VERN'),
             'bc11e_setpoint': get_pv('PHYS:SYS1:1:F2LFB_BC11E_VERN'),
             'bc14e_setpoint': get_pv('PHYS:SYS1:1:F2LFB_BC14E_VERN'),
             'bc20e_setpoint': get_pv('PHYS:SYS1:1:F2LFB_BC20E_VERN'),
-        }
+            }
         # initial bunch charge setpoint for reset_intensity
         self.init_charge_setpoint = self.PVs['Q_setpoint'].get()
         self.UVWP_init = self.PVs['UVWP_angle'].get()
@@ -85,8 +85,8 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         self.bpm_buffer = make_bpm_buffer(self.f2m, self.bpms, Npts=self.nsamples)
         print('InterfaceFACET2_Linac is ready')
 
-    def log_messages(self, console):
-        self.log = console or print
+    def log_messages(self,console):
+        self.log=console or print
 
     def _meascharge(self):
         qraw = []
@@ -104,7 +104,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC11BL_TARGET').put(4400)
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC14BL_TARGET').put(5000)
         time.sleep(5.0)
-        return -(3.0 / 335.0)
+        return -(3.0/335.0)
 
     def reset_energy(self):
         """ zero dl10 setpoint, re-enable feedbacks """
@@ -140,17 +140,16 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
     def get_sequence(self, *args):
         return self.sequence
 
-    def get_hcorrectors_names(self):
-        return self.xcorrs
-
-    def get_vcorrectors_names(self):
-        return self.ycorrs
-
-    def get_elements_position(self, names):
-        return [self.f2m.S[self.f2m.ix[name]] for name in names]
+    def get_hcorrectors_names(self): return self.xcorrs
 
     def get_target_dispersion(self, names):
         return [0. for _ in names], [0. for _ in names]
+
+    def get_vcorrectors_names(self): return self.ycorrs
+
+    def get_elements_position(self, names): return [self.f2m.S[self.f2m.ix[name]] for name in names]
+
+    def get_target_dispersion(self, names): return [0. for _ in names], [0. for _ in names]
 
     def get_correctors(self):
         print("Reading correctors' strengths...")
@@ -159,10 +158,10 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
             devname = self.f2m.device_names[self.f2m.ix[corname]]
             if devname == '':
                 print(f'skipping {corname}')
-                continue  # some model elements don't have an actual magnet
+                continue # some model elements don't have an actual magnet
             bdes.append(get_pv(f'{devname}:BDES').get())
             bact.append(get_pv(f'{devname}:BACT').get())
-        return {"names": self.corrs, "bdes": np.array(bdes), "bact": np.array(bact)}
+        return { "names": self.corrs, "bdes": np.array(bdes), "bact": np.array(bact) }
 
     def get_bpms(self):
         itry = 0
@@ -216,7 +215,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
             raise ValueError('len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
         devnames = [self.f2m.device_names[self.f2m.ix[name]] for name in names]
         bdes_init = [get_pv(f'{devname}:BDES').get() for devname in devnames]
-        updated_corr_vals = [bdes + delta for bdes, delta in zip(bdes_init, corr_vals)]
+        updated_corr_vals = [bdes+delta for bdes,delta in zip(bdes_init, corr_vals)]
         set_magnets(devnames, updated_corr_vals, perturb=True)
         time.sleep(1)
 

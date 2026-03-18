@@ -1,28 +1,15 @@
 from State import State
 from Response import Response
-from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
-try:
-    from PyQt6 import uic
-    from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QVBoxLayout,
-        QLineEdit, QListWidget, QPushButton,
-        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
-        )
-    from PyQt6.QtCore import Qt,QTimer
-    pyqt_version = 6
-
-except ImportError:
-    from PyQt5 import uic
-    from PyQt5.QtWidgets import (
-        QApplication, QMainWindow, QVBoxLayout,
-        QLineEdit, QListWidget, QPushButton,
-        QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
-        )
-    from PyQt5.QtCore import Qt,QTimer
-    pyqt_version = 5
-
+from PyQt5 import uic
 import numpy as np
 import glob,sys,os,argparse,matplotlib
+from SaveOrLoad import SaveOrLoad
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QVBoxLayout,
+    QLineEdit, QListWidget, QPushButton,
+    QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+)
+from PyQt5.QtCore import Qt,QTimer
 from SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -36,7 +23,7 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
 
-class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
+class MainWindow(QMainWindow, SaveOrLoad):
     def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
         uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)
@@ -55,11 +42,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.save_as_button.clicked.connect(self.__save_as_button_clicked)
         self.diff_checkbox.toggled.connect(self._compute_difference_clicked)
         self._compute_difference_clicked(self.diff_checkbox.isChecked())
-        self.plot_singular_values_button.clicked.connect(self._plot_singular_values)
         self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
         self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
-        self.hcorrector_prefixes=("zh", "zx")
-        self.vcorrector_prefixes=("zv")
 
         layout = self.plot_widget.layout()
         if layout is None:
@@ -82,49 +66,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         if self.auto_click_compute:
             QTimer.singleShot(0, self.__compute_button_clicked)
 
-    def _compute_response_of_one_data_directory(self,directory):
-        directory=self._expand_path(directory)
-        datafiles=sorted(glob.glob(os.path.join(directory,"DATA*.pkl")))
-        if not datafiles:
-            QMessageBox.warning(self, "Error", "No data files found")
-            return
-        S=State(filename=datafiles[0])
-        self.sequence=S.get_sequence()
-        correctors = [self.correctors_list.item(i).text() for i in range(self.correctors_list.count()) if self.correctors_list.item(i).isSelected()]
-        bpms = [self.bpms_list.item(i).text() for i in range(self.bpms_list.count()) if self.bpms_list.item(i).isSelected()]
-
-        if not correctors:
-            for i in range(self.correctors_list.count()):
-                self.correctors_list.item(i).setSelected(True)
-            correctors=self.correctors
-
-        if not bpms:
-            for i in range(self.bpms_list.count()):
-                self.bpms_list.item(i).setSelected(True)
-            bpms=self.bpms
-
-        Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms=self._compute_response_matrix_from_directory(directory=directory, correctors=correctors, bpms=bpms, triangular=bool(self.triangular_checkbox.isChecked()))
-
-        R = Response()
-        R.bpms = bpms
-        R.hcorrs = hcorrs
-        R.vcorrs = vcorrs
-        R.Rxx = Rxx
-        R.Rxy = Rxy
-        R.Ryx = Ryx
-        R.Ryy = Ryy
-        R.Bx = Bx
-        R.By = By
-        return R
-
-    def _is_h_corrector(self, s):
-        name=str(s).lower()
-        return name.startswith(self.hcorrector_prefixes)
-
-    def _is_v_corrector(self, s):
-        name=str(s).lower()
-        return name.startswith(self.vcorrector_prefixes)
-
     def _expand_path(self,path):
         expanded_path=(path or "").strip()
         expanded_path=os.path.expandvars(os.path.expanduser(expanded_path))
@@ -135,21 +76,6 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.label_dir_2.setEnabled(checked)
         self.choose_directory_2.setEnabled(checked)
         self.data_directory_2.setEnabled(checked)
-
-    def _plot_singular_values(self):
-        def get_SV(R):
-            R = R.copy()
-            R[np.isnan(R)] = 0
-            U, S, Vh = np.linalg.svd(R)
-            return S
-        plt.semilogy(get_SV(self.R.Rxx), label='Rxx')
-        plt.semilogy(get_SV(self.R.Rxy), label='Rxy', linestyle='dashed')
-        plt.semilogy(get_SV(self.R.Ryx), label='Ryx', linestyle='dashed')
-        plt.semilogy(get_SV(self.R.Ryy), label='Ryy')
-        plt.xlabel('Singular Value')
-        plt.ylabel('Value')
-        plt.legend()
-        plt.show()
 
     def _pick_directory_with_data(self,line_edit):
         base=self._expand_path(line_edit.text() or self.cwd) or self.cwd
@@ -162,11 +88,11 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
     def _load_lists_from_directory(self,folder):
         folder=self._expand_path(folder)
-        datafiles=sorted(glob.glob(os.path.join(folder,"DATA*.pkl")))
+        datafiles=sorted(glob.glob(os.path.join(folder,"SAMPLE*.pkl")))
         if not datafiles:
             return
         S=State(filename=datafiles[0])
-        self.sequence=S.get_sequence()
+        self.sequence=S.sequence
         self.correctors=list(S.get_correctors()["names"])
         self.bpms=list(S.get_bpms()["names"])
 
@@ -175,6 +101,137 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
         self.bpms_list.clear()
         self.bpms_list.addItems([str(b) for b in self.bpms])
+
+    def _compute_response_of_one_data_directory(self,directory):
+        directory=self._expand_path(directory)
+        datafiles=sorted(glob.glob(os.path.join(directory, "SAMPLE*.pkl")))
+        if not datafiles:
+            QMessageBox.warning(self,"No DATA files found.","No valid data found")
+            return
+
+        S = State(filename=datafiles[0])
+        sequence=S.sequence
+
+        correctors = [item.text() for item in self.correctors_list.selectedItems()]
+        bpms = [item.text() for item in self.bpms_list.selectedItems()]
+
+        if not correctors:
+            for i in range(self.correctors_list.count()):
+                self.correctors_list.item(i).setSelected(True)
+            correctors = self.correctors
+
+        if not bpms:
+            for i in range(self.bpms_list.count()):
+                self.bpms_list.item(i).setSelected(True)
+            bpms = self.bpms
+
+        hcorrs = [string for string in correctors if string.lower().startswith('x')]
+        vcorrs = [string for string in correctors if string.lower().startswith('y')]
+
+        # Pick all correctors preceding the last bpm
+        hcorrs = [corr for corr in hcorrs if sequence.index(corr) < sequence.index(bpms[-1])]
+        vcorrs = [corr for corr in vcorrs if sequence.index(corr) < sequence.index(bpms[-1])]
+
+        # Pick all bpms following the first corrector
+        bpms = [bpm for bpm in bpms if sequence.index(bpm) > sequence.index(hcorrs[0])]
+        bpms = [bpm for bpm in bpms if sequence.index(bpm) > sequence.index(vcorrs[0])]
+
+        # Read all orbits
+        Bx = np.empty((0, len(bpms)))
+        By = np.empty((0, len(bpms)))
+        Cx = np.empty((0, len(hcorrs)))
+        Cy = np.empty((0, len(vcorrs)))
+        B_mask = np.full((1, len(bpms)), True, dtype=bool)
+        for datafile in datafiles:
+            Sp = State(filename=datafile)
+            Op = Sp.get_orbit(bpms)
+            all_not_finite  = not np.any(np.isfinite(Op['x']))
+            all_not_finite |= not np.any(np.isfinite(Op['y']))
+            if all_not_finite:
+                print(f'Skipping all-Nan file {datafile}')
+                continue
+            B_mask &= np.isfinite(Op['x']) & np.isfinite(Op['y'])
+            Cx_p = Sp.get_correctors(hcorrs)['bact']
+            Cy_p = Sp.get_correctors(vcorrs)['bact']
+            Bx = np.vstack((Bx, Op['x']))
+            By = np.vstack((By, Op['y']))
+            Cx = np.vstack((Cx, Cx_p))
+            Cy = np.vstack((Cy, Cy_p))
+
+        B_mask = B_mask.ravel()
+
+        # Compute the response matrices
+        ones_column_x = np.ones((Cx.shape[0], 1))
+        ones_column_y = np.ones((Cy.shape[0], 1))
+
+        # Add the column of ones to the matrix
+        Cx = np.hstack((Cx, ones_column_x)).astype('float')
+        Cy = np.hstack((Cy, ones_column_y)).astype('float')
+
+        Bx = Bx.astype('float')
+        By = By.astype('float')
+
+        def lstsq(C, B):
+            return np.transpose(np.linalg.lstsq(C, B[:,B_mask], rcond=None)[0])
+
+        Rxx_ = lstsq(Cx, Bx)
+        Rxy_ = lstsq(Cy, Bx)
+        Ryx_ = lstsq(Cx, By)
+        Ryy_ = lstsq(Cy, By)
+
+        # Response matrices
+        Rxx_ = Rxx_[:, :-1]
+        Rxy_ = Rxy_[:, :-1]
+        Ryx_ = Ryx_[:, :-1]
+        Ryy_ = Ryy_[:, :-1]
+
+        # Restore nan columns
+        k = B_mask.size
+
+        Rxx = np.full((k,Rxx_.shape[1]), np.nan)
+        Rxy = np.full((k,Rxy_.shape[1]), np.nan)
+        Ryx = np.full((k,Ryx_.shape[1]), np.nan)
+        Ryy = np.full((k,Ryy_.shape[1]), np.nan)
+
+        Rxx[B_mask,:] = Rxx_
+        Rxy[B_mask,:] = Rxy_
+        Ryx[B_mask,:] = Ryx_
+        Ryy[B_mask,:] = Ryy_
+
+        # Reference trajectory
+        '''
+        Bx = Rxx[:,-1]
+        By = Ryy[:,-1]
+        '''
+
+        Bx = np.mean(Bx, axis=0).reshape(-1, 1)
+        By = np.mean(By, axis=0).reshape(-1, 1)
+
+
+        # Zero the response of all bpms preceeding the correctors
+        if self.triangular_checkbox.isChecked():
+            for corr in hcorrs:
+                bpm_indexes = [bpms.index(bpm) for bpm in bpms if sequence.index(bpm) < sequence.index(corr)]
+                Rxx[bpm_indexes, hcorrs.index(corr)] = 0
+                Ryx[bpm_indexes, hcorrs.index(corr)] = 0
+
+            for corr in vcorrs:
+                bpm_indexes = [bpms.index(bpm) for bpm in bpms if sequence.index(bpm) < sequence.index(corr)]
+                Rxy[bpm_indexes, vcorrs.index(corr)] = 0
+                Ryy[bpm_indexes, vcorrs.index(corr)] = 0
+
+        # Save on disk
+        R = Response()
+        R.bpms = bpms
+        R.hcorrs = hcorrs
+        R.vcorrs = vcorrs
+        R.Rxx = Rxx
+        R.Rxy = Rxy
+        R.Ryx = Ryx
+        R.Ryy = Ryy
+        R.Bx = Bx
+        R.By = By
+        return R
 
     def _substract_matrices(self,R1,R2):
         if R1.Rxx.shape != R2.Rxx.shape or R1.Ryy.shape != R2.Ryy.shape:
@@ -195,7 +252,17 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self._save_correctors()
 
     def __load_correctors_button_clicked(self):
-        self._load_correctors()
+        dir_name = self.data_directory_1.text() + '/correctors.txt'
+        filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
+        if filename:
+            with open(filename, 'r') as f:
+                selected_correctors = [line.strip() for line in f]
+
+        self.correctors_list.clearSelection()
+        for item in selected_correctors:
+            items = self.correctors_list.findItems(item, Qt.MatchFlag.MatchExactly)
+            for item in items:
+                item.setSelected(True)
 
     def __clear_correctors_button_clicked(self):
         self.correctors_list.clearSelection()
@@ -204,7 +271,17 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self._save_bpms()
 
     def __load_bpms_button_clicked(self):
-        self._load_bpms()
+        dir_name = self.data_directory_1.text() + '/bpms.txt'
+        filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
+        if filename:
+            with open(filename, 'r') as f:
+                selected_bpms = [line.strip() for line in f]
+
+        self.bpms_list.clearSelection()
+        for item in selected_bpms:
+            items = self.bpms_list.findItems(item, Qt.MatchFlag.MatchExactly)
+            for item in items:
+                item.setSelected(True)
 
     def __clear_bpms_button_clicked(self):
         self.bpms_list.clearSelection()
@@ -267,18 +344,14 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 QMessageBox.warning(self, "Error", "No data directory specified")
                 return
             R1=self._compute_response_of_one_data_directory(directory_1)
-            if R1 is None:
-                QMessageBox.warning(self, "Error", "No valid DATA pairs found in the first directory")
-                return
+
             if self.diff_checkbox.isChecked():
-                directory_2 = self._expand_path(self.data_directory_2.text())
+                self._expand_path(self.data_directory_2.text())
+                directory_2 = (self.data_directory_2.text() or "").strip()
                 if not directory_2:
                     QMessageBox.warning(self, "Error", "No second data directory specified")
                     return
                 R2 = self._compute_response_of_one_data_directory(directory_2)
-                if R2 is None:
-                    QMessageBox.warning(self, "Error", "No valid DATA pairs found in the second directory")
-                    return
                 self.R=self._substract_matrices(R1=R1,R2=R2)
             else:
                 self.R=R1

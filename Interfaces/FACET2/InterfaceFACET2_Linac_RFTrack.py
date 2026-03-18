@@ -24,11 +24,11 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         self.log = print
         self.lattice = FACET2.load_FACET()
         self.lattice.set_bpm_resolution(bpm_resolution)
-        self.sequence = [e.get_name() for e in self.lattice['*']]
-        self.bpms = [e.get_name() for e in self.lattice.get_bpms()]
-        self.corrs = [e.get_name() for e in self.lattice.get_correctors()]
-        self.screens = [e.get_name() for e in self.lattice.get_screens()]
-        self.Pref = np.sqrt(125.0 ** 2 - rft.electronmass ** 2)
+        self.sequence = [ e.get_name() for e in self.lattice['*']]
+        self.bpms = [ e.get_name() for e in self.lattice.get_bpms()]
+        self.corrs = [ e.get_name() for e in self.lattice.get_correctors()]
+        self.screens = [ e.get_name() for e in self.lattice.get_screens()]
+        self.Pref = np.sqrt(125.0**2 - rft.electronmass**2)
         self.bunch_length_ps = 3
         self.nparticles = nparticles
         self.population = population
@@ -39,8 +39,8 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         self.__setup_beam0()
         self.__track_bunch()
 
-    def log_messages(self, console):
-        self.log = console or print
+    def log_messages(self,console):
+        self.log=console or print
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
@@ -52,7 +52,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         T.sigma_pt = 0.0
         T.emitt_x = 3.2
         T.emitt_y = 3.2
-        T.sigma_pt = 0.8  # permille
+        T.sigma_pt = 0.8 # permille
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, self.nparticles)
 
     def __setup_beam1(self):
@@ -67,7 +67,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         T.sigma_pt = 0.0
         T.emitt_x = 3.2
         T.emitt_y = 3.2
-        T.sigma_pt = 0.8  # permille
+        T.sigma_pt = 0.8 # permille
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, self.nparticles)
 
     def __setup_beam2(self):
@@ -82,16 +82,16 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         T.sigma_pt = 0.0
         T.emitt_x = 3.2
         T.emitt_y = 3.2
-        T.sigma_pt = 0.8  # permille
+        T.sigma_pt = 0.8 # permille
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, self.nparticles)
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
-        dx = self.jitter * I0.sigma_x
-        dy = self.jitter * I0.sigma_y
+        dx = self.jitter*I0.sigma_x
+        dy = self.jitter*I0.sigma_y
         dz, dt, roll = 0.0, 0.0, 0.0
-        pitch = self.jitter * I0.sigma_py
-        yaw = self.jitter * I0.sigma_px
+        pitch = self.jitter*I0.sigma_py
+        yaw   = self.jitter*I0.sigma_px
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         B1 = self.lattice.track(B0_offset)
         I = B1.get_info()
@@ -110,7 +110,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         self.__setup_beam0()
         self.__track_bunch()
 
-    def change_intensity(self):  # reduced charge
+    def change_intensity(self): #reduced charge
         self.__setup_beam2()
         self.__track_bunch()
 
@@ -127,7 +127,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('y')]
 
-    def get_elements_position(self, names):
+    def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None):
@@ -137,7 +137,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
 
     def get_icts(self):
         self.log("Reading ict's...")
-        charge = [bpm.get_total_charge() for bpm in self.lattice.get_bpms()]
+        charge = [ bpm.get_total_charge() for bpm in self.lattice.get_bpms() ]
         icts = {
             "names": self.bpms,
             "charge": charge
@@ -147,12 +147,12 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
     def get_correctors(self):
         self.log("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
-        for i, corrector in enumerate(self.corrs):
+        for i,corrector in enumerate(self.corrs):
             if corrector[:2] == "XC":
-                bdes[i] = (self.lattice[corrector].get_strength()[0] * 10)  # gauss*m
+                bdes[i] = (self.lattice[corrector].get_strength()[0]*10)  # gauss*m
             elif corrector[:2] == "YC":
-                bdes[i] = (self.lattice[corrector].get_strength()[1] * 10)  # gauss*m
-        correctors = {"names": self.corrs, "bdes": bdes, "bact": bdes}
+                bdes[i] = (self.lattice[corrector].get_strength()[1]*10)  # gauss*m
+        correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
         return correctors
 
     def get_bpms(self):
@@ -161,21 +161,21 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
         for i in range(self.nsamples):
-            for j, bpm in enumerate(self.bpms):
+            for j,bpm in enumerate(self.bpms):
                 b = self.lattice[bpm]
                 reading = b.get_reading()
-                x[i, j] = reading[0]
-                y[i, j] = reading[1]
-                tmit[i, j] = b.get_total_charge()
-        bpms = {"names": self.bpms, "x": x, "y": y, "tmit": tmit}
+                x[i,j] = reading[0]
+                y[i,j] = reading[1]
+                tmit[i,j] = b.get_total_charge()
+        bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
         return bpms
 
     def get_screens(self, names=None):
         self.log('Reading screens...')
         if isinstance(names, str):
-            names = [names]  # allows passing a single screen name
-        hpixel = 0.001  # mm, horizontal size of a pixel
-        vpixel = 0.001  # mm, vertical size of a pixel
+            names = [names] # allows passing a single screen name
+        hpixel =  0.001 # mm, horizontal size of a pixel
+        vpixel =  0.001 # mm, vertical size of a pixel
         hpixel_list = []
         vpixel_list = []
         xb_list = []
@@ -189,41 +189,39 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         screen_names = []
 
         for s in self.lattice.get_screens():
-            screen_name = s.get_name()
+            screen_name=s.get_name()
             if names is not None and screen_name not in names:
                 continue
             screen_names.append(screen_name)
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             m = s.get_bunch().get_phase_space('%x %y')
-            if m is None or len(m) == 0:  # empty bunch
+            if m is None or len(m) == 0: #empty bunch
                 xb_list.append(np.nan)
                 yb_list.append(np.nan)
                 sigx_list.append(np.nan)
                 sigy_list.append(np.nan)
                 sum_list.append(0)
-                images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0, hpixel]))
-                vedges_all.append(np.array([0, vpixel]))
+                images.append(np.zeros((1,1)))
+                hedges_all.append(np.array([0,hpixel]))
+                vedges_all.append(np.array([0,vpixel]))
                 continue
 
-            sumw = len(m[:, 0])  # number of particles in the screen; intensity
-            xb_list.append(np.mean(m[:, 0]))  # mean x of particles
-            yb_list.append(np.mean(m[:, 1]))  # mean y of particles
-            sigx_list.append(np.std(m[:, 0]))  # RMS x beam size
-            sigy_list.append(np.std(m[:, 1]))  # RMS y beam size
+            sumw=len(m[:,0]) # number of particles in the screen; intensity
+            xb_list.append(np.mean(m[:,0])) # mean x of particles
+            yb_list.append(np.mean(m[:,1])) # mean y of particles
+            sigx_list.append(np.std(m[:,0])) # RMS x beam size
+            sigy_list.append(np.std(m[:,1])) # RMS y beam size
             sum_list.append(sumw)
 
-            nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(
-                m[:, 0]) > 0 else 1  # ceil rounds up, so it can take the whole range
+            nx = int(np.ceil(np.ptp(m[:,0]) / hpixel)) if np.ptp(m[:,0]) > 0 else 1 # ceil rounds up, so it can take the whole range
             ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
-            nx = int(np.clip(nx, 10, 400))
-            ny = int(np.clip(ny, 10, 400))
-            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx,
-                                                                           ny))  # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
-            images.append(image)  # image[i,j] = nparticles in bin i on x axis and nparticles in bin j on y axis
-            hedges_all.append(hedges)  # bin edges in x (nx + 1)
-            vedges_all.append(vedges)  # bin edges in y (ny + 1)
+            nx=int(np.clip(nx,10,400))
+            ny=int(np.clip(ny,10,400))
+            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx, ny)) # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
+            images.append(image) # image[i,j] = nparticles in bin i on x axis and nparticles in bin j on y axis
+            hedges_all.append(hedges) # bin edges in x (nx + 1)
+            vedges_all.append(vedges) # bin edges in y (ny + 1)
 
         screens = {"names": screen_names,
                    "hpixel": np.array(hpixel_list, dtype=float),
@@ -241,33 +239,33 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
 
     def set_correctors(self, names, corr_vals):
         if not isinstance(names, list):
-            names = [names]  # makes it a list
+            names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "XC":
-                self.lattice[corr].set_strength(val / 10, 0.0)  # T*mm
+                self.lattice[corr].set_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "YC":
-                self.lattice[corr].set_strength(0.0, val / 10)  # T*mm
+                self.lattice[corr].set_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
 
     def vary_correctors(self, names, corr_vals):
         if not isinstance(names, list):
-            names = [names]  # makes it a list
+            names = [ names ] # makes it a list
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "XC":
-                self.lattice[corr].vary_strength(val / 10, 0.0)  # T*mm
+                self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "YC":
-                self.lattice[corr].vary_strength(0.0, val / 10)  # T*mm
+                self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
         self.__track_bunch()
 
     def align_everything(self):
         self.lattice.align_elements()
         self.__track_bunch()
 
-    def misalign_quadrupoles(self, sigma_x=0.100, sigma_y=0.100):
+    def misalign_quadrupoles(self,sigma_x=0.100,sigma_y=0.100):
         self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
-    def misalign_bpms(self, sigma_x=0.100, sigma_y=0.100):
+    def misalign_bpms(self,sigma_x=0.100,sigma_y=0.100):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
