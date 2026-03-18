@@ -2,8 +2,6 @@
 Absolutely wrong...
 '''
 
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import os,sys,time
@@ -11,6 +9,10 @@ import os,sys,time
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class CLEAR_real_machine(AbstractMachineInterface):
+    MACHINE='CLEAR'
+    DISPLAY_NAME="CLEAR"
+    SETTINGS={"nsamples":3}
+
     def JapcReadback(japc_address, japc_selector):
         try:
             import jpype

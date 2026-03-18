@@ -5,6 +5,10 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 from epics import PV, ca, caget
 
 class InterfaceATF2_DR(AbstractMachineInterface):
+    MACHINE='ATF2'
+    DISPLAY_NAME="ATF2 DR"
+    SETTINGS={"nsamples": 10}
+
     def get_name(self):
         return 'ATF2_DR'
 

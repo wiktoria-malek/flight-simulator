@@ -29,6 +29,10 @@ def devname_swap_micro_primary(device):
 
 
 class InterfaceFACET2_Linac(AbstractMachineInterface):
+    MACHINE='FACET2'
+    DISPLAY_NAME="FACET2 Linac"
+    SETTINGS={"nsamples":10}
+
     def get_name(self):
         return 'FACET2_Linac'
 
@@ -135,12 +139,6 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
 
     def get_sequence(self, *args):
         return self.sequence
-
-    def get_bpms_names(self, *args):
-        return self.bpms
-
-    def get_correctors_names(self):
-        return self.corrs
 
     def get_hcorrectors_names(self):
         return self.xcorrs

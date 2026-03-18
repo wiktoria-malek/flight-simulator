@@ -4,6 +4,10 @@ from epics import PV, ca, caget
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceATF2_Ext(AbstractMachineInterface):
+    MACHINE='ATF2'
+    DISPLAY_NAME="ATF2 Ext"
+    SETTINGS={"nsamples":3}
+
     def get_name(self):
         return 'ATF2_Ext'
 

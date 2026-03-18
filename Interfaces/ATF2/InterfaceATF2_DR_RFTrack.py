@@ -6,13 +6,18 @@ from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
+    MACHINE='ATF2'
+    DISPLAY_NAME="ATF2 DR RFTrack"
+    SETTINGS={"jitter":0.0, "bpm_resolution":0.0, "nsamples":1}
+    ACTIONS=["align_everything","misalign_bpms","misalign_quadrupoles"]
+
     def get_name(self):
         return 'ATF2_DR_RFT'
 
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.log = print
         self.twiss_path=os.path.join(os.path.dirname(__file__),'Ext_ATF2','ATF2_EXT_FF_v5.2.twiss')
-        self.lattice = rft.Lattice(twiss_path)
+        self.lattice = rft.Lattice(self.twiss_path)
         for i,q in enumerate(self.lattice.get_quadrupoles()):
             if i%3 == 0:
                 cx, cy = rft.Corrector(), rft.Corrector()
@@ -146,7 +151,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
 
     def get_target_dispersion(self, names=None):
         if names is None:
-            names = self.get_bpms_names()
+            names = self.get_bpms()["names"]
         twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
         with open(twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]

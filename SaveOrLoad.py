@@ -48,12 +48,12 @@ class SaveOrLoad():
                     selected = State.get_bpms()["names"]
                 elif elements_list is self.correctors_list:
                     selected = State.get_correctors()["names"]
-                elif elements_list is self.quadrupoles_list:
+                elif hasattr(self, "quadrupoles_list") and elements_list is self.quadrupoles_list:
                     selected = State.get_quadrupoles()["names"]
-                elif elements_list is self.screens_list:
+                elif hasattr(self, "screens_list") and elements_list is self.screens_list:
                     selected = State.get_screens()["names"]
-                else:
-                    selected = [elements_list.item(i).text() for i in range(elements_list.count())]
+            else:
+                selected = [elements_list.item(i).text() for i in range(elements_list.count())]
             elements_list.clearSelection()
         for name in selected:
             for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):

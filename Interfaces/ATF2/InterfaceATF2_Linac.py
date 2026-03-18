@@ -7,6 +7,11 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 from epics import PV, ca
 
 class InterfaceATF2_Linac(AbstractMachineInterface):
+    MACHINE='ATF2'
+    DISPLAY_NAME="ATF2 Linac"
+    SETTINGS={"nsamples":3}
+
+
     def get_name(self):
         return 'ATF2_Linac'
 
