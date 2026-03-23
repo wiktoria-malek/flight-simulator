@@ -129,24 +129,36 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             data = line.split()
             bpms_name = data[elements_names].strip('"')
 
-            if names == None or bpms_name in names:
+            if names is None or bpms_name in names:
                 target_disp_x.append(float(data[DX_column]))
                 target_disp_y.append(float(data[DY_column]))
 
         return target_disp_x, target_disp_y
-    
-    def get_icts(self):
+
+    def get_icts(self, names=None):
         print("Reading ict's...")
         charge = []
         for ict in self.ict_names:
             pv = PV(f'{ict}')
             charge.append(pv.get())
-        names = [ self.ict_names ] if type(self.ict_names) == str else self.ict_names
-        charge = np.array(charge)
-        icts = { "names": names, "charge": charge }
+
+        icts = {
+            "names": self.ict_names,
+            "charge": np.array(charge),
+        }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(icts["names"]) if s in names])
+            icts = {
+                "names": np.array(icts["names"])[idx],
+                "charge": np.array(icts["charge"])[idx],
+            }
+
         return icts
 
-    def get_correctors(self):
+    def get_correctors(self, names=None):
         print("Reading correctors' strengths...")
         bdes, bact = [], []
         for corrector in self.corrs:
@@ -154,15 +166,27 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             pv_act = PV(f'{corrector}:currentRead')
             bdes.append(pv_des.get())
             bact.append(pv_act.get())
-        names = [ self.corrs ] if type(self.corrs) == str else self.corrs
-        bdes = np.array(bdes)
-        bact = np.array(bact)
-        correctors = { "names": names, "bdes": bdes, "bact": bact }
+
+        correctors = {
+            "names": self.corrs,
+            "bdes": np.array(bdes),
+            "bact": np.array(bact),
+        }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            correctors = {
+                "names": np.array(correctors["names"])[idx],
+                "bdes": np.array(correctors["bdes"])[idx],
+                "bact": np.array(correctors["bact"])[idx],
+            }
+
         return correctors
-    
-    def get_bpms(self):
+
+    def get_bpms(self, names=None):
         print('Reading bpms...')
-        #p = PV('ATF2:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
             try:
@@ -170,7 +194,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 m = caget('ATF2:monitors')
                 a = m.reshape((-1, 10))
                 status = a[self.bpm_indexes, 0]
-                # Set elements that are not equal to 1 to zero
                 status[status != 1] = 0
                 x.append(a[self.bpm_indexes, 1])
                 y.append(a[self.bpm_indexes, 2])
@@ -179,37 +202,50 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 time.sleep(1)
             except Exception as e:
                 print(f'An error occurred: {e}')
-                sample = sample-1
-        names = [ self.bpms ] if type(self.bpms) == str else self.bpms
-        x = np.vstack(x) / 1e3 # mm
-        y = np.vstack(y) / 1e3 # mm
-        tmit = np.vstack(tmit)
-        bpms = { "names": names, "x": x, "y": y, "tmit": tmit }
+                sample = sample - 1
+
+        bpms = {
+            "names": self.bpms,
+            "x": np.vstack(x) / 1e3,
+            "y": np.vstack(y) / 1e3,
+            "tmit": np.vstack(tmit),
+        }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(bpms["names"]) if s in names])
+            bpms = {
+                "names": np.array(bpms["names"])[idx],
+                "x": np.array(bpms["x"])[:, idx],
+                "y": np.array(bpms["y"])[:, idx],
+                "tmit": np.array(bpms["tmit"])[:, idx],
+            }
+
         return bpms
 
     # Instead time.sleep(1) : setpoint :currentWrite -> readback :currentRead -> until readback reaches setpoint
     # It might be faster than 1s
 
     def set_correctors(self, names, corr_vals):
-        if type(corr_vals) == float:
-            corr_vals = np.array([corr_vals])
-        if type(names) == str:
+        if isinstance(names, str):
             names = [names]
-        if len(names) != corr_vals.size:
-            print('Error: len(names) != len(corr_vals) in push(names, corr_vals)')
-
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
+        if len(names) != len(corr_vals):
+            print('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
         time.sleep(1)
 
     def vary_correctors(self, names, corr_vals):
-        if type(corr_vals) is float:
-            corr_vals = np.array([corr_vals])
-        if type(names) == str:
+        if isinstance(names, str):
             names = [names]
-        if len(names) != corr_vals.size:
-            print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)') 
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
+        if len(names) != len(corr_vals):
+            print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             curr_val = pv_des.get()

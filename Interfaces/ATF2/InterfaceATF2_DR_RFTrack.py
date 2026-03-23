@@ -186,42 +186,74 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
             target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
-    def get_icts(self):
-        #print("Reading ict's...")
+    def get_icts(self, names=None):
         self.log("Reading ict's...")
-        charge = [ bpm.get_total_charge() for bpm in self.lattice.get_bpms() ]
         icts = {
             "names": self.bpms,
-            "charge": charge
-        }        
+            "charge": np.array([bpm.get_total_charge() for bpm in self.lattice.get_bpms()])
+        }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(icts["names"]) if s in names])
+            icts = {
+                "names": np.array(icts["names"])[idx],
+                "charge": np.array(icts["charge"])[idx],
+            }
+
         return icts
 
-    def get_correctors(self):
-        #print("Reading correctors' strengths...")
+    def get_correctors(self, names=None):
         self.log("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
-        for i,corrector in enumerate(self.corrs):
+        for i, corrector in enumerate(self.corrs):
             if corrector[:2] == "ZH" or corrector[:2] == "ZX":
-                bdes[i] = (self.lattice[corrector].get_strength()[0]*10)  # gauss*m
+                bdes[i] = self.lattice[corrector].get_strength()[0] * 10
             elif corrector[:2] == "ZV":
-                bdes[i] = (self.lattice[corrector].get_strength()[1]*10)  # gauss*m
-        correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
+                bdes[i] = self.lattice[corrector].get_strength()[1] * 10
+
+        correctors = {"names": self.corrs, "bdes": bdes, "bact": bdes.copy()}
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            correctors = {
+                "names": np.array(correctors["names"])[idx],
+                "bdes": np.array(correctors["bdes"])[idx],
+                "bact": np.array(correctors["bact"])[idx],
+            }
+
         return correctors
-    
-    def get_bpms(self):
-        #print('Reading bpms...')
+
+    def get_bpms(self, names=None):
         self.log('Reading bpms...')
         x = np.zeros((self.nsamples, len(self.bpms)))
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
+
         for i in range(self.nsamples):
-            for j,bpm in enumerate(self.bpms):
+            for j, bpm in enumerate(self.bpms):
                 b = self.lattice[bpm]
                 reading = b.get_reading()
-                x[i,j] = reading[0]
-                y[i,j] = reading[1]
-                tmit[i,j] = b.get_total_charge()
-        bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
+                x[i, j] = reading[0]
+                y[i, j] = reading[1]
+                tmit[i, j] = b.get_total_charge()
+
+        bpms = {"names": self.bpms, "x": x, "y": y, "tmit": tmit}
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(bpms["names"]) if s in names])
+            bpms = {
+                "names": np.array(bpms["names"])[idx],
+                "x": np.array(bpms["x"])[:, idx],
+                "y": np.array(bpms["y"])[:, idx],
+                "tmit": np.array(bpms["tmit"])[:, idx],
+            }
+
         return bpms
 
     def get_screens(self, names=None):
@@ -319,29 +351,42 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                    "S": np.array(s_list, dtype=float),}
         return screens
 
-    def get_quadrupoles(self):  # returns quadrupole strengths
+    def get_quadrupoles(self, names=None):
         self.log("Reading quadrupoles' strengths...")
-        bdes = np.zeros(len(self.quadrupoles), dtype=float)  # one value per each quadrupole
+        bdes = np.zeros(len(self.quadrupoles), dtype=float)
 
         for i, quadrupole_name in enumerate(self.quadrupoles):
-            elements=self.lattice[quadrupole_name]
+            elements = self.lattice[quadrupole_name]
             if not isinstance(elements, list):
                 elements = [elements]
-            k1_values=[]
+
+            k1_values = []
             for element in elements:
                 try:
-                    strength=element.get_K1(self.Pref / self.Q)  # 1/m2
+                    strength = element.get_K1(self.Pref / self.Q)
                 except Exception:
                     continue
                 if isinstance(strength, (list, tuple, np.ndarray)):
-                    if len(strength) > 0: k1_values.append(float(strength[0]))
-                else: k1_values.append(float(strength))
-            if len(k1_values) == 0: bdes[i]=0.0
-            else:
-                if not np.allclose(k1_values, k1_values[0],rtol=0.0, atol=1e-12):
-                    self.log(f"Parts of quadrupole {quadrupole_name} have different strengths")
-                bdes[i]=k1_values[0]
-        return {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
+                    if len(strength) > 0:
+                        k1_values.append(float(strength[0]))
+                else:
+                    k1_values.append(float(strength))
+
+            bdes[i] = k1_values[0] if k1_values else 0.0
+
+        quadrupoles = {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(quadrupoles["names"]) if s in names])
+            quadrupoles = {
+                "names": np.array(quadrupoles["names"])[idx],
+                "bdes": np.array(quadrupoles["bdes"])[idx],
+                "bact": np.array(quadrupoles["bact"])[idx],
+            }
+
+        return quadrupoles
 
     def set_quadrupoles(self, names, values_range):
         if isinstance(names, str):
@@ -366,15 +411,17 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
             elif corr[:2] == "ZV":
                 self.lattice[corr].set_strength(0.0, val / 10)
         self.__track_bunch()
-    
+
     def vary_correctors(self, names, corr_vals):
-        if not isinstance(names, list):
-            names = [ names ] # makes it a list
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
         for corr, val in zip(names, corr_vals):
             if corr[:2] == "ZH" or corr[:2] == "ZX":
-                self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
+                self.lattice[corr].vary_strength(val / 10, 0.0)
             elif corr[:2] == "ZV":
-                self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
+                self.lattice[corr].vary_strength(0.0, val / 10)
         self.__track_bunch()
 
     def align_everything(self):

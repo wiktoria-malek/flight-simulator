@@ -134,40 +134,68 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         self.PVs['Q_setpoint'].put(self.init_charge_setpoint)
         return self
 
-    def get_icts(self, *args, **kwargs):
-        return {"names": [], "charge": []}
+    def get_icts(self, names=None):
+        return {"names": np.array([]), "charge": np.array([])}
 
-    def get_sequence(self, *args):
+    def get_sequence(self):
         return self.sequence
 
     def get_hcorrectors_names(self): return self.xcorrs
 
-    def get_target_dispersion(self, names):
+    def get_target_dispersion(self, names=None):
+        if names is None:
+            names = self.get_bpms()["names"]
         return [0. for _ in names], [0. for _ in names]
 
     def get_vcorrectors_names(self): return self.ycorrs
 
     def get_elements_position(self, names): return [self.f2m.S[self.f2m.ix[name]] for name in names]
 
-    def get_target_dispersion(self, names): return [0. for _ in names], [0. for _ in names]
-
-    def get_correctors(self):
+    def get_correctors(self, names=None):
         print("Reading correctors' strengths...")
-        bdes, bact = [], []
+        corr_names, bdes, bact = [], [], []
         for corname in self.corrs:
             devname = self.f2m.device_names[self.f2m.ix[corname]]
             if devname == '':
                 print(f'skipping {corname}')
-                continue # some model elements don't have an actual magnet
+                continue
+            corr_names.append(corname)
             bdes.append(get_pv(f'{devname}:BDES').get())
             bact.append(get_pv(f'{devname}:BACT').get())
-        return { "names": self.corrs, "bdes": np.array(bdes), "bact": np.array(bact) }
 
-    def get_bpms(self):
+        correctors = {
+            "names": corr_names,
+            "bdes": np.array(bdes),
+            "bact": np.array(bact),
+        }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            correctors = {
+                "names": np.array(correctors["names"])[idx],
+                "bdes": np.array(correctors["bdes"])[idx],
+                "bact": np.array(correctors["bact"])[idx],
+            }
+
+        return correctors
+
+    def get_bpms(self, names=None):
         itry = 0
         while itry < 10:
             try:
                 bpmdata = get_bpmdata2(self.bpm_buffer)
+                if isinstance(names, str):
+                    names = [names]
+                if names is not None:
+                    idx = np.array([i for i, s in enumerate(bpmdata["names"]) if s in names])
+                    bpmdata = {
+                        "names": np.array(bpmdata["names"])[idx],
+                        "x": np.array(bpmdata["x"])[:, idx],
+                        "y": np.array(bpmdata["y"])[:, idx],
+                        "tmit": np.array(bpmdata["tmit"])[:, idx],
+                    }
                 return bpmdata
             except Exception as e:
                 print('BPM data acquisition failed! trying again ...')
@@ -175,7 +203,18 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
                 itry += 1
         else:
             print(f'unable to get BPMs after {itry} tries')
-            return self._dummy_bpmdata()
+            bpmdata = self._dummy_bpmdata()
+            if isinstance(names, str):
+                names = [names]
+            if names is not None:
+                idx = np.array([i for i, s in enumerate(bpmdata["names"]) if s in names])
+                bpmdata = {
+                    "names": np.array(bpmdata["names"])[idx],
+                    "x": np.array(bpmdata["x"])[:, idx],
+                    "y": np.array(bpmdata["y"])[:, idx],
+                    "tmit": np.array(bpmdata["tmit"])[:, idx],
+                }
+            return bpmdata
 
     def _dummy_bpmdata(self):
         """ mock BPM data, all nans """
@@ -195,10 +234,10 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
 
     def set_correctors(self, names, corr_vals):
         """ write BDES to correctors """
-        if type(corr_vals) == float:
-            corr_vals = np.array([corr_vals])
-        if type(names) == str:
+        if isinstance(names, str):
             names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
             raise ValueError('len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
         devnames = [self.f2m.device_names[self.f2m.ix[name]] for name in names]
@@ -207,10 +246,10 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
 
     def vary_correctors(self, names, corr_vals):
         """ write deltas to correctors """
-        if type(corr_vals) is float:
-            corr_vals = np.array([corr_vals])
-        if type(names) == str:
+        if isinstance(names, str):
             names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
             raise ValueError('len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
         devnames = [self.f2m.device_names[self.f2m.ix[name]] for name in names]

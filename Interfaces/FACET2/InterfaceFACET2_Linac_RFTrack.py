@@ -144,7 +144,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         }
         return icts
 
-    def get_correctors(self):
+    def get_correctors(self,names=None):
         self.log("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
@@ -153,9 +153,20 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
             elif corrector[:2] == "YC":
                 bdes[i] = (self.lattice[corrector].get_strength()[1]*10)  # gauss*m
         correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            correctors = {
+                "names": np.array(correctors["names"])[idx],
+                "bdes": np.array(correctors["bdes"])[idx],
+                "bact": np.array(correctors["bact"])[idx],
+            }
+
         return correctors
 
-    def get_bpms(self):
+    def get_bpms(self,names=None):
         self.log('Reading bpms...')
         x = np.zeros((self.nsamples, len(self.bpms)))
         y = np.zeros(x.shape)
@@ -168,6 +179,17 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
                 y[i,j] = reading[1]
                 tmit[i,j] = b.get_total_charge()
         bpms = { "names": self.bpms, "x": x, "y": y, "tmit": tmit }
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(bpms["names"]) if s in names])
+            bpms = {
+                "names": np.array(bpms["names"])[idx],
+                "x": np.array(bpms["x"])[:, idx],
+                "y": np.array(bpms["y"])[:, idx],
+                "tmit": np.array(bpms["tmit"])[:, idx],
+            }
+
         return bpms
 
     def get_screens(self, names=None):

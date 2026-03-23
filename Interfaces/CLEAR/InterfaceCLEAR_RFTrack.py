@@ -284,8 +284,6 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return None
 
-
-
     def __track_bunch(self):
         I0 = self.B0.get_info()
         dx = self.jitter*I0.sigma_x
@@ -326,16 +324,25 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
-    def get_icts(self):
+    def get_icts(self, names=None):
         self.log("Reading ict's...")
-        charge = [bpm.get_total_charge() for bpm in self.lattice.get_bpms()]
         icts = {
             "names": self.bpms,
-            "charge": charge
+            "charge": np.array([bpm.get_total_charge() for bpm in self.lattice.get_bpms()])
         }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(icts["names"]) if s in names])
+            icts = {
+                "names": np.array(icts["names"])[idx],
+                "charge": np.array(icts["charge"])[idx],
+            }
+
         return icts
 
-    def get_correctors(self):
+    def get_correctors(self,names=None):
         print("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
@@ -346,45 +353,73 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             elif ("SDV" in corrector) or ("DHJ" in corrector): #vertical
                 bdes[i] = (hy*10)  # gauss*m
         correctors = { "names": self.corrs, "bdes": bdes, "bact": bdes }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            correctors = {
+                "names": np.array(correctors["names"])[idx],
+                "bdes": np.array(correctors["bdes"])[idx],
+                "bact": np.array(correctors["bact"])[idx],
+            }
+
         return correctors
-    
-    def get_bpms(self):
+
+    def get_bpms(self, names=None):
         print('Reading bpms...')
         nb = len(self.screens)
         x = np.zeros((self.nsamples, nb))
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
-        for i in range(self.nsamples):
-            for j,name in enumerate(self.screens):
-                s=self.screen_elements[name]
-                B=s.get_bunch()
-                I=B.get_info()
-                x[i,j] = I.mean_x #is it ok? #mm
-                y[i,j] = I.mean_y
-                tmit[i,j] = B.get_total_charge()
 
-        bpms = { "names": self.screens, "x": x, "y": y, "tmit": tmit }
+        for i in range(self.nsamples):
+            for j, name in enumerate(self.screens):
+                s = self.screen_elements[name]
+                B = s.get_bunch()
+                I = B.get_info()
+                x[i, j] = I.mean_x
+                y[i, j] = I.mean_y
+                tmit[i, j] = B.get_total_charge()
+
+        bpms = {"names": self.screens, "x": x, "y": y, "tmit": tmit}
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(bpms["names"]) if s in names])
+            bpms = {
+                "names": np.array(bpms["names"])[idx],
+                "x": np.array(bpms["x"])[:, idx],
+                "y": np.array(bpms["y"])[:, idx],
+                "tmit": np.array(bpms["tmit"])[:, idx],
+            }
+
         return bpms
 
     def set_correctors(self, names, corr_vals):
-        if not isinstance(names, list):
-            names = [ names ] # makes it a list
-        for corr, val in zip(names, corr_vals):  #iteration of tuples
-            c=self.corrector_elements[corr]
-            if "DHG" in corr:
-                c.set_strength(val/10, 0.0)  # T*mm
-            elif ("DHJ" in corr) or ("SDV" in corr):
-                c.set_strength(0.0, val/10)  # T*mm
-        self.__track_bunch()
-    
-    def vary_correctors(self, names, corr_vals):
-        if not isinstance(names, list):
-            names = [ names ] # makes it a list
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
         for corr, val in zip(names, corr_vals):
-            c=self.corrector_elements[corr]
+            c = self.corrector_elements[corr]
             if "DHG" in corr:
-                c.vary_strength(val/10, 0.0)  # T*mm
+                c.set_strength(val / 10, 0.0)
+            elif ("DHJ" in corr) or ("SDV" in corr):
+                c.set_strength(0.0, val / 10)
+        self.__track_bunch()
+
+    def vary_correctors(self, names, corr_vals):
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
+        for corr, val in zip(names, corr_vals):
+            c = self.corrector_elements[corr]
+            if "DHG" in corr:
+                c.vary_strength(val / 10, 0.0)
             elif ("SDV" in corr) or ("DHJ" in corr):
-                c.vary_strength(0.0, val/10)  # T*mm
+                c.vary_strength(0.0, val / 10)
         self.__track_bunch()
 

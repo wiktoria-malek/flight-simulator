@@ -170,13 +170,22 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
-    def get_icts(self):
+    def get_icts(self, names=None):
         self.log("Reading ict's...")
-        charge = [bpm.get_total_charge() for bpm in self.lattice.get_bpms()]
         icts = {
             "names": self.bpms,
-            "charge": charge
+            "charge": np.array([bpm.get_total_charge() for bpm in self.lattice.get_bpms()])
         }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(icts["names"]) if s in names])
+            icts = {
+                "names": np.array(icts["names"])[idx],
+                "charge": np.array(icts["charge"])[idx],
+            }
+
         return icts
 
     def get_correctors(self, names=None):
@@ -543,6 +552,9 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "muy": np.array(result["MUY"]),
             "L": np.array(result["L"]),
         }
+
+    def _get_units(self):
+        pass
 
     def align_everything(self):
         self.lattice.align_elements()
