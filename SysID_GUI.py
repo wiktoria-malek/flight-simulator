@@ -1,6 +1,6 @@
 from datetime import datetime
 import numpy as np
-from SaveOrLoad import SaveOrLoad
+from Backend.SaveOrLoad import SaveOrLoad
 import time, sys, os,matplotlib
 try:
     from PyQt6 import uic
@@ -18,6 +18,7 @@ from enum import Enum
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from Interfaces.interface_setup import INTERFACE_SETUP
 
 class Mode(Enum):
     Orbit = "Orbit Correction"
@@ -41,8 +42,6 @@ class Worker(QObject):
         super().__init__()
         self.output_dir=output_dir
         self.interface = interface
-        self.initial_state = self.interface.get_state()
-        self.S = state
         self.correctors = correctors
         self.hcorrs = self.interface.get_hcorrectors_names()
         self.vcorrs = self.interface.get_vcorrectors_names()
@@ -57,9 +56,6 @@ class Worker(QObject):
         self.running = False
         self.paused = False
         self.progress_value=0
-
-        if hasattr(self, "working_directory_dialog"):
-            self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
 
     @pyqtSlot()
     def run(self):
@@ -182,6 +178,10 @@ class Worker(QObject):
     def unpause(self):
         self.paused = False
 
+    def stop(self):
+        self.running = False
+        self.paused = False
+
     def _await_user(self):
         reminder = '  -> [ SCAN PAUSED ] Press "resume" button to continue'
         while self.paused and self.running:
@@ -256,8 +256,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.mode=Mode.Orbit
         self._update_folder_path()
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
-        self.initial_hkick_settings.setText("0.01")
-        self.initial_vkick_settings.setText("0.01")
+        # self.initial_hkick_settings.setText("0.01")
+        # self.initial_vkick_settings.setText("0.01")
 
         #for FACET2:
         # self.initial_hkick_settings.setText("0.0001")
@@ -277,13 +277,19 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
 
-        if hasattr(self, "working_directory_dialog"):
-            self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
+        self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
         self.__set_status_in_title("[Idle]")
         interface_name=interface.get_name()
         self.modes_to_do=[]
         self.counter=0
         self.current_mode=None
+        units_settings, sysid_kick, bpm_unit, corrs_unit=self._get_interface_units()
+        self.sysid_kick=sysid_kick
+        self.bpm_unit=bpm_unit
+        self.corrs_unit=corrs_unit
+        self.initial_hkick_settings.setText(str(self.sysid_kick))
+        self.initial_vkick_settings.setText(str(self.sysid_kick))
+
 
     def _current_measuring_mode(self):
         if self.mode == Mode.All:
@@ -292,8 +298,29 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self.modes_to_do=[self.mode]
         self.counter=0
 
+    def _get_interface_initial_settings(self):
+        interface_class_name=self.interface.__class__.__name__
+        interface_module_name=self.interface.__class__.__module__
+
+        for machine_interfaces in INTERFACE_SETUP.values():
+            for interface_defaults in machine_interfaces:
+                if (interface_defaults.get("class_name")==interface_class_name) and (interface_defaults.get("module")==interface_module_name):
+                    return interface_defaults
+        return None
+
+    def _get_interface_units(self):
+        interface_defaults=self._get_interface_initial_settings()
+        if interface_defaults is None:
+            return {},0.01,"mm",""
+        units_settings=interface_defaults.get("units",{})
+        sysid_kick=units_settings.get("sysid_corrector_kick",0.01)
+        bpm_unit=units_settings.get("bpm_position","mm")
+        corrs_unit=units_settings.get("corrector_strength","T*mm")
+
+        return units_settings, sysid_kick,bpm_unit,corrs_unit
+
     def _start_next_mode(self):
-        initial_hkick=self._read_initial_kicks()
+        #initial_hkick=self._read_initial_kicks()
         #selected_correctors = self.interface.get_correctors()['names']
         #kicks=initial_hkick*np.ones(len(self.selected_correctors),dtype=float)
         if self.counter>=len(self.modes_to_do):
@@ -302,10 +329,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
             return
         mode=self.modes_to_do[self.counter]
         self.current_mode=mode
-
-        mode=self.modes_to_do[self.counter]
-        self.current_mode=mode
-
         dir_name=self.mode_dirs[mode]
         os.chdir(dir_name)
         self.working_directory_input.setText(dir_name)
@@ -489,7 +512,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 return
             if self.counter< len(self.modes_to_do):
                 self._start_next_mode()
-                initial_hkick = self._read_initial_kicks()
+                initial_hkick = float(self.initial_hkick_settings.text())
+                initial_vkick=float(self.initial_vkick_settings.text())
                 hkicks = initial_hkick * np.ones(len(selected_correctors), dtype=float)
                 vkicks = initial_vkick * np.ones(len(selected_correctors), dtype=float)
                 max_osc_h = self.horizontal_excursion_spinbox.value()
@@ -551,7 +575,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot_widget.axes.legend(loc='upper left')
         self.plot_widget.axes.set_xticks(scale)
         self.plot_widget.axes.set_xticklabels(selected_bpms,rotation=90,fontsize=8)
-        self.plot_widget.axes.set_ylabel('Orbit [mm]')
+        self.plot_widget.axes.set_ylabel(f'Orbit [{self.bpm_unit}]')
         self.plot_widget.axes.set_title(f"Corrector '{corrector}'")
         self.plot_widget.axes.grid(color='#EEEEEE')
         self.plot_widget.draw()
@@ -570,7 +594,8 @@ app = QApplication(sys.argv)
 
 ## Select interface
 #from SelectInterface import InterfaceSelectionDialog
-import SelectInterface
+from Backend import SelectInterface
+
 #dialog = InterfaceSelectionDialog()
 dialog = SelectInterface.choose_acc_and_interface()
 if dialog is None:

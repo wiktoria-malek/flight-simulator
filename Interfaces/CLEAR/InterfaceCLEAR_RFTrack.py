@@ -30,11 +30,6 @@ def get_Quad_K_from_I(I, Lquad, Pref):
     return K
 
 class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
-    MACHINE='CLEAR'
-    DISPLAY_NAME="CLEAR RFTrack"
-    SETTINGS={"jitter":0.1, "bpm_resolution":0.05, "nsamples":1}
-    ACTIONS=["align_everything","misalign_quadrupoles","misalign_bpms"]
-
     def get_name(self):
         return 'CLEAR_RFT'
 

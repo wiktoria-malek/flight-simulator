@@ -1,13 +1,12 @@
-import os, sys, json, matplotlib, pickle,pprint
+import os, sys, matplotlib
 from datetime import datetime
 import numpy as np
-from SaveOrLoad import SaveOrLoad
+from Backend.SaveOrLoad import SaveOrLoad
 matplotlib.use("QtAgg")
 from PyQt6 import uic
-from PyQt6.QtWidgets import QApplication, QMainWindow,QMessageBox,QFileDialog,QVBoxLayout, QListWidget
+from PyQt6.QtWidgets import QApplication, QMainWindow,QMessageBox, QVBoxLayout, QListWidget
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from State import State
 from scipy.optimize import least_squares
 
 class MatplotlibWidget(FigureCanvas):
@@ -614,7 +613,8 @@ class MainWindow(QMainWindow,SaveOrLoad):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    import SelectInterface
+    from Backend import SelectInterface
+
     dialog = SelectInterface.choose_acc_and_interface()
     if dialog is None:
         print("Selection cancelled.")

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from State import State
+from Backend.State import State
 import numpy as np
 
 class AbstractMachineInterface(ABC):

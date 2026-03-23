@@ -1,20 +1,24 @@
-from State import State
-from Response import Response
-from PyQt5 import uic
+from Backend.State import State
+from Backend.Response import Response
 import numpy as np
 import glob,sys,os,argparse,matplotlib
-from SaveOrLoad import SaveOrLoad
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout,
-    QLineEdit, QListWidget, QPushButton,
-    QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
-)
-from PyQt5.QtCore import Qt,QTimer
-from SaveOrLoad import SaveOrLoad
+try:
+    from PyQt6 import uic
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt6.QtTest import QTest
+    pyqt_version = 6
+except ImportError:
+    from PyQt5 import uic
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt5.QtTest import QTest
+    pyqt_version = 5
+from Backend.SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
+
 
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):

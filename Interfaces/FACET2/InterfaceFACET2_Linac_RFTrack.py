@@ -9,13 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from FACET2 import FACET2
 
-
 class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
-    MACHINE='FACET2'
-    DISPLAY_NAME="FACET2 RFTrack"
-    SETTINGS={"jitter":0.0, "bpm_resolution":0.0, "nsamples":1}
-    ACTIONS=["align_everything","misalign_quadrupoles","misalign_bpms"]
-
     def get_name(self):
         return 'FACET2_Linac_RFT'
 

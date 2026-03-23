@@ -1,6 +1,6 @@
-from State import State
-from Response import Response
-from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
+from Backend.State import State
+from Backend.Response import Response
+from Backend.DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 try:
     from PyQt6 import uic
     from PyQt6.QtWidgets import (
@@ -23,7 +23,7 @@ except ImportError:
 
 import numpy as np
 import glob,sys,os,argparse,matplotlib
-from SaveOrLoad import SaveOrLoad
+from Backend.SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure

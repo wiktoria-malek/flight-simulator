@@ -1,7 +1,4 @@
-import sys, os, pickle, re, matplotlib, glob, time,json
-from datetime import datetime
-import numpy as np
-import sys, os, pickle, re, matplotlib, glob, time,json
+import sys, os, re, matplotlib
 from datetime import datetime
 import numpy as np
 try:
@@ -17,25 +14,16 @@ except ImportError:
     from PyQt5.QtGui import QPainter
     pyqt_version = 5
 matplotlib.use("QtAgg")
-from enum import Enum
-from dataclasses import dataclass
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from LogConsole_BBA import LogConsole
-from TestOrbits_BBA import TestOrbits
-from SaveOrLoad import SaveOrLoad
-from DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
+from Backend.LogConsole_BBA import LogConsole
+from Backend.TestOrbits_BBA import TestOrbits
+from Backend.SaveOrLoad import SaveOrLoad
+from Backend.DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
 import matplotlib.pyplot as plt
-from BPM_weights import BPM_weights
+from Backend.BPM_weights import BPM_weights
 from traceback import print_exception
-
-
-class Machine(Enum):
-    ATF2_DR = "ATF2_DR"
-    ATF2_EXT = "ATF2_Ext"
-    ATF2_LINAC = "ATF2_Linac"
-    ATF2_DR_RFT = "ATF2_DR_RFT"
-    ATF2_EXT_RFT = "ATF2_Ext_RFT"
+from Interfaces.interface_setup import INTERFACE_SETUP
 
 class BpmWeightsDelegate(QStyledItemDelegate):
     WEIGHTS_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -133,6 +121,12 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.hcorrector_names=set(map(str, self.interface.get_hcorrectors_names() or [])) # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
         self.vcorrector_names=set(map(str, self.interface.get_vcorrectors_names() or []))
 
+        units_settings, sysid_kick, bpm_unit, corrs_unit=self._get_interface_units()
+        self.sysid_kick=sysid_kick
+        self.bpm_unit=bpm_unit
+        self.corrs_unit=corrs_unit
+
+
         max_curr_h=0.0
         max_curr_v=0.0
 
@@ -154,6 +148,27 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
+    def _get_interface_initial_settings(self):
+        interface_class_name=self.interface.__class__.__name__
+        interface_module_name=self.interface.__class__.__module__
+
+        for machine_interfaces in INTERFACE_SETUP.values():
+            for interface_defaults in machine_interfaces:
+                if (interface_defaults.get("class_name")==interface_class_name) and (interface_defaults.get("module")==interface_module_name):
+                    return interface_defaults
+        return None
+
+    def _get_interface_units(self):
+        interface_defaults=self._get_interface_initial_settings()
+        if interface_defaults is None:
+            return {},0.01,"mm",""
+        units_settings=interface_defaults.get("units",{})
+        sysid_kick=units_settings.get("sysid_corrector_kick",0.01)
+        bpm_unit=units_settings.get("bpm_position","mm")
+        corrs_unit=units_settings.get("corrector_strength","T*mm")
+
+        return units_settings, sysid_kick,bpm_unit,corrs_unit
 
     def _restore_initial_settings(self):
         self.log("Restoring initial settings...")
@@ -225,7 +240,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self.disp_fig, self.disp_canvas,self.disp_ax = install(self.plot_widget_4)
         self.wake_fig, self.wake_canvas, self.wake_ax = install(self.plot_widget_5)
 
-    def _plot_series(self, ax, canvas, values_x,values_y, vals,title=None,ylabel="Residual norm [mm]", error_x=None,error_y=None,error_all=None):
+    def _plot_series(self, ax, canvas, values_x,values_y, vals,title=None, error_x=None,error_y=None,error_all=None):
+        ylabel = f"Residual norm [{self.bpm_unit}]"
         if canvas is None or ax is None:
             return
         ax.clear()
@@ -654,9 +670,9 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                     self._hist_wake_y_err.append(err_wake_y)
                     self._hist_wake_err.append(err_wake_all)
 
-                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y, vals=self._hist_orbit,error_x=self._hist_orbit_x_err, error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None,ylabel="Residual norm [mm]")
-                self._plot_series(ax=self.disp_ax, canvas=self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None,ylabel="Residual norm [mm]")
-                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,error_x=self._hist_wake_x_err, error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None,ylabel="Residual norm [mm]")
+                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,values_y=self._hist_orbit_y, vals=self._hist_orbit,error_x=self._hist_orbit_x_err, error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None)
+                self._plot_series(ax=self.disp_ax, canvas=self.disp_canvas, values_x= self._hist_disp_x,values_y=self._hist_disp_y ,vals=self._hist_disp,error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None)
+                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y ,vals=self._hist_wake,error_x=self._hist_wake_x_err, error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None)
                 QApplication.processEvents()
 
             self.setWindowTitle("BBA GUI")
@@ -712,9 +728,9 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
         self._hist_orbit_x_err.clear(), self._hist_orbit_y_err.clear(), self._hist_orbit_err.clear()
         self._hist_disp_x_err.clear(), self._hist_disp_y_err.clear(), self._hist_disp_err.clear()
         self._hist_wake_x_err.clear(), self._hist_wake_y_err.clear(), self._hist_wake_err.clear()
-        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],vals=[],title=None,ylabel="Residual norm [mm]")
-        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None,ylabel="Residual norm [mm]")
-        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None,ylabel="Residual norm [mm]")
+        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],vals=[],title=None)
+        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None)
+        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None)
 
     def handling(self, app_name,cwd=None, args=None):
         try:
@@ -775,7 +791,8 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    import SelectInterface
+    from Backend import SelectInterface
+
     dialog = SelectInterface.choose_acc_and_interface()
     if dialog is None:
         print("Selection cancelled.")

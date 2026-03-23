@@ -1,7 +1,7 @@
 import os, pickle, re, matplotlib, glob
 import numpy as np
 matplotlib.use("QtAgg")
-from State import State
+from Backend.State import State
 
 '''
 Mutual response matrix calculation algorithm.

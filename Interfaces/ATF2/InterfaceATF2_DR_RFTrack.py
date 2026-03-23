@@ -1,15 +1,11 @@
 import RF_Track as rft
 import numpy as np
 import time,os
-from LogConsole_BBA import LogConsole
+from Backend.LogConsole_BBA import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
-    MACHINE='ATF2'
-    DISPLAY_NAME="ATF2 DR RFTrack"
-    SETTINGS={"jitter":0.0, "bpm_resolution":0.0, "nsamples":1}
-    ACTIONS=["align_everything","misalign_bpms","misalign_quadrupoles"]
 
     def get_name(self):
         return 'ATF2_DR_RFT'
