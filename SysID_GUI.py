@@ -1,5 +1,6 @@
 from datetime import datetime
 import numpy as np
+from SaveOrLoad import SaveOrLoad
 import time, sys, os,matplotlib
 try:
     from PyQt6 import uic
@@ -40,6 +41,7 @@ class Worker(QObject):
         super().__init__()
         self.output_dir=output_dir
         self.interface = interface
+        self.initial_state = self.interface.get_state()
         self.S = state
         self.correctors = correctors
         self.hcorrs = self.interface.get_hcorrectors_names()
@@ -66,7 +68,6 @@ class Worker(QObject):
         total_steps=self.Niter*len(self.correctors)
         self.progress_value=0
         I = self.interface
-        S = self.S
         vkicks = self.vkicks
         hkicks = self.hkicks
 
@@ -80,7 +81,7 @@ class Worker(QObject):
             if self.paused:      self._await_user()
 
             for icorr, corrector in enumerate(self.correctors):
-                corr = S.get_correctors(corrector)
+                corr = I.get_correctors(corrector)
                 if not self.running: break
                 if self.paused:      self._await_user()
 
@@ -190,7 +191,7 @@ class Worker(QObject):
                 if not self.paused or not self.running:
                     break
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, SaveOrLoad):
     def __set_status_in_title(self, status):
         self.setWindowTitle("SYSID - " + self.interface.__class__.__name__ + " " + status)
 
@@ -344,62 +345,19 @@ class MainWindow(QMainWindow):
         self._update_folder_path()
 
     def __save_correctors_button_clicked(self):
-        dir_name = self.working_directory_input.text()
-        os.makedirs (dir_name, exist_ok=True)
-        os.chdir(dir_name)
-        selected_correctors = self._sort_elements([j.text() for j in self.correctors_list.selectedItems()], which='corrs')
-
-        dir_name = self.working_directory_input.text() + '/correctors.txt'
-        filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
-        if filename:
-            with open(filename, 'w') as f:
-                for cname in selected_correctors:
-                    f.write(f"{cname}\n")
+        self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors", base_dir=self.working_directory_input.text())
 
     def __load_correctors_button_clicked(self):
-        dir_name = self.working_directory_input.text() + '/correctors.txt'
-        filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
-        if filename:
-            with open(filename, 'r') as f:
-                selected_correctors = self._sort_elements([line.strip() for line in f], which='corrs')
-        else:
-            selected_correctors = self.interface.get_correctors()['names']
-
-        self.correctors_list.clearSelection()
-        for item in selected_correctors:
-            items = self.correctors_list.findItems(item, Qt.MatchFlag.MatchExactly)
-            for item in items:
-                item.setSelected(True)
+        self._loading_func(elements_list=self.correctors_list, filename="correctors.txt", loading_name="Load Correctors", base_dir=self.working_directory_input.text())
 
     def __clear_correctors_button_clicked(self):
         self.correctors_list.clearSelection()
 
     def __save_bpms_button_clicked(self):
-        dir_name = self.working_directory_input.text()
-        os.makedirs (dir_name, exist_ok=True)
-        os.chdir (dir_name)
-        selected_bpms = self._sort_elements([j.text() for j in self.bpms_list.selectedItems()], which='bpms')
-        dir_name = self.working_directory_input.text() + '/bpms.txt'
-        filename, _ = QFileDialog.getSaveFileName(None, "Save File", dir_name, "Text Files (*.txt)")
-        if filename:
-            with open(filename, 'w') as f:
-                for bpmname in selected_bpms:
-                    f.write(f"{bpmname}\n")
+        self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs", base_dir=self.working_directory_input.text())
 
     def __load_bpms_button_clicked(self):
-        dir_name = self.working_directory_input.text() + '/bpms.txt'
-        filename, _ = QFileDialog.getOpenFileName(None, "Open File", dir_name, "Text Files (*.txt)")
-        if filename:
-            with open(filename, 'r') as f:
-                selected_bpms = self._sort_elements([line.strip() for line in f], which='bmps')
-        else:
-            selected_bpms = self.interface.get_bpms()['names']
-
-        self.bpms_list.clearSelection()
-        for item in selected_bpms:
-            items = self.bpms_list.findItems(item, Qt.MatchFlag.MatchExactly)
-            for item in items:
-                item.setSelected(True)
+        self._loading_func(elements_list=self.bpms_list, filename="bpms.txt", loading_name="Load BPMs", base_dir=self.working_directory_input.text())
 
     def __clear_bpms_button_clicked(self):
         self.bpms_list.clearSelection()
@@ -439,22 +397,27 @@ class MainWindow(QMainWindow):
 
         selected_correctors = self._sort_elements([item.text() for item in self.correctors_list.selectedItems()], which='corrs')
 
-        self.selected_correctors = selected_correctors
         if not selected_correctors:
             for i in range(self.correctors_list.count()):
                 self.correctors_list.item(i).setSelected(True)
             selected_correctors = self.interface.get_correctors()['names']
-        filename = self.working_directory_input.text() + '/correctors.txt'
+
+        dir_name = self.working_directory_input.text()
+        os.makedirs(dir_name, exist_ok=True)
+
+        filename = os.path.join(dir_name, 'correctors.txt')
         with open(filename, 'w') as f:
             for item in selected_correctors:
                 f.write(f"{item}\n")
 
-        selected_bpms = [item.text() for item in self.bpms_list.selectedItems()]
+        selected_bpms = self._sort_elements([item.text() for item in self.bpms_list.selectedItems()], which='bpms')
         self.selected_bpms = selected_bpms
         if not selected_bpms:
             for i in range(self.bpms_list.count()):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
+        dir_name = self.working_directory_input.text()
+        os.makedirs(dir_name, exist_ok=True)
         filename = self.working_directory_input.text() + '/bpms.txt'
         with open(filename, 'w') as f:
             for item in selected_bpms:

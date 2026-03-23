@@ -15,21 +15,47 @@ except ImportError:
 import numpy as np
 
 class SaveOrLoad():
+
+    def _refactor_names_order(self,elements_list, selected_names):
+        state=getattr(self,"initial_state",None)
+
+        if state is not None:
+            if elements_list is self.correctors_list:
+                ref_list=[str(x) for x in state.get_correctors()["names"]]
+            elif elements_list is self.bpms_list:
+                ref_list=[str(x) for x in state.get_bpms()["names"]]
+            elif hasattr(self,"quadrupoles_list") and elements_list is self.quadrupoles_list:
+                ref_list = [str(x) for x in state.get_quadrupoles()["names"]]
+            elif hasattr(self,"screens_list") and elements_list is self.screens_list:
+                ref_list = [str(x) for x in state.get_screens()["names"]]
+            else:
+                ref_list=[elements_list.item(i).text() for i in range(elements_list.count())]
+        else:
+            ref_list = [elements_list.item(i).text() for i in range(elements_list.count())]
+
+        selected_set={str(x) for x in selected_names}
+        return [name for name in ref_list if name in selected_set]
+
+
     def _saving_func(self, elements_list, filename, saving_name, *, use_dialog=True,base_dir=None):  # * - must be passed by keyword
         items = elements_list.selectedItems()
         if not items:
-            items = [elements_list.item(i) for i in range(elements_list.count())]
+            selected_names = [elements_list.item(i).text() for i in range(elements_list.count())]
+        else:
+            selected_names=[it.text() for it in items]
+
+        ordered_names=self._refactor_names_order(elements_list,selected_names)
         base = base_dir or self.dir_name
         os.makedirs(base, exist_ok=True)
         if use_dialog:
-            fn, _ = QFileDialog.getSaveFileName(self, f"{saving_name}", os.path.join(self.dir_name, f"{filename}"),"Text (*.txt)")
+            fn, _ = QFileDialog.getSaveFileName(self, f"{saving_name}", os.path.join(base, f"{filename}"),"Text (*.txt)")
             if not fn:
                 return
         else:
             fn = os.path.join(base, filename)
         with open(fn, "w") as f:
-            for it in items:
-                f.write(f"{it.text()}\n")
+            for it in ordered_names:
+                f.write(f"{it}\n")
 
     def _loading_func(self, elements_list, filename, loading_name, *, use_dialog=True, base_dir=None):
         base = base_dir or self.dir_name
@@ -42,16 +68,16 @@ class SaveOrLoad():
             with open(fn, "r") as f:
                 selected = [ln.strip() for ln in f]
         if not selected:
-            State=getattr(self,"initial_state",None)
-            if State is not None:
+            state=getattr(self,"initial_state",None)
+            if state is not None:
                 if elements_list is self.bpms_list:
-                    selected = State.get_bpms()["names"]
+                    selected = state.get_bpms()["names"]
                 elif elements_list is self.correctors_list:
-                    selected = State.get_correctors()["names"]
+                    selected = state.get_correctors()["names"]
                 elif hasattr(self, "quadrupoles_list") and elements_list is self.quadrupoles_list:
-                    selected = State.get_quadrupoles()["names"]
+                    selected = state.get_quadrupoles()["names"]
                 elif hasattr(self, "screens_list") and elements_list is self.screens_list:
-                    selected = State.get_screens()["names"]
+                    selected = state.get_screens()["names"]
             else:
                 selected = [elements_list.item(i).text() for i in range(elements_list.count())]
             elements_list.clearSelection()
@@ -198,8 +224,6 @@ class SaveOrLoad():
             return
         if hasattr(self, "load_session_button"):
             self.session_database.setText(folder)
-        QMessageBox.information(self.session_database, "Data directory selected", "Loaded session")
-
         # load quadrupoles
         self._loading_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt",
                            loading_name="Load Quadrupoles", use_dialog=False, base_dir=folder)
@@ -208,13 +232,16 @@ class SaveOrLoad():
                            use_dialog=False, base_dir=folder)
 
         scan_settings_path = os.path.join(folder, "scan_settings.json")
+        if not os.path.isfile(scan_settings_path):
+            QMessageBox.warning(self, "Load session", "Wrong data in the folder.")
+            return
         try:
             with open(scan_settings_path, "r") as f:
                 settings = json.load(f)
         except Exception as e:
-            QMessageBox.warning(self, "Load session", str(e))
-            settings = {}
-        self._quad_scan_session=settings
+            QMessageBox.warning(self, "Load session", "Wrong data in the folder.")
+            return
+        QMessageBox.information(self.session_database, "Data directory selected", "Loaded session")
 
         if "delta_min" in settings: self.delta_min_scan.setValue(float(settings["delta_min"]))
         if "delta_max" in settings: self.delta_max_scan.setValue(float(settings["delta_max"]))
@@ -230,7 +257,6 @@ class SaveOrLoad():
             return
         if hasattr(self, "session_database_3"):
             self.session_database_3.setText(folder)
-        QMessageBox.information(self.session_database_3, "Data directory selected", "Loaded session")
 
         # load correctors
         self._loading_func(elements_list=self.correctors_list, filename="correctors.txt",
@@ -240,23 +266,27 @@ class SaveOrLoad():
                            use_dialog=False, base_dir=folder)
 
         correction_settings_path = os.path.join(folder, "correction_settings.json")
+        if not os.path.isfile(correction_settings_path):
+            QMessageBox.warning(self, "Load session", "Selected folder doesn't contain proper correction settings.")
+            return
         try:
             with open(correction_settings_path, "r") as f:
                 settings = json.load(f)
-                paths = settings.get("data_dirs") or {}
-                for key, path in paths.items():
-                    if not path:
-                        continue
-                    path = os.path.expanduser(os.path.expandvars(path))
-                    info = self._find_useful_files(path)
-                    if info["ok"]:
-                        self._data_dirs[key] = info
-                    else:
-                        QMessageBox.warning(self, "Load session", "Data directory not found")
-
         except Exception as e:
-            QMessageBox.warning(self, "Load session", str(e))
-            settings = {}
+            QMessageBox.warning(self,"Load session",f"Couldn't read correction_settings.json: {e}")
+            return
+        paths = settings.get("data_dirs") or {}
+        for key, path in paths.items():
+            if not path:
+                continue
+            path = os.path.expanduser(os.path.expandvars(path))
+            info = self._find_useful_files(path)
+            if info["ok"]:
+                self._data_dirs[key] = info
+            else:
+                QMessageBox.warning(self, "Load session", "Data directory not found")
+                return
+        QMessageBox.information(self.session_database_3, "Data directory selected", "Loaded session")
 
         if "w1" in settings: self.lineEdit.setText(str(settings["w1"]))
         if "w2" in settings: self.lineEdit_2.setText(str(settings["w2"]))

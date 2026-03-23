@@ -395,17 +395,21 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
     def _start_correction(self):
         try:
-            self.S0bdes = []
             corrs, bpms = self._get_selection()
-            print(f'debuug1: corrs = {corrs}')
-            print(f'debuug1: bpms = {bpms}')
-            self.selected_correctors = []
-            # save list of initial bdes for reset
-            for cname,bdes in zip(self.S0.correctors['names'],self.S0.correctors['bdes']):
-                if cname in corrs:
-                    self.S0bdes.append(bdes)
-                    self.selected_correctors.append(cname)
 
+            '''
+            Restore only selected correctors
+            '''
+            # self.S0bdes = []
+            # corrs, bpms = self._get_selection()
+            print(f'debug: corrs = {corrs}')
+            print(f'debug: bpms = {bpms}')
+            # self.selected_correctors = []
+            # # save list of initial bdes for reset
+            # for cname, bdes in zip(self.S0.correctors['names'], self.S0.correctors['bdes']):
+            #     if cname in corrs:
+            #         self.S0bdes.append(bdes)
+            #         self.selected_correctors.append(cname)
             print("Starting correction...")
             self.log("Starting correction...")
             self._cancel = False
