@@ -469,9 +469,12 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
 
             def clamp(val, max_val):
-                if max_val == 0.0:
-                    return val
-                return max(-max_val, min(val, max_val))
+                val=np.asarray(val,dtype=float)
+                max_val=np.asarray(max_val,dtype=float)
+                result=val.copy()
+                finite=np.isfinite(max_val)&(max_val>0.0)
+                result[finite]=np.clip(result[finite],-max_val[finite],max_val[finite]) # clip limits the values in an array
+                return result
 
             plt.ion()
 
@@ -619,15 +622,24 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
                 corrX=delta[:nh] # horizontal changes
                 corrY=delta[nh:] # vertical changes
 
-                vals_x = [clamp(v,max_curr_h) for v in corrX.ravel()]
-                vals_y = [clamp(v,max_curr_v) for v in corrY.ravel()] # flattens an array
+                delta_x=np.asarray(corrX.ravel(),dtype=float) # asarray doesnt copy, like np.array
+                delta_y=np.asarray(corrY.ravel(),dtype=float)
+                delta_vals=np.concatenate([delta_x,delta_y])
 
-                vals = np.array(vals_x + vals_y)
-                self.interface.vary_correctors(Cx_cut + Cy_cut, vals)
+                selected_correctors=Cx_cut+Cy_cut
+                current_corrs=self.interface.get_correctors(selected_correctors)
+                current_bdes=np.asarray(current_corrs['bdes'],dtype=float).ravel()
 
-                print(f'vals = {vals}')
-                print(f'Cx = {Cx}')
-                print(f'Cy = {Cy}')
+                max_vals_x=np.full(delta_x.shape,max_curr_h,dtype=float)
+                max_vals_y=np.full(delta_y.shape,max_curr_v,dtype=float)
+                max_vals=np.concatenate([max_vals_x,max_vals_y])
+
+                new_bdes=current_bdes+delta_vals
+                new_bdes=clamp(new_bdes,max_vals)
+                self.interface.set_correctors(selected_correctors,new_bdes)
+                vals=new_bdes-current_bdes
+
+                # current_bdes + delta -> clamp(final_bdes) -> set_correctors(final_bdes)
 
                 def filtering_norm_x(Ox,Bx):
                     Ox[np.isnan(Ox)] = 0

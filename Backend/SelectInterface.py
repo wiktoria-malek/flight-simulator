@@ -1,13 +1,13 @@
 try:
     from PyQt6.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel,QMessageBox
+        QRadioButton, QLabel,QMessageBox,QPushButton
         )
     from PyQt6.QtCore import QEvent, Qt
 except ImportError:
     from PyQt5.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel,QMessageBox
+        QRadioButton, QLabel,QMessageBox, QPushButton
         )
     from PyQt5.QtCore import QEvent, Qt
 
@@ -65,6 +65,8 @@ class InterfaceSelectionDialog(QDialog):
         self.selected_interface = None
         self.selected_interface_name = None
         self.selected_acc = selected_acc
+        self.go_back=False
+        self.are_more_machines=len(INTERFACE_SETUP.keys())>1
         self.entries=INTERFACE_SETUP.get(selected_acc,[])
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose one of the following Interfaces:"))
@@ -82,10 +84,18 @@ class InterfaceSelectionDialog(QDialog):
         self.button_box = QDialogButtonBox(buttons)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
+        if self.are_more_machines:
+            self.back_button=QPushButton("Back")
+            self.button_box.addButton(self.back_button,QDialogButtonBox.ButtonRole.ActionRole)
+            self.back_button.clicked.connect(self._go_back)
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setDefault(True)
         layout.addWidget(self.button_box)
 
         self.installEventFilter(self)
+
+    def _go_back(self):
+        self.go_back=True
+        self.reject()
 
     def accept(self):
         selected_entry = None
@@ -135,15 +145,21 @@ def choose_acc_and_interface(parent=None):
 
     if len(machines)==1:
         accelerator=machines[0]
-    else:
-        acc_dialog=SelectAcc(machines,parent=None)
+        interface_dialog=InterfaceSelectionDialog(accelerator,parent=parent)
+        if interface_dialog.exec():
+            return interface_dialog.selected_interface
+        return None
+    while True:
+        acc_dialog=SelectAcc(machines,parent=parent)
         if acc_dialog.exec():
             accelerator=acc_dialog.selected_machine
         else:
             return None
-    interface_dialog=InterfaceSelectionDialog(accelerator,parent=None)
-    if interface_dialog.exec():
-        return interface_dialog.selected_interface
-    return None
+        interface_dialog=InterfaceSelectionDialog(accelerator,parent=None)
+        if interface_dialog.exec():
+            return interface_dialog.selected_interface
+        if getattr(interface_dialog,"go_back",False):
+            continue
+        return None
 
 

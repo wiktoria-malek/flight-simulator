@@ -99,8 +99,8 @@ class DFS_WFS_Correction_BBA():
         Cx = np.hstack((Cx, ones_column_x)).astype(float)
         Cy = np.hstack((Cy, ones_column_y)).astype(float)
 
-        Bx = Bx.astype(float)
-        By = By.astype(float)
+        Bx = Bx.astype(float) # facet2 might give objects instead of floats64, like atf2
+        By = By.astype(float) # so we do a conversion of a whole array so that every element is a float and lstsq gets a normal, numeric array
 
         def lstsq(C, B):
             return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=None)[0])

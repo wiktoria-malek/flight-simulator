@@ -289,6 +289,12 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.corrs_unit=corrs_unit
         self.initial_hkick_settings.setText(str(self.sysid_kick))
         self.initial_vkick_settings.setText(str(self.sysid_kick))
+        self._set_directory_edit_enabled(True)
+
+
+    def _set_directory_edit_enabled(self, enabled):
+        self.working_directory_input.setEnabled(enabled)
+        self.working_directory_dialog.setEnabled(enabled)
 
 
     def _current_measuring_mode(self):
@@ -414,6 +420,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         # self.S.save(basename='machine_status')
 
         self.progressBar.setValue(0)
+        self._set_directory_edit_enabled(False)
         self.stop_requested=False
         if self.thread and self.thread.isRunning():
             return  # already running
@@ -425,26 +432,12 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 self.correctors_list.item(i).setSelected(True)
             selected_correctors = self.interface.get_correctors()['names']
 
-        dir_name = self.working_directory_input.text()
-        os.makedirs(dir_name, exist_ok=True)
-
-        filename = os.path.join(dir_name, 'correctors.txt')
-        with open(filename, 'w') as f:
-            for item in selected_correctors:
-                f.write(f"{item}\n")
-
         selected_bpms = self._sort_elements([item.text() for item in self.bpms_list.selectedItems()], which='bpms')
         self.selected_bpms = selected_bpms
         if not selected_bpms:
             for i in range(self.bpms_list.count()):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
-        dir_name = self.working_directory_input.text()
-        os.makedirs(dir_name, exist_ok=True)
-        filename = self.working_directory_input.text() + '/bpms.txt'
-        with open(filename, 'w') as f:
-            for item in selected_bpms:
-                f.write(f"{item}\n")
 
         self._current_measuring_mode()
 
@@ -457,6 +450,16 @@ class MainWindow(QMainWindow, SaveOrLoad):
             d = os.path.join(base, f"{project_name}_{time_str}_{mode.name}")
             os.makedirs(d, exist_ok=True)
             self.mode_dirs[mode] = d
+
+            filename = os.path.join(d, 'correctors.txt')
+            with open(filename, 'w') as f:
+                for item in selected_correctors:
+                    f.write(f"{item}\n")
+
+            filename = os.path.join(d, 'bpms.txt')
+            with open(filename, 'w') as f:
+                for item in selected_bpms:
+                    f.write(f"{item}\n")
 
         machine_state=self.interface.get_state()
         for mode,d in self.mode_dirs.items():
@@ -508,6 +511,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self.worker = None
             self.counter+=1
             if self.stop_requested:
+                self._set_directory_edit_enabled(True)
                 self.__set_status_in_title("[Idle]")
                 return
             if self.counter< len(self.modes_to_do):
@@ -535,6 +539,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 self.worker.progress.connect(self._update_progress)
                 self.thread.start()
             else:
+                self._set_directory_edit_enabled(True)
                 self.__set_status_in_title("[Idle]")
 
         self.thread.finished.connect(clear_thread)
@@ -582,7 +587,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot_widget.repaint()
 
     def _pick_and_load_data_dir(self):
-        default_dir = os.path.join(self.cwd, "Data")
+        default_dir = os.path.join(self.cwd)
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
         if not folder:
