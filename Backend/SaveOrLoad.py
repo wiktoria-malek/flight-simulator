@@ -80,7 +80,7 @@ class SaveOrLoad():
                     selected = state.get_screens()["names"]
             else:
                 selected = [elements_list.item(i).text() for i in range(elements_list.count())]
-            elements_list.clearSelection()
+        elements_list.clearSelection()
         for name in selected:
             for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):
                 it.setSelected(True)

@@ -4,13 +4,13 @@ from Backend.SaveOrLoad import SaveOrLoad
 import time, sys, os,matplotlib
 try:
     from PyQt6 import uic
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget,QMessageBox
     from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
     from PyQt6.QtTest import QTest
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
-    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget,QMessageBox
     from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
     from PyQt5.QtTest import QTest
     pyqt_version = 5
@@ -34,7 +34,7 @@ class MatplotlibWidget(FigureCanvas):
         self.axes = fig.add_subplot(111)
 
 class Worker(QObject):
-    plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
+    plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, object,str)
     progress=pyqtSignal(int)
     finished = pyqtSignal()
 
@@ -61,11 +61,20 @@ class Worker(QObject):
     def run(self):
         self.running = True
         self.paused = False
-        total_steps=self.Niter*len(self.correctors)
         self.progress_value=0
         I = self.interface
         vkicks = self.vkicks
         hkicks = self.hkicks
+        pending_steps=0
+
+        for iter in range(self.Niter):
+            for corrector in self.correctors:
+                filename_p=os.path.join(self.output_dir, f'DATA_{corrector}_p{iter:04d}.pkl')
+                filename_m = os.path.join(self.output_dir, f'DATA_{corrector}_m{iter:04d}.pkl')
+                if not (os.path.isfile(filename_p) and os.path.isfile(filename_m)):
+                    pending_steps+=1 # if a file is missing, a step is added, if both are present, they are not considered worth iterating
+        total_steps=max(pending_steps,1)
+
 
         def clamp(val, max_val):
             if max_val == 0.0:
@@ -93,8 +102,14 @@ class Worker(QObject):
 
                 corr_changed = False
 
-                print(f"Corrector {corrector} '+' excitation...")
-                filename_p=f'DATA_{corrector}_p{iter:04d}.pkl'
+                filename_p=os.path.join(self.output_dir, f'DATA_{corrector}_p{iter:04d}.pkl')
+                filename_m=os.path.join(self.output_dir, f'DATA_{corrector}_m{iter:04d}.pkl')
+
+                corr_fully_measured=os.path.isfile(filename_p) and os.path.isfile(filename_m)
+                measured_this_corr=False
+
+                if not corr_fully_measured:
+                    print(f"Corrector {corrector} '+' excitation...")
                 if not os.path.isfile(filename_p):
                     print('corr[bds] =', corr['bdes'], ' also kick = ', kick) 
                     curr_p = corr['bdes'] + kick
@@ -107,15 +122,14 @@ class Worker(QObject):
 
                     if not self.running: break
                     if self.paused:      self._await_user()
-
+                    measured_this_corr=True
                     state_p=I.get_state()
                     state_p.save(filename=filename_p)
                 else:
                     state_p=self.interface.get_state().__class__(filename=filename_p)
                 Op = state_p.get_orbit(self.bpms)
-
-                print(f"Corrector {corrector} '-' excitation...")
-                filename_m=f'DATA_{corrector}_m{iter:04d}.pkl'
+                if not corr_fully_measured:
+                    print(f"Corrector {corrector} '-' excitation...")
                 if not os.path.isfile(filename_m):
                     curr_m = corr['bdes'] - kick
                     if corrector in self.hcorrs:
@@ -127,6 +141,7 @@ class Worker(QObject):
 
                     if not self.running: break
                     if self.paused:      self._await_user()
+                    measured_this_corr=True
 
                     state_m=I.get_state()
                     state_m.save(filename=filename_m)
@@ -145,10 +160,11 @@ class Worker(QObject):
                 nsamples = Op['stdx'].size
                 Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
-                self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
-                self.progress_value=self.progress_value + 1
-                percent = int(self.progress_value / total_steps * 100)
-                self.progress.emit(percent)
+                if measured_this_corr:
+                    self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, self.bpms, corrector)
+                    self.progress_value=self.progress_value + 1
+                    percent = int(self.progress_value / total_steps * 100)
+                    self.progress.emit(percent)
 
                 if corrector in self.hcorrs:
                     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
@@ -164,10 +180,10 @@ class Worker(QObject):
                 with open(os.path.join(self.output_dir,'kicks.txt'), 'w') as f:
                     for i, c in enumerate(self.correctors):
                         f.write(f'{c} {hkicks[i]} {vkicks[i]}\n')
-
-                t0=time.monotonic() #saves current time
-                while self.running and (time.monotonic() -t0) <1:
-                    time.sleep(0.05)
+                if measured_this_corr:
+                    t0=time.monotonic() #saves current time, but not a system time, it's for measuring time difference
+                    while self.running and (time.monotonic() -t0) <1:
+                        time.sleep(0.05)
 
         self.running = False
         self.finished.emit()
@@ -291,11 +307,9 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.initial_vkick_settings.setText(str(self.sysid_kick))
         self._set_directory_edit_enabled(True)
 
-
     def _set_directory_edit_enabled(self, enabled):
         self.working_directory_input.setEnabled(enabled)
         self.working_directory_dialog.setEnabled(enabled)
-
 
     def _current_measuring_mode(self):
         if self.mode == Mode.All:
@@ -412,13 +426,33 @@ class MainWindow(QMainWindow, SaveOrLoad):
             if name in unsorted_names: sorted_names.append(str(name))
         return sorted_names
 
-    def __start_button_clicked(self):
-        # dir_name = self.working_directory_input.text()
-        # os.makedirs (dir_name, exist_ok=True)
-        # os.chdir (dir_name)
-        # self.S = State(interface=self.interface)
-        # self.S.save(basename='machine_status')
+    def _read_filenames(self,basedir,filename):
+        path=os.path.join(basedir,filename)
+        if not os.path.isfile(path):
+            return []
+        with open(path,'r') as f:
+            return [line.strip() for line in f if line.strip()]
 
+    def _is_a_valid_directory_to_resume(self,base_dir):
+        if not base_dir:
+            return False
+        base_dir=os.path.expanduser(os.path.expandvars(base_dir)) # environmental names, like $HOME
+        return (
+            os.path.isdir(base_dir) # checks if it's a directory, not a file for example
+            and os.path.isfile(os.path.join(base_dir,'machine_status.pkl')) # is there such file
+            and os.path.isfile(os.path.join(base_dir,'correctors.txt'))
+            and os.path.isfile(os.path.join(base_dir, 'bpms.txt'))
+        )
+
+    def _save_names_if_missing(self,base_dir,filename,names):
+        path=os.path.join(base_dir,filename)
+        if os.path.isfile(path):
+            return
+        with open(path,'w') as f:
+            for item in names:
+                f.write(f"{item}\n")
+
+    def __start_button_clicked(self):
         self.progressBar.setValue(0)
         self._set_directory_edit_enabled(False)
         self.stop_requested=False
@@ -439,6 +473,17 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 self.bpms_list.item(i).setSelected(True)
             selected_bpms = self.interface.get_bpms()['names']
 
+        resume_directory=os.path.expanduser(os.path.expandvars(self.working_directory_input.text()))
+        is_valid_resume_directory=self.mode!=Mode.All and self._is_a_valid_directory_to_resume(resume_directory)
+        if is_valid_resume_directory:
+            saved_correctors=self._read_filenames(resume_directory,'correctors.txt')
+            saved_bpms=self._read_filenames(resume_directory,'bpms.txt')
+            if saved_correctors:
+                selected_correctors=self._sort_elements(saved_correctors,'corrs')
+            if saved_bpms:
+                selected_bpms=self._sort_elements(saved_bpms,'bpms')
+            self.selected_bpms=selected_bpms
+            QMessageBox.information(self,"Resuming SysID", "Resuming SysID from a given directory")
         self._current_measuring_mode()
 
         self.mode_dirs={}
@@ -446,24 +491,23 @@ class MainWindow(QMainWindow, SaveOrLoad):
         base = os.path.expanduser(os.path.expandvars("~/flight-simulator-data"))
 
         for mode in self.modes_to_do:
-            time_str=datetime.now().strftime("%Y%m%d_%H%M%S")
-            d = os.path.join(base, f"{project_name}_{time_str}_{mode.name}")
+            if len(self.modes_to_do)==1:
+                d=resume_directory
+            else:
+                time_str=datetime.now().strftime("%Y%m%d_%H%M%S")
+                d = os.path.join(base, f"{project_name}_{time_str}_{mode.name}")
             os.makedirs(d, exist_ok=True)
             self.mode_dirs[mode] = d
 
-            filename = os.path.join(d, 'correctors.txt')
-            with open(filename, 'w') as f:
-                for item in selected_correctors:
-                    f.write(f"{item}\n")
+            self._save_names_if_missing(d,'correctors.txt',selected_correctors)
+            self._save_names_if_missing(d,'bpms.txt',selected_bpms)
 
-            filename = os.path.join(d, 'bpms.txt')
-            with open(filename, 'w') as f:
-                for item in selected_bpms:
-                    f.write(f"{item}\n")
 
         machine_state=self.interface.get_state()
         for mode,d in self.mode_dirs.items():
-            machine_state.save(filename=os.path.join(d,"machine_status.pkl"))
+            machine_status=os.path.join(d,'machine_status.pkl')
+            if not os.path.isfile(machine_status):
+                machine_state.save(filename=machine_status)
 
         self.counter=0
         self._start_next_mode()
@@ -568,18 +612,21 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self.__set_status_in_title(f"[Running {mode.name} mode]")
             self.worker.unpause()
 
-    def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, corrector):
+    def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, bpm_names,corrector):
+        Diff_x=np.asarray(Diff_x).ravel()
+        Diff_y=np.asarray(Diff_y).ravel()
+        Err_x=np.asarray(Err_x).ravel()
+        Err_y=np.asarray(Err_y).ravel()
+        bpm_names=[str(x) for x in bpm_names]
+
         self.plot_widget.axes.clear()
-        selected_bpms = [item.text() for item in self.bpms_list.selectedItems()]
-        #nbpms=Op['nbpms']
-        l_bpms=len(selected_bpms)
-        scale=np.arange(l_bpms)
-        #bpms_names=Op['names']
+        n=min(len(Diff_x),len(Diff_y),len(Err_x),len(Err_y))
+        scale=np.arange(n) # np.arange(start,stop,step) -> 0,n,1
         self.plot_widget.axes.errorbar(scale, Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
         self.plot_widget.axes.errorbar(scale, Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
         self.plot_widget.axes.legend(loc='upper left')
         self.plot_widget.axes.set_xticks(scale)
-        self.plot_widget.axes.set_xticklabels(selected_bpms,rotation=90,fontsize=8)
+        self.plot_widget.axes.set_xticklabels(bpm_names[:n],rotation=90,fontsize=8)
         self.plot_widget.axes.set_ylabel(f'Orbit [{self.bpm_unit}]')
         self.plot_widget.axes.set_title(f"Corrector '{corrector}'")
         self.plot_widget.axes.grid(color='#EEEEEE')
@@ -593,6 +640,25 @@ class MainWindow(QMainWindow, SaveOrLoad):
         if not folder:
             return
         self.working_directory_input.setText(folder)
+
+        if not self._is_a_valid_directory_to_resume(folder):
+            return
+
+        self._loading_func(
+            elements_list=self.correctors_list,
+            filename="correctors.txt",
+            loading_name="Load Correctors",
+            use_dialog=False,
+            base_dir=folder,
+        )
+        self._loading_func(
+            elements_list=self.bpms_list,
+            filename="bpms.txt",
+            loading_name="Load BPMs",
+            use_dialog=False,
+            base_dir=folder,
+        )
+        QMessageBox.information(self,"Directory loaded","Loaded directory data to be resumed.")
 
 ## MAIN
 app = QApplication(sys.argv)

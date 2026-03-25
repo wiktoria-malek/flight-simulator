@@ -113,21 +113,25 @@ class State:
     def load(self, filename):
         from glob import glob
         f = glob(f'{filename}*')
-        if len(f)>0:
-            try:
-                with open(f[0], "rb") as pickle_file:
-                    data = pickle.load(pickle_file)
-                self.sequence = data['sequence']
-                self.correctors = data['correctors']
-                self.bpms = data['bpms']
-                self.icts = data['icts']
-                self.screens = data.get('screens',{"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])})
-                self.quadrupoles = data.get('quadrupoles',{"names":[], "bdes": np.array([]), "bact": np.array([])})
-                self.hcorrectors_names = data['hcorrectors_names']
-                self.vcorrectors_names = data['vcorrectors_names']
-                self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
-            except Exception:
-                raise Exception(f"Could not load {filename}")
+        if len(f)==0:
+            raise FileNotFoundError(f"Couldn't find state file matching {filename}")
+        try:
+            with open(f[0], "rb") as pickle_file:
+                data = pickle.load(pickle_file)
+            self.sequence = data['sequence']
+            self.correctors = data['correctors']
+            self.bpms = data['bpms']
+            self.icts = data['icts']
+            self.screens = data.get('screens',
+                                    {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x": np.array([]),
+                                     "y": np.array([]), "sigx": np.array([]), "sigy": np.array([]), "sum": np.array([]),
+                                     "hedges": [], "vedges": [], "images": [], "S": np.array([])})
+            self.quadrupoles = data.get('quadrupoles', {"names": [], "bdes": np.array([]), "bact": np.array([])})
+            self.hcorrectors_names = data['hcorrectors_names']
+            self.vcorrectors_names = data['vcorrectors_names']
+            self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
+        except Exception:
+            raise Exception(f"Could not load {filename}")
 
     def save(self, basename=None, filename=None):
         if basename is not None:
