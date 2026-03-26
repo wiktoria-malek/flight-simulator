@@ -18,7 +18,7 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_DR_RFTrack",
             "class_name": "InterfaceATF2_DR_RFTrack",
             "settings": {"jitter":0.0, "bpm_resolution":0.0, "nsamples":1},
-            "actions": ["align_everything", "misalign_quadrupoles", "misalign_bpms"],
+            "actions": ["align_everything", "misalign_bpms"],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -43,8 +43,8 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Extraction Line RFTrack",
             "module": "Interfaces.ATF2.InterfaceATF2_Ext_RFTrack",
             "class_name": "InterfaceATF2_Ext_RFTrack",
-            "settings": {"jitter":0.0, "bpm_resolution":0.01},
-            "actions": ["align_everything","misalign_quadrupoles","misalign_bpms"],
+            "settings": {"jitter":0.00, "bpm_resolution":0.0},
+            "actions": ["align_everything","misalign_bpms"],
             "units":
                 {
                     "corrector_strength": "T*mm",

@@ -689,6 +689,9 @@ class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
 
             self.setWindowTitle("BBA GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
+            state = self.interface.get_state()
+            print(state.get_bpms())
+            print(state.get_screens())
             self.log("Correction finished.")
             self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By)
 
