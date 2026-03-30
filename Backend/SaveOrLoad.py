@@ -20,10 +20,10 @@ class SaveOrLoad():
         state=getattr(self,"initial_state",None)
 
         if state is not None:
-            if elements_list is self.correctors_list:
+            if hasattr(self,"correctors_list") and elements_list is self.correctors_list:
                 ref_list=[str(x) for x in state.get_correctors()["names"]]
-            elif elements_list is self.bpms_list:
-                ref_list=[str(x) for x in state.get_bpms()["names"]]
+            elif hasattr(self, "bpms_list") and elements_list is self.bpms_list:
+                    ref_list=[str(x) for x in state.get_bpms()["names"]]
             elif hasattr(self,"quadrupoles_list") and elements_list is self.quadrupoles_list:
                 ref_list = [str(x) for x in state.get_quadrupoles()["names"]]
             elif hasattr(self,"screens_list") and elements_list is self.screens_list:
@@ -70,16 +70,16 @@ class SaveOrLoad():
         if not selected:
             state=getattr(self,"initial_state",None)
             if state is not None:
-                if elements_list is self.bpms_list:
+                if hasattr(self, "bpms_list") and elements_list is self.bpms_list:
                     selected = state.get_bpms()["names"]
-                elif elements_list is self.correctors_list:
+                elif hasattr(self, "correctors_list") and elements_list is self.correctors_list:
                     selected = state.get_correctors()["names"]
                 elif hasattr(self, "quadrupoles_list") and elements_list is self.quadrupoles_list:
                     selected = state.get_quadrupoles()["names"]
                 elif hasattr(self, "screens_list") and elements_list is self.screens_list:
                     selected = state.get_screens()["names"]
-            else:
-                selected = [elements_list.item(i).text() for i in range(elements_list.count())]
+                else:
+                    selected = [elements_list.item(i).text() for i in range(elements_list.count())]
         elements_list.clearSelection()
         for name in selected:
             for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):
@@ -125,42 +125,6 @@ class SaveOrLoad():
 
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
-
-    def _save_session_quad_scan(self, delta_min,delta_max,steps,nshots,quad_name, K1_0,sigx_mean,sigy_mean,sigx_std,sigy_std, deltas=None,K1_values=None):
-        time_str = datetime.now().strftime("%y%m%d%H%M%S")
-        default_dir = f"~/flight-simulator-data/"
-        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
-        save_session_dir = os.path.join(default_dir, f"Quadrupole_scan_{self.interface.get_name()}_{time_str}_session_settings")
-        os.makedirs(save_session_dir, exist_ok=True)
-
-        self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt", saving_name="Save Quadrupoles",
-                          use_dialog=False, base_dir=save_session_dir)
-        self._saving_func(elements_list=self.screens_list, filename="screens.txt", saving_name="Save Screens", use_dialog=False,
-                          base_dir=save_session_dir)
-
-        sigx_mean = np.asarray(sigx_mean, dtype=float)
-        sigy_mean = np.asarray(sigy_mean, dtype=float)
-        sigx_std = np.asarray(sigx_std, dtype=float)
-        sigy_std = np.asarray(sigy_std, dtype=float)
-
-        scan_settings = {
-            "delta_min": delta_min,
-            "delta_max": delta_max,
-            "steps": steps,
-            "nshots": nshots,
-            "quad_name": quad_name,
-            "K1_0": K1_0,
-            "sigx_mean": sigx_mean.tolist(),
-            "sigy_mean": sigy_mean.tolist(),
-            "sigx_std": sigx_std.tolist(),
-            "sigy_std": sigy_std.tolist(),
-            "deltas": deltas.tolist() if deltas is not None else None,
-            "K1_values": K1_values.tolist() if K1_values is not None else None,
-        }
-
-        with open(os.path.join(save_session_dir, "scan_settings.json"), "w") as f:
-            json.dump(scan_settings, f, indent=2)
-        self.session_database.setText(save_session_dir)
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
@@ -298,3 +262,68 @@ class SaveOrLoad():
         if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
         if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")
         if hasattr(self, "wfs_response_3"): self.wfs_response_3.setText(settings["data_dirs"]["wfs"] or "")
+
+
+    def save_emittance_measurement_session(self,session):
+        time_str = datetime.now().strftime("%y%m%d%H%M%S")
+        default_dir=os.path.expanduser(os.path.expandvars("~/flight-simulator-data/"))
+        save_session_dir=os.path.join(default_dir, f"EmittanceMeasurement_{self.interface.get_name()}_{time_str}_session")
+        os.makedirs(save_session_dir, exist_ok=True)
+
+        self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt",saving_name="Save quadrupoles",use_dialog=False, base_dir=save_session_dir)
+        self._saving_func(elements_list=self.screens_list, filename="screens.txt",saving_name="Save screens",use_dialog=False, base_dir=save_session_dir)
+
+        with open(os.path.join(save_session_dir,"emittance_session.pkl"),"wb") as f: # write in a binary format
+            pickle.dump(session,f)
+
+        self.session_database.setText(save_session_dir)
+
+        return save_session_dir
+
+
+    def load_emittance_measurement_session(self):
+        default_dir = os.path.expanduser(os.path.expandvars("~/flight-simulator-data/"))
+        os.makedirs(default_dir, exist_ok=True)
+        folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
+        if not folder:
+            return
+        self._loading_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt", loading_name="Load quadrupoles", use_dialog=False, base_dir=folder)
+        self._loading_func(elements_list=self.screens_list, filename="screens.txt", loading_name="Load screens", use_dialog=False, base_dir=folder)
+
+        session_path=os.path.join(folder, "emittance_session.pkl")
+        if not os.path.isfile(session_path):
+            QMessageBox.warning(self, "Load session", "Session not found")
+            return None
+        try:
+            with open(session_path,"rb") as f:
+                session=pickle.load(f)
+        except Exception:
+            QMessageBox.warning(self, "Load session", "Session not found")
+            return None
+        self.session_database.setText(folder)
+        return session
+
+
+
+
+
+        self.session_database.setText(save_session_dir)
+
+        return save_session_dir
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

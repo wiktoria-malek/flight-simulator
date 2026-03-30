@@ -19,7 +19,7 @@ from matplotlib.figure import Figure
 from Backend.LogConsole_BBA import LogConsole
 from Backend.TestOrbits_BBA import TestOrbits
 from Backend.SaveOrLoad import SaveOrLoad
-from Backend.DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
+from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import matplotlib.pyplot as plt
 from Backend.BPM_weights import BPM_weights
 from traceback import print_exception
@@ -54,7 +54,7 @@ class BpmWeightsDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
-class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
+class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
     def __init__(self, interface, dir_name):
         super().__init__()
         self.cwd = os.getcwd()

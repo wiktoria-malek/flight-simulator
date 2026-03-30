@@ -1,6 +1,6 @@
 from Backend.State import State
 from Backend.Response import Response
-from Backend.DFS_WFS_Correction_BBA import DFS_WFS_Correction_BBA
+from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 try:
     from PyQt6 import uic
     from PyQt6.QtWidgets import (
@@ -36,7 +36,7 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
 
-class MainWindow(QMainWindow, SaveOrLoad, DFS_WFS_Correction_BBA):
+class MainWindow(QMainWindow, SaveOrLoad, Correction_Optics_ResponseMatrix):
     def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
         uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)

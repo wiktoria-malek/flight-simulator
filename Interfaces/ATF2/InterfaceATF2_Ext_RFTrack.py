@@ -1,6 +1,6 @@
 import RF_Track as rft
 import numpy as np
-import time, os
+import time, os, re
 from Backend.LogConsole_BBA import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
@@ -10,7 +10,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
+    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=50000):
         super().__init__()
         self.log = print
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
@@ -37,7 +37,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.wfs_test_charge = 0.90
         self.__setup_beam0()
         self.__track_bunch()
-
     def log_messages(self, console):
         self.log = console or print
 
@@ -549,8 +548,21 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "L": np.array(result["L"]),
         }
 
-    def _get_units(self):
-        pass
+    def get_twiss_at_element(self,name):
+        optics=self._get_optics_from_twiss_file()
+        names=list(optics["names"])
+        if name not in names:
+            raise ValueError(f"Element {name} not found in twiss file")
+        i=names.index(name)
+        return {
+            "name": names[i],
+            "S": float(optics["S"][i]),
+            "betx": float(optics["betx"][i]),
+            "alfx": float(optics["alfx"][i]),
+            "bety": float(optics["bety"][i]),
+            "alfy": float(optics["alfy"][i]),
+
+        }
 
     def align_everything(self):
         self.lattice.align_elements()

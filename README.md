@@ -1,5 +1,5 @@
 # Installation
-Requires: Python >= 3.12 and Poetry.
+Requires: Python >= 3.11 and Poetry.
 
 ### Install Poetry (if not yet installed)
 ```bash
@@ -302,7 +302,7 @@ components:
 
 * **Sampling**: Increase `nsamples` in the constructor if you want automatic multi-shot acquisition with per-shot 1 s spacing.
 * **Units**: BPM positions are returned in **mm**; intensities are passed through the BPM status gate.
-* **Safety**: `push` and `vary_correctors` talk directly to setpoint PVs. Use with care in live machines and follow your facility’s MPS/permit procedures.
+* **Safety**: `set_correctors` and `vary_correctors` talk directly to setpoint PVs. Use with care in live machines and follow your facility’s MPS/permit procedures.
 * **Extensibility**: The placeholder energy/intensity methods can be filled with site-specific PVs or finite-state-machine hooks if needed.
 ---
 

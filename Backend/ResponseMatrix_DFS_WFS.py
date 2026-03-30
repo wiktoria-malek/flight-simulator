@@ -7,7 +7,7 @@ from Backend.State import State
 Mutual response matrix calculation algorithm.
 '''
 
-class DFS_WFS_Correction_BBA():
+class ResponseMatrix_DFS_WFS():
 
     def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False):
         info=self._find_useful_files(directory)
