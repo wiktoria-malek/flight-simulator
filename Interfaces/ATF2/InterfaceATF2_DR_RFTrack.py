@@ -12,7 +12,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
 
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1):
         self.log = print
-        self.twiss_path=os.path.join(os.path.dirname(__file__),'Ext_ATF2','ATF2_EXT_FF_v5.2.twiss')
+        self.twiss_path=os.path.join(os.path.dirname(__file__),'DR_ATF2','ATF_DR_twiss_file.tws')
         self.lattice = rft.Lattice(self.twiss_path)
         for i,q in enumerate(self.lattice.get_quadrupoles()):
             if i%3 == 0:
@@ -148,8 +148,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
     def get_target_dispersion(self, names=None):
         if names is None:
             names = self.get_bpms()["names"]
-        twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
-        with open(twiss_path, "r") as file:
+        with open(self.twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
@@ -424,7 +423,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.lattice.align_elements()
         self.__track_bunch()
 
-    def misalign_quadrupoles(self,sigma_x=0.100,sigma_y=0.100):
+    def misalign_quadrupoles(self,sigma_x=0.02,sigma_y=0.02):
         self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 

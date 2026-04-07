@@ -149,24 +149,43 @@ class ResponseMatrix_DFS_WFS():
 
     def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, _force_triangular=False):
 
-        info_traj = self._data_dirs["traj"]
-        info_dfs = self._data_dirs["dfs"]
-        info_wfs = self._data_dirs["wfs"]
+        info_traj = self._data_dirs.get("traj")
+        info_dfs = self._data_dirs.get("dfs")
+        info_wfs = self._data_dirs.get("wfs")
 
-        if not (info_traj and info_traj["ok"] and info_dfs and info_dfs["ok"] and info_wfs and info_wfs["ok"]):
-            raise RuntimeError("Please select all data directories")
+        w1, w2, w3, rcond, iters, gain, beta = self._read_params()
+
+        if not (info_traj and info_traj["ok"]):
+            raise RuntimeError("Please select a trajectory data directory")
+        if w2 > 0 and not (info_dfs and info_dfs["ok"]):
+            raise RuntimeError("Please select a dispersion data directory")
+        if w3 > 0 and not (info_wfs and info_wfs["ok"]):
+            raise RuntimeError("Please select a wakefield data directory")
 
         triangular = bool(self._force_triangular() or _force_triangular)
 
         R0xx, R0yy, R0xy, R0yx, B0x, B0y, hcorrs0, vcorrs0, bpms0 = self._compute_response_matrix(
             pairs=info_traj["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
         )
-        R1xx, R1yy, R1xy, R1yx, B1x, B1y, hcorrs1, vcorrs1, bpms1 = self._compute_response_matrix(
-            pairs=info_dfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
-        )
-        R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs2, vcorrs2, bpms2 = self._compute_response_matrix(
-            pairs=info_wfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
-        )
+
+        if w2 > 0:
+            R1xx, R1yy, R1xy, R1yx, B1x, B1y, hcorrs1, vcorrs1, bpms1 = self._compute_response_matrix(
+                pairs=info_dfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
+            )
+        else:
+            R1xx, R1yy, R1xy, R1yx = R0xx.copy(), R0yy.copy(), R0xy.copy(), R0yx.copy()
+            B1x, B1y = B0x.copy(), B0y.copy()
+            hcorrs1, vcorrs1, bpms1 = list(hcorrs0), list(vcorrs0), list(bpms0)
+
+        if w3 > 0:
+            R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs2, vcorrs2, bpms2 = self._compute_response_matrix(
+                pairs=info_wfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
+            )
+        else:
+            R2xx, R2yy, R2xy, R2yx = R0xx.copy(), R0yy.copy(), R0xy.copy(), R0yx.copy()
+            B2x, B2y = B0x.copy(), B0y.copy()
+            hcorrs2, vcorrs2, bpms2 = list(hcorrs0), list(vcorrs0), list(bpms0)
+
         return (
             R0xx, R0yy, R0xy, R0yx, B0x, B0y,
             R1xx, R1yy, R1xy, R1yx, B1x, B1y,

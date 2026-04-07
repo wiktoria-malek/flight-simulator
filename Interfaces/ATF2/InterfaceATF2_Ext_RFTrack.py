@@ -10,7 +10,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=50000):
+    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
@@ -568,11 +568,11 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.lattice.align_elements()
         self.__track_bunch()
 
-    def misalign_quadrupoles(self, sigma_x=0.04, sigma_y=0.04):
+    def misalign_quadrupoles(self, sigma_x=0.02, sigma_y=0.02):
         self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
-    def misalign_bpms(self, sigma_x=0.06, sigma_y=0.06):
+    def misalign_bpms(self, sigma_x=0.100, sigma_y=0.100):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 

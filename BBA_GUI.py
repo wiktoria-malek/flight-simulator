@@ -18,6 +18,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.LogConsole_BBA import LogConsole
 from Backend.TestOrbits_BBA import TestOrbits
+from Backend.RMS_Plots_BBA import RMS_Plots
 from Backend.SaveOrLoad import SaveOrLoad
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import matplotlib.pyplot as plt
@@ -55,15 +56,20 @@ class BpmWeightsDelegate(QStyledItemDelegate):
             painter.restore()
 
 class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
-    def __init__(self, interface, dir_name):
+    def __init__(self, interface, dir_name,nominal_state=None, start_state=None):
         super().__init__()
         self.cwd = os.getcwd()
         self.interface = interface
         self.dir_name = dir_name
+        self.nominal_state = nominal_state
+        self.start_state = start_state if start_state is not None else interface.get_state()
+        self.restore_state=self.start_state
+        self.initial_state=self.start_state
+        self.measurement_start_state=None
         self._cancel = False
         self._number_re = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
-        self.initial_state=interface.get_state() # initial, for restoring
-        self.state=interface.get_state() # for latter use
+        #self.initial_state=interface.get_state() # initial, for restoring
+        #self.state=interface.get_state() # for latter use
         self.reset_reference_orbit=False
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
         uic.loadUi(ui_path, self)
@@ -76,9 +82,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._hist_orbit_x_err,self._hist_orbit_y_err, self._hist_orbit_err = [],[],[]
         self._hist_disp_x_err,self._hist_disp_y_err,self._hist_disp_err = [],[],[]
         self._hist_wake_x_err,self._hist_wake_y_err,self._hist_wake_err = [],[],[]
+        self._hist_abs_rms_x, self._hist_abs_rms_y, self._hist_abs_rms_xy = [],[], []
         self.log_console=None
         self.show_response_matrix=None
         self.test_orbits=None
+        self.rms_plots=None
         self._setup_canvases()
         self.bpm_weights={}
         self._populate_lists()
@@ -114,6 +122,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.lineEdit_beta.setText("0")
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
         self.pushButton_reset_ref_orbit.clicked.connect(self._reset_reference_orbit)
+        self.show_orbit_RMS_button.clicked.connect(self._show_orbit_RMS_plots)
         self.reset_ref_orb=False
         self.bpms_list.itemDoubleClicked.connect(self._edit_bpm_weights)
         correctors = self.interface.get_correctors()
@@ -148,7 +157,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
-
     def _get_interface_initial_settings(self):
         interface_class_name=self.interface.__class__.__name__
         interface_module_name=self.interface.__class__.__module__
@@ -176,8 +184,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._running=False
         self.interface.reset_energy()
         self.interface.reset_intensity()
-        self.interface.restore_correctors_state(self.initial_state)
+        self.interface.restore_correctors_state(self.restore_state)
         self.reset_ref_orb=True
+        self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
         self._clear_graphs()
         self.log("Machine initial settings restored.")
 
@@ -248,13 +257,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
         if values_x:
             err_x=error_x if error_x is not None else None
-            ax.errorbar(range(1, len(values_x) + 1), values_x,yerr=err_x, marker="o",color='red',label="x",capsize=6, elinewidth=2, capthick=2, markersize=4) #yerr - height of the error bar on the plot, capsize - size of the top line on the error bar
+            ax.errorbar(range(len(values_x)), values_x,yerr=err_x, marker="o",color='red',label="x",capsize=6, elinewidth=2, capthick=2, markersize=4) #yerr - height of the error bar on the plot, capsize - size of the top line on the error bar
         if values_y:
             err_y=error_y if error_y is not None else None
-            ax.errorbar(range(1, len(values_y) + 1), values_y, yerr=err_y,marker="o",color='blue',label="y", capsize=6, elinewidth=2, capthick=2, markersize=4)
+            ax.errorbar(range(len(values_y)), values_y, yerr=err_y,marker="o",color='blue',label="y", capsize=6, elinewidth=2, capthick=2, markersize=4)
         if vals:
             err_all=error_all if error_all is not None else None
-            ax.errorbar(range(1, len(vals) + 1), vals, yerr=err_all,linestyle="dashed",color='black',label="combined norm",capsize=6, elinewidth=2, capthick=2, markersize=4)
+            ax.errorbar(range(len(vals)), vals, yerr=err_all,linestyle="dashed",color='black',label="combined norm",capsize=6, elinewidth=2, capthick=2, markersize=4)
         if values_x or values_y:
             ax.legend(fontsize=7,loc="upper right")
         if title is not None:
@@ -429,6 +438,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             print("Starting correction...")
             self.log("Starting correction...")
             self._cancel = False
+            self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
             w1, w2, w3, rcond, iters, gain,beta = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
             corrs, bpms = self._get_selection()
@@ -438,6 +448,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             Cy = [s for s in corrs if self._is_v_corrector(s)]
 
             Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs, bpms_common = self._creating_response_matrices()
+            print("hcorrs order =", hcorrs)
+            print("vcorrs order =", vcorrs)
+            print("Cx from GUI =", Cx)
+            print("Cy from GUI =", Cy)
+
+            Axx_base = np.array(Axx, copy=True)
+            Ayy_base = np.array(Ayy, copy=True)
+            Axy_base = np.array(Axy, copy=True)
+            Ayx_base = np.array(Ayx, copy=True)
             bpms=list(bpms_common)
 
             n=len(bpms)
@@ -487,14 +506,24 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 print("Measuring orbit")
                 self.log("Measuring orbit")
                 state0=self.interface.get_state()
+                if it==0:
+                    self.measurement_start_state=state0
                 O0 = state0.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
                 O0x=np.asarray(O0['x'],dtype=float).reshape(-1,1)
                 O0y=np.asarray(O0['y'],dtype=float).reshape(-1,1)
                 bpms0=state0.get_bpms(bpms)
                 x0_vals=np.asarray(bpms0['x'],dtype=float)
                 y0_vals=np.asarray(bpms0['y'],dtype=float)
+                mean_x = np.mean(x0_vals,axis=0) if x0_vals.ndim == 2 else x0_vals
+                mean_y = np.mean(y0_vals,axis=0) if y0_vals.ndim == 2 else y0_vals
+                orbit_rms_x = float(np.sqrt(np.mean(mean_x**2)))
+                orbit_rms_y = float(np.sqrt(np.mean(mean_y**2)))
+                orbit_rms_xy = float(np.sqrt(np.mean(mean_x**2+mean_y**2)))
+                self._hist_abs_rms_x.append(orbit_rms_x)
+                self._hist_abs_rms_y.append(orbit_rms_y)
+                self._hist_abs_rms_xy.append(orbit_rms_xy)
 
-                if it == 0: #instead of golden orbit, correct from current orbit
+                if it == 0: # instead of golden orbit, correct from current orbit
                     B0x = O0x
                     B0y = O0y
 
@@ -503,6 +532,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     B0y=O0y.copy()
                     self.reset_ref_orb=False
                     self.log("Reference orbit reset to current orbit")
+
+                # if it == 0 and self.nominal_state is not None:
+                #     nominal_orbit = self.nominal_state.get_orbit(bpms)
+                #     B0x = np.asarray(nominal_orbit["x"], dtype=float).reshape(-1, 1)
+                #     B0y = np.asarray(nominal_orbit["y"], dtype=float).reshape(-1, 1)
 
                 # dfs
                 if w2>0:
@@ -549,6 +583,29 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     "O1y": None if O1y is None else np.asarray(O1y).reshape(-1),
                     "O2y": None if O2y is None else np.asarray(O2y).reshape(-1),
                 }
+                if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
+                    self.rms_orbits_data = {}
+
+                self.rms_orbits_data = {
+                    "selected_bpms": list(bpms),
+                    "start_x": np.asarray(x0_vals, dtype=float) if it==0 else self.rms_orbits_data.get("start_x"),
+                    "start_y": np.asarray(y0_vals, dtype=float) if it==0 else self.rms_orbits_data.get("start_y"),
+                    "current_x": np.asarray(x0_vals, dtype=float),
+                    "current_y": np.asarray(y0_vals, dtype=float),
+                    "final_x": self.rms_orbits_data.get("final_x"),
+                    "final_y": self.rms_orbits_data.get("final_y"),
+                    "x1_vals": None if w2 <= 0 else np.asarray(x1_vals, dtype=float),
+                    "y1_vals": None if w2 <= 0 else np.asarray(y1_vals, dtype=float),
+                    "x2_vals": None if w3 <= 0 else np.asarray(x2_vals, dtype=float),
+                    "y2_vals": None if w3 <= 0 else np.asarray(y2_vals, dtype=float),
+                    "nominal_x": None,
+                    "nominal_y": None,
+                }
+
+                if self.nominal_state is not None:
+                    nominal_bpms = self.nominal_state.get_bpms(bpms)
+                    self.rms_orbits_data["nominal_x"] = np.asarray(nominal_bpms["x"], dtype=float)
+                    self.rms_orbits_data["nominal_y"] = np.asarray(nominal_bpms["y"], dtype=float)
 
                 Bx=[]
                 By=[]
@@ -566,19 +623,25 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     By.append(wgt_wfs*(O2y-O0y))
                     Bx.append(wgt_wfs*(O2x-O0x))
 
+                Axx_it = np.array(Axx_base, copy=True)
+                Ayy_it = np.array(Ayy_base, copy=True)
+                Axy_it = np.array(Axy_base, copy=True)
+                Ayx_it = np.array(Ayx_base, copy=True)
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
+                print("||Bx|| =", np.linalg.norm(Bx))
+                print("||By|| =", np.linalg.norm(By))
 
-                Axx[np.isnan(Axx)] = 0
-                Ayy[np.isnan(Ayy)] = 0
-                Axy[np.isnan(Axy)] = 0
-                Ayx[np.isnan(Ayx)] = 0
+                Axx_it[np.isnan(Axx_it)] = 0
+                Ayy_it[np.isnan(Ayy_it)] = 0
+                Axy_it[np.isnan(Axy_it)] = 0
+                Ayx_it[np.isnan(Ayx_it)] = 0
 
-                Axx[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
-                Axy[np.isnan(Bx.ravel()),:] =0 # flattens an array into 1d
+                Axx_it[np.isnan(Bx.ravel()), :] = 0 # flattens an array into 1d
+                Axy_it[np.isnan(Bx.ravel()), :] = 0 # flattens an array into 1d
 
-                Ayy[np.isnan(By.ravel()),:] = 0
-                Ayx[np.isnan(By.ravel()),:] = 0
+                Ayy_it[np.isnan(By.ravel()), :] = 0
+                Ayx_it[np.isnan(By.ravel()), :] = 0
 
                 Bx[np.isnan(Bx)] = 0
                 By[np.isnan(By)] = 0
@@ -586,20 +649,24 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 # A = U * Sigma * V^
                 # A^+ = V * Sigma^+ * U^T
 
-                filter_corr_x=np.all(np.isfinite(Axx),axis=0) & np.all(np.isfinite(Ayx),axis=0) #corrs
-                filter_corr_y=np.all(np.isfinite(Ayy),axis=0) & np.all(np.isfinite(Axy),axis=0)
+                filter_corr_x = np.all(np.isfinite(Axx_it), axis=0) & np.all(np.isfinite(Ayx_it), axis=0)
+                filter_corr_y = np.all(np.isfinite(Ayy_it), axis=0) & np.all(np.isfinite(Axy_it), axis=0)
 
-                Axx=Axx[:,filter_corr_x]
-                Ayx=Ayx[:,filter_corr_x]
+                Axx_it = Axx_it[:, filter_corr_x]
+                Ayx_it = Ayx_it[:, filter_corr_x]
 
-                Ayy=Ayy[:,filter_corr_y]
-                Axy=Axy[:,filter_corr_y]
+                Ayy_it = Ayy_it[:, filter_corr_y]
+                Axy_it = Axy_it[:, filter_corr_y]
 
                 Cy_cut=[corr for corr,true in zip(vcorrs,filter_corr_y) if true]
                 Cx_cut=[corr for corr,true in zip(hcorrs,filter_corr_x) if true]
 
-                A = np.block([[Axx,Axy],
-                              [Ayx,Ayy]])
+                # Axy_it[:]=0.0 # REMOVE LATER!
+                # Ayx_it[:]=0.0 # REMOVE LATER!
+
+
+                A = np.block([[Axx_it,Axy_it],
+                              [Ayx_it,Ayy_it]])
 
                 B=np.vstack([Bx,By])
 
@@ -627,8 +694,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 delta_vals=np.concatenate([delta_x,delta_y])
 
                 selected_correctors=Cx_cut+Cy_cut
-                current_corrs=self.interface.get_correctors(selected_correctors)
-                current_bdes=np.asarray(current_corrs['bdes'],dtype=float).ravel()
+                print("Cx_cut =", Cx_cut)
+                print("Cy_cut =", Cy_cut)
+                print("selected_correctors =", selected_correctors)
+                current_corrs = self.interface.get_correctors(selected_correctors)
+                returned_names = list(current_corrs["names"])
+                returned_bdes = np.asarray(current_corrs["bdes"], dtype=float).ravel()
+
+                bdes_map = {name: val for name, val in zip(returned_names, returned_bdes)}
+                current_bdes = np.array([bdes_map[name] for name in selected_correctors], dtype=float)
 
                 max_vals_x=np.full(delta_x.shape,max_curr_h,dtype=float)
                 max_vals_y=np.full(delta_y.shape,max_curr_v,dtype=float)
@@ -637,6 +711,20 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 new_bdes=current_bdes+delta_vals
                 new_bdes=clamp(new_bdes,max_vals)
                 self.interface.set_correctors(selected_correctors,new_bdes)
+
+                after_corrs = self.interface.get_correctors(selected_correctors)
+                after_names = list(after_corrs["names"])
+                after_vals = np.asarray(after_corrs["bdes"], dtype=float).ravel()
+                after_map = {name: val for name, val in zip(after_names, after_vals)}
+                after_bdes = np.array([after_map[name] for name in selected_correctors], dtype=float)
+
+                print("selected_correctors =", selected_correctors)
+                print("current_bdes =", current_bdes)
+                print("new_bdes =", new_bdes)
+                print("after_bdes =", after_bdes)
+                print("applied_delta =", after_bdes - current_bdes)
+                # new bdes and after bdes should be the same
+
                 vals=new_bdes-current_bdes
 
                 # current_bdes + delta -> clamp(final_bdes) -> set_correctors(final_bdes)
@@ -689,9 +777,31 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
             self.setWindowTitle("BBA GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
-            state = self.interface.get_state()
-            print(state.get_bpms())
-            print(state.get_screens())
+            final_state = self.interface.get_state()
+
+
+            final_bpms = final_state.get_bpms(bpms)
+            final_x_vals = np.asarray(final_bpms["x"], dtype=float)
+            final_y_vals = np.asarray(final_bpms["y"], dtype=float)
+
+            if hasattr(self, "rms_orbits_data") and self.rms_orbits_data is not None:
+                self.rms_orbits_data["final_x"] = final_x_vals
+                self.rms_orbits_data["final_y"] = final_y_vals
+
+            mean_final_x = np.mean(final_x_vals, axis=0) if final_x_vals.ndim == 2 else final_x_vals
+            mean_final_y = np.mean(final_y_vals, axis=0) if final_y_vals.ndim == 2 else final_y_vals
+
+            final_rms_x = float(np.sqrt(np.mean(mean_final_x ** 2)))
+            final_rms_y = float(np.sqrt(np.mean(mean_final_y ** 2)))
+            final_rms_xy = float(np.sqrt(np.mean(mean_final_x ** 2 + mean_final_y ** 2)))
+
+            self._hist_abs_rms_x.append(final_rms_x)
+            self._hist_abs_rms_y.append(final_rms_y)
+            self._hist_abs_rms_xy.append(final_rms_xy)
+            print(f"FINAL RMS x = {final_rms_x:.6f} mm")
+            print(f"FINAL RMS y = {final_rms_y:.6f} mm")
+            print(f"FINAL RMS combined = {final_rms_xy:.6f} mm")
+
             self.log("Correction finished.")
             self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By)
 
@@ -705,6 +815,34 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._cancel = True
         QMessageBox.information(self, "Correction", "Stop requested. Finishing current iteration...")
         self.log("Stop requested. Finishing current iteration...")
+
+    def _show_orbit_RMS_plots(self):
+        if self.rms_plots is None:
+            self.rms_plots=RMS_Plots(self)
+        if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
+            QMessageBox.information(self, "Error", "No RMS orbits available.")
+        else:
+            self.rms_plots.plot_all(
+                selected_bpms=self.rms_orbits_data["selected_bpms"],
+                start_x=self.rms_orbits_data.get("start_x"),
+                start_y=self.rms_orbits_data.get("start_y"),
+                current_x=self.rms_orbits_data.get("current_x"),
+                current_y=self.rms_orbits_data.get("current_y"),
+                final_x=self.rms_orbits_data.get("final_x"),
+                final_y=self.rms_orbits_data.get("final_y"),
+                x1_vals=self.rms_orbits_data["x1_vals"],
+                y1_vals=self.rms_orbits_data["y1_vals"],
+                x2_vals=self.rms_orbits_data["x2_vals"],
+                y2_vals=self.rms_orbits_data["y2_vals"],
+                rms_x_iter=self._hist_abs_rms_x,
+                rms_y_iter=self._hist_abs_rms_y,
+                rms_xy_iter=self._hist_abs_rms_xy,
+                nominal_x=self.rms_orbits_data.get("nominal_x"),
+                nominal_y=self.rms_orbits_data.get("nominal_y"),
+            )
+        self.rms_plots.show()
+        self.rms_plots.raise_()
+        self.rms_plots.activateWindow()
 
     def _show_test_orbits(self):
         if self.test_orbits is None:
@@ -813,13 +951,15 @@ if __name__ == "__main__":
         print("Selection cancelled.")
         sys.exit(1)
 
-    I=dialog
-    project_name=I.get_name()
+    I = dialog
+    project_name = I.get_name()
+    nominal_state = None
+    start_state = I.get_state()
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     dir_name = f"~/flight-simulator-data/BBA_{I.get_name()}_{time_str}_session_settings"
     dir_name = os.path.expanduser(os.path.expandvars(dir_name))
-    w = MainWindow(interface=I, dir_name=dir_name)
+    w = MainWindow(interface=I, dir_name=dir_name,nominal_state=nominal_state,start_state=start_state)
 
     if hasattr(I, "log_messages"):
         I.log_messages(w.log)

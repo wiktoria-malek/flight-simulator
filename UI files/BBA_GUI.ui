@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1141</width>
+    <width>1295</width>
     <height>886</height>
    </rect>
   </property>
@@ -658,6 +658,13 @@
              </widget>
             </item>
             <item>
+             <widget class="QPushButton" name="show_orbit_RMS_button">
+              <property name="text">
+               <string>Show Orbit RMS</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QPushButton" name="pushButton_reset_ref_orbit">
               <property name="styleSheet">
                <string notr="true">background-color: red; color: white;</string>
@@ -724,7 +731,7 @@
           <item>
            <widget class="QGroupBox" name="groupBox_2">
             <property name="title">
-             <string>Trajectory</string>
+             <string>Trajectory (Residual to response matrix reference)</string>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_8">
              <item>
@@ -749,7 +756,7 @@
           <item>
            <widget class="QGroupBox" name="groupBox_3">
             <property name="title">
-             <string>Dispersion</string>
+             <string>Dispersion (Residual to response matrix reference)</string>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_4">
              <item>
@@ -774,7 +781,7 @@
           <item>
            <widget class="QGroupBox" name="groupBox_4">
             <property name="title">
-             <string>Wakefield</string>
+             <string>Wakefield (Residual to response matrix reference)</string>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_5">
              <item>
