@@ -33,8 +33,15 @@ class MeasureOptics:
 
         K1_nom = float(K1_values[idx0])
 
-        fit_x = self._fit_plane(K1_values=K1_values, sigma=sigx, sigma_std=sigx_std, K1_nom=K1_nom, plane="x")
-        fit_y = self._fit_plane(K1_values=K1_values, sigma=sigy, sigma_std=sigy_std, K1_nom=K1_nom, plane="y")
+        model_twiss_screen0 = None
+        try:
+            if hasattr(self.interface, "get_twiss_at_screen") and screens:
+                model_twiss_screen0 = self.interface.get_twiss_at_screen(screens[0])
+        except Exception:
+            model_twiss_screen0 = None
+
+        fit_x = self._fit_plane(K1_values=K1_values, sigma=sigx, sigma_std=sigx_std, K1_nom=K1_nom, plane="x", model_twiss=model_twiss_screen0)
+        fit_y = self._fit_plane(K1_values=K1_values, sigma=sigy, sigma_std=sigy_std, K1_nom=K1_nom, plane="y", model_twiss=model_twiss_screen0)
 
         return {
             "type": "screen0_twiss_vs_K1",
@@ -92,21 +99,52 @@ class MeasureOptics:
 
         return result
 
-    def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane):
+    def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane, model_twiss=None):
         nsteps, nscreens = sigma.shape
         dK1_values = K1_values - K1_nom
 
         sigma2_raw = sigma ** 2 # nsteps x nscreens
+        sigma2_err = 2.0 * np.abs(sigma) * np.abs(sigma_std)
 
+        screen_scale = np.nanmedian(sigma2_raw, axis=0)
+        screen_scale = np.where(np.isfinite(screen_scale), screen_scale, np.nan)
+
+        floor_per_screen = np.maximum(0.03 * np.abs(screen_scale), 1e-6)
+        floor_per_screen = np.where(np.isfinite(floor_per_screen), floor_per_screen, 1e-6)
+
+        sigma2_err = np.where(np.isfinite(sigma2_err), sigma2_err, np.nan)
+        sigma2_err = np.maximum(sigma2_err, floor_per_screen[None, :])
+        sigma2_err[~np.isfinite(sigma2_err)] = 1e-6
+
+        valid_downstream = (
+                np.isfinite(sigma2_raw[:, 1:]) &
+                np.isfinite(sigma2_err[:, 1:]) &
+                (sigma2_err[:, 1:] > 0)
+        )
         nom_idx = int(np.argmin(np.abs(dK1_values)))
         sig2_0 = float(np.nanmedian(sigma2_raw[:, 0]))
-        beta_guess = max(sig2_0 / 1e-3, 1e-6)
+
+        model_beta_guess = np.nan
+        model_alpha_guess = np.nan
+        if isinstance(model_twiss, dict):
+            model_beta_guess = float(model_twiss.get(f"beta_{plane}", np.nan))
+            model_alpha_guess = float(model_twiss.get(f"alpha_{plane}", np.nan))
+
+        if np.isfinite(model_beta_guess) and model_beta_guess > 1e-6:
+            beta_guess = float(model_beta_guess)
+        else:
+            beta_guess = max(sig2_0 / 1e-3, 1e-6)
+
+        if np.isfinite(model_alpha_guess):
+            alpha_guess = float(model_alpha_guess)
+        else:
+            alpha_guess = 0.0
 
         x0_twiss = np.array([
             np.log(beta_guess),  # beta_log_p0
             0.0,                 # beta_log_p1
             0.0,                 # beta_log_p2
-            0.0,                 # alpha_p0
+            alpha_guess,         # alpha_p0
             0.0,                 # alpha_p1
             0.0                  # alpha_p2
         ], dtype=float)
@@ -134,7 +172,7 @@ class MeasureOptics:
         def predict(x):
             beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params = unpack(x)
 
-            pred = np.full((nsteps, nscreens), np.nan)
+            pred = np.full((nsteps, nscreens), np.nan, dtype=float)
 
             for k, dK1 in enumerate(dK1_values):
                 beta0 = np.exp(beta_log_p0 + beta_log_p1 * dK1 + beta_log_p2 * dK1 ** 2)
@@ -147,7 +185,9 @@ class MeasureOptics:
 
                 for i, (R11, R12) in enumerate(t_params):
                     numer = (R11 ** 2 * beta0 - 2.0 * R11 * R12 * alpha0 + R12 ** 2 * gamma0)
-                    pred[k, i + 1] = c_params[i] * sigma2_ref_meas * (numer / beta0)
+                    val = c_params[i] * sigma2_ref_meas * (numer / beta0)
+                    if np.isfinite(val):
+                        pred[k, i + 1] = val
 
             return pred
 
@@ -155,58 +195,87 @@ class MeasureOptics:
             pred = predict(x)
             res = []
 
-            sigma2 = sigma ** 2
-            sigma2_err = 2.0 * np.abs(sigma) * np.abs(sigma_std)
+            pred_downstream = pred[:, 1:]
+            meas_downstream = sigma2_raw[:, 1:]
+            err_downstream = sigma2_err[:, 1:]
 
-            screen_scale = np.nanmedian(sigma2, axis=0)
-            screen_scale = np.where(np.isfinite(screen_scale), screen_scale, np.nan)
+            safe_pred_downstream = np.where(np.isfinite(pred_downstream), pred_downstream, 0.0)
+            data_residuals = (safe_pred_downstream - meas_downstream) / err_downstream
 
-            floor_per_screen = np.maximum(0.03 * np.abs(screen_scale), 1e-6)
-            floor_per_screen = np.where(np.isfinite(floor_per_screen), floor_per_screen, 1e-6)
+            invalid_penalty = np.where(
+                valid_downstream & ~np.isfinite(pred_downstream),
+                1e6,
+                0.0
+            )
 
-            sigma2_err = np.where(np.isfinite(sigma2_err), sigma2_err, np.nan)
-            sigma2_err = np.maximum(sigma2_err, floor_per_screen[None, :])
-            sigma2_err[~np.isfinite(sigma2_err)] = 1e-6
-            for k in range(nsteps):
-                for i in range(1, nscreens):
-                    y = sigma2_raw[k, i]
-                    y_p = pred[k, i]
-                    err = sigma2_err[k, i]
+            data_residuals = np.where(
+                valid_downstream,
+                data_residuals + invalid_penalty,
+                0.0
+            )
 
-                    if np.isfinite(y) and np.isfinite(y_p):
-                        if np.isfinite(err) and err > 0:
-                            res.append((y_p - y) / err)
-                        else:
-                            res.append(y_p - y)
+            res.extend(data_residuals[valid_downstream].ravel().tolist())
 
-            _, _, _, _, _, _, c_params, t_params = unpack(x)
+            _, _, _, _, _, _, c_params, _ = unpack(x)
 
             for c in c_params:
                 res.append((c - 1.0) / 0.08)
 
             beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(x)
-            res.append(beta_log_p1 / 0.20)
-            res.append(beta_log_p2 / 0.20)
-            res.append(alpha_p1 / 0.25)
-            res.append(alpha_p2 / 0.25)
 
-            return np.asarray(res)
+            if np.isfinite(model_beta_guess) and model_beta_guess > 1e-6:
+                res.append((beta_log_p0 - np.log(model_beta_guess)) / 0.60)
+            if np.isfinite(model_alpha_guess):
+                res.append((alpha_p0 - model_alpha_guess) / 1.20)
 
+            res.append(beta_log_p1 / 0.12)
+            res.append(beta_log_p2 / 0.12)
+            res.append(alpha_p1 / 0.15)
+            res.append(alpha_p2 / 0.15)
+
+            beta_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values ** 2)
+            alpha_vals = alpha_p0 + alpha_p1 * dK1_values + alpha_p2 * dK1_values ** 2
+
+            for b in beta_vals:
+                if np.isfinite(b):
+                    res.append(max(0.2 - b, 0.0) / 0.1)
+                    res.append(max(b - 30.0, 0.0) / 5.0)
+                else:
+                    res.append(1e6)
+                    res.append(1e6)
+
+            for a in alpha_vals:
+                if np.isfinite(a):
+                    res.append(max(abs(a) - 5.0, 0.0) / 0.5)
+                else:
+                    res.append(1e6)
+
+            return np.asarray(res, dtype=float)
+
+        last_error = None
         best_fit = None
         best_cost = np.inf
 
         def run(x0):
+            nonlocal last_error
             try:
                 lower = np.concatenate([
-                    np.array([np.log(1e-8), -1.5, -1.5, -10.0, -2.0, -2.0], dtype=float),
+                    np.array([np.log(1e-8), -1.5, -1.5, -8.0, -2.0, -2.0], dtype=float),
                     np.full(nscreens - 1, 0.90, dtype=float),
                     np.tile(np.array([-10.0, 0.05], dtype=float), nscreens - 1),
                 ])
                 upper = np.concatenate([
-                    np.array([np.log(1e4), 1.5, 1.5, 10.0, 2.0, 2.0], dtype=float),
+                    np.array([np.log(1e4), 1.5, 1.5, 8.0, 2.0, 2.0], dtype=float),
                     np.full(nscreens - 1, 1.10, dtype=float),
                     np.tile(np.array([10.0, 20.0], dtype=float), nscreens - 1),
                 ])
+
+                x0 = np.asarray(x0, dtype=float)
+                if x0.shape != lower.shape:
+                    raise ValueError(f"Initial guess shape {x0.shape} does not match bounds shape {lower.shape}")
+
+                eps = 1e-10
+                x0 = np.minimum(np.maximum(x0, lower + eps), upper - eps)
 
                 return least_squares(
                     residuals,
@@ -217,13 +286,24 @@ class MeasureOptics:
                     bounds=(lower, upper),
                     max_nfev=5000,
                 )
-            except Exception:
+            except Exception as e:
+                last_error = e
                 return None
 
         r = run(x0_canonical)
-        if r is not None and r.cost < best_cost:
-            best_cost = r.cost
-            best_fit = r
+        if r is not None:
+            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(r.x)
+            beta_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values ** 2)
+            alpha_vals = alpha_p0 + alpha_p1 * dK1_values + alpha_p2 * dK1_values ** 2
+
+            penalty = 0.0
+            penalty += 50.0 * np.sum(np.maximum(np.abs(alpha_vals) - 5.0, 0.0))
+            penalty += 50.0 * np.sum(np.maximum(0.2 - beta_vals, 0.0))
+            score = float(r.cost) + penalty
+
+            if score < best_cost:
+                best_cost = score
+                best_fit = r
 
         # random restarts
         for _ in range(self.n_starts - 1):
@@ -235,12 +315,24 @@ class MeasureOptics:
             x0_rand = np.concatenate([x0_twiss, c_rand, t_rand.ravel()])
 
             r = run(x0_rand)
-            if r is not None and r.cost < best_cost:
-                best_cost = r.cost
-                best_fit = r
+            if r is not None:
+                beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(r.x)
+                beta_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values ** 2)
+                alpha_vals = alpha_p0 + alpha_p1 * dK1_values + alpha_p2 * dK1_values ** 2
+
+                penalty = 0.0
+                penalty += 50.0 * np.sum(np.maximum(np.abs(alpha_vals) - 5.0, 0.0))
+                penalty += 50.0 * np.sum(np.maximum(0.2 - beta_vals, 0.0))
+                score = float(r.cost) + penalty
+
+                if score < best_cost:
+                    best_cost = score
+                    best_fit = r
 
         if best_fit is None:
-            raise RuntimeError(f"Transport fit failed for plane {plane}")
+            if last_error is None:
+                raise RuntimeError(f"Transport fit failed for plane {plane}")
+            raise RuntimeError(f"Transport fit failed for plane {plane}: {last_error}")
         beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params = unpack(best_fit.x)
 
         beta0_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values**2)

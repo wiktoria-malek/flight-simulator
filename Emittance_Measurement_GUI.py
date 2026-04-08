@@ -504,23 +504,37 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             emit = float(np.exp(p[0]))
             pred, beta_step, alpha_step = predict_sigma2(emit)
 
-            res = []
-            for k in range(nsteps):
-                for i in range(1, nscreens):
-                    y = sigma2[k, i]
-                    yp = pred[k, i]
-                    err = sigma2_err[k, i]
-                    if np.isfinite(y) and np.isfinite(yp) and np.isfinite(err) and err > 0:
-                        res.append((yp - y) / err)
+            valid_downstream = (
+                    np.isfinite(sigma2[:, 1:]) &
+                    np.isfinite(sigma2_err[:, 1:]) &
+                    (sigma2_err[:, 1:] > 0)
+            )
+            pred_downstream = pred[:, 1:]
+            meas_downstream = sigma2[:, 1:]
+            err_downstream = sigma2_err[:, 1:]
+
+            safe_pred_downstream = np.where(np.isfinite(pred_downstream), pred_downstream, 0.0)
+            data_residuals = (safe_pred_downstream - meas_downstream) / err_downstream
+            invalid_penalty = np.where(
+                valid_downstream & ~np.isfinite(pred_downstream),
+                1e6,
+                0.0,
+            )
+            data_residuals = np.where(
+                valid_downstream,
+                data_residuals + invalid_penalty,
+                0.0,
+            )
+
+            res = data_residuals[valid_downstream].ravel().tolist()
 
             y0 = sigma2[nom_idx, 0]
             yp0 = pred[nom_idx, 0]
             err0 = sigma2_err[nom_idx, 0]
             if np.isfinite(y0) and np.isfinite(yp0) and np.isfinite(err0) and err0 > 0:
                 res.append(0.25 * (yp0 - y0) / err0)
-
-            _, beta_step, alpha_step = predict_sigma2(emit)
-
+            elif np.isfinite(y0) and np.isfinite(err0) and err0 > 0:
+                res.append(1e6)
 
             return np.asarray(res, dtype=float)
 
