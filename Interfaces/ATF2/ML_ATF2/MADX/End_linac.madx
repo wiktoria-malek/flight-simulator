@@ -1,0 +1,94 @@
+! FODO lattice MAD-X statements definition
+! *********************************************************************
+! Definition of parameters
+! *********************************************************************
+
+
+Eenergy=0.080;
+l_cell=15.557;
+a0=0.016;
+quadrupolelength=0.190; ! Updated on 16/05/2025 after talking with Okugi
+myk_0:=0;
+myk_1:=(3.14/quadrupolelength)*0.3/1.300;
+myk_2:=(3.08/quadrupolelength)*0.3/1.300;
+myk_3:=(3.04/quadrupolelength)*0.3/1.300;
+myk_4:=(3.12/quadrupolelength)*0.3/1.300;
+
+value, myk_1;
+value, myk_2;
+value, myk_3;
+value, myk_4;
+
+kickerlength = 0.075;
+kh1:=0;
+kv2:=0;
+kh3:=0;
+kv4:=0;
+
+striplinelength = 0.085;
+rbpmlength = 0.180;
+OTRlength = 0.116;
+
+! *********************************************************************
+! Definition of magnets
+! ********************************************************************* 
+
+q1_f: quadrupole, l=quadrupolelength, k1:=myk_1;
+q2_d: quadrupole, l=quadrupolelength, k1:=-myk_2;
+q3_f: quadrupole, l=quadrupolelength, k1:=myk_3;
+q4_d: quadrupole, l=quadrupolelength, k1:=-myk_4;
+
+k1_h: hkicker ,l=kickerlength, kick=kh1;
+k2_v: vkicker ,l=kickerlength, kick=kv2;
+k3_h: hkicker ,l=kickerlength, kick=kh3;
+k4_v: vkicker ,l=kickerlength, kick=kv4;
+
+
+! *********************************************************************
+! Definition of BPMs
+! ********************************************************************* 
+
+stripline: monitor, l=striplinelength;
+rbpm: monitor, l=rbpmlength;
+
+! *********************************************************************
+! Definition of sequence
+! *********************************************************************
+
+linacend:sequence, refer=entry, l=l_cell;
+
+m1: marker, at=0;
+
+ZH13L: k1_h, at=6.174;
+
+Q1PL: q1_f, at=0.095+kickerlength/2, from=ZH13L;
+
+ZV13L: k2_v, at=0.307+quadrupolelength/2, from=Q1PL;
+
+Q2PL: q2_d, at=0.098+kickerlength/2, from=ZV13L;
+
+ZH14L: k3_h, at=0.307+quadrupolelength/2, from=Q2PL;
+
+Q3PL: q3_f, at=0.098+kickerlength/2, from=ZH14L;
+
+ZV14L: k4_v, at=0.307+quadrupolelength/2, from=Q3PL;
+
+Q4PL: q4_d, at=0.098+kickerlength/2, from=ZV14L;
+
+BPMS03: stripline, at=0.240+quadrupolelength/2-striplinelength/2, from=Q4PL;
+
+PRM13: marker, at=2.804, from=BPMS03;
+
+BPMT01: stripline, at=0.324-striplinelength/2, from=PRM13;
+
+RefBPM: rbpm, at=0.990+striplinelength/2, from=BPMT01;
+
+BPMT07: stripline, at=2.157+rbpmlength/2, from=RefBPM;
+
+
+endsequence;
+
+beam,particle=electron,energy=0.080;
+use, sequence=linacend;
+select, flag=twiss, full;
+twiss, betx=0.451, alfx=-3.599, bety=2.236, alfy=-10.419, file=linacend.tws;
