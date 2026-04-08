@@ -6,7 +6,7 @@ class MeasureOptics:
 
     def __init__(self, interface, n_starts=5, rng_seed=42): #every time it's the same random set of numbers, pseudorandom
         self.interface = interface
-        self.n_starts = int(n_starts) # how many restars with initial values
+        self.n_starts = int(n_starts) # how many restarts with initial values
         self.rng = np.random.default_rng(rng_seed) # exactly for random starting points in _fit_plane
 
     def get_from_session(self, session):
@@ -55,23 +55,37 @@ class MeasureOptics:
         beta_log_p2 = float(fit["beta_log_p2"])
         alpha_p0 = float(fit["alpha_p0"])
         alpha_p1 = float(fit["alpha_p1"])
+        alpha_p2 = float(fit.get("alpha_p2", 0.0))
 
         beta0 = np.exp(beta_log_p0 + beta_log_p1 * dK1 + beta_log_p2 * dK1**2)
-        alpha0 = alpha_p0 + alpha_p1 * dK1
+        alpha0 = alpha_p0 + alpha_p1 * dK1 + alpha_p2 * dK1**2
 
         return beta0, alpha0
 
     @staticmethod
-    def _get_transport_at_K1(measured_optics, plane, K1_values): # it doesn't use any class state
+    def _get_transport_at_K1(measured_optics, plane, K1_values):
         fit = measured_optics[f"fit_{plane}"]
         params = np.asarray(fit["transport_params"], dtype=float)
+        K1_values = np.asarray(K1_values, dtype=float)
+        K1_nom = float(measured_optics["K1_nom"])
+        dK1_values = K1_values - K1_nom
 
         result = []
-        for _ in K1_values:
+        for dK1 in dK1_values:
             Rs = [np.eye(2)]
-            for R11, R12 in params:
+            for row in params:
+                row = np.asarray(row, dtype=float).ravel()
+                if row.size == 2:
+                    R11, R12 = row
+                elif row.size == 4:
+                    R11_0, R11_1, R12_0, R12_1 = row
+                    R11 = R11_0 + R11_1 * dK1
+                    R12 = R12_0 + R12_1 * dK1
+                else:
+                    raise ValueError(f"Unexpected transport parameter size: {row.size}")
+
                 Rs.append(np.array([
-                    [R11, R12], # it just refactors the params so it can be used easier later in the code
+                    [R11, R12],
                     [0.0, 1.0]
                 ]))
             result.append(Rs)
@@ -79,56 +93,30 @@ class MeasureOptics:
         return result
 
     def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane):
-        '''
-        It takes beam sizes at each plane and adjust model optics that tells is
-        how beam sizes at screens change throughout the quadrupole scan.
-
-        So it returns:
-        Twiss parameters at the first screen: beta_0 = exp(p0 + p1 dK1 + p2 dK1^2)
-                                              alpha_0 = q0 + q1 dK1
-        And transport from screen0 to other screens. -> R11, R12
-
-        '''
         nsteps, nscreens = sigma.shape
         dK1_values = K1_values - K1_nom
 
         sigma2_raw = sigma ** 2 # nsteps x nscreens
-        sigma2_ref = np.maximum(sigma2_raw[:, [0]], 1e-30) # takes all raws from columns 0, so sigma**2 at first screen, it's a column, 1e-30 so we don't divide by zero
-        sigma2_ratio = sigma2_raw / sigma2_ref
-        '''
-        sigma_i^2 = emit * (R11**2 * beta0 - 2 * R11 * R12 * alpha0 + R12^2 * gamma0)
-        sigma_0^2 = emit * beta0
-        So by calculating ratio, we don't need emittance yet.
-        When we know the optics, then we infer emitance.
-        '''
-        sigma_safe = np.maximum(np.abs(sigma), 1e-30) # sigma, but cannot be 0
-        ref_safe = np.maximum(np.abs(sigma[:, [0]]), 1e-30)
-
-        rel_err_num = 2.0 * np.abs(sigma_std) / sigma_safe # 2 * dsigma/sigma
-        rel_err_den = 2.0 * np.abs(sigma_std[:, [0]]) / ref_safe # for denominator
-        ratio_err = sigma2_ratio * np.sqrt(rel_err_num**2 + rel_err_den**2) # error propagation, derr/err = np.sqrt((dA/A)^2 + (dB/B)^2)
-        ratio_err[:, 0] = 1e-6 # because usually for the first screen the ratio_err = 1, so giving a small error
-        ratio_err[~np.isfinite(ratio_err)] = np.nan
 
         nom_idx = int(np.argmin(np.abs(dK1_values)))
-        sig2_0 = float(sigma2_raw[nom_idx, 0])
-
-        beta_guess = max(sig2_0 / 1e-3, 1e-6) # starting point
+        sig2_0 = float(np.nanmedian(sigma2_raw[:, 0]))
+        beta_guess = max(sig2_0 / 1e-3, 1e-6)
 
         x0_twiss = np.array([
-            np.log(beta_guess),
-            0.0, # beta_log_p1
-            0.0, # beta_log_p2
-            0.0, # alpha_p0
-            0.0  # alpha_p1
-        ], dtype=float) # so, beta0(dK1) = const
-                        #     alpha0(dK1) = 0
+            np.log(beta_guess),  # beta_log_p0
+            0.0,                 # beta_log_p1
+            0.0,                 # beta_log_p2
+            0.0,                 # alpha_p0
+            0.0,                 # alpha_p1
+            0.0                  # alpha_p2
+        ], dtype=float)
 
+        c0 = np.ones(nscreens - 1, dtype=float)
         t0 = np.zeros((nscreens - 1, 2), dtype=float)
-        t0[:, 0] = 1.0   # R11
-        t0[:, 1] = 1.0   # R12
+        t0[:, 0] = 1.0  # R11
+        t0[:, 1] = 1.0  # R12
 
-        x0_canonical = np.concatenate([x0_twiss, t0.ravel()]) # optimizer wants a vector with numbers, that's why
+        x0_canonical = np.concatenate([x0_twiss, c0, t0.ravel()])
 
         def unpack(x):
             beta_log_p0 = float(x[0])
@@ -136,28 +124,30 @@ class MeasureOptics:
             beta_log_p2 = float(x[2])
             alpha_p0 = float(x[3])
             alpha_p1 = float(x[4])
-            t_params = x[5:].reshape(nscreens - 1, 2)
-            return beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, t_params
+            alpha_p2 = float(x[5])
+
+            c_params = x[6:6 + (nscreens - 1)]
+            t_params = x[6 + (nscreens - 1):].reshape(nscreens - 1, 2)
+
+            return beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params
 
         def predict(x):
-            '''
-            If parameters are x, what ratio sigma_i^2 / sigma_0^2 model assumes.
-            '''
-            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, t_params = unpack(x)
+            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params = unpack(x)
 
             pred = np.full((nsteps, nscreens), np.nan)
 
             for k, dK1 in enumerate(dK1_values):
-                beta0 = np.exp(beta_log_p0 + beta_log_p1 * dK1 + beta_log_p2 * dK1**2) # beta0 > 0
+                beta0 = np.exp(beta_log_p0 + beta_log_p1 * dK1 + beta_log_p2 * dK1 ** 2)
                 beta0 = max(beta0, 1e-12)
-                alpha0 = alpha_p0 + alpha_p1 * dK1
-                gamma0 = (1.0 + alpha0**2) / beta0
+                alpha0 = alpha_p0 + alpha_p1 * dK1 + alpha_p2 * dK1 ** 2
+                gamma0 = (1.0 + alpha0 ** 2) / beta0
 
-                pred[k, 0] = 1.0
+                sigma2_ref_meas = max(float(sigma2_raw[k, 0]), 1e-12)
+                pred[k, 0] = sigma2_ref_meas
 
                 for i, (R11, R12) in enumerate(t_params):
-                    numer = (R11**2 * beta0 - 2.0 * R11 * R12 * alpha0 + R12**2 * gamma0)
-                    pred[k, i + 1] = numer / beta0 # ratio
+                    numer = (R11 ** 2 * beta0 - 2.0 * R11 * R12 * alpha0 + R12 ** 2 * gamma0)
+                    pred[k, i + 1] = c_params[i] * sigma2_ref_meas * (numer / beta0)
 
             return pred
 
@@ -165,11 +155,23 @@ class MeasureOptics:
             pred = predict(x)
             res = []
 
+            sigma2 = sigma ** 2
+            sigma2_err = 2.0 * np.abs(sigma) * np.abs(sigma_std)
+
+            screen_scale = np.nanmedian(sigma2, axis=0)
+            screen_scale = np.where(np.isfinite(screen_scale), screen_scale, np.nan)
+
+            floor_per_screen = np.maximum(0.03 * np.abs(screen_scale), 1e-6)
+            floor_per_screen = np.where(np.isfinite(floor_per_screen), floor_per_screen, 1e-6)
+
+            sigma2_err = np.where(np.isfinite(sigma2_err), sigma2_err, np.nan)
+            sigma2_err = np.maximum(sigma2_err, floor_per_screen[None, :])
+            sigma2_err[~np.isfinite(sigma2_err)] = 1e-6
             for k in range(nsteps):
-                for i in range(nscreens):
-                    y = sigma2_ratio[k, i] # from data
-                    y_p = pred[k, i] # model assumptions
-                    err = ratio_err[k, i]
+                for i in range(1, nscreens):
+                    y = sigma2_raw[k, i]
+                    y_p = pred[k, i]
+                    err = sigma2_err[k, i]
 
                     if np.isfinite(y) and np.isfinite(y_p):
                         if np.isfinite(err) and err > 0:
@@ -177,14 +179,44 @@ class MeasureOptics:
                         else:
                             res.append(y_p - y)
 
+            _, _, _, _, _, _, c_params, t_params = unpack(x)
+
+            for c in c_params:
+                res.append((c - 1.0) / 0.08)
+
+            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(x)
+            res.append(beta_log_p1 / 0.20)
+            res.append(beta_log_p2 / 0.20)
+            res.append(alpha_p1 / 0.25)
+            res.append(alpha_p2 / 0.25)
+
             return np.asarray(res)
 
-        best_fit = None # among all starts
+        best_fit = None
         best_cost = np.inf
 
-        def run(x0): # (model - data) / error
-            try: # what best adjusts model to data
-                return least_squares(residuals, x0, method="trf", max_nfev=5000) # trf is not doing big steps, max_nfev is max evaluations of residuals function
+        def run(x0):
+            try:
+                lower = np.concatenate([
+                    np.array([np.log(1e-8), -1.5, -1.5, -10.0, -2.0, -2.0], dtype=float),
+                    np.full(nscreens - 1, 0.90, dtype=float),
+                    np.tile(np.array([-10.0, 0.05], dtype=float), nscreens - 1),
+                ])
+                upper = np.concatenate([
+                    np.array([np.log(1e4), 1.5, 1.5, 10.0, 2.0, 2.0], dtype=float),
+                    np.full(nscreens - 1, 1.10, dtype=float),
+                    np.tile(np.array([10.0, 20.0], dtype=float), nscreens - 1),
+                ])
+
+                return least_squares(
+                    residuals,
+                    x0,
+                    method="trf",
+                    loss="soft_l1",
+                    f_scale=1.0,
+                    bounds=(lower, upper),
+                    max_nfev=5000,
+                )
             except Exception:
                 return None
 
@@ -195,11 +227,12 @@ class MeasureOptics:
 
         # random restarts
         for _ in range(self.n_starts - 1):
+            c_rand = self.rng.uniform(0.95, 1.05, nscreens - 1)
             t_rand = np.zeros((nscreens - 1, 2), dtype=float)
-            t_rand[:, 0] = self.rng.uniform(-2.0, 2.0, nscreens - 1)   # R11, in given range, random is uniform
-            t_rand[:, 1] = self.rng.uniform(0.01, 10.0, nscreens - 1)  # R12
+            t_rand[:, 0] = self.rng.uniform(-3.0, 3.0, nscreens - 1)  # R11
+            t_rand[:, 1] = self.rng.uniform(0.2, 8.0, nscreens - 1)  # R12
 
-            x0_rand = np.concatenate([x0_twiss, t_rand.ravel()])
+            x0_rand = np.concatenate([x0_twiss, c_rand, t_rand.ravel()])
 
             r = run(x0_rand)
             if r is not None and r.cost < best_cost:
@@ -208,11 +241,10 @@ class MeasureOptics:
 
         if best_fit is None:
             raise RuntimeError(f"Transport fit failed for plane {plane}")
-
-        beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, t_params = unpack(best_fit.x)
+        beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params = unpack(best_fit.x)
 
         beta0_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values**2)
-        alpha0_vals = alpha_p0 + alpha_p1 * dK1_values
+        alpha0_vals = alpha_p0 + alpha_p1 * dK1_values + alpha_p2 * dK1_values**2
 
         return {
             "beta_log_p0": float(beta_log_p0),
@@ -227,4 +259,6 @@ class MeasureOptics:
             "success": bool(best_fit.success),
             "message": str(best_fit.message),
             "plane": plane,
+            "alpha_p2": float(alpha_p2),
+            "screen_scale_params": c_params.tolist(),
         }

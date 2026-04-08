@@ -37,6 +37,12 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.wfs_test_charge = 0.90
         self.__setup_beam0()
         self.__track_bunch()
+
+    def get_beam_factors(self):
+        gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
+        return gamma_rel, beta_rel
+
     def log_messages(self, console):
         self.log = console or print
 
@@ -576,3 +582,25 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
+    def get_twiss_at_screen(self, name): # for emittance measurement, can be deleted later
+        if name not in self.screens:
+            raise ValueError(f"Screen {name} not found")
+
+        screen = self.lattice[name]
+        bunch = screen.get_bunch()
+        if bunch is None:
+            raise RuntimeError(f"Screen {name} has no bunch. Track the beam first.")
+
+        info = bunch.get_info()
+        return {
+            "name": name,
+            "beta_x": float(info.beta_x),
+            "alpha_x": float(info.alpha_x),
+            "beta_y": float(info.beta_y),
+            "alpha_y": float(info.alpha_y),
+            "emitt_x": float(info.emitt_x),
+            "emitt_y": float(info.emitt_y),
+            "sigma_x": float(info.sigma_x),
+            "sigma_y": float(info.sigma_y),
+            "S": float(info.S),
+        }

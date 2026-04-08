@@ -798,9 +798,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._hist_abs_rms_x.append(final_rms_x)
             self._hist_abs_rms_y.append(final_rms_y)
             self._hist_abs_rms_xy.append(final_rms_xy)
-            print(f"FINAL RMS x = {final_rms_x:.6f} mm")
-            print(f"FINAL RMS y = {final_rms_y:.6f} mm")
-            print(f"FINAL RMS combined = {final_rms_xy:.6f} mm")
 
             self.log("Correction finished.")
             self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By)

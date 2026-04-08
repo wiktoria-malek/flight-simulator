@@ -39,8 +39,10 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.dfs_test_energy = 0.98
         self.wfs_test_charge = 0.90
         self.Q=-1
+        self.electronmass = rft.electronmass
         self.__setup_beam0()
         self.__track_bunch()
+
 
     def log_messages(self,console):
         self.log=console or print
@@ -105,15 +107,15 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         self.lattice.track(B0_offset)
         I=B0_offset.get_info()
-        # print("Emittance after tracking:")
-        # print(f"εx = {I.emitt_x}[mm.rad]")
-        # print(f"εy = {I.emitt_y}[mm.rad]")
-        # print(f"εz = {I.emitt_z}[mm.permille]")
-
         self.log("Emittance after tracking:")
         self.log(f"εx = {I.emitt_x}[mm.rad]")
         self.log(f"εy = {I.emitt_y}[mm.rad]")
         self.log(f"εz = {I.emitt_z}[mm.permille]")
+
+    def get_beam_factors(self):
+        gamma_rel = (self.Pref + self.electronmass) / self.electronmass
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel**2)
+        return gamma_rel, beta_rel
 
     def change_energy(self):
         self.__setup_beam1()

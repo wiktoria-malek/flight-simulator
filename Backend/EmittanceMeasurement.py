@@ -174,31 +174,50 @@ class EmittanceMeasurement:
         session["scan_quality"] = self._is_quality_scan(sigx_mean=sigx_mean, sigy_mean=sigy_mean, screens=screens)
         return session
 
-    def _is_quality_scan(self,sigx_mean,sigy_mean,screens,threshold=0.05):
-        sigx_mean=np.array(sigx_mean,dtype=float)
-        sigy_mean=np.array(sigy_mean,dtype=float)
-        screens=list(screens)
+    def _is_quality_scan(self, sigx_mean, sigy_mean, screens, threshold=0.05, strong_threshold=0.15):
+        sigx_mean = np.asarray(sigx_mean, dtype=float)
+        sigy_mean = np.asarray(sigy_mean, dtype=float)
+        screens = list(screens)
 
-        x_range=np.nanmax(sigx_mean**2,axis=0) - np.nanmin(sigx_mean**2,axis=0) # maximum - minimum of an array
-        y_range=np.nanmax(sigy_mean**2,axis=0) - np.nanmin(sigy_mean**2,axis=0)
+        x2 = sigx_mean ** 2
+        y2 = sigy_mean ** 2
 
-        x_mean=np.nanmean(sigx_mean**2,axis=0)
-        y_mean=np.nanmean(sigy_mean**2,axis=0) # 0 for columns, 1 for rows
+        x_range = np.nanmax(x2, axis=0) - np.nanmin(x2, axis=0)
+        y_range = np.nanmax(y2, axis=0) - np.nanmin(y2, axis=0)
 
-        x_rel=np.full(len(screens),np.nan,dtype=float)
-        y_rel=np.full(len(screens),np.nan,dtype=float)
+        x_mean = np.nanmean(x2, axis=0)
+        y_mean = np.nanmean(y2, axis=0)
 
-        mx=np.isfinite(x_range) & np.isfinite(x_mean) & (np.abs(x_mean)>0)
-        my=np.isfinite(y_range) & np.isfinite(y_mean) & (np.abs(y_mean)>0)
+        x_rel = np.full(len(screens), np.nan, dtype=float)
+        y_rel = np.full(len(screens), np.nan, dtype=float)
 
-        x_rel[mx]=x_range[mx]/x_mean[mx] # range/mean, relative change
-        y_rel[my]=y_range[my]/y_mean[my]
+        mx = np.isfinite(x_range) & np.isfinite(x_mean) & (np.abs(x_mean) > 0)
+        my = np.isfinite(y_range) & np.isfinite(y_mean) & (np.abs(y_mean) > 0)
 
-        best_x_idx=int(np.nanargmax(x_rel)) if np.any(np.isfinite(x_rel)) else None # tests which has the biggest change, ignores nans
-        best_y_idx=int(np.nanargmax(y_rel)) if np.any(np.isfinite(y_rel)) else None
+        x_rel[mx] = x_range[mx] / x_mean[mx]
+        y_rel[my] = y_range[my] / y_mean[my]
 
-        best_x_rel=float(x_rel[best_x_idx]) if best_x_idx is not None else None # what was the biggest relative change in x
-        best_y_rel=float(y_rel[best_y_idx]) if best_y_idx is not None else None
+        best_x_idx = int(np.nanargmax(x_rel)) if np.any(np.isfinite(x_rel)) else None
+        best_y_idx = int(np.nanargmax(y_rel)) if np.any(np.isfinite(y_rel)) else None
+
+        best_x_rel = float(x_rel[best_x_idx]) if best_x_idx is not None else np.nan
+        best_y_rel = float(y_rel[best_y_idx]) if best_y_idx is not None else np.nan
+
+        x_good = bool(np.isfinite(best_x_rel) and best_x_rel >= threshold)
+        y_good = bool(np.isfinite(best_y_rel) and best_y_rel >= threshold)
+        x_strong = bool(np.isfinite(best_x_rel) and best_x_rel >= strong_threshold)
+        y_strong = bool(np.isfinite(best_y_rel) and best_y_rel >= strong_threshold)
+
+        if x_strong and y_strong:
+            recommendation = "good_for_joint_fit"
+        elif x_good and y_good:
+            recommendation = "acceptable_but_weak"
+        elif x_good and not y_good:
+            recommendation = "good_mainly_in_x"
+        elif y_good and not x_good:
+            recommendation = "good_mainly_in_y"
+        else:
+            recommendation = "poor_scan"
 
         return {
             "sigx2_range_per_screen": x_range.tolist(),
@@ -207,10 +226,18 @@ class EmittanceMeasurement:
             "sigy2_rel_range_per_screen": y_rel.tolist(),
             "best_screen_x": screens[best_x_idx] if best_x_idx is not None else None,
             "best_screen_y": screens[best_y_idx] if best_y_idx is not None else None,
-            "best_rel_var_x": best_x_rel,
-            "best_rel_var_y": best_y_rel,
-            "is_useful_scan": bool(np.isfinite(best_x_rel) and best_x_rel>=threshold) or bool(np.isfinite(best_y_rel) and best_y_rel>=threshold),
+            "best_rel_var_x": None if not np.isfinite(best_x_rel) else best_x_rel,
+            "best_rel_var_y": None if not np.isfinite(best_y_rel) else best_y_rel,
+            "x_good": x_good,
+            "y_good": y_good,
+            "x_strong": x_strong,
+            "y_strong": y_strong,
+            "is_useful_scan": bool(x_good or y_good),
+            "is_good_for_joint_fit": bool(x_good and y_good),
+            "joint_fit_is_strong": bool(x_strong and y_strong),
+            "recommendation": recommendation,
             "rel_threshold": threshold,
+            "strong_rel_threshold": strong_threshold,
         }
 
     def _get_scan_dir(self,quad_name): # saves state files for each quadrupole

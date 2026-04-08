@@ -6,7 +6,7 @@ matplotlib.use("QtAgg")
 
 from datetime import datetime
 from scipy.optimize import least_squares
-
+from scipy.stats import median_abs_deviation
 try:
     from PyQt6 import uic
     from PyQt6.QtWidgets import (
@@ -34,6 +34,148 @@ class MatplotlibWidget(FigureCanvas):
 
 
 class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
+    def _describe_scan_quality(self):
+        if self.session is None:
+            return None
+        quality = self.session.get("scan_quality")
+        if not quality:
+            return None
+
+        best_x = quality.get("best_rel_var_x")
+        best_y = quality.get("best_rel_var_y")
+        best_screen_x = quality.get("best_screen_x")
+        best_screen_y = quality.get("best_screen_y")
+        recommendation = quality.get("recommendation", "unknown")
+
+        def fmt(v):
+            return "n/a" if v is None else f"{100.0 * float(v):.1f}%"
+
+        return (
+            f"Scan quality\n"
+            f"best x variation: {fmt(best_x)} at {best_screen_x}\n"
+            f"best y variation: {fmt(best_y)} at {best_screen_y}\n"
+            f"recommendation: {recommendation}"
+        )
+
+    def _assess_fit_quality(self, result):
+        fit_x_rms = result.get("fit_x_residual_rms")
+        fit_y_rms = result.get("fit_y_residual_rms")
+        fit_x_rms_per_screen = result.get("fit_x_residual_rms_per_screen", {})
+        fit_y_rms_per_screen = result.get("fit_y_residual_rms_per_screen", {})
+        worst_screen_x = result.get("worst_screen_x")
+        worst_screen_y = result.get("worst_screen_y")
+        emit_x = result.get("emit_x_norm")
+        emit_y = result.get("emit_y_norm")
+        beta_x = result.get("beta_x0")
+        beta_y = result.get("beta_y0")
+        alpha_x = result.get("alpha_x0")
+        alpha_y = result.get("alpha_y0")
+        beta_x_scale = result.get("beta_x_scale_vs_measured")
+        beta_y_scale = result.get("beta_y_scale_vs_measured")
+        alpha_x_offset = result.get("alpha_x_offset_vs_measured")
+        alpha_y_offset = result.get("alpha_y_offset_vs_measured")
+
+        physical = True
+        trustworthy = True
+        reasons = []
+
+        def bad(v):
+            return v is None or (not np.isfinite(float(v)))
+
+        for label, value in [
+            ("emit_x_norm", emit_x),
+            ("emit_y_norm", emit_y),
+            ("beta_x0", beta_x),
+            ("beta_y0", beta_y),
+            ("alpha_x0", alpha_x),
+            ("alpha_y0", alpha_y),
+        ]:
+            if bad(value):
+                physical = False
+                trustworthy = False
+                reasons.append(f"{label} is not finite")
+
+        if physical:
+            if emit_x <= 0 or emit_y <= 0:
+                physical = False
+                trustworthy = False
+                reasons.append("non-positive emittance")
+
+            if beta_x <= 0 or beta_y <= 0:
+                physical = False
+                trustworthy = False
+                reasons.append("non-positive beta")
+
+            if beta_x > 50.0 or beta_y > 50.0:
+                trustworthy = False
+                reasons.append("beta is very large")
+
+            if abs(alpha_x) > 5.0 or abs(alpha_y) > 5.0:
+                trustworthy = False
+                reasons.append("alpha is very large")
+
+            if emit_x > 50.0 or emit_y > 50.0:
+                trustworthy = False
+                reasons.append("emittance is very large")
+
+        for label, value in [
+            ("fit_x_residual_rms", fit_x_rms),
+            ("fit_y_residual_rms", fit_y_rms),
+            ("beta_x_scale_vs_measured", beta_x_scale),
+            ("beta_y_scale_vs_measured", beta_y_scale),
+            ("alpha_x_offset_vs_measured", alpha_x_offset),
+            ("alpha_y_offset_vs_measured", alpha_y_offset),
+        ]:
+            if bad(value):
+                trustworthy = False
+                reasons.append(f"{label} is not finite")
+
+        if not bad(fit_x_rms) and float(fit_x_rms) > 5.0:
+            trustworthy = False
+            reasons.append("x residual RMS is large")
+        if not bad(fit_y_rms) and float(fit_y_rms) > 5.0:
+            trustworthy = False
+            reasons.append("y residual RMS is large")
+
+        if worst_screen_x is not None:
+            wx = fit_x_rms_per_screen.get(worst_screen_x)
+            if wx is not None and np.isfinite(float(wx)) and float(wx) > 6.0:
+                trustworthy = False
+                reasons.append(f"worst x screen is {worst_screen_x}")
+
+        if worst_screen_y is not None:
+            wy = fit_y_rms_per_screen.get(worst_screen_y)
+            if wy is not None and np.isfinite(float(wy)) and float(wy) > 6.0:
+                trustworthy = False
+                reasons.append(f"worst y screen is {worst_screen_y}")
+
+        if not bad(beta_x_scale) and not (0.4 <= float(beta_x_scale) <= 2.5):
+            trustworthy = False
+            reasons.append("x beta scale drifted too far from measured optics")
+        if not bad(beta_y_scale) and not (0.4 <= float(beta_y_scale) <= 2.5):
+            trustworthy = False
+            reasons.append("y beta scale drifted too far from measured optics")
+
+        if not bad(alpha_x_offset) and abs(float(alpha_x_offset)) > 2.0:
+            trustworthy = False
+            reasons.append("x alpha offset is large")
+        if not bad(alpha_y_offset) and abs(float(alpha_y_offset)) > 2.0:
+            trustworthy = False
+            reasons.append("y alpha offset is large")
+
+        if physical and trustworthy:
+            status = "trusted"
+        elif physical:
+            status = "physical_but_untrusted"
+        else:
+            status = "non_physical"
+
+        return {
+            "fit_is_physical": bool(physical),
+            "fit_is_trustworthy": bool(trustworthy),
+            "fit_quality_status": status,
+            "fit_quality_reasons": reasons,
+        }
 
     def __init__(self, interface, dir_name):
         super().__init__()
@@ -254,7 +396,11 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             return
 
         self._draw_live_scan(self.session)
-        QMessageBox.information(self, "Scan", "Scan completed.")
+        quality_msg = self._describe_scan_quality()
+        if quality_msg is None:
+            QMessageBox.information(self, "Scan", "Scan completed.")
+        else:
+            QMessageBox.information(self, "Scan", f"Scan completed.\n\n{quality_msg}")
 
     def _run_measure_optics(self):
         if self.session is None:
@@ -270,6 +416,188 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         self.session["measured_optics"] = optics
         QMessageBox.information(self, "Measure Optics", "Completed.")
 
+    def _safe_sigma2_errors(self, sig, sig_std):
+        sig = np.asarray(sig, dtype=float)
+        sig_std = np.asarray(sig_std, dtype=float)
+
+        sigma2 = sig ** 2
+        sigma2_err = 2.0 * np.abs(sig) * np.abs(sig_std)
+
+        screen_scale = np.nanmedian(sigma2, axis=0)
+        screen_scale = np.where(np.isfinite(screen_scale), screen_scale, np.nan)
+
+        floor_per_screen = np.maximum(0.03 * np.abs(screen_scale), 1e-6)
+        floor_per_screen = np.where(np.isfinite(floor_per_screen), floor_per_screen, 1e-6)
+
+        sigma2_err = np.where(np.isfinite(sigma2_err), sigma2_err, np.nan)
+        sigma2_err = np.maximum(sigma2_err, floor_per_screen[None, :])
+        sigma2_err[~np.isfinite(sigma2_err)] = 1e-6
+
+        return sigma2_err
+
+    def _beam_factors(self):
+        gamma_rel, beta_rel = self.interface.get_beam_factors()
+        return gamma_rel, beta_rel
+
+
+    def _fit_plane(self, sig, sig_std, plane, measured_optics):
+        screens = list(self.session["screens"])
+        K1_values = np.asarray(self.session["K1_values"], dtype=float)
+        deltas = np.asarray(self.session["deltas"], dtype=float)
+
+        sig = np.asarray(sig, dtype=float)
+        sig_std = np.asarray(sig_std, dtype=float)
+        sigma2 = sig ** 2
+        sigma2_err = self._safe_sigma2_errors(sig, sig_std)
+
+        nsteps = len(K1_values)
+        nscreens = len(screens)
+
+        fit = measured_optics[f"fit_{plane}"]
+        K1_nom = float(measured_optics["K1_nom"])
+        dK1_values = K1_values - K1_nom
+        beta0_measured, alpha0_measured = MeasureOptics._twiss_from_fit_params(fit, K1_values, K1_nom)
+        beta0_measured = np.asarray(beta0_measured, dtype=float)
+        alpha0_measured = np.asarray(alpha0_measured, dtype=float)
+        transport_params = np.asarray(fit["transport_params"], dtype=float)
+        screen_scale_params = np.asarray(
+            fit.get("screen_scale_params", np.ones(nscreens - 1)),
+            dtype=float
+        )
+        nom_idx = int(np.argmin(np.abs(deltas)))
+        beta0_ref = float(beta0_measured[nom_idx])
+        alpha0_ref = float(alpha0_measured[nom_idx])
+        beta_prior_scale = max(0.08 * abs(beta0_ref), 0.02)
+        alpha_prior_scale = 0.20
+        emit_guess = max(sigma2[nom_idx, 0] / max(beta0_ref, 1e-12), 1e-12)
+
+        # p[0] = log(emit)
+        # p[1] = log(beta_scale)
+        # p[2] = alpha_offset
+        x0 = np.array([
+            np.log(emit_guess),
+        ], dtype=float)
+
+        def predict_sigma2(emit):
+            beta_step = np.maximum(beta0_measured, 1e-12)
+            alpha_step = alpha0_measured
+            gamma_step = (1.0 + alpha_step ** 2) / beta_step
+
+            pred = np.zeros((nsteps, nscreens), dtype=float)
+            pred[:, 0] = emit * beta_step
+
+            for i, row in enumerate(transport_params):
+                row = np.asarray(row, dtype=float).ravel()
+                if row.size != 2:
+                    raise ValueError(f"Expected constant downstream transport with 2 parameters, got {row.size}")
+
+                R11, R12 = row
+                pred[:, i + 1] = emit * screen_scale_params[i] * (
+                        R11 ** 2 * beta_step
+                        - 2.0 * R11 * R12 * alpha_step
+                        + R12 ** 2 * gamma_step
+                )
+
+            return pred, beta_step, alpha_step
+
+        def residuals(p):
+            emit = float(np.exp(p[0]))
+            pred, beta_step, alpha_step = predict_sigma2(emit)
+
+            res = []
+            for k in range(nsteps):
+                for i in range(1, nscreens):
+                    y = sigma2[k, i]
+                    yp = pred[k, i]
+                    err = sigma2_err[k, i]
+                    if np.isfinite(y) and np.isfinite(yp) and np.isfinite(err) and err > 0:
+                        res.append((yp - y) / err)
+
+            y0 = sigma2[nom_idx, 0]
+            yp0 = pred[nom_idx, 0]
+            err0 = sigma2_err[nom_idx, 0]
+            if np.isfinite(y0) and np.isfinite(yp0) and np.isfinite(err0) and err0 > 0:
+                res.append(0.25 * (yp0 - y0) / err0)
+
+            _, beta_step, alpha_step = predict_sigma2(emit)
+
+
+            return np.asarray(res, dtype=float)
+
+        lsq = least_squares(
+            residuals,
+            x0,
+            method="trf",
+            loss="soft_l1",
+            f_scale=1.0,
+            bounds=(
+                np.array([np.log(1e-8)], dtype=float),
+                np.array([np.log(1e3)], dtype=float),
+            ),
+        )
+
+        emit = float(np.exp(lsq.x[0]))
+        pred, beta_step, alpha_step = predict_sigma2(emit)
+        beta_scale = 1.0
+        alpha_offset = 0.0
+
+        data_res = []
+        per_screen_res = {screen: [] for screen in screens}
+
+        for k in range(nsteps):
+            for i, screen in enumerate(screens):
+                y = sigma2[k, i]
+                yp = pred[k, i]
+                err = sigma2_err[k, i]
+
+                if np.isfinite(y) and np.isfinite(yp) and np.isfinite(err) and err > 0:
+                    if i == 0 and k != nom_idx:
+                        continue
+                    weight = 0.35 if i == 0 else 1.0
+                    r = weight * (yp - y) / err
+                    data_res.append(r)
+                    per_screen_res[screen].append(r)
+
+        data_res = np.asarray(data_res, dtype=float)
+
+        if data_res.size:
+            rms_res = float(np.sqrt(np.mean(data_res ** 2)))
+            mad_res = float(median_abs_deviation(data_res, scale="normal"))
+        else:
+            rms_res = np.nan
+            mad_res = np.nan
+
+        per_screen_rms = {}
+        for screen, vals in per_screen_res.items():
+            vals = np.asarray(vals, dtype=float)
+            if vals.size:
+                per_screen_rms[screen] = float(np.sqrt(np.mean(vals ** 2)))
+            else:
+                per_screen_rms[screen] = np.nan
+
+        finite_items = [(screen, val) for screen, val in per_screen_rms.items() if np.isfinite(val)]
+        worst_screen = max(finite_items, key=lambda x: x[1])[0] if finite_items else None
+
+        return {
+            "emit": emit,
+            "beta0": float(beta_step[nom_idx]),
+            "alpha0": float(alpha_step[nom_idx]),
+            "pred": pred,
+            "beta0_measured": beta0_ref,
+            "alpha0_measured": alpha0_ref,
+            "beta_scale": beta_scale,
+            "alpha_offset": alpha_offset,
+            "beta_step": beta_step.tolist(),
+            "alpha_step": alpha_step.tolist(),
+            "residual_rms": rms_res,
+            "residual_mad": mad_res,
+            "residual_rms_per_screen": per_screen_rms,
+            "worst_screen": worst_screen,
+            "success": bool(lsq.success),
+            "message": str(lsq.message),
+            "cost": float(lsq.cost),
+        }
+
     def _fit_twiss_and_emittance(self):
 
         if self.session is None:
@@ -279,6 +607,16 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         measured_optics = self.session.get("measured_optics")
         if not measured_optics:
             QMessageBox.information(self, "Fit", "Run Measure Optics first.")
+            return
+        quality = self.session.get("scan_quality", {})
+        if not quality.get("is_good_for_joint_fit", False):
+            msg = self._describe_scan_quality()
+            QMessageBox.information(
+                self,
+                "Fit",
+                "This scan does not excite both planes strongly enough for a reliable joint emittance/Twiss fit.\n\n"
+                + (msg if msg is not None else "Choose another quadrupole or a larger scan range.")
+            )
             return
 
         screens = list(self.session["screens"])
@@ -290,101 +628,100 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
 
         nsteps = len(K1_values)
         nscreens = len(screens)
+        if nscreens < 2:
+            QMessageBox.information(self, "Fit", "At least two screens are required for the fit.")
+            return
+        fit_x = self._fit_plane(sigx, sigx_std, "x", measured_optics)
+        fit_y = self._fit_plane(sigy, sigy_std, "y", measured_optics)
 
-        def fit_plane(sig, sig_std, plane):
+        emit_x = fit_x["emit"]
+        beta_x0 = fit_x["beta0"]
+        alpha_x0 = fit_x["alpha0"]
+        pred_x = fit_x["pred"]
 
-            sigma2 = sig ** 2
-            sigma2_err = 2.0 * np.abs(sig) * np.abs(sig_std)
-            sigma2_err[sigma2_err <= 0] = np.nan
-
-            fit = measured_optics[f"fit_{plane}"]
-            K1_nom = float(measured_optics["K1_nom"])
-
-            beta0_vals, alpha0_vals = MeasureOptics._twiss_from_fit_params(fit, K1_values, K1_nom)
-            t_params = np.asarray(fit["transport_params"], dtype=float) # it takes R11 and R12 for downstream screens
-
-            def predict_emit(emit):
-                pred = np.zeros((nsteps, nscreens), dtype=float)
-
-                for k in range(nsteps):
-                    beta0 = float(beta0_vals[k]) # twiss params for screen0 at each K1
-                    alpha0 = float(alpha0_vals[k])
-                    gamma0 = (1.0 + alpha0**2) / beta0
-
-                    pred[k, 0] = emit * beta0
-
-                    for i, (R11, R12) in enumerate(t_params):
-                        pred[k, i + 1] = emit * (R11**2 * beta0- 2.0 * R11 * R12 * alpha0 + R12**2 * gamma0)
-
-                return pred
-
-            # initial guess from nominal screen0
-            nom_idx = int(np.argmin(np.abs(np.asarray(self.session["deltas"], dtype=float))))
-            emit_guess = max(sigma2[nom_idx, 0] / max(beta0_vals[nom_idx], 1e-12), 1e-12) # emit_guess = sigma_0^2 / beta0
-
-            x0 = np.array([np.log(emit_guess)], dtype=float) # exp, because emit must be positive
-
-            def residuals(p):
-                emit = float(np.exp(p[0]))
-                pred = predict_emit(emit)
-
-                res = []
-                for k in range(nsteps):
-                    for i in range(nscreens):
-                        y = sigma2[k, i]
-                        yp = pred[k, i]
-                        err = sigma2_err[k, i]
-
-                        if np.isfinite(y) and np.isfinite(yp):
-                            if np.isfinite(err):
-                                res.append((yp - y) / err)
-                            else:
-                                res.append(yp - y)
-                return np.asarray(res)
-
-            lsq = least_squares(residuals, x0, method="trf")
-            emit = float(np.exp(lsq.x[0]))
-            pred = predict_emit(emit)
-
-            beta0_nom = float(beta0_vals[nom_idx])
-            alpha0_nom = float(alpha0_vals[nom_idx])
-
-            return emit, beta0_nom, alpha0_nom, pred
-
-        emit_x, beta_x0, alpha_x0, pred_x = fit_plane(sigx, sigx_std, "x")
-        emit_y, beta_y0, alpha_y0, pred_y = fit_plane(sigy, sigy_std, "y")
-
-        try:
-            gamma_rel = (self.interface.Pref + self.interface.electronmass) / self.interface.electronmass
-            beta_rel = np.sqrt(1 - 1 / gamma_rel**2)
-            emit_x_norm = gamma_rel * beta_rel * emit_x
-            emit_y_norm = gamma_rel * beta_rel * emit_y
-        except Exception:
-            emit_x_norm = np.nan
-            emit_y_norm = np.nan
-
+        emit_y = fit_y["emit"]
+        beta_y0 = fit_y["beta0"]
+        alpha_y0 = fit_y["alpha0"]
+        pred_y = fit_y["pred"]
+        gamma_rel, beta_rel = self._beam_factors()
+        emit_x_norm = gamma_rel * beta_rel * emit_x if np.isfinite(gamma_rel) and np.isfinite(beta_rel) else np.nan
+        emit_y_norm = gamma_rel * beta_rel * emit_y if np.isfinite(gamma_rel) and np.isfinite(beta_rel) else np.nan
         result = {
             "screen0": screens[0],
             "quad_name": self.session["quad_name"],
+            "scan_quality_recommendation": quality.get("recommendation"),
+            "best_rel_var_x": quality.get("best_rel_var_x"),
+            "best_rel_var_y": quality.get("best_rel_var_y"),
             "emit_x_norm": emit_x_norm,
             "emit_y_norm": emit_y_norm,
             "beta_x0": beta_x0,
             "alpha_x0": alpha_x0,
             "beta_y0": beta_y0,
             "alpha_y0": alpha_y0,
+            "beta_x0_measured": fit_x["beta0_measured"],
+            "alpha_x0_measured": fit_x["alpha0_measured"],
+            "beta_x_scale_vs_measured": fit_x["beta_scale"],
+            "alpha_x_offset_vs_measured": fit_x["alpha_offset"],
+            "beta_y_scale_vs_measured": fit_y["beta_scale"],
+            "alpha_y_offset_vs_measured": fit_y["alpha_offset"],
+            "beta_y0_measured": fit_y["beta0_measured"],
+            "alpha_y0_measured": fit_y["alpha0_measured"],
+            "fit_x_success": fit_x["success"],
+            "fit_y_success": fit_y["success"],
+            "fit_x_message": fit_x["message"],
+            "fit_y_message": fit_y["message"],
+            "fit_x_residual_rms": fit_x["residual_rms"],
+            "fit_y_residual_rms": fit_y["residual_rms"],
+            "fit_x_residual_mad": fit_x["residual_mad"],
+            "fit_y_residual_mad": fit_y["residual_mad"],
+            "fit_x_cost": fit_x["cost"],
+            "fit_y_cost": fit_y["cost"],
+            "fit_x_residual_rms_per_screen": fit_x["residual_rms_per_screen"],
+            "worst_screen_x": fit_x["worst_screen"],
+            "fit_y_residual_rms_per_screen": fit_y["residual_rms_per_screen"],
+            "worst_screen_y": fit_y["worst_screen"],
         }
 
-        self.session["fit_result_twiss_emit"] = result
+        fit_quality = self._assess_fit_quality(result)
+        result.update(fit_quality)
 
-        self._update_fit_panel(result)
-        self._plot_fit_overlay(pred_x, pred_y, result=result)
+        fit_reasons = result.get("fit_quality_reasons", [])
+        reasons_text = "none" if not fit_reasons else "; ".join(fit_reasons[:6])
 
         QMessageBox.information(
             self,
             "Fit complete",
             f"εₓ = {emit_x_norm:.4f} mm·mrad\n"
-            f"εᵧ = {emit_y_norm:.4f} mm·mrad"
+            f"εᵧ = {emit_y_norm:.4f} mm·mrad\n"
+            f"βₓ0 = {beta_x0:.4f} m, αₓ0 = {alpha_x0:.4f}\n"
+            f"βᵧ0 = {beta_y0:.4f} m, αᵧ0 = {alpha_y0:.4f}\n"
+            f"measured βₓ0 = {fit_x['beta0_measured']:.4f}, αₓ0 = {fit_x['alpha0_measured']:.4f}\n"
+            f"measured βᵧ0 = {fit_y['beta0_measured']:.4f}, αᵧ0 = {fit_y['alpha0_measured']:.4f}\n\n"
+            f"Scan quality: {quality.get('recommendation', 'unknown')}\n"
+            f"Fit quality: {result.get('fit_quality_status', 'unknown')}\n"
+            f"Notes: {reasons_text}"
         )
+
+        self.session["fit_result_twiss_emit"] = result
+        print(f"quad_name: {self.session["quad_name"]}")
+        print(f"delta_min: {self.session["delta_min"]}")
+        print(f"delta_max: {self.session["delta_max"]}")
+        print(f"εₓ = {emit_x_norm:.4f} mm·mrad")
+        print(f"εᵧ = {emit_y_norm:.4f} mm·mrad")
+        print(f"βₓ0 = {beta_x0:.4f} m, αₓ0 = {alpha_x0:.4f}")
+        print(f"βᵧ0 = {beta_y0:.4f} m, αᵧ0 = {alpha_y0:.4f}")
+        print(f"measured βₓ0 = {fit_x['beta0_measured']:.4f}, αₓ0 = {fit_x['alpha0_measured']:.4f}")
+        print(f"measured βᵧ0 = {fit_y['beta0_measured']:.4f}, αᵧ0 = {fit_y['alpha0_measured']:.4f}")
+        print("fit_x_residual_rms =", result["fit_x_residual_rms"])
+        print("fit_y_residual_rms =", result["fit_y_residual_rms"])
+        print("fit_x_residual_rms_per_screen =", result["fit_x_residual_rms_per_screen"])
+        print("fit_y_residual_rms_per_screen =", result["fit_y_residual_rms_per_screen"])
+        print("worst_screen_x =", result["worst_screen_x"])
+        print("worst_screen_y =", result["worst_screen_y"])
+        truth = self.interface.get_twiss_at_screen("OTR0X")
+        print("Twiss parameters from rftrack interface: " , truth)
+        self._update_fit_panel(result)
+        self._plot_fit_overlay(pred_x, pred_y, result)
 
 if __name__ == "__main__":
 
