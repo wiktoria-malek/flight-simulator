@@ -9,12 +9,12 @@ Mutual response matrix calculation algorithm.
 
 class ResponseMatrix_DFS_WFS():
 
-    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False):
+    def _compute_response_matrix_from_directory(self, directory, correctors, bpms=None, screens=None, triangular=False, monitor_mode="bpm_only"):
         info=self._find_useful_files(directory)
         if not info["ok"]:
             raise RuntimeError(f"Could not find any valid DATA pairs in {directory}")
 
-        return self._compute_response_matrix(pairs=info["pairs"],correctors=correctors, bpms=bpms, triangular=triangular)
+        return self._compute_response_matrix(pairs=info["pairs"],correctors=correctors, bpms=bpms, triangular=triangular, screens=screens, monitor_mode = monitor_mode)
 
 
     def _find_useful_files(self, directory):
@@ -31,7 +31,7 @@ class ResponseMatrix_DFS_WFS():
 
         return {"ok":bool(pairs), "dir":directory, "pairs":pairs}
 
-    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False):
+    def _compute_response_matrix(self, pairs, correctors, bpms = None, screens=None, triangular=False, monitor_mode = "bpm_only"):
         if not hasattr(self, 'sequence'):
             file = pairs[0][0]
             S = State(filename=file)
@@ -40,50 +40,90 @@ class ResponseMatrix_DFS_WFS():
         hcorrs = [string for string in correctors if self._is_h_corrector(string)]
         vcorrs = [string for string in correctors if self._is_v_corrector(string)]
 
+        if monitor_mode not in ("bpm_only", "screen_only", "bpm_plus_screens"):
+            raise ValueError(f"Unsupported monitor_mode: {monitor_mode}")
+        bpms = list(bpms or [])
+        screens = list(screens or [])
 
-        # Pick all correctors preceding the last bpm
-        hcorrs = [corr for corr in hcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1])]
-        vcorrs = [corr for corr in vcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1])]
+        if monitor_mode == "bpm_only" and not bpms:
+            raise ValueError("Application requires a non-empty bpms list")
+        if monitor_mode == "screen_only" and not screens:
+            raise ValueError("Application requires a non-empty screens list")
+        if monitor_mode == "bpm_plus_screens" and not (bpms or screens):
+            raise ValueError("Application requires at least one bpm or screen")
 
-        # Pick all bpms following the first corrector
-        if hcorrs:
-            bpms = [bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(hcorrs[0])]
-        if vcorrs:
-            bpms = [bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(vcorrs[0])]
+        monitor_names_ref = []
+        monitor_types_ref = []
+
+        if monitor_mode in ("bpm_only", "bpm_plus_screens") and bpms:
+            last_bpm = bpms[-1]
+
+            # Pick all correctors preceding the last bpm
+            hcorrs = [corr for corr in hcorrs if self.sequence.index(corr) < self.sequence.index(last_bpm)]
+            vcorrs = [corr for corr in vcorrs if self.sequence.index(corr) < self.sequence.index(last_bpm)]
+
+            # Pick all bpms following the first corrector
+            if hcorrs:
+                bpms = [bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(hcorrs[0])]
+            if vcorrs:
+                bpms = [bpm for bpm in bpms if self.sequence.index(bpm) > self.sequence.index(vcorrs[0])]
+
+        if monitor_mode == "bpm_only":
+            monitor_names_ref = list(bpms)
+            monitor_types_ref = ["bpm"] * len(bpms)
+        elif monitor_mode == "screen_only":
+            monitor_names_ref = list(screens)
+            monitor_types_ref = ["screen"] * len(screens)
+        else:
+            monitor_names_ref = list(bpms) + list(screens)
+            monitor_types_ref = ["bpm"] * len(bpms) + ["screen"] * len(screens)
+        nmonitors = len(monitor_names_ref)
+
+        if nmonitors == 0:
+            raise ValueError("No monitor devices selected for response matrix computation")
 
         # Read all orbits
-        Bx = np.empty((0, len(bpms)))
-        By = np.empty((0, len(bpms)))
+        Bx = np.empty((0, nmonitors))
+        By = np.empty((0, nmonitors))
         Cx = np.empty((0, len(hcorrs)))
         Cy = np.empty((0, len(vcorrs)))
-        B_mask = np.full((1, len(bpms)), True, dtype=bool)
+        B_mask = np.full((1, nmonitors), True, dtype=bool)
 
         for fp, fm in pairs:
             Sp = State(filename=fp)
             Sm = State(filename=fm)
 
-            Op = Sp.get_orbit(bpms)
-            Om = Sm.get_orbit(bpms)
+            # Op = Sp.get_orbit(bpms)
+            # Om = Sm.get_orbit(bpms)
 
-            all_not_finite = not np.any(np.isfinite(Op['x']))
-            all_not_finite |= not np.any(np.isfinite(Om['x']))
-            all_not_finite |= not np.any(np.isfinite(Op['y']))
-            all_not_finite |= not np.any(np.isfinite(Om['y']))
+            Mp = self._get_monitor_readings(Sp, bpms=bpms, screens=screens, monitor_mode=monitor_mode)
+            Mm = self._get_monitor_readings(Sm, bpms = bpms, screens = screens, monitor_mode=monitor_mode)
+
+            if not monitor_names_ref:
+                monitor_names_ref = list(Mp["names"])
+                monitor_types_ref = list(Mp["types"])
+            elif list(Mp["names"]) != monitor_names_ref:
+                raise RuntimeError(f"Wrong monitor order")
+
+            all_not_finite = not np.any(np.isfinite(Mp['x']))
+            all_not_finite |= not np.any(np.isfinite(Mm['x']))
+            all_not_finite |= not np.any(np.isfinite(Mp['y']))
+            all_not_finite |= not np.any(np.isfinite(Mm['y']))
 
             if all_not_finite:
                 print(f"Skipping all-NaN files: {os.path.basename(fp)} / {os.path.basename(fm)}")
                 continue
 
-            B_mask &= np.isfinite(Op['x']) & np.isfinite(Om['x']) & np.isfinite(Op['y']) & np.isfinite(Om['y'])
+            B_mask &= np.isfinite(Mp['x']) & np.isfinite(Mm['x']) & np.isfinite(Mp['y']) & np.isfinite(Mm['y'])
             Cx_p = Sp.get_correctors(hcorrs)['bact']
             Cy_p = Sp.get_correctors(vcorrs)['bact']
             Cx_m = Sm.get_correctors(hcorrs)['bact']
             Cy_m = Sm.get_correctors(vcorrs)['bact']
 
-            Bx = np.vstack((Bx, Op['x']))
-            Bx = np.vstack((Bx, Om['x']))
-            By = np.vstack((By, Op['y']))
-            By = np.vstack((By, Om['y']))
+            Bx = np.vstack((Bx, Mp['x']))
+            Bx = np.vstack((Bx, Mm['x']))
+            By = np.vstack((By, Mp['y']))
+            By = np.vstack((By, Mm['y']))
             Cx = np.vstack((Cx, Cx_p))
             Cx = np.vstack((Cx, Cx_m))
             Cy = np.vstack((Cy, Cy_p))
@@ -134,21 +174,20 @@ class ResponseMatrix_DFS_WFS():
         By = np.mean(By, axis=0).reshape(-1, 1)
 
         # Zero the response of all bpms preceeding the correctors
-        if triangular:
+        if triangular and bpms:
             for corr in hcorrs:
-                bpm_indexes = [bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]
+                bpm_indexes = [monitor_names_ref.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]
                 Rxx[bpm_indexes, hcorrs.index(corr)] = 0
                 Ryx[bpm_indexes, hcorrs.index(corr)] = 0
 
             for corr in vcorrs:
-                bpm_indexes = [bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]
+                bpm_indexes = [monitor_names_ref.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]
                 Rxy[bpm_indexes, vcorrs.index(corr)] = 0
                 Ryy[bpm_indexes, vcorrs.index(corr)] = 0
 
-        return Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms
+        return Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, monitor_names_ref, monitor_types_ref
 
-    def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, _force_triangular=False):
-
+    def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, selected_screens = None, monitor_mode = "bpm_only", _force_triangular=False):
         info_traj = self._data_dirs.get("traj")
         info_dfs = self._data_dirs.get("dfs")
         info_wfs = self._data_dirs.get("wfs")
@@ -164,34 +203,33 @@ class ResponseMatrix_DFS_WFS():
 
         triangular = bool(self._force_triangular() or _force_triangular)
 
-        R0xx, R0yy, R0xy, R0yx, B0x, B0y, hcorrs0, vcorrs0, bpms0 = self._compute_response_matrix(
-            pairs=info_traj["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
-        )
+        R0xx, R0yy, R0xy, R0yx, B0x, B0y, hcorrs0, vcorrs0, monitors0, monitor_types0 = self._compute_response_matrix(
+            pairs=info_traj["pairs"], correctors=selected_corrs, bpms=selected_bpms, screens=selected_screens, triangular=triangular, monitor_mode=monitor_mode)
 
         if w2 > 0:
-            R1xx, R1yy, R1xy, R1yx, B1x, B1y, hcorrs1, vcorrs1, bpms1 = self._compute_response_matrix(
-                pairs=info_dfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
-            )
+            R1xx, R1yy, R1xy, R1yx, B1x, B1y, hcorrs1, vcorrs1, monitors1, monitor_types1 = self._compute_response_matrix(
+                pairs=info_dfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, screens=selected_screens, triangular=triangular, monitor_mode=monitor_mode)
+
         else:
             R1xx, R1yy, R1xy, R1yx = R0xx.copy(), R0yy.copy(), R0xy.copy(), R0yx.copy()
             B1x, B1y = B0x.copy(), B0y.copy()
-            hcorrs1, vcorrs1, bpms1 = list(hcorrs0), list(vcorrs0), list(bpms0)
+            hcorrs1, vcorrs1, monitors1, monitor_types1 = list(hcorrs0), list(vcorrs0), list(monitors0), list(
+            monitor_types0)
 
         if w3 > 0:
-            R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs2, vcorrs2, bpms2 = self._compute_response_matrix(
-                pairs=info_wfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
-            )
+            R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs2, vcorrs2, monitors2, monitor_types2 = self._compute_response_matrix(
+                pairs=info_wfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, screens=selected_screens, triangular=triangular, monitor_mode=monitor_mode)
         else:
             R2xx, R2yy, R2xy, R2yx = R0xx.copy(), R0yy.copy(), R0xy.copy(), R0yx.copy()
             B2x, B2y = B0x.copy(), B0y.copy()
-            hcorrs2, vcorrs2, bpms2 = list(hcorrs0), list(vcorrs0), list(bpms0)
+            hcorrs2, vcorrs2, monitors2, monitor_types2 = list(hcorrs0), list(vcorrs0), list(monitors0), list(monitor_types0)
 
         return (
             R0xx, R0yy, R0xy, R0yx, B0x, B0y,
             R1xx, R1yy, R1xy, R1yx, B1x, B1y,
             R2xx, R2yy, R2xy, R2yx, B2x, B2y,
             hcorrs0, vcorrs0, hcorrs1, vcorrs1, hcorrs2, vcorrs2,
-            bpms0, bpms1, bpms2,
+            monitors0, monitor_types0, monitors1, monitor_types1, monitors2, monitor_types2,
         )
     def _creating_response_matrices(self):
 
@@ -199,15 +237,17 @@ class ResponseMatrix_DFS_WFS():
         wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
         corrs, bpms = self._get_selection()
-
+        monitor_mode = getattr(self, "_response_monitor_mode", "bpm_only")
+        screens = getattr(self, "_response_screens", [])
         (
             R0xx, R0yy, R0xy, R0yx, B0x, B0y,
             R1xx, R1yy, R1xy, R1yx, B1x, B1y,
             R2xx, R2yy, R2xy, R2yx, B2x, B2y,
             hcorrs0, vcorrs0, hcorrs1, vcorrs1, hcorrs2, vcorrs2,
-            bpms0, bpms1, bpms2,
+            monitors0, monitor_types0, monitors1, monitor_types1, monitors2, monitor_types2,
         ) = self._get_data_from_loaded_directories(
-            selected_corrs=corrs, selected_bpms=bpms, _force_triangular=self._force_triangular()
+            selected_corrs=corrs, selected_bpms=bpms, selected_screens=screens, monitor_mode=monitor_mode,
+            _force_triangular=self._force_triangular()
         )
         def _handle_missing_corrector(R,corrs,corrs_ref):
             if corrs== corrs_ref:
@@ -221,25 +261,25 @@ class ResponseMatrix_DFS_WFS():
                         final_matrix[:,j] = R[:,i]
                 return final_matrix
 
-        def _handle_missing_bpm(Rxx,Ryy,Rxy,Ryx,Bx,By,bpms,bpms_ref):
-            if bpms== bpms_ref:
-                return Rxx,Ryy,Rxy,Ryx,Bx,By
-            index = {b: i for i, b in enumerate(bpms)}
-            bpm_indexes=[index[b] for b in bpms_ref]
+        def _handle_missing_monitor(Rxx,Ryy,Rxy,Ryx,Bx,By,monitors,monitors_ref):
+            if monitors == monitors_ref:
+                return Rxx, Ryy, Rxy, Ryx, Bx, By
+            index = {m: i for i, m in enumerate(monitors)}
+            monitor_indexes = [index[m] for m in monitors_ref]
 
             return (
-                Rxx[bpm_indexes, :],
-                Ryy[bpm_indexes, :],
-                Rxy[bpm_indexes, :],
-                Ryx[bpm_indexes, :],
-                Bx[bpm_indexes, :],
-                By[bpm_indexes, :],
+                Rxx[monitor_indexes, :],
+                Ryy[monitor_indexes, :],
+                Rxy[monitor_indexes, :],
+                Ryx[monitor_indexes, :],
+                Bx[monitor_indexes, :],
+                By[monitor_indexes, :],
             )
 
         #intersection
         hcorrs=[c for c in hcorrs0 if (c in hcorrs1 and c in hcorrs2)]
         vcorrs=[c for c in vcorrs0 if (c in vcorrs1 and c in vcorrs2)]
-        bpms=[b for b in bpms0 if (b in bpms1 and b in bpms2)]
+        monitors = [m for m in monitors0 if (m in monitors1 and m in monitors2)]
 
         R0xx=_handle_missing_corrector(R0xx, hcorrs0,hcorrs)
         R0yy=_handle_missing_corrector(R0yy, vcorrs0,vcorrs)
@@ -254,9 +294,9 @@ class ResponseMatrix_DFS_WFS():
         R2xy=_handle_missing_corrector(R2xy, vcorrs2,vcorrs)
         R2yx=_handle_missing_corrector(R2yx, hcorrs2,hcorrs)
 
-        R0xx, R0yy, R0xy, R0yx, B0x, B0y = _handle_missing_bpm(R0xx, R0yy, R0xy, R0yx, B0x, B0y, bpms0, bpms)
-        R1xx, R1yy, R1xy, R1yx, B1x, B1y = _handle_missing_bpm(R1xx, R1yy, R1xy, R1yx, B1x, B1y, bpms1, bpms)
-        R2xx, R2yy, R2xy, R2yx, B2x, B2y = _handle_missing_bpm(R2xx, R2yy, R2xy, R2yx, B2x, B2y, bpms2, bpms)
+        R0xx, R0yy, R0xy, R0yx, B0x, B0y = _handle_missing_monitor(R0xx, R0yy, R0xy, R0yx, B0x, B0y, monitors0, monitors)
+        R1xx, R1yy, R1xy, R1yx, B1x, B1y = _handle_missing_monitor(R1xx, R1yy, R1xy, R1yx, B1x, B1y, monitors1, monitors)
+        R2xx, R2yy, R2xy, R2yx, B2x, B2y = _handle_missing_monitor(R2xx, R2yy, R2xy, R2yx, B2x, B2y, monitors2, monitors)
 
         Axx=[]
         Ayy=[]
@@ -286,4 +326,56 @@ class ResponseMatrix_DFS_WFS():
         Axy = np.vstack(Axy)
         Ayx = np.vstack(Ayx)
 
-        return Axx, Ayy, Axy, Ayx, B0x, B0y, hcorrs, vcorrs, bpms
+        return Axx, Ayy, Axy, Ayx, B0x, B0y, hcorrs, vcorrs, monitors
+
+    def _get_monitor_readings(self, state, bpms=None, screens=None, monitor_mode="bpm_only"):
+        names = []
+        x = []
+        y = []
+        types = []
+
+        bpms = list(bpms or [])
+        screens = list(screens or [])
+
+        if monitor_mode not in ("bpm_only", "screen_only", "bpm_plus_screens"):
+            raise ValueError(f"Unsupported monitor_mode: {monitor_mode}")
+
+        use_bpms = monitor_mode in ("bpm_only", "bpm_plus_screens")
+        use_screens = monitor_mode in ("screen_only", "bpm_plus_screens")
+
+        if use_bpms and bpms:
+            orbit = state.get_orbit(bpms)
+            idx = {str(name): i for i, name in enumerate(orbit["names"])}
+            for name in bpms:
+                key = str(name)
+                i = idx.get(key)
+                names.append(key)
+                if i is None:
+                    x.append(np.nan)
+                    y.append(np.nan)
+                else:
+                    x.append(float(orbit["x"][i]))
+                    y.append(float(orbit["y"][i]))
+                types.append("bpm")
+
+        if use_screens and screens:
+            scr = state.get_screens(screens)
+            idx = {str(name): i for i, name in enumerate(scr["names"])}
+            for name in screens:
+                key = str(name)
+                i = idx.get(key)
+                names.append(key)
+                if i is None:
+                    x.append(np.nan)
+                    y.append(np.nan)
+                else:
+                    x.append(float(scr["x"][i]))
+                    y.append(float(scr["y"][i]))
+                types.append("screen")
+
+        return {
+            "names": names,
+            "x": np.asarray(x, dtype=float),
+            "y": np.asarray(y, dtype=float),
+            "types": types,
+        }

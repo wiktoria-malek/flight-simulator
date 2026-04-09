@@ -9,7 +9,7 @@ class MeasureOptics:
         self.n_starts = int(n_starts) # how many restarts with initial values
         self.rng = np.random.default_rng(rng_seed) # exactly for random starting points in _fit_plane
 
-    def get_from_session(self, session):
+    def get_from_session(self, session, screen_response = None):
 
         screens = list(session.get("screens", []))
         K1_values = np.asarray(session.get("K1_values", []), dtype=float)
@@ -40,8 +40,8 @@ class MeasureOptics:
         except Exception:
             model_twiss_screen0 = None
 
-        fit_x = self._fit_plane(K1_values=K1_values, sigma=sigx, sigma_std=sigx_std, K1_nom=K1_nom, plane="x", model_twiss=model_twiss_screen0)
-        fit_y = self._fit_plane(K1_values=K1_values, sigma=sigy, sigma_std=sigy_std, K1_nom=K1_nom, plane="y", model_twiss=model_twiss_screen0)
+        fit_x = self._fit_plane(K1_values=K1_values, sigma=sigx, sigma_std=sigx_std, K1_nom=K1_nom, plane="x", model_twiss=model_twiss_screen0, screen_response=screen_response, screens = screens)
+        fit_y = self._fit_plane(K1_values=K1_values, sigma=sigy, sigma_std=sigy_std, K1_nom=K1_nom, plane="y", model_twiss=model_twiss_screen0, screen_response=screen_response, screens = screens)
 
         return {
             "type": "screen0_twiss_vs_K1",
@@ -50,6 +50,7 @@ class MeasureOptics:
             "K1_nom": K1_nom,
             "fit_x": fit_x,
             "fit_y": fit_y,
+            "screen_response": screen_response,
         }
 
     @staticmethod
@@ -99,7 +100,7 @@ class MeasureOptics:
 
         return result
 
-    def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane, model_twiss=None):
+    def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane, model_twiss=None, screen_response=None, screens=None):
         nsteps, nscreens = sigma.shape
         dK1_values = K1_values - K1_nom
 
@@ -139,6 +140,28 @@ class MeasureOptics:
             alpha_guess = float(model_alpha_guess)
         else:
             alpha_guess = 0.0
+
+        screen_names = list(screens or [])
+        response_rel_amp = None
+        response_monitor_names = []
+        response_matrix = None
+
+        if screen_response is not None:
+            response_monitor_names = [str(name) for name in getattr(screen_response, "bpms", [])]
+
+            if plane == "x":
+                response_matrix = np.asarray(getattr(screen_response, "Rxx", None), dtype=float)
+            else:
+                response_matrix = np.asarray(getattr(screen_response, "Ryy", None), dtype=float)
+
+            if response_matrix is not None and response_matrix.ndim == 2 and response_matrix.shape[0] == len(response_monitor_names):
+                row_norms = np.linalg.norm(np.nan_to_num(response_matrix, nan = 0.0), axis=1)
+                response_map = {name: float(val) for name, val in zip(response_monitor_names, row_norms)}
+                amps = np.asarray([response_map.get(str(name), np.nan) for name in screen_names], dtype=float)
+                if amps.size == nscreens and amps.size >=2 and np.all(np.isfinite(amps[1:])):
+                    ref = np.nanmedian(amps[1:])
+                    if np.isfinite(ref) and ref > 0:
+                        response_rel_amp = amps[1:] / ref
 
         x0_twiss = np.array([
             np.log(beta_guess),  # beta_log_p0
@@ -216,10 +239,21 @@ class MeasureOptics:
 
             res.extend(data_residuals[valid_downstream].ravel().tolist())
 
-            _, _, _, _, _, _, c_params, _ = unpack(x)
+            _, _, _, _, _, _, c_params, t_params = unpack(x)
 
             for c in c_params:
                 res.append((c - 1.0) / 0.08)
+
+            if response_rel_amp is not None:
+                model_amp = np.sqrt(np.sum(np.asarray(t_params, dtype=float) ** 2, axis=1))
+                model_ref = np.nanmedian(model_amp)
+                if np.isfinite(model_ref) and model_ref > 0:
+                    model_ref_amp = model_amp / model_ref
+                    for meas_rel, model_rel in zip(response_rel_amp, model_ref_amp):
+                        if np.isfinite(meas_rel) and np.isfinite(model_rel):
+                            res.append((model_rel - meas_rel) / 0.35)
+                        else:
+                            res.append(1e6)
 
             beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(x)
 
@@ -353,4 +387,6 @@ class MeasureOptics:
             "plane": plane,
             "alpha_p2": float(alpha_p2),
             "screen_scale_params": c_params.tolist(),
+            "response_monitor_names": response_monitor_names,
+            "response_rel_amp": None if response_rel_amp is None else response_rel_amp.tolist(),
         }

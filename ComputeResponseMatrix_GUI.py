@@ -36,7 +36,7 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
 
-class MainWindow(QMainWindow, SaveOrLoad, Correction_Optics_ResponseMatrix):
+class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
     def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
         uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)
@@ -88,7 +88,12 @@ class MainWindow(QMainWindow, SaveOrLoad, Correction_Optics_ResponseMatrix):
         if not datafiles:
             QMessageBox.warning(self, "Error", "No data files found")
             return
-        S=State(filename=datafiles[0])
+
+        S = State(filename=datafiles[0])
+        print("bpms:", S.get_bpms()["names"])
+        print("screens:", S.get_screens()["names"])
+
+
         self.sequence=S.get_sequence()
         correctors = [self.correctors_list.item(i).text() for i in range(self.correctors_list.count()) if self.correctors_list.item(i).isSelected()]
         bpms = [self.bpms_list.item(i).text() for i in range(self.bpms_list.count()) if self.bpms_list.item(i).isSelected()]
@@ -103,10 +108,22 @@ class MainWindow(QMainWindow, SaveOrLoad, Correction_Optics_ResponseMatrix):
                 self.bpms_list.item(i).setSelected(True)
             bpms=self.bpms
 
-        Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms=self._compute_response_matrix_from_directory(directory=directory, correctors=correctors, bpms=bpms, triangular=bool(self.triangular_checkbox.isChecked()))
+        # REMOVE LATER!!
+        screens = [s for s in ["OTR0X", "OTR1X", "OTR2X", "OTR3X"] if s in getattr(self, "screens", [])]
+        if len(screens) != 4:
+            raise RuntimeError(f"Could not find all requested screens in data. Found screens: {getattr(self, 'screens', [])}")
+
+        Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, monitors, monitor_types = self._compute_response_matrix_from_directory(
+            directory=directory,
+            correctors=correctors,
+            bpms=bpms,
+            screens=screens,
+            triangular=bool(self.triangular_checkbox.isChecked()),
+            monitor_mode="screen_only",
+        )
 
         R = Response()
-        R.bpms = bpms
+        R.bpms = monitors
         R.hcorrs = hcorrs
         R.vcorrs = vcorrs
         R.Rxx = Rxx
@@ -169,6 +186,7 @@ class MainWindow(QMainWindow, SaveOrLoad, Correction_Optics_ResponseMatrix):
         self.sequence=S.get_sequence()
         self.correctors=list(S.get_correctors()["names"])
         self.bpms=list(S.get_bpms()["names"])
+        self.screens=list(S.get_screens()["names"])
 
         self.correctors_list.clear()
         self.correctors_list.addItems([str(c) for c in self.correctors])

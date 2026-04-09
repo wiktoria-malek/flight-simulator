@@ -166,8 +166,13 @@ class SaveOrLoad():
         __save_graph_data(os.path.join(save_session_dir, "wakefield_y_after_correction.txt"), self._hist_wake_y)
 
         corrs, bpms = self._get_selection()
-        R0xx, R0yy, R0xy, R0yx, B0x, B0y, R1xx, R1yy, R1xy, R1yx, B1x, B1y, R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs0, vcorrs0, hcorrs1, vcorrs1, hcorrs2, vcorrs2, bpms0, bpms1, bpms2 = self._get_data_from_loaded_directories(
+
+        R0xx, R0yy, R0xy, R0yx, B0x, B0y, R1xx, R1yy, R1xy, R1yx, B1x, B1y, R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs0, vcorrs0, hcorrs1, vcorrs1, hcorrs2, vcorrs2, monitors0, monitor_types0, monitors1, monitor_types1, monitors2, monitor_types2 = self._get_data_from_loaded_directories(
             selected_corrs=corrs, selected_bpms=bpms)
+        bpms0 = list(monitors0)
+        bpms1 = list(monitors1)
+        bpms2 = list(monitors2)
+
         correction_matrices = {
             "Axx": Axx, "Ayy": Ayy, "Axy":Axy, "Ayx":Ayx, "B0x": B0x, "B0y": B0y,
             "R0xx": R0xx, "R1xx": R1xx, "R2xx": R2xx,

@@ -1,9 +1,7 @@
-import os
-import sys
+import os, sys, pickle
 import numpy as np
 import matplotlib
 matplotlib.use("QtAgg")
-
 from datetime import datetime
 from scipy.optimize import least_squares
 from scipy.stats import median_abs_deviation
@@ -20,11 +18,9 @@ except ImportError:
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-
 from Backend.SaveOrLoad import SaveOrLoad
 from Backend.EmittanceMeasurement import EmittanceMeasurement
 from Backend.MeasureOptics import MeasureOptics
-
 
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None):
@@ -179,10 +175,11 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
 
     def __init__(self, interface, dir_name):
         super().__init__()
-
         self.interface = interface
         self.dir_name = dir_name
         self.session = None
+        #self.screen_response_file = None
+        self.screen_response_file = "/Users/wiktoriamalek/flight-simulator-data/ATF2_Ext_RFT_mis_bpms_0_100_Orbit_SCREENS.pkl"
 
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
@@ -407,8 +404,12 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             QMessageBox.information(self, "Error", "No session.")
             return
         try:
+            screen_response = None
+            if self.screen_response_file:
+                with open(self.screen_response_file, "rb") as file:
+                    screen_response = pickle.load(file)
             measure_tool = MeasureOptics(self.interface, n_starts=5)
-            optics = measure_tool.get_from_session(self.session)
+            optics = measure_tool.get_from_session(self.session, screen_response=screen_response)
         except Exception as e:
             QMessageBox.information(self, "Measure Optics", str(e))
             return
