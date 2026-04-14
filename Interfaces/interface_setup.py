@@ -44,7 +44,7 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_Ext_RFTrack",
             "class_name": "InterfaceATF2_Ext_RFTrack",
             "settings": {"jitter":0.00, "bpm_resolution":0.00},
-            "actions": ["align_everything", "misalign_bpms"],
+            "actions": ["align_everything"],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -64,6 +64,19 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.01
                 },
+        },
+        {
+            "display_name": "ATF2 Linac RFTrack",
+            "module": "Interfaces.ATF2.InterfaceATF2_Linac_RFTrack",
+            "class_name": "InterfaceATF2_Linac_RFTrack",
+            "settings": {"jitter": 0.00, "bpm_resolution": 0.00},
+            "actions": ["align_everything"],
+            "units":
+                {
+                    "corrector_strength": "T*mm",
+                    "bpm_position": "mm",
+                    "sysid_corrector_kick": 0.01
+                }
         },
     ],
 

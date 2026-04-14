@@ -508,6 +508,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 state0=self.interface.get_state()
                 if it==0:
                     self.measurement_start_state=state0
+                    screens0=state0.get_screens()
+                    print("Screen values before correction:")
+                    print(f"Sigx: {screens0['sigx']}")
+                    print(f"Sigy: {screens0['sigy']}")
+                    print("Emittance before correction:")
+                    for screen_name in screens0["names"]:
+                        tw = self.interface.get_twiss_at_screen(screen_name)
+                        print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
+                        print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
+
                 O0 = state0.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
                 O0x=np.asarray(O0['x'],dtype=float).reshape(-1,1)
                 O0y=np.asarray(O0['y'],dtype=float).reshape(-1,1)
@@ -523,9 +533,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self._hist_abs_rms_y.append(orbit_rms_y)
                 self._hist_abs_rms_xy.append(orbit_rms_xy)
 
-                if it == 0: # instead of golden orbit, correct from current orbit
-                    B0x = O0x
-                    B0y = O0y
+
+                # UNCOMMENT AFTER SANITY CHECKS
+                # if it == 0: # instead of golden orbit, correct from current orbit
+                #     B0x = O0x
+                #     B0y = O0y
 
                 if self.reset_ref_orb==True:
                     B0x = O0x.copy()
@@ -533,10 +545,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self.reset_ref_orb=False
                     self.log("Reference orbit reset to current orbit")
 
-                # if it == 0 and self.nominal_state is not None:
-                #     nominal_orbit = self.nominal_state.get_orbit(bpms)
-                #     B0x = np.asarray(nominal_orbit["x"], dtype=float).reshape(-1, 1)
-                #     B0y = np.asarray(nominal_orbit["y"], dtype=float).reshape(-1, 1)
+                # COMMENT AFTER SANITY CHECKS
+                if it == 0:
+                    if self.nominal_state is not None:
+                        nominal_orbit = self.nominal_state.get_orbit(bpms)
+                        B0x = np.asarray(nominal_orbit["x"], dtype=float).reshape(-1, 1)
+                        B0y = np.asarray(nominal_orbit["y"], dtype=float).reshape(-1, 1)
+                    else:
+                        B0x = O0x.copy()
+                        B0y = O0y.copy()
 
                 # dfs
                 if w2>0:
@@ -629,8 +646,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 Ayx_it = np.array(Ayx_base, copy=True)
                 Bx=np.vstack(Bx)
                 By=np.vstack(By)
+
                 print("||Bx|| =", np.linalg.norm(Bx))
                 print("||By|| =", np.linalg.norm(By))
+
 
                 Axx_it[np.isnan(Axx_it)] = 0
                 Ayy_it[np.isnan(Ayy_it)] = 0
@@ -778,8 +797,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.setWindowTitle("BBA GUI")
             QMessageBox.information(self, "Correction", "Correction finished.")
             final_state = self.interface.get_state()
-
-
+            screens_f=final_state.get_screens()
+            print("Screen values after correction:")
+            print(f"Sigx: {screens_f['sigx']}")
+            print(f"Sigy: {screens_f['sigy']}")
+            print("Emittance after correction:")
+            for screen_name in screens_f["names"]:
+                tw = self.interface.get_twiss_at_screen(screen_name)
+                print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
+                print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
             final_bpms = final_state.get_bpms(bpms)
             final_x_vals = np.asarray(final_bpms["x"], dtype=float)
             final_y_vals = np.asarray(final_bpms["y"], dtype=float)
@@ -869,7 +895,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.log_console.log(line)
 
     def _clear_graphs(self):
-        # it doesnt do fresh - start, it only clears the graphs
+        # it doesnt do fresh start, it only clears the graphs
         self._cancel = True
         self._hist_orbit_x.clear(),self._hist_orbit_y.clear()
         self._hist_disp_x.clear(),self._hist_disp_y.clear()
@@ -948,10 +974,23 @@ if __name__ == "__main__":
         print("Selection cancelled.")
         sys.exit(1)
 
+    # UNCOMMENT AFTER SANITY CHECKS
+    # I = dialog
+    # project_name = I.get_name()
+    # nominal_state = None
+    # start_state = I.get_state()
+
+
+    # COMMENT AFTER SANITY CHECKS
     I = dialog
-    project_name = I.get_name()
-    nominal_state = None
+    I.align_everything()
+    nominal_state = I.get_state()
+    I.misalign_bpms()
     start_state = I.get_state()
+    project_name = I.get_name()
+
+
+
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     dir_name = f"~/flight-simulator-data/BBA_{I.get_name()}_{time_str}_session_settings"

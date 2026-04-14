@@ -11,7 +11,7 @@ matplotlib.use("QtAgg")
 class LogConsole(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("UI files/Log Console")
+        self.setWindowTitle("Log Console")
         self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
         self.setMinimumSize(520, 320)
         self.resize(700, 420)

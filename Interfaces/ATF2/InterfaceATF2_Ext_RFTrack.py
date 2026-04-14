@@ -574,7 +574,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.lattice.align_elements()
         self.__track_bunch()
 
-    def misalign_quadrupoles(self, sigma_x=0.02, sigma_y=0.02):
+    def misalign_quadrupoles(self, sigma_x=0.100, sigma_y=0.100):
         self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 

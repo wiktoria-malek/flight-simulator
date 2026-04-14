@@ -127,7 +127,7 @@ class InterfaceSelectionDialog(QDialog):
             super().accept()
 
         except Exception as e:
-            QMessageBox.critical(self,"Interface unavailable",f"This interface is unavailable.")
+            QMessageBox.critical(self,"Interface unavailable",f"This interface is unavailable. {e}")
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Type.KeyPress:
