@@ -32,6 +32,8 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         self.wfs_test_charge = 0.90
         self.__setup_beam0()
         self.__track_bunch()
+        self._saved_sextupoles_state = None
+        self.sextupoles = self._get_element_names_from_twiss_types({"SEXTUPOLE"})
 
     def log_messages(self,console):
         self.log=console or print
@@ -283,5 +285,66 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
 
     def misalign_bpms(self,sigma_x=0.100,sigma_y=0.100):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
+        self.__track_bunch()
+
+    def get_sextupoles(self, names = None):
+        self.log("Reading sextupoles' strengths...")
+        bdes = np.zeros(len(self.sextupoles), dtype=float)
+
+        for i, sextupole_name in enumerate(self.sextupoles):
+            elements = self.lattice[sextupole_name]
+            if not isinstance(elements, list):
+                elements = [elements]
+
+            k2_values = []
+            for element in elements:
+                try:
+                    strength = element.get_strengths()
+                except Exception:
+                    continue
+                strengths = np.asarray(strength, dtype = complex ).ravel()
+                if strengths.size >= 3:
+                    k2_values.append(float(np.real(strengths[2])))
+                else:
+                    k2_values.append(0.0)
+            if len(k2_values) > 1 and not np.allclose(k2_values, k2_values[0], rtol = 0.0, atol = 1e-12):
+                self.log(f"Parts of sextupole {sextupole_name} are not consistent.")
+
+            bdes[i] = k2_values[0] if k2_values else 0.0
+
+        sextupoles = {"names": self.sextupoles, "bdes": bdes, "bact": bdes.copy()}
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(sextupoles["names"]) if s in names])
+            sextupoles = {
+                "names": np.array(sextupoles["names"])[idx],
+                "bdes": np.array(sextupoles["bdes"])[idx],
+                "bact": np.array(sextupoles["bact"])[idx],
+            }
+        return sextupoles
+
+    def set_sextupoles(self, names, values_range):
+        if isinstance(names, str):
+            names = [names]
+        if not (isinstance(values_range, (list, tuple, np.ndarray))):
+            values_range = [values_range]
+        for sextupole_name, value in zip(names, values_range):
+            elements = self.lattice[sextupole_name]
+            if not isinstance(elements, (list)): elements = [elements]
+            for element in elements:
+                try:
+                    strengths = element.get_strengths()
+                except Exception:
+                    continue
+                strengths = np.asarray(strengths, dtype = complex).ravel()
+
+                if strengths.size < 3:
+                    padded = np.zeros(3, dtype = complex)
+                    padded[:strengths.size] = strengths
+                    strengths = padded
+                strengths[2] = complex(float(value), 0.0)
+                element.set_strengths(strengths)
         self.__track_bunch()
 

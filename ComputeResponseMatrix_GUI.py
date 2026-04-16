@@ -36,7 +36,7 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
 
-class MainWindow(QMainWindow, SaveOrLoad, Correction_Optics_ResponseMatrix):
+class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
     def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
         uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)
@@ -290,7 +290,9 @@ class MainWindow(QMainWindow, SaveOrLoad, Correction_Optics_ResponseMatrix):
             print_exception(e)
 
     def __save_as_button_clicked(self):
-        dir_name = self.cwd + '/response2.pkl'
+        default_dir = f"~/flight-simulator-data/"
+        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
+        dir_name = default_dir + '/response.pkl'
         os.chdir (self.cwd)
         filename, _ = QFileDialog.getSaveFileName(None, "Save Response Matrix", dir_name, "Pickle Files (*.pkl)")
         if filename:

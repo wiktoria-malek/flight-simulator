@@ -126,7 +126,7 @@ class SaveOrLoad():
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
 
-    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By):
+    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir = f"~/flight-simulator-data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
@@ -145,6 +145,11 @@ class SaveOrLoad():
             "rcond": rcond,
             "iters": iters,
             "gain": gain,
+            "beta": beta,
+            "max_horizontal_current" : max_horizontal_current,
+            "max_vertical_current" : max_vertical_current,
+            "is_triangular" : is_triangular,
+            "bpm_weights" : bpm_weights,
             "data_dirs": {k: (self._expand_data_path(v["dir"]) if v else None)
                           for k, v in self._data_dirs.items()},
         }
@@ -258,6 +263,20 @@ class SaveOrLoad():
         if "rcond" in settings: self.lineEdit_4.setText(str(settings["rcond"]))
         if "iters" in settings:  self.lineEdit_5.setText(str(settings["iters"]))
         if "gain" in settings: self.lineEdit_6.setText(str(settings["gain"]))
+        if "beta" in settings: self.lineEdit_beta.setText(str(settings["beta"]))
+        if "max_horizontal_current" in settings: self.max_horizontal_current_spinbox.setValue(settings["max_horizontal_current"])
+        if "max_vertical_current" in settings: self.max_vertical_current_spinbox.setValue(settings["max_vertical_current"])
+        if "is_triangular" in settings: self.triangular_checkbox.setChecked(settings["is_triangular"])
+        if "bpm_weights" in settings:
+            for bpm_name, weights in settings["bpm_weights"].items():
+                try:
+                    w1_bpm, w2_bpm, w3_bpm = weights
+                    self.bpm_weights[str(bpm_name)] = (float(w1_bpm), float(w2_bpm), float(w3_bpm))
+                except Exception:
+                    continue
+            for i in range(self.bpms_list.count()):
+                item = self.bpms_list.item(i)
+                self._update_bpm_weights(item)
 
         if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
         if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")

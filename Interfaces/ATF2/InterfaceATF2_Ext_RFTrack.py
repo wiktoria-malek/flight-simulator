@@ -26,6 +26,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.corrs = [e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [e.get_name() for e in self.lattice.get_screens()]
         self.quadrupoles = list(dict.fromkeys(e.get_name() for e in self.lattice.get_quadrupoles()))
+        self.sextupoles = self._get_element_names_from_twiss_types({"SEXTUPOLE"})
         self.Pref = 1.2999999e3  # 1.3 GeV/c
         self.nparticles = nparticles
         self.electronmass = rft.electronmass
@@ -37,6 +38,53 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.wfs_test_charge = 0.90
         self.__setup_beam0()
         self.__track_bunch()
+        self._saved_sextupoles_state = None
+
+    def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
+        with open(self.twiss_path, "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+        header_idx = None
+        format_idx = None
+        name_column = None
+        type_column = None
+        for i, line in enumerate(lines):
+            if not line.startswith("*"):
+                continue
+            columns = line.lstrip("*").split()
+            if "NAME" not in columns:
+                continue
+            type_col_name = None
+            if "KEYWORD" in columns:
+                type_col_name = "KEYWORD"
+            elif "TYPE" in columns:
+                type_col_name = "TYPE"
+            else:
+                continue
+            header_idx = i
+            name_column = columns.index("NAME")
+            type_column = columns.index(type_col_name)
+            for j in range(i + 1, len(lines)):
+                if lines[j].startswith("$"):
+                    format_idx = j
+                    break
+            break
+        if header_idx is None or format_idx is None:
+            return []
+        names = []
+        seen = set()
+        for line in lines[format_idx + 1:]:
+            if line.startswith("@") or line.startswith("*") or line.startswith("$"):
+                continue
+            data = line.split()
+            if len(data) <= max(name_column, type_column):
+                continue
+            elem_name = data[name_column].strip('"')
+            elem_type = data[type_column].strip('"').upper()
+            if elem_type in allowed_types and elem_name not in seen:
+                names.append(elem_name)
+                seen.add(elem_name)
+        return names
+
 
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
@@ -98,10 +146,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         B1=self.lattice.track(B0_offset)
         I = B0_offset.get_info()
-        # self.log("Emittance after tracking:")
-        # self.log(f"εx = {I.emitt_x}[mm.rad]")
-        # self.log(f"εy = {I.emitt_y}[mm.rad]")
-        # self.log(f"εz = {I.emitt_z}[mm.permille]")
 
     def change_energy(self):
         self.__setup_beam1()
@@ -604,3 +648,65 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "sigma_y": float(info.sigma_y),
             "S": float(info.S),
         }
+
+    def get_sextupoles(self, names = None):
+        self.log("Reading sextupoles' strengths...")
+        bdes = np.zeros(len(self.sextupoles), dtype=float)
+
+        for i, sextupole_name in enumerate(self.sextupoles):
+            elements = self.lattice[sextupole_name]
+            if not isinstance(elements, list):
+                elements = [elements]
+
+            k2_values = []
+            for element in elements:
+                try:
+                    strength = element.get_strengths()
+                except Exception:
+                    continue
+                strengths = np.asarray(strength, dtype = complex ).ravel()
+                if strengths.size >= 3:
+                    k2_values.append(float(np.real(strengths[2])))
+                else:
+                    k2_values.append(0.0)
+            if len(k2_values) > 1 and not np.allclose(k2_values, k2_values[0], rtol = 0.0, atol = 1e-12):
+                self.log(f"Parts of sextupole {sextupole_name} are not consistent.")
+
+            bdes[i] = k2_values[0] if k2_values else 0.0
+
+        sextupoles = {"names": self.sextupoles, "bdes": bdes, "bact": bdes.copy()}
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = np.array([i for i, s in enumerate(sextupoles["names"]) if s in names])
+            sextupoles = {
+                "names": np.array(sextupoles["names"])[idx],
+                "bdes": np.array(sextupoles["bdes"])[idx],
+                "bact": np.array(sextupoles["bact"])[idx],
+            }
+        return sextupoles
+
+    def set_sextupoles(self, names, values_range):
+        if isinstance(names, str):
+            names = [names]
+        if not (isinstance(values_range, (list, tuple, np.ndarray))):
+            values_range = [values_range]
+        for sextupole_name, value in zip(names, values_range):
+            elements = self.lattice[sextupole_name]
+            if not isinstance(elements, (list)): elements = [elements]
+            for element in elements:
+                try:
+                    strengths = element.get_strengths()
+                except Exception:
+                    continue
+                strengths = np.asarray(strengths, dtype = complex).ravel()
+
+                if strengths.size < 3:
+                    padded = np.zeros(3, dtype = complex)
+                    padded[:strengths.size] = strengths
+                    strengths = padded
+                strengths[2] = complex(float(value), 0.0)
+                element.set_strengths(strengths)
+        self.__track_bunch()
+

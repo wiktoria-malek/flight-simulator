@@ -4,13 +4,13 @@ import numpy as np
 try:
     from PyQt6 import uic
     from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget)
     from PyQt6.QtGui import QPainter
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate)
+    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget)
     from PyQt5.QtGui import QPainter
     pyqt_version = 5
 matplotlib.use("QtAgg")
@@ -25,6 +25,20 @@ import matplotlib.pyplot as plt
 from Backend.BPM_weights import BPM_weights
 from traceback import print_exception
 from Interfaces.interface_setup import INTERFACE_SETUP
+
+class PlotPopup(QMainWindow):
+    def __init__(self, title, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(1000, 700)
+        central = QWidget(self)
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(6, 6, 6, 6)
+        self.fig = Figure(figsize=(9, 6), tight_layout=True)
+        self.canvas = FigureCanvas(self.fig)
+        layout.addWidget(self.canvas)
+        self.ax = self.fig.add_subplot(111)
 
 class BpmWeightsDelegate(QStyledItemDelegate):
     WEIGHTS_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -87,7 +101,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.show_response_matrix=None
         self.test_orbits=None
         self.rms_plots=None
+        self.traj_popup, self.disp_popup, self.wake_popup = None, None,None
         self._setup_canvases()
+        self._plot_double_clicks()
         self.bpm_weights={}
         self._populate_lists()
         self._procs=[]
@@ -129,16 +145,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         correctors_list = correctors['names']
         self.hcorrector_names=set(map(str, self.interface.get_hcorrectors_names() or [])) # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
         self.vcorrector_names=set(map(str, self.interface.get_vcorrectors_names() or []))
-
         units_settings, sysid_kick, bpm_unit, corrs_unit=self._get_interface_units()
         self.sysid_kick=sysid_kick
         self.bpm_unit=bpm_unit
         self.corrs_unit=corrs_unit
-
-
         max_curr_h=0.0
         max_curr_v=0.0
-
         if correctors_list is not None:
             hcorrs = self.interface.get_hcorrectors_names()
             vcorrs = self.interface.get_vcorrectors_names()
@@ -157,6 +169,94 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
+    def _plot_double_clicks(self):
+        if getattr(self, "traj_canvas", None) is not None: # mpl connect watches/listens to events in matplotlib popup
+            self.traj_canvas.mpl_connect("button_press_event", lambda event: self._handle_plot_click(event, "traj"))
+        if getattr(self, "disp_canvas", None) is not None:
+            self.disp_canvas.mpl_connect("button_press_event", lambda event: self._handle_plot_click(event, "disp"))
+        if getattr(self, "wake_canvas", None) is not None:
+            self.wake_canvas.mpl_connect("button_press_event", lambda event: self._handle_plot_click(event, "wake"))
+    def _handle_plot_click(self, event, plot_type):
+        if event is None: return
+        if getattr(event, "dblclick", False) and getattr(event, "button", None) == 1:
+            self._open_plot_popup(plot_type)
+
+    def _open_plot_popup(self, plot_type):
+        popup_attr = f"{plot_type}_popup"
+        popup = getattr(self,popup_attr, None)
+        if popup is None:
+            titles = {
+                "traj": "Trajectory (Residual to response matrix reference)" ,
+                "disp": "Dispersion (Residual to response matrix reference)" ,
+                "wake": "Wakefield (Residual to response matrix reference)" ,
+            }
+            popup = PlotPopup(titles.get(plot_type, "Correction plot"), parent=self)
+            setattr(self, popup_attr, popup)
+        self._refresh_plot_popup(plot_type)
+        popup.show()
+        popup.raise_()
+        popup.activateWindow()
+
+    def _refresh_plot_popup(self, plot_kind):
+        popup = getattr(self, f"{plot_kind}_popup", None)
+        if popup is None:
+            return
+
+        if plot_kind == "traj":
+            values_x = self._hist_orbit_x
+            values_y = self._hist_orbit_y
+            vals = self._hist_orbit
+            error_x = self._hist_orbit_x_err
+            error_y = self._hist_orbit_y_err
+            error_all = self._hist_orbit_err
+            ylabel = f"Residual norm [{self.bpm_unit}]"
+            title = "Trajectory (Residual to response matrix reference)"
+        elif plot_kind == "disp":
+            values_x = self._hist_disp_x
+            values_y = self._hist_disp_y
+            vals = self._hist_disp
+            error_x = self._hist_disp_x_err
+            error_y = self._hist_disp_y_err
+            error_all = self._hist_disp_err
+            ylabel = f"Residual norm [{self.bpm_unit}]"
+            title = "Dispersion (Residual to response matrix reference)"
+        else:
+            values_x = self._hist_wake_x
+            values_y = self._hist_wake_y
+            vals = self._hist_wake
+            error_x = self._hist_wake_x_err
+            error_y = self._hist_wake_y_err
+            error_all = self._hist_wake_err
+            ylabel = f"Residual norm [{self.bpm_unit}]"
+            title = "Wakefield (Residual to response matrix reference)"
+
+        ax = popup.ax
+        ax.clear()
+
+        if values_x:
+            err_x = error_x if error_x is not None else None
+            ax.errorbar(range(len(values_x)), values_x, yerr=err_x, marker="o", color="red", label="x", capsize=6, elinewidth=2, capthick=2, markersize=4)
+        if values_y:
+            err_y = error_y if error_y is not None else None
+            ax.errorbar(range(len(values_y)), values_y, yerr=err_y, marker="o", color="blue", label="y", capsize=6, elinewidth=2, capthick=2, markersize=4)
+        if vals:
+            err_all = error_all if error_all is not None else None
+            ax.errorbar(range(len(vals)), vals, yerr=err_all, linestyle="dashed", color="black", label="combined norm", capsize=6, elinewidth=2, capthick=2, markersize=4)
+
+        if values_x or values_y or vals:
+            ax.legend(fontsize=9, loc="upper right")
+        ax.set_title(title)
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel(ylabel)
+        ax.grid(True, alpha=0.3)
+        popup.canvas.draw_idle()
+
+    def _refresh_all_plot_popups(self):
+        self._refresh_plot_popup("traj")
+        self._refresh_plot_popup("disp")
+        self._refresh_plot_popup("wake")
+
     def _get_interface_initial_settings(self):
         interface_class_name=self.interface.__class__.__name__
         interface_module_name=self.interface.__class__.__module__
@@ -185,6 +285,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.interface.reset_energy()
         self.interface.reset_intensity()
         self.interface.restore_correctors_state(self.restore_state)
+        self.interface.restore_sextupoles_state(self.restore_state)
         self.reset_ref_orb=True
         self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
         self._clear_graphs()
@@ -214,10 +315,19 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if not self._running:
             self._running = True
             self._step = True
+            saved_state = self.interface.get_state()
+            sextupoles = saved_state.get_sextupoles()
+            sextupoles_to_disable = len(sextupoles["names"]) > 0
             try:
+                if sextupoles_to_disable:
+                    self.interface.set_sextupoles(sextupoles["names"],np.zeros(len(sextupoles["names"]),dtype=float))
+                    self.log("Sextupoles disabled")
                 self._start_correction()
             finally:
                 self._running = False
+                if sextupoles_to_disable:
+                    self.interface.restore_sextupoles_state(saved_state)
+                    self.log("Sextupoles restored.")
         else:
             self._step = True
 
@@ -275,6 +385,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         ax.yaxis.get_offset_text().set_fontsize(7)
         ax.grid(True, alpha=0.3)
         canvas.draw_idle()
+
+        if ax is self.traj_ax:
+            self._refresh_plot_popup("traj")
+        elif ax is self.disp_ax:
+            self._refresh_plot_popup("disp")
+        elif ax is self.wake_ax:
+            self._refresh_plot_popup("wake")
 
     def _get_bpm_weights_text(self,bpm_name):
         wbpm_orb, wbpm_dfs, wbpm_wfs = self.bpm_weights.get(bpm_name, (1.0, 1.0, 1.0))
@@ -826,7 +943,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._hist_abs_rms_xy.append(final_rms_xy)
 
             self.log("Correction finished.")
-            self.save_session_settings(w1, w2, w3, rcond, iters, gain, Axx, Ayy,Axy,Ayx, Bx, By)
+            self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h,max_curr_v, bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy,Axy,Ayx, Bx, By)
 
         except Exception as e:
             self.setWindowTitle("BBA GUI")
@@ -907,6 +1024,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[],vals=[],title=None)
         self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None)
         self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None)
+        self._refresh_all_plot_popups()
 
     def handling(self, app_name,cwd=None, args=None):
         try:
@@ -988,8 +1106,6 @@ if __name__ == "__main__":
     I.misalign_bpms()
     start_state = I.get_state()
     project_name = I.get_name()
-
-
 
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")

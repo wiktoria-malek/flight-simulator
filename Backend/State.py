@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 
 class State:
-    def __init__(self, correctors=None,bpms=None, icts=None,sequence=None,hcorrectors_names=None,vcorrectors_names=None,screens=None,quadrupoles=None,timestamp=None,filename=None):
+    def __init__(self, sextupoles = None, correctors=None,bpms=None, icts=None,sequence=None,hcorrectors_names=None,vcorrectors_names=None,screens=None,quadrupoles=None,timestamp=None,filename=None):
         if filename is not None:
             self.load(filename)
             return
@@ -15,6 +15,7 @@ class State:
         self.vcorrectors_names = vcorrectors_names if vcorrectors_names is not None else []
         self.screens = screens if screens is not None else {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])}
         self.quadrupoles = quadrupoles if quadrupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([])}
+        self.sextupoles = sextupoles if sextupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([])}
         self.timestamp = timestamp if timestamp is not None else datetime.now()
 
     def get_sequence(self):
@@ -74,6 +75,19 @@ class State:
             }
         return quadrupoles
 
+    def get_sextupoles(self, names=None):
+        if isinstance(names, str):
+            names = [names]
+        sextupoles=self.sextupoles
+        if names is not None:
+            sextupole_indexes=np.array([index for index, string in enumerate(sextupoles['names']) if string in names])
+            sextupoles = {
+                "names": np.array(self.sextupoles['names'])[sextupole_indexes],
+                "bdes": np.array(self.sextupoles['bdes'])[sextupole_indexes],
+                "bact": np.array(self.sextupoles['bact'])[sextupole_indexes],
+            }
+        return sextupoles
+
     def get_orbit(self, names=None):
         bpms = self.get_bpms(names)
         x = np.mean(bpms['x'],axis=0) # mm
@@ -127,6 +141,7 @@ class State:
                                      "y": np.array([]), "sigx": np.array([]), "sigy": np.array([]), "sum": np.array([]),
                                      "hedges": [], "vedges": [], "images": [], "S": np.array([])})
             self.quadrupoles = data.get('quadrupoles', {"names": [], "bdes": np.array([]), "bact": np.array([])})
+            self.sextupoles = data.get('sextupoles', {"names": [], "bdes": np.array([]), "bact": np.array([])})
             self.hcorrectors_names = data['hcorrectors_names']
             self.vcorrectors_names = data['vcorrectors_names']
             self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
@@ -159,6 +174,12 @@ class State:
             "bdes": self.quadrupoles['bdes'],
         }
 
+        sextupoles = {
+            'names': self.sextupoles['names'],
+            "bact": self.sextupoles['bact'],
+            "bdes": self.sextupoles['bdes'],
+        }
+
         screens={
             'names': self.screens['names'],
             'hpixel': self.screens['hpixel'],
@@ -181,6 +202,7 @@ class State:
             "icts": icts,
             "screens": screens,
             "quadrupoles": quadrupoles,
+            "sextupoles": sextupoles,
             "hcorrectors_names": self.hcorrectors_names,
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")

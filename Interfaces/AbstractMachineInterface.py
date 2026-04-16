@@ -31,6 +31,16 @@ class AbstractMachineInterface(ABC):
             "bact": np.array([]),
         }
 
+    def get_sextupoles(self):
+        return {
+            "names": [],
+            "bdes": np.array([]),
+            "bact": np.array([]),
+        }
+
+    def set_sextupoles(self, names, values):
+        raise NotImplementedError(f"{self.get_name()} does not implement set_sextupoles")
+
     def get_screens(self):
         return {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])}
 
@@ -80,6 +90,7 @@ class AbstractMachineInterface(ABC):
             vcorrectors_names=self.get_vcorrectors_names(),
             screens=self.get_screens(),
             quadrupoles=self.get_quadrupoles(),
+            sextupoles=self.get_sextupoles(),
         )
 
     def restore_correctors_state(self, state):
@@ -93,3 +104,12 @@ class AbstractMachineInterface(ABC):
                 self.set_quadrupoles(quadrupoles["names"], quadrupoles["bdes"])
             except NotImplementedError:
                 pass
+
+    def restore_sextupoles_state(self, state):
+        sextupoles = state.get_sextupoles()
+        if len(sextupoles["names"]) > 0:
+            try:
+                self.set_sextupoles(sextupoles["names"], sextupoles["bdes"])
+            except NotImplementedError:
+                pass
+
