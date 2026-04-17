@@ -71,6 +71,13 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         self.test_laser_intensity = wfs_intensity
         #self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
+    def get_beam_factors(self):
+        # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
+        Pref = 1.2999999e3
+        gamma_rel = np.sqrt((Pref / 0.51099895) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
+        return gamma_rel, beta_rel
+
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)

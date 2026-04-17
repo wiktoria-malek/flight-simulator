@@ -85,7 +85,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 seen.add(elem_name)
         return names
 
-
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)

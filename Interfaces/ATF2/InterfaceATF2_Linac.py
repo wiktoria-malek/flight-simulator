@@ -83,6 +83,13 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
     def log_messages(self,console):
         self.log=console or print
 
+    def get_beam_factors(self):
+        # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
+        Pref = 80
+        gamma_rel = np.sqrt((Pref / 0.51099895) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
+        return gamma_rel, beta_rel
+
     def change_energy(self):
         pv = PV('CM1L:phaseWrite')
         rel_phase = 5

@@ -22,11 +22,9 @@ CORRECTOR_BLACKLIST = [
     'XCB2LE','XCB3RE','XCB3LE','XCB2RE','XC1EX',
     ]
 
-
 def devname_swap_micro_primary(device):
     ds = device.split(':')
     return f'{ds[1]}:{ds[0]}:{ds[2]}'
-
 
 class InterfaceFACET2_Linac(AbstractMachineInterface):
     def get_name(self):
@@ -90,6 +88,13 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
             qraw.append(self.PVs['Q_readback'].get())
             time.sleep(0.1)
         return np.nanmean(qraw)
+
+    def get_beam_factors(self):
+        # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
+        Pref = np.sqrt(125.0**2 - 0.51099895*2)
+        gamma_rel = np.sqrt((Pref / 0.51099895) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
+        return gamma_rel, beta_rel
 
     def change_energy(self):
         """ set beam to -2MeV at DL10 and disable downstream feedbacks """

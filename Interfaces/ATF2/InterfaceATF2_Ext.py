@@ -1,4 +1,4 @@
-import sys, time, math,os
+import sys, time, math, os
 import numpy as np
 from epics import PV, ca, caget
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
@@ -9,6 +9,19 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
     def __init__(self, nsamples=1, nominal_intensity=0.15, wfs_intensity=0.1):
         self.nsamples = nsamples
+        self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
+        self.electronmass = 0.51099895 # MeV/c^2
+        self.Pref = 1.2999999e3 # MeV/c, until a PV is specified
+        self.screen_names = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
+        self.screen_pv_names = {
+            'OTR0X': 'mOTR1',
+            'OTR1X': 'mOTR2',
+            'OTR2X': 'mOTR3',
+            'OTR3X': 'mOTR4'
+        }
+
+        self.screen_image_shape = (960, 1280) # image size = 1280 x 960
+
         # Bpms and correctors in beamline order
         sequence = [
             "MB2X", "ZV1X", "MQF1X", "ZV2X", "MQD2X", "MQF3X", "ZH1X", "ZV3X", "MQF4X",
@@ -62,6 +75,70 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.nominal_laser_intensity = nominal_intensity
         self.test_laser_intensity = wfs_intensity
         #PV('RFGun:LaserIntensity1:Read').get()
+
+    def get_beam_factors(self):
+        # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
+        gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
+        return gamma_rel, beta_rel
+
+    def _read_twiss_file(self):
+        with open(self.twiss_path, "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+        return lines, columns, dollar_sign
+
+    def  _get_twiss_s_position(self, names):
+        names = list(names)
+        lines, columns, dollar_sign = self._read_twiss_file()
+        try:
+            name_column = columns.index("NAME")
+            s_column = columns.index("S")
+        except ValueError:
+            return [np.nan] * len(names)
+        s_pos = {}
+
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            if len(data) <= max(name_column, s_column):
+                continue
+            elem_name = data[name_column].strip('"')
+            try:
+                s_pos[elem_name] = float(data[s_column])
+            except ValueError:
+                continue
+        return [s_pos.get(name, np.nan) for name in names]
+
+    @staticmethod
+    def make_safe_float(value, default = np.nan):
+        try:
+            if value is None:
+                return float(default)
+            arr = np.asarray(value)
+            if arr.size == 0:
+                return float(default)
+            return float(arr.flat[0])
+        except Exception:
+            return float(default)
+
+    def _valid_pv_value(self, pv_names, default = np.nan):
+        for pv_name in pv_names:
+            try:
+                value = caget(pv_name)
+            except Exception:
+                continue
+            value = self.make_safe_float(value, default = np.nan)
+            if np.isfinite(value):
+                return value
+        return float(default)
+
+    def _read_screen_status(self, screen_pv_name):
+        return self.make_safe_float(caget(f'{screen_pv_name}):Target:READ:INOUT'),
+
+
+
 
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)

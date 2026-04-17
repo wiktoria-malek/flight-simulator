@@ -96,6 +96,11 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         self.log(f"εy = {I.emitt_y}[mm.mrad]")
         self.log(f"εz = {I.emitt_z}[mm.permille]")
 
+    def get_beam_factors(self):
+        gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
+        return gamma_rel, beta_rel
+
     def change_energy(self):
         self.__setup_beam1()
         self.__track_bunch()

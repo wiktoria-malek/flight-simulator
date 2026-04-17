@@ -2,6 +2,7 @@ import os, sys, pickle
 import numpy as np
 import matplotlib
 matplotlib.use("QtAgg")
+import matplotlib.colors as mcolors
 from datetime import datetime
 from scipy.optimize import least_squares
 from scipy.stats import median_abs_deviation
@@ -10,11 +11,13 @@ try:
     from PyQt6.QtWidgets import (
         QApplication, QMainWindow, QMessageBox, QVBoxLayout
     )
+    from PyQt6.QtCore import Qt, QTimer
 except ImportError:
     from PyQt5 import uic
     from PyQt5.QtWidgets import (
         QApplication, QMainWindow, QMessageBox, QVBoxLayout
     )
+    from PyQt5.QtCore import Qt, QTimer
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -221,7 +224,8 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
 
         self._clear_fit_panel()
         self._reset_canvas()
-
+        self.screens_list.itemSelectionChanged.connect(self._screen_selection_changed)
+        self._filter_quadrupoles_in_gui()
     def _clear_fit_panel(self):
         self.result_reference_screen.setText("-")
         self.result_quad.setText("-")
@@ -281,8 +285,16 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         fig = self.canvas.figure
         fig.clear()
 
+        def lighten_plot_color(color, amount = 0.45):
+            rgb = np.array(mcolors.to_rgb(color), dtype=float)
+            return tuple(rgb + (1.0 - rgb) * amount)
+
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212, sharex=ax1)
+
+        color_cycle = matplotlib.rcParams['axes.prop_cycle'].by_key().get('color', [])
+        if not color_cycle:
+            color_cycle = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
 
         for i, screen in enumerate(screens):
             mask_x = np.isfinite(sigx[:, i])
@@ -317,17 +329,47 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         fig = self.canvas.figure
         fig.clear()
 
+        def lighten_color(color, amount=0.45):
+            import matplotlib.colors as mcolors
+            rgb = np.array(mcolors.to_rgb(color), dtype=float)
+            return tuple(rgb + (1.0 - rgb) * amount)
+
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212, sharex=ax1)
 
-        for i, screen in enumerate(screens):
-            ax1.plot(K1_values, sigx[:, i], 'o', label=f"{screen} data")
-            fit_x = np.sqrt(np.maximum(pred_x[:, i], 0.0))
-            ax1.plot(K1_values, fit_x, '-', label=f"{screen} fit")
+        color_cycle = matplotlib.rcParams['axes.prop_cycle'].by_key().get('color', [])
+        if not color_cycle:
+            color_cycle = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
 
-            ax2.plot(K1_values, sigy[:, i], 'o', label=f"{screen} data")
+        for i, screen in enumerate(screens):
+            base_color = color_cycle[i % len(color_cycle)]
+            fit_color = lighten_color(base_color, amount=0.45)
+
+            ax1.plot(
+                K1_values, sigx[:, i], 'o',
+                color=base_color,
+                label=f"{screen} data"
+            )
+            fit_x = np.sqrt(np.maximum(pred_x[:, i], 0.0))
+            ax1.plot(
+                K1_values, fit_x, '-',
+                color=fit_color,
+                linewidth=2.0,
+                label=f"{screen} fit"
+            )
+
+            ax2.plot(
+                K1_values, sigy[:, i], 'o',
+                color=base_color,
+                label=f"{screen} data"
+            )
             fit_y = np.sqrt(np.maximum(pred_y[:, i], 0.0))
-            ax2.plot(K1_values, fit_y, '-', label=f"{screen} fit")
+            ax2.plot(
+                K1_values, fit_y, '-',
+                color=fit_color,
+                linewidth=2.0,
+                label=f"{screen} fit"
+            )
 
         ax1.set_ylabel("sigx")
         ax2.set_ylabel("sigy")
@@ -347,7 +389,6 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         QApplication.processEvents()
 
     def _run_scan(self):
-
         current_quad = self.quadrupoles_list.currentItem()
         if current_quad is None:
             QMessageBox.information(self, "Scan error", "No quadrupole selected.")
@@ -536,9 +577,6 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             lines.append("beta_screen_y " + ", ".join(f"{s}: {v:.3f}" for s, v in zip(screens, by) if np.isfinite(v)))
         return "\n".join(lines)
 
-
-
-
     def _get_twiss_s_positions(self, names):
         names = list(names)
         positions = [np.nan] * len(names)
@@ -558,6 +596,48 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         except Exception:
             positions = [np.nan] * len(names)
         return positions
+
+    def _filter_quadrupoles_in_gui(self):
+        if not hasattr(self,"quadrupoles_list") or self.quadrupoles_list is None:
+            return
+        if not hasattr(self,"screens_list") or self.screens_list is None:
+            return
+        selected_screens = self._get_sorted_selected_screens()
+        if not selected_screens:
+            return
+
+        screen_position = self._get_twiss_s_positions(selected_screens)
+        finite_screen_S = [float(s) for s in screen_position if np.isfinite(s)]
+        if not finite_screen_S:
+            return
+        last_screen_position = max(finite_screen_S)
+        current_quad = None
+        this_quad = self.quadrupoles_list.currentItem()
+        if this_quad is not None:
+            current_quad = this_quad.text()
+
+        all_quadrupoles = list(self.interface.get_quadrupoles().get("names",[]))
+        quad_S = self._get_twiss_s_positions(all_quadrupoles)
+
+        before_last_screen_quads = [name for name, s in zip(all_quadrupoles, quad_S) if np.isfinite(s) and float(s) < last_screen_position]
+        self.quadrupoles_list.blockSignals(True)
+        self.quadrupoles_list.clear()
+        self.quadrupoles_list.addItems(before_last_screen_quads)
+
+        if current_quad in before_last_screen_quads:
+            try:
+                match_flag = Qt.MatchFlag.MatchExactly
+            except AttributeError:
+                match_flag = Qt.MatchExactly
+            matching = self.quadrupoles_list.findItems(current_quad, match_flag)
+            if matching:
+                self.quadrupoles_list.setCurrentItem(matching[0])
+            elif self.quadrupoles_list.count() > 0:
+                self.quadrupoles_list.setCurrentRow(0)
+            self.quadrupoles_list.blockSignals(False)
+
+    def _screen_selection_changed(self):
+        self._filter_quadrupoles_in_gui()
 
     @staticmethod
     def _mean_bpm_axis(bpms, axis):

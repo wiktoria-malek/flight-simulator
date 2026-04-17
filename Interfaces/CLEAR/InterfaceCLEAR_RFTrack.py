@@ -289,6 +289,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         B0_offset = self.B0.displaced(dx, dy, dz, roll, pitch, yaw)
         self.lattice.track(B0_offset)
 
+    def get_beam_factors(self):
+        gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
+        return gamma_rel, beta_rel
+
     def change_energy(self):
         self.__setup_beam1()
         self.__track_bunch()
