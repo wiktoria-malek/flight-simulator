@@ -19,6 +19,7 @@ except ImportError:
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
+from Backend.MeasureTrajectoryResponse import MeasureTrajectoryResponse
 from Backend.EmittanceMeasurement import EmittanceMeasurement
 from Backend.MeasureOptics import MeasureOptics
 
@@ -155,7 +156,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         if not bad(alpha_x_offset) and abs(float(alpha_x_offset)) > 2.0:
             trustworthy = False
             reasons.append("x alpha offset is large")
-        if not bad(alpha_y_offset) and abs(float(alpha_y_offset)) > 2.0:
+        if not bad(alpha_y_offset) and abs(float(alpha_y_offset)) > 1.0:
             trustworthy = False
             reasons.append("y alpha offset is large")
 
@@ -178,8 +179,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         self.interface = interface
         self.dir_name = dir_name
         self.session = None
-        #self.screen_response_file = None
-        self.screen_response_file = "/Users/wiktoriamalek/flight-simulator-data/ATF2_Ext_RFT_mis_bpms_0_100_Orbit_SCREENS.pkl"
+        self.screen_response_file = None
 
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
@@ -393,6 +393,13 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             return
 
         self._draw_live_scan(self.session)
+
+        try:
+            self.session["screen_response_scans"] = self._measure_screen_response()
+        except Exception as e:
+            self.session["screen_response_scans"] = None
+            QMessageBox.information(self, "Scan error", str(e))
+
         quality_msg = self._describe_scan_quality()
         if quality_msg is None:
             QMessageBox.information(self, "Scan", "Scan completed.")
@@ -403,19 +410,173 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         if self.session is None:
             QMessageBox.information(self, "Error", "No session.")
             return
+
+        diagnostic_note = None
+        fitted_note = None
+        transport_source = "measured_fitted"
+        self.session["transport_decision"] = {
+            "active_transport_source": transport_source,
+            "reason": "measured optics / measured transport first, then emittance and Twiss reconstruction",
+        }
+
         try:
-            screen_response = None
-            if self.screen_response_file:
-                with open(self.screen_response_file, "rb") as file:
-                    screen_response = pickle.load(file)
-            measure_tool = MeasureOptics(self.interface, n_starts=5)
-            optics = measure_tool.get_from_session(self.session, screen_response=screen_response)
+            if self.session.get("screen_response_scans") is None:
+                self.session["screen_response_scans"] = self._measure_screen_response()
+        except Exception:
+            self.session["screen_response_scans"] = None
+
+        try:
+            transport_tool = MeasureTrajectoryResponse(self.interface)
+            measured_transport = transport_tool.get_from_session(self.session)
+            self.session["measured_transport"] = measured_transport
+            diagnostic_note = self._info_measured_transport()
+
+            measured_fitted_transport = transport_tool.fit_measured_transport_from_session(self.session)
+            self.session["measured_fitted_transport"] = measured_fitted_transport
+            fitted_note = self._info_measured_fitted_transport()
+        except Exception as e:
+            self.session["measured_transport"] = None
+            self.session["measured_fitted_transport"] = None
+            diagnostic_note = f"trajectory-response diagnostic unavailable: {e}"
+            fitted_note = None
+            QMessageBox.information(self, "Measure Optics", str(e))
+            return
+
+        try:
+            measure_tool = MeasureOptics(self.interface, n_starts=5, transport_source=transport_source)
+            optics = measure_tool.get_from_session(self.session)
         except Exception as e:
             QMessageBox.information(self, "Measure Optics", str(e))
             return
 
         self.session["measured_optics"] = optics
-        QMessageBox.information(self, "Measure Optics", "Completed.")
+
+        msg = f"Completed using {transport_source} transport."
+        if diagnostic_note:
+            msg += "\n\nTrajectory-response diagnostic:\n" + diagnostic_note
+        if fitted_note:
+            msg += "\n\nMeasured-fitted transport:\n" + fitted_note
+        QMessageBox.information(self, "Measure Optics", msg)
+
+    @staticmethod
+    def _fmt_float(value, digits=3):
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return "n/a"
+        return f"{value:.{digits}f}" if np.isfinite(value) else "n/a"
+
+    def _info_measured_transport(self):
+        meas_transport = None if self.session is None else self.session.get("measured_transport")
+
+        if not meas_transport:
+            return None
+
+        K1_vals = np.asarray(meas_transport.get("base_K1_values", []), dtype=float)
+        mean_rel_x = np.asarray(meas_transport.get("mean_rel_x", []), dtype=float)
+        mean_rel_y = np.asarray(meas_transport.get("mean_rel_y", []), dtype=float)
+        screens = list(meas_transport.get("screen_names", []))
+        correctors = list(meas_transport.get("correctors", []))
+        bpm_names = list(meas_transport.get("bpm_names", []))
+        raw_bpm_Rxx = np.asarray(meas_transport.get("raw_bpm_Rxx", []), dtype=float)
+        raw_bpm_Ryy = np.asarray(meas_transport.get("raw_bpm_Ryy", []), dtype=float)
+
+        if K1_vals.size == 0 or mean_rel_x.ndim != 2 or mean_rel_y.ndim != 2 or len(screens) == 0:
+            return None
+
+        lines = []
+        lines.append(f"trajectory-response diagnostic, correctors={len(correctors)}, bpms={len(bpm_names)}")
+        if raw_bpm_Rxx.ndim == 3:
+            lines.append(f"raw_bpm_Rxx shape={raw_bpm_Rxx.shape}")
+        if raw_bpm_Ryy.ndim == 3:
+            lines.append(f"raw_bpm_Ryy shape={raw_bpm_Ryy.shape}")
+
+        for i, K1 in enumerate(K1_vals):
+            x_parts = []
+            y_parts = []
+
+            for j, screen in enumerate(screens):
+                xval = mean_rel_x[i, j] if i < mean_rel_x.shape[0] and j < mean_rel_x.shape[1] else np.nan
+                yval = mean_rel_y[i, j] if i < mean_rel_y.shape[0] and j < mean_rel_y.shape[1] else np.nan
+
+                if np.isfinite(xval):
+                    x_parts.append(f"{screen}: {xval:.3f}")
+                if np.isfinite(yval):
+                    y_parts.append(f"{screen}: {yval:.3f}")
+
+            lines.append(f"K1={K1:.6g}")
+
+            if x_parts:
+                lines.append(" mean_rel_x " + ", ".join(x_parts))
+            if y_parts:
+                lines.append(" mean_rel_y " + ", ".join(y_parts))
+
+        return "\n".join(lines)
+
+    def _info_measured_fitted_transport(self):
+        fitted = None if self.session is None else self.session.get("measured_fitted_transport")
+        if not isinstance(fitted, dict):
+            return None
+
+        screens = list(fitted.get("screen_names", []))
+        bx = np.asarray(fitted.get("beta_screen_x", []), dtype=float)
+        by = np.asarray(fitted.get("beta_screen_y", []), dtype=float)
+        px = np.asarray(fitted.get("transport_params_x", []), dtype=float)
+        py = np.asarray(fitted.get("transport_params_y", []), dtype=float)
+
+        lines = []
+        lines.append(f"mode={fitted.get('mode', 'unknown')}")
+        if px.ndim == 2:
+            lines.append(f"transport_params_x shape={px.shape}")
+        if py.ndim == 2:
+            lines.append(f"transport_params_y shape={py.shape}")
+        if len(screens) == bx.size:
+            lines.append("beta_screen_x " + ", ".join(f"{s}: {v:.3f}" for s, v in zip(screens, bx) if np.isfinite(v)))
+        if len(screens) == by.size:
+            lines.append("beta_screen_y " + ", ".join(f"{s}: {v:.3f}" for s, v in zip(screens, by) if np.isfinite(v)))
+        return "\n".join(lines)
+
+
+
+
+    def _get_twiss_s_positions(self, names):
+        names = list(names)
+        positions = [np.nan] * len(names)
+        if not hasattr(self.interface, "_get_optics_from_twiss_file"):
+            return positions
+
+        try:
+            optics = self.interface._get_optics_from_twiss_file()
+            optics_names = list(optics.get("names", []))
+            optics_s = np.asarray(optics.get("S", []), dtype=float)
+            lookup = {
+                name: float(optics_s[i])
+                for i, name in enumerate(optics_names)
+                if i < optics_s.size and np.isfinite(optics_s[i])
+            }
+            positions = [lookup.get(name, np.nan) for name in names]
+        except Exception:
+            positions = [np.nan] * len(names)
+        return positions
+
+    @staticmethod
+    def _mean_bpm_axis(bpms, axis):
+        names = list(bpms.get("names", []))
+        arr = np.asarray(bpms.get(axis, []), dtype=float)
+        if arr.ndim == 2:
+            values = np.nanmean(arr, axis=0)
+        elif arr.ndim == 1:
+            values = arr
+        else:
+            values = np.full(len(names), np.nan, dtype=float)
+
+        if values.size != len(names):
+            fixed = np.full(len(names), np.nan, dtype=float)
+            n = min(fixed.size, values.size)
+            if n:
+                fixed[:n] = values[:n]
+            values = fixed
+        return values
 
     def _safe_sigma2_errors(self, sig, sig_std):
         sig = np.asarray(sig, dtype=float)
@@ -613,6 +774,132 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             "cost": float(lsq.cost),
         }
 
+    def _measure_screen_response_current_state(self,correctors, delta_corr = 1e-4):
+        screens = list(self.session["screens"])
+        corr_data0 = self.interface.get_correctors(correctors)
+        corr_names = list(corr_data0["names"])
+        corr_bdes0 = np.asarray(corr_data0["bdes"], dtype=float)
+
+        configured_bpms = self.session.get("bpms", [])
+        bpm_names = [] if configured_bpms is None else list(configured_bpms)
+        if not bpm_names:
+            try:
+                bpm_names = list(self.interface.get_bpms()["names"])
+            except Exception:
+                bpm_names = []
+
+        ns = len(screens)
+        nb = len(bpm_names)
+        nc = len(corr_names)
+        Rxx = np.full((ns, nc), np.nan, dtype=float)
+        Ryy = np.full((ns, nc), np.nan, dtype=float)
+        bpm_Rxx = np.full((nb, nc), np.nan, dtype=float)
+        bpm_Ryy = np.full((nb, nc), np.nan, dtype=float)
+
+        try:
+            for j, _ in enumerate(corr_names):
+                vals_p = corr_bdes0.copy()
+                vals_m = corr_bdes0.copy()
+                vals_p[j] += delta_corr
+                vals_m[j] -= delta_corr
+
+                self.interface.set_correctors(corr_names, vals_p.tolist())
+                state_p = self.interface.get_state()
+
+                self.interface.set_correctors(corr_names, vals_m.tolist())
+                state_m = self.interface.get_state()
+
+                sp = state_p.get_screens(screens)
+                sm = state_m.get_screens(screens)
+
+                dx = (np.asarray(sp["x"], dtype=float) - np.asarray(sm["x"], dtype=float)) / (2.0 * delta_corr)
+                dy = (np.asarray(sp["y"], dtype=float) - np.asarray(sm["y"], dtype=float)) / (2.0 * delta_corr)
+
+                Rxx[:, j] = dx
+                Ryy[:, j] = dy
+
+                if nb:
+                    bp = state_p.get_bpms(bpm_names)
+                    bm = state_m.get_bpms(bpm_names)
+                    bpm_dx = (self._mean_bpm_axis(bp, "x") - self._mean_bpm_axis(bm, "x")) / (2.0 * delta_corr)
+                    bpm_dy = (self._mean_bpm_axis(bp, "y") - self._mean_bpm_axis(bm, "y")) / (2.0 * delta_corr)
+                    n_bpm = min(nb, bpm_dx.size, bpm_dy.size)
+                    if n_bpm:
+                        bpm_Rxx[:n_bpm, j] = bpm_dx[:n_bpm]
+                        bpm_Ryy[:n_bpm, j] = bpm_dy[:n_bpm]
+
+        finally:
+            self.interface.set_correctors(corr_names, corr_bdes0.tolist())
+
+        return {
+            "Rxx": Rxx.tolist(),
+            "Ryy": Ryy.tolist(),
+            "correctors": corr_names,
+            "screens": screens,
+            "bpm_Rxx": bpm_Rxx.tolist(),
+            "bpm_Ryy": bpm_Ryy.tolist(),
+            "bpm_names": bpm_names,
+            "bpm_S": self._get_twiss_s_positions(bpm_names),
+            "delta_corr": float(delta_corr),
+        }
+
+    def _set_scan_quad_to_step(self, step_index):
+        quad_name = self.session["quad_name"]
+        K1_values = np.asarray(self.session["K1_values"], dtype=float)
+        target_K1 = float(K1_values[step_index])
+
+        quads = self.interface.get_quadrupoles([quad_name])
+        names = list(quads["names"])
+        if not names:
+            raise RuntimeError("Quadrupole not found")
+        self.interface.set_quadrupoles(names, [target_K1])
+        return target_K1
+
+    def _measure_screen_response(self):
+        if self.session is None:
+            raise RuntimeError("No session")
+        quad_name = self.session["quad_name"]
+        K1_values = np.asarray(self.session["K1_values"], dtype=float)
+        deltas = np.asarray(self.session["deltas"], dtype=float)
+
+        nom_idx = int(np.argmin(np.abs(deltas)))
+        indexes = [0, nom_idx, len(K1_values) - 1]
+
+        all_corrs = self.interface.get_correctors()["names"]
+        correctors = [c for c in all_corrs if str(c).lower().startswith(("zh", "zx", "zv"))][:6]
+
+        if not correctors:
+            raise RuntimeError("No correctors found")
+
+        quad_data0 = self.interface.get_quadrupoles([quad_name])
+        quad_names0 = list(quad_data0["names"])
+        if not quad_names0:
+            raise RuntimeError("Quadrupole not found")
+        quad_bdes0 = np.asarray(quad_data0["bdes"], dtype=float)
+
+        output = {
+            "correctors": correctors,
+            "screen_names": list(self.session["screens"]),
+            "bpm_names": [],
+            "bpm_S": [],
+            "K1_indices": indexes,
+            "K1_values": [],
+            "responses": [],
+        }
+        try:
+            for idx in indexes:
+                K1 = self._set_scan_quad_to_step(idx)
+                resp = self._measure_screen_response_current_state(correctors = correctors, delta_corr = 1e-4)
+                output["K1_values"].append(K1)
+                output["responses"].append(resp)
+                if not output["bpm_names"] and resp.get("bpm_names"):
+                    output["bpm_names"] = list(resp.get("bpm_names", []))
+                    output["bpm_S"] = list(resp.get("bpm_S", []))
+        finally:
+            self.interface.set_quadrupoles(quad_names0,quad_bdes0.tolist())
+        self.session["screen_response_scans"] = output
+        return output
+
     def _fit_twiss_and_emittance(self):
 
         if self.session is None:
@@ -620,8 +907,12 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             return
 
         measured_optics = self.session.get("measured_optics")
+        transport_source = None if not measured_optics else measured_optics.get("transport_source")
         if not measured_optics:
             QMessageBox.information(self, "Fit", "Run Measure Optics first.")
+            return
+        if transport_source not in {"model", "measured_fitted"}:
+            QMessageBox.information(self, "Fit", "Current fit supports only model or measured_fitted transport.")
             return
         quality = self.session.get("scan_quality", {})
         if not quality.get("is_good_for_joint_fit", False):
@@ -664,6 +955,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         result = {
             "screen0": screens[0],
             "quad_name": self.session["quad_name"],
+            "transport_source": transport_source,
             "scan_quality_recommendation": quality.get("recommendation"),
             "best_rel_var_x": quality.get("best_rel_var_x"),
             "best_rel_var_y": quality.get("best_rel_var_y"),
@@ -718,9 +1010,9 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         )
 
         self.session["fit_result_twiss_emit"] = result
-        print(f"quad_name: {self.session["quad_name"]}")
-        print(f"delta_min: {self.session["delta_min"]}")
-        print(f"delta_max: {self.session["delta_max"]}")
+        print(f"quad_name: {self.session['quad_name']}")
+        print(f"delta_min: {self.session['delta_min']}")
+        print(f"delta_max: {self.session['delta_max']}")
         print(f"εₓ = {emit_x_norm:.4f} mm·mrad")
         print(f"εᵧ = {emit_y_norm:.4f} mm·mrad")
         print(f"βₓ0 = {beta_x0:.4f} m, αₓ0 = {alpha_x0:.4f}")
@@ -734,7 +1026,20 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         print("worst_screen_x =", result["worst_screen_x"])
         print("worst_screen_y =", result["worst_screen_y"])
         truth = self.interface.get_twiss_at_screen("OTR0X")
-        print("Twiss parameters from rftrack interface: " , truth)
+        print("Twiss parameters from rftrack interface: ", truth)
+        scans = self.session.get("screen_response_scans")
+        if isinstance(scans, dict):
+            print(scans.keys())
+        meas_t = self.session.get("measured_transport")
+        if isinstance(meas_t, dict):
+            print(meas_t.keys())
+            print("raw_Rxx shape =", np.asarray(meas_t.get("raw_Rxx", []), dtype=float).shape)
+            print("raw_Ryy shape =", np.asarray(meas_t.get("raw_Ryy", []), dtype=float).shape)
+            print("raw_bpm_Rxx shape =", np.asarray(meas_t.get("raw_bpm_Rxx", []), dtype=float).shape)
+            print("raw_bpm_Ryy shape =", np.asarray(meas_t.get("raw_bpm_Ryy", []), dtype=float).shape)
+            print(meas_t.get("mean_rel_y"))
+        else:
+            print("No measured_transport diagnostic available")
         self._update_fit_panel(result)
         self._plot_fit_overlay(pred_x, pred_y, result)
 

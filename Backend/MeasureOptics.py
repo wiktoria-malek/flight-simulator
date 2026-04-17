@@ -1,15 +1,17 @@
 import numpy as np
 from scipy.optimize import least_squares
 
-
 class MeasureOptics:
 
-    def __init__(self, interface, n_starts=5, rng_seed=42): #every time it's the same random set of numbers, pseudorandom
+    def __init__(self, interface, n_starts=5, rng_seed=42, transport_source="model"): #every time it's the same random set of numbers, pseudorandom
         self.interface = interface
         self.n_starts = int(n_starts) # how many restarts with initial values
         self.rng = np.random.default_rng(rng_seed) # exactly for random starting points in _fit_plane
+        self.transport_source = str(transport_source).lower()
+        if self.transport_source not in {"model", "measured_fitted"}:
+            raise ValueError("transport_source must be 'model' or 'measured_fitted'")
 
-    def get_from_session(self, session, screen_response = None):
+    def get_from_session(self, session):
 
         screens = list(session.get("screens", []))
         K1_values = np.asarray(session.get("K1_values", []), dtype=float)
@@ -19,6 +21,7 @@ class MeasureOptics:
         sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
         sigx_std = np.asarray(session.get("sigx_std", []), dtype=float)
         sigy_std = np.asarray(session.get("sigy_std", []), dtype=float)
+
 
         if len(screens) < 2:
             raise ValueError("At least 2 screens are required.")
@@ -35,14 +38,41 @@ class MeasureOptics:
 
         model_twiss_screen0 = None
         try:
-            if hasattr(self.interface, "get_twiss_at_screen") and screens:
-                model_twiss_screen0 = self.interface.get_twiss_at_screen(screens[0])
+            if hasattr(self.interface, "_get_optics_from_twiss_file") and screens:
+                optics = self.interface._get_optics_from_twiss_file()
+                names = list(optics.get("names", []))
+                if screens[0] in names:
+                    i0 = names.index(screens[0])
+                    model_twiss_screen0 = {
+                        "beta_x": float(np.asarray(optics["betx"], dtype=float)[i0]),
+                        "alpha_x": float(np.asarray(optics["alfx"], dtype=float)[i0]),
+                        "beta_y": float(np.asarray(optics["bety"], dtype=float)[i0]),
+                        "alpha_y": float(np.asarray(optics["alfy"], dtype=float)[i0]),
+                    }
         except Exception:
             model_twiss_screen0 = None
 
-        fit_x = self._fit_plane(K1_values=K1_values, sigma=sigx, sigma_std=sigx_std, K1_nom=K1_nom, plane="x", model_twiss=model_twiss_screen0, screen_response=screen_response, screens = screens)
-        fit_y = self._fit_plane(K1_values=K1_values, sigma=sigy, sigma_std=sigy_std, K1_nom=K1_nom, plane="y", model_twiss=model_twiss_screen0, screen_response=screen_response, screens = screens)
-
+        measured_fitted_transport = session.get("measured_fitted_transport")
+        fit_x = self._fit_plane(
+            K1_values=K1_values,
+            sigma=sigx,
+            sigma_std=sigx_std,
+            K1_nom=K1_nom,
+            plane="x",
+            model_twiss=model_twiss_screen0,
+            measured_fitted_transport=measured_fitted_transport,
+            screens=screens,
+        )
+        fit_y = self._fit_plane(
+            K1_values=K1_values,
+            sigma=sigy,
+            sigma_std=sigy_std,
+            K1_nom=K1_nom,
+            plane="y",
+            model_twiss=model_twiss_screen0,
+            measured_fitted_transport=measured_fitted_transport,
+            screens=screens,
+        )
         return {
             "type": "screen0_twiss_vs_K1",
             "screens": screens,
@@ -50,7 +80,7 @@ class MeasureOptics:
             "K1_nom": K1_nom,
             "fit_x": fit_x,
             "fit_y": fit_y,
-            "screen_response": screen_response,
+            "transport_source": self.transport_source,
         }
 
     @staticmethod
@@ -69,6 +99,47 @@ class MeasureOptics:
         alpha0 = alpha_p0 + alpha_p1 * dK1 + alpha_p2 * dK1**2
 
         return beta0, alpha0
+
+
+    def _get_model_transport_params(self, screens,plane):
+        if not hasattr(self.interface, "_get_optics_from_twiss_file"):
+            raise RuntimeError("Interface doesn't provide model optics")
+        optics = self.interface._get_optics_from_twiss_file()
+        names = list(optics["names"])
+
+        beta_key = "betx" if plane == "x" else "bety"
+        alpha_key = "alfx" if plane == "x" else "alfy"
+        mu_key = "mux" if plane == "x" else "muy"
+
+        beta_arr = np.asarray(optics[beta_key], dtype=float)
+        alpha_arr = np.asarray(optics[alpha_key], dtype=float)
+        mu_arr = np.asarray(optics[mu_key], dtype=float)
+
+        if not screens:
+            raise ValueError("No screens provided")
+
+        if screens[0] not in names:
+            raise ValueError(f"Screen {screens[0]} not available in twiss file")
+        i0 = names.index(screens[0])
+        beta0_model = float(beta_arr[i0])
+        alpha0_model = float(alpha_arr[i0])
+        mu0_model = float(mu_arr[i0])
+
+        params = []
+        for screen in screens[1:]:
+            if screen not in names:
+                raise ValueError(f"Screen {screen} not available in twiss file")
+            i1 = names.index(screen)
+            betai = float(beta_arr[i1])
+            mui = float(mu_arr[i1])
+
+            dmu = 2 * np.pi * (mui - mu0_model)
+
+            R11 = np.sqrt(max(betai, 1e-12)/ max(beta0_model, 1e-12)) * (np.cos(dmu) + alpha0_model * np.sin(dmu))
+            R12 = np.sqrt(max(betai, 1e-12) * max(beta0_model, 1e-12)) * np.sin(dmu)
+
+            params.append([R11, R12])
+        return np.asarray(params, dtype=float)
 
     @staticmethod
     def _get_transport_at_K1(measured_optics, plane, K1_values):
@@ -100,7 +171,7 @@ class MeasureOptics:
 
         return result
 
-    def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane, model_twiss=None, screen_response=None, screens=None):
+    def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane, model_twiss=None, measured_fitted_transport=None, screens=None):
         nsteps, nscreens = sigma.shape
         dK1_values = K1_values - K1_nom
 
@@ -141,27 +212,13 @@ class MeasureOptics:
         else:
             alpha_guess = 0.0
 
-        screen_names = list(screens or [])
-        response_rel_amp = None
-        response_monitor_names = []
-        response_matrix = None
-
-        if screen_response is not None:
-            response_monitor_names = [str(name) for name in getattr(screen_response, "bpms", [])]
-
-            if plane == "x":
-                response_matrix = np.asarray(getattr(screen_response, "Rxx", None), dtype=float)
-            else:
-                response_matrix = np.asarray(getattr(screen_response, "Ryy", None), dtype=float)
-
-            if response_matrix is not None and response_matrix.ndim == 2 and response_matrix.shape[0] == len(response_monitor_names):
-                row_norms = np.linalg.norm(np.nan_to_num(response_matrix, nan = 0.0), axis=1)
-                response_map = {name: float(val) for name, val in zip(response_monitor_names, row_norms)}
-                amps = np.asarray([response_map.get(str(name), np.nan) for name in screen_names], dtype=float)
-                if amps.size == nscreens and amps.size >=2 and np.all(np.isfinite(amps[1:])):
-                    ref = np.nanmedian(amps[1:])
-                    if np.isfinite(ref) and ref > 0:
-                        response_rel_amp = amps[1:] / ref
+        if self.transport_source == "measured_fitted":
+            key = f"transport_params_{plane}"
+            if not isinstance(measured_fitted_transport, dict) or key not in measured_fitted_transport:
+                raise RuntimeError(f"Missing measured_fitted_transport for plane {plane}")
+            model_transport_params = np.asarray(measured_fitted_transport[key], dtype=float)
+        else:
+            model_transport_params = self._get_model_transport_params(list(screens or []), plane)
 
         x0_twiss = np.array([
             np.log(beta_guess),  # beta_log_p0
@@ -173,11 +230,7 @@ class MeasureOptics:
         ], dtype=float)
 
         c0 = np.ones(nscreens - 1, dtype=float)
-        t0 = np.zeros((nscreens - 1, 2), dtype=float)
-        t0[:, 0] = 1.0  # R11
-        t0[:, 1] = 1.0  # R12
-
-        x0_canonical = np.concatenate([x0_twiss, c0, t0.ravel()])
+        x0_canonical = np.concatenate([x0_twiss, c0])
 
         def unpack(x):
             beta_log_p0 = float(x[0])
@@ -188,13 +241,11 @@ class MeasureOptics:
             alpha_p2 = float(x[5])
 
             c_params = x[6:6 + (nscreens - 1)]
-            t_params = x[6 + (nscreens - 1):].reshape(nscreens - 1, 2)
 
-            return beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params
+            return beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params
 
         def predict(x):
-            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params = unpack(x)
-
+            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params = unpack(x)
             pred = np.full((nsteps, nscreens), np.nan, dtype=float)
 
             for k, dK1 in enumerate(dK1_values):
@@ -206,12 +257,11 @@ class MeasureOptics:
                 sigma2_ref_meas = max(float(sigma2_raw[k, 0]), 1e-12)
                 pred[k, 0] = sigma2_ref_meas
 
-                for i, (R11, R12) in enumerate(t_params):
-                    numer = (R11 ** 2 * beta0 - 2.0 * R11 * R12 * alpha0 + R12 ** 2 * gamma0)
+                for i, (R11, R12) in enumerate(model_transport_params):
+                    numer = (R11 ** 2 * beta0 - 2 * R11 * R12 * alpha0 + R12 ** 2 * gamma0)
                     val = c_params[i] * sigma2_ref_meas * (numer / beta0)
                     if np.isfinite(val):
                         pred[k, i + 1] = val
-
             return pred
 
         def residuals(x):
@@ -239,23 +289,12 @@ class MeasureOptics:
 
             res.extend(data_residuals[valid_downstream].ravel().tolist())
 
-            _, _, _, _, _, _, c_params, t_params = unpack(x)
+            _, _, _, _, _, _, c_params = unpack(x)
 
             for c in c_params:
                 res.append((c - 1.0) / 0.08)
 
-            if response_rel_amp is not None:
-                model_amp = np.sqrt(np.sum(np.asarray(t_params, dtype=float) ** 2, axis=1))
-                model_ref = np.nanmedian(model_amp)
-                if np.isfinite(model_ref) and model_ref > 0:
-                    model_ref_amp = model_amp / model_ref
-                    for meas_rel, model_rel in zip(response_rel_amp, model_ref_amp):
-                        if np.isfinite(meas_rel) and np.isfinite(model_rel):
-                            res.append((model_rel - meas_rel) / 0.35)
-                        else:
-                            res.append(1e6)
-
-            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(x)
+            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _ = unpack(x)
 
             if np.isfinite(model_beta_guess) and model_beta_guess > 1e-6:
                 res.append((beta_log_p0 - np.log(model_beta_guess)) / 0.60)
@@ -296,12 +335,10 @@ class MeasureOptics:
                 lower = np.concatenate([
                     np.array([np.log(1e-8), -1.5, -1.5, -8.0, -2.0, -2.0], dtype=float),
                     np.full(nscreens - 1, 0.90, dtype=float),
-                    np.tile(np.array([-10.0, 0.05], dtype=float), nscreens - 1),
                 ])
                 upper = np.concatenate([
                     np.array([np.log(1e4), 1.5, 1.5, 8.0, 2.0, 2.0], dtype=float),
                     np.full(nscreens - 1, 1.10, dtype=float),
-                    np.tile(np.array([10.0, 20.0], dtype=float), nscreens - 1),
                 ])
 
                 x0 = np.asarray(x0, dtype=float)
@@ -326,7 +363,7 @@ class MeasureOptics:
 
         r = run(x0_canonical)
         if r is not None:
-            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(r.x)
+            beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _ = unpack(r.x)
             beta_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values ** 2)
             alpha_vals = alpha_p0 + alpha_p1 * dK1_values + alpha_p2 * dK1_values ** 2
 
@@ -342,15 +379,11 @@ class MeasureOptics:
         # random restarts
         for _ in range(self.n_starts - 1):
             c_rand = self.rng.uniform(0.95, 1.05, nscreens - 1)
-            t_rand = np.zeros((nscreens - 1, 2), dtype=float)
-            t_rand[:, 0] = self.rng.uniform(-3.0, 3.0, nscreens - 1)  # R11
-            t_rand[:, 1] = self.rng.uniform(0.2, 8.0, nscreens - 1)  # R12
-
-            x0_rand = np.concatenate([x0_twiss, c_rand, t_rand.ravel()])
+            x0_rand = np.concatenate([x0_twiss, c_rand])
 
             r = run(x0_rand)
             if r is not None:
-                beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, _, _ = unpack(r.x)
+                beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params = unpack(r.x)
                 beta_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values ** 2)
                 alpha_vals = alpha_p0 + alpha_p1 * dK1_values + alpha_p2 * dK1_values ** 2
 
@@ -367,7 +400,7 @@ class MeasureOptics:
             if last_error is None:
                 raise RuntimeError(f"Transport fit failed for plane {plane}")
             raise RuntimeError(f"Transport fit failed for plane {plane}: {last_error}")
-        beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params, t_params = unpack(best_fit.x)
+        beta_log_p0, beta_log_p1, beta_log_p2, alpha_p0, alpha_p1, alpha_p2, c_params = unpack(best_fit.x)
 
         beta0_vals = np.exp(beta_log_p0 + beta_log_p1 * dK1_values + beta_log_p2 * dK1_values**2)
         alpha0_vals = alpha_p0 + alpha_p1 * dK1_values + alpha_p2 * dK1_values**2
@@ -378,15 +411,14 @@ class MeasureOptics:
             "beta_log_p2": float(beta_log_p2),
             "alpha_p0": float(alpha_p0),
             "alpha_p1": float(alpha_p1),
-            "transport_params": t_params.tolist(),
+            "transport_params": model_transport_params.tolist(),
             "beta0_vs_K1": beta0_vals.tolist(),
             "alpha0_vs_K1": alpha0_vals.tolist(),
+            "transport_rel_step": None,
             "cost": float(best_fit.cost),
             "success": bool(best_fit.success),
             "message": str(best_fit.message),
             "plane": plane,
             "alpha_p2": float(alpha_p2),
             "screen_scale_params": c_params.tolist(),
-            "response_monitor_names": response_monitor_names,
-            "response_rel_amp": None if response_rel_amp is None else response_rel_amp.tolist(),
         }
