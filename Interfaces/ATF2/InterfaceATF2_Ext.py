@@ -90,7 +90,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         columns = lines[star_symbol].lstrip("*").split()
         return lines, columns, dollar_sign
 
-    def  _get_twiss_s_position(self, names):
+    def  _get_twiss_s_positions(self, names):
         names = list(names)
         lines, columns, dollar_sign = self._read_twiss_file()
         try:
@@ -112,7 +112,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return [s_pos.get(name, np.nan) for name in names]
 
     @staticmethod
-    def make_safe_float(value, default = np.nan):
+    def make_safe_float(value, default = np.nan): #so even if pv returns none, empty array or whatever, interface still works
         try:
             if value is None:
                 return float(default)
@@ -135,9 +135,151 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return float(default)
 
     def _read_screen_status(self, screen_pv_name):
-        return self.make_safe_float(caget(f'{screen_pv_name}):Target:READ:INOUT'),
+        return self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
 
+    def _read_screen_calibration(self, screen_pv_name, plane):
+        if plane.lower()=='h':
+            pvs = [
+                f'{screen_pv_name}:H:x1:Calibration:Factor',
+                f'{screen_pv_name}:H:X1:Calibration:Factor',
+            ]
+        else:
+            pvs = [
+                f'{screen_pv_name}:V:y1:Calibration:Factor',
+                f'{screen_pv_name}:V:Y1:Calibration:Factor',
+            ]
+        return self._valid_pv_value(pvs, default = np.nan)
 
+    def _acquire_screen_image(self, screen_pv_name):
+        try:
+            PV(f'{screen_pv_name}:CAMERA:Acquire').put(1)
+            time.sleep(2)
+        except Exception:
+            pass
+
+        raw_img = caget(f'{screen_pv_name}:IMAGE:ArrayData')
+        if raw_img is None:
+            return None
+        raw_img = np.asanyarray(raw_img)
+        if raw_img.size == 0:
+            return None
+
+        nx, ny = self.screen_image_shape
+        correct_image_size = ny * nx
+        if raw_img.size < correct_image_size:
+            return None
+        raw_img = raw_img[:correct_image_size]
+
+        image = raw_img.reshape((ny, nx)).astype(float)
+        return image
+
+    @staticmethod
+    def _screen_data_from_image(image,hpixel,vpixel):
+        if image is None:
+            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1,1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
+        img = np.asarray(image, dtype=float)
+        img[~np.isfinite(img)] = 0.0
+        total = float(np.sum(img)) # intensity
+        ny ,nx  = img.shape # rows, columns
+
+        if total <= 0.0 or nx == 0 or ny == 0:
+            hedges = np.arange(nx + 1, dtype = float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1)
+            vedges = np.arange(ny + 1, dtype = float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1)
+
+            return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
+
+        if not np.isfinite(hpixel) or hpixel <= 0:
+            hpixel = 1e-3
+        if not np.isfinite(vpixel) or vpixel <= 0:
+            vpixel = 1e-3
+
+        x_centers = (np.arange(nx, dtype = float) - 0.5 * (nx -1)) * hpixel # middle of the pixel
+        y_centers = (np.arange(ny, dtype = float) - 0.5 * (ny -1) ) * vpixel
+
+        proj_x = np.sum(img, axis = 0)
+        proj_y = np.sum(img, axis = 1)
+
+        x_mean = float(np.sum(x_centers * proj_x) / total)
+        y_mean = float(np.sum(y_centers * proj_y) / total)
+        sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
+        sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
+
+        hedges = (np.arange(nx + 1, dtype = float) - 0.5 * nx) * hpixel
+        vedges = (np.arange(ny + 1, dtype = float) - 0.5 * ny) * vpixel
+
+        return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
+
+    def get_screens(self, names=None):
+        print('Reading screens...')
+
+        if isinstance(names, str):
+            names = [names]
+        selected_names = self.screen_names if names is None else [name for name in self.screen_names if name in names]
+
+        s_positions = self._get_twiss_s_positions(selected_names)
+
+        hpixel_list = []
+        vpixel_list = []
+        xb_list = []
+        yb_list = []
+        sigx_list = []
+        sigy_list = []
+        sum_list = []
+        images = []
+        hedges_all = []
+        vedges_all = []
+        inout_list = [] # is screen in or out
+
+        for screen_name in selected_names:
+            screen_pv_name = self.screen_pv_names.get(screen_name)
+            if screen_pv_name is None:
+                hpixel_list.append(np.nan)
+                vpixel_list.append(np.nan)
+                xb_list.append(np.nan)
+                yb_list.append(np.nan)
+                sigx_list.append(np.nan)
+                sigy_list.append(np.nan)
+                sum_list.append(0.0)
+                images.append(np.zeros((1, 1)))
+                hedges_all.append(np.array([0.0, 1.0]))
+                vedges_all.append(np.array([0.0, 1.0]))
+                inout_list.append(np.nan)
+                continue
+
+            status = self._read_screen_status(screen_pv_name)
+            hpixel = self._read_screen_calibration(screen_pv_name, 'h')
+            vpixel = self._read_screen_calibration(screen_pv_name, 'v')
+            image = self._acquire_screen_image(screen_pv_name)
+            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel)
+
+            hpixel_list.append(hpixel)
+            vpixel_list.append(vpixel)
+            xb_list.append(x_mean)
+            yb_list.append(y_mean)
+            sigx_list.append(sigx)
+            sigy_list.append(sigy)
+            sum_list.append(total)
+            images.append(image)
+            hedges_all.append(hedges)
+            vedges_all.append(vedges)
+            inout_list.append(status)
+
+        screens = {
+            "names": selected_names,
+            "hpixel": np.asarray(hpixel_list, dtype=float),
+            "vpixel": np.asarray(vpixel_list, dtype=float),
+            "x": np.asarray(xb_list, dtype=float),
+            "y": np.asarray(yb_list, dtype=float),
+            "sigx": np.asarray(sigx_list, dtype=float),
+            "sigy": np.asarray(sigy_list, dtype=float),
+            "sum": np.asarray(sum_list, dtype=float),
+            "hedges": hedges_all,
+            "vedges": vedges_all,
+            "images": images,
+            "S": np.asarray(s_positions, dtype=float),
+            "inout": np.asarray(inout_list, dtype=float),
+        }
+        return screens
 
 
     def change_energy(self):
