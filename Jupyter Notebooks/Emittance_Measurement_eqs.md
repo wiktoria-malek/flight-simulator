@@ -6,7 +6,6 @@
 The application currently has two steps:
 
 ## Step 1  - beam-size-based emittance reconstruction
-This is the main emittance workflow:
 
 1. Do a **quadrupole scan**.
 2. Measure beam sizes on screens for each quadrupole setting.
@@ -169,17 +168,17 @@ $$
 \sigma_0^2(K)=\varepsilon\,\beta_0(K).
 $$
 
-That is because at the reference screen the beam size squared is simply \(\Sigma_{11}\).
+That is because at the reference screen the beam size squared is simply $$(\Sigma_{11})$$.
 
 ---
 
-# 6. Step 1 in the application: `MeasureOptics`
+# 5. Step 1 in the application: `MeasureOptics`
 
 The job of `MeasureOptics` is to infer optics at the reference screen and define downstream transport.
 
 It does **not** yet perform the final emittance fit in the same way as the final GUI step.
 
-## 6.1 Parametrization of Twiss vs quadrupole setting
+## 5.1 Parametrization of Twiss vs quadrupole setting
 In `MeasureOptics`, the Twiss parameters at the reference screen are parametrized as smooth functions of the scan variable:
 
 $$
@@ -210,7 +209,7 @@ $$
 
 for all fit parameters, which avoids negative beta values during optimization.
 
-# 7. Approach used in `MeasureOptics`
+# 6. Approach used in `MeasureOptics`
 
 In `MeasureOptics`, the code does **not** directly fit emittance in the same way as the final GUI fit.
 
@@ -245,9 +244,9 @@ $$
 
 ---
 
-# 9. Merit function in `MeasureOptics`
+# 7. Merit function in `MeasureOptics`
 
-## 9.1 Data residuals
+## 7.1 Data residuals
 For downstream screens:
 
 $$
@@ -262,12 +261,12 @@ $$
 - $$(\sigma^2_{\text{meas},k,i})$$ is the measured beam size squared,
 - $$(\Delta \sigma^2_{k,i})$$ is the propagated uncertainty from the screen beam-size measurement.
 
-## 9.3 Relation with model Twiss file
+## 7.2 Relation with model Twiss file
 If model optics is available at the reference screen, the fit adds soft priors to keep the solution from wandering too far from the model starting point.
 
 So the fit uses model at the beigging, thus it is not purely model-free.
 
-# 10. Final step in the GUI: fit emittance only
+# 8. Final step in the GUI: fit emittance only
 
 After `MeasureOptics` has provided:
 
@@ -314,7 +313,7 @@ So the final least-squares in the GUI is a **one-parameter fit per plane**:
 
 ---
 
-# 11. Merit function in the GUI
+# 9. Merit function in the GUI
 
 The final fit residuals are conceptually
 
@@ -332,7 +331,7 @@ $$
 \chi^2 = \sum_{k,i} r_{k,i}^2.
 $$
 
-## 12.1 Model transport
+## 9.1 Model transport
 If `transport_source="model"`, then `MeasureOptics` computes `R11` and `R12` from Twiss-file optics.
 
 From screen optics:
@@ -365,18 +364,18 @@ $$
 
 This is exactly what `_get_model_transport_params(...)` computes.
 
-## 12.2 Measured fitted transport
+## 9.2 Measured fitted transport
 If you use the trajectory-response machinery, the code attempts to infer monitor optics from response matrices, then computes `R11`, `R12` from the fitted optics on the screens using the same formulas above.
 
 So in both cases the final formulas for `R11`, `R12` are the same; what changes is **where the optics comes from**.
 
 ---
 
-# 13. Obtainging rajectory-response
+# 10. Obtainging rajectory-response
 
 This is the logic implemented in `MeasureTrajectoryResponse.py`.
 
-## 13.1 Excitation
+## 10.1 Excitation
 For a few selected quadrupole settings, the application excites correctors as a test:
 
 $$
@@ -391,7 +390,7 @@ For each corrector :
 
 Finite differences give the response matrices.
 
-## 13.3 What model is fitted?
+## 10.2 Fitted model
 The measured transport fit uses a model of the form
 
 $$
@@ -412,7 +411,7 @@ The result is:
 - extracted \(\beta,\alpha,\mu\) on screens,
 - then converted into `R11`, `R12`.
 
-# 17. The general equations used
+# 11. The general equations used
 
 ## Beam matrix at reference screen
 $$

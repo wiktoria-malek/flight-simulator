@@ -1104,6 +1104,10 @@ if __name__ == "__main__":
     I.align_everything()
     nominal_state = I.get_state()
     I.misalign_bpms()
+    '''
+    Only for the robustness check.
+    '''
+    I.set_failed_bpms(["MB1X", "MB2X"])
     start_state = I.get_state()
     project_name = I.get_name()
 

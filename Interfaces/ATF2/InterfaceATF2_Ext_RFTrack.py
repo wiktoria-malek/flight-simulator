@@ -39,6 +39,20 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.__setup_beam0()
         self.__track_bunch()
         self._saved_sextupoles_state = None
+        '''
+        Only for the robustness check.
+        '''
+        self.failed_bpms = set()
+        self.fail_bpm_tmit = False
+
+    '''
+    Only for the robustness check.
+    '''
+    def set_failed_bpms(self, names, fail_tmit = False ):
+        if isinstance(names, str):
+            names = [names]
+        self.failed_bpms = set(names or [])
+        self.fail_bpm_tmit = bool(fail_tmit)
 
     def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
         with open(self.twiss_path, "r") as file:
@@ -265,9 +279,17 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             for j, bpm in enumerate(self.bpms):
                 b = self.lattice[bpm]
                 reading = b.get_reading()
-                x[i, j] = reading[0]
-                y[i, j] = reading[1]
-                tmit[i, j] = b.get_total_charge()
+                '''
+                Only for the robustness check.
+                '''
+                if bpm in self.failed_bpms:
+                    x[i, j] = np.nan
+                    y[i, j] = np.nan
+                    tmit[i, j] = np.nan if self.fail_bpm_tmit else b.get_total_charge()
+                else:
+                    x[i, j] = reading[0]
+                    y[i, j] = reading[1]
+                    tmit[i, j] = b.get_total_charge()
 
         bpms = {"names": self.bpms, "x": x, "y": y, "tmit": tmit}
 
