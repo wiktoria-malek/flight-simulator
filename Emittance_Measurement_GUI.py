@@ -33,6 +33,7 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
 
 
+
 class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
     def _describe_scan_quality(self):
         if self.session is None:
@@ -190,6 +191,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         self.setWindowTitle("Emittance Measurement GUI")
         self.fitResultsVBox.setStretch(0, 0)
         self.fitResultsVBox.setStretch(1, 1)
+        self.progressBar.setValue(0)
 
         self.canvas = MatplotlibWidget(self.plotPlaceholder)
         layout = self.plotPlaceholder.layout()
@@ -221,11 +223,17 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         self.start_button.clicked.connect(self._run_scan)
         self.measure_optics_button.clicked.connect(self._run_measure_optics)
         self.fit_emm_twiss_button.clicked.connect(self._fit_twiss_and_emittance)
-
+        self._set_progress(0)
         self._clear_fit_panel()
         self._reset_canvas()
         self.screens_list.itemSelectionChanged.connect(self._screen_selection_changed)
         self._filter_quadrupoles_in_gui()
+
+    def _set_progress(self, value):
+        self.progressBar.setRange(0, 100)
+        self.progressBar.setValue(int(max(0, min(100,value))))
+        QApplication.processEvents()
+
     def _clear_fit_panel(self):
         self.result_reference_screen.setText("-")
         self.result_quad.setText("-")
@@ -386,6 +394,8 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
     def _scan_progress_callback(self, session_partial, current_step, total_steps): # refreshes plot in the gui
         self.session = session_partial
         self._draw_live_scan(session_partial)
+        if total_steps:
+            self._set_progress(100.0 * float(current_step) / float(total_steps))
         QApplication.processEvents()
 
     def _run_scan(self):
@@ -413,7 +423,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         nshots = int(self.meas_per_step.value())
 
         self._clear_fit_panel()
-
+        self._set_progress(0)
         try:
             self.session = self.run_scan(
                 quad_name=quad_name,
@@ -427,14 +437,16 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
                 progress_callback=self._scan_progress_callback
             )
         except TypeError:
+            self._set_progress(0)
             QMessageBox.information(self,"Scan error","Error")
             return
         except Exception as e:
+            self._set_progress(0)
             QMessageBox.information(self, "Scan error", str(e))
             return
 
         self._draw_live_scan(self.session)
-
+        self._set_progress(90)
         try:
             self.session["screen_response_scans"] = self._measure_screen_response()
         except Exception as e:
@@ -444,13 +456,16 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         quality_msg = self._describe_scan_quality()
         if quality_msg is None:
             QMessageBox.information(self, "Scan", "Scan completed.")
+            self._set_progress(100)
         else:
             QMessageBox.information(self, "Scan", f"Scan completed.")
+            self._set_progress(100)
 
     def _run_measure_optics(self):
         if self.session is None:
             QMessageBox.information(self, "Error", "No session.")
             return
+        self._set_progress(0)
 
         diagnostic_note = None
         fitted_note = None
@@ -465,17 +480,21 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
                 self.session["screen_response_scans"] = self._measure_screen_response()
         except Exception:
             self.session["screen_response_scans"] = None
+        self._set_progress(15)
 
         try:
             transport_tool = MeasureTrajectoryResponse(self.interface)
             measured_transport = transport_tool.get_from_session(self.session)
             self.session["measured_transport"] = measured_transport
+            self._set_progress(40)
             diagnostic_note = self._info_measured_transport()
 
             measured_fitted_transport = transport_tool.fit_measured_transport_from_session(self.session)
             self.session["measured_fitted_transport"] = measured_fitted_transport
+            self._set_progress(65)
             fitted_note = self._info_measured_fitted_transport()
         except Exception as e:
+            self._set_progress(0)
             self.session["measured_transport"] = None
             self.session["measured_fitted_transport"] = None
             diagnostic_note = f"trajectory-response diagnostic unavailable: {e}"
@@ -484,13 +503,16 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             return
 
         try:
+            self._set_progress(75)
             measure_tool = MeasureOptics(self.interface, n_starts=5, transport_source=transport_source)
             optics = measure_tool.get_from_session(self.session)
         except Exception as e:
+            self._set_progress(0)
             QMessageBox.information(self, "Measure Optics", str(e))
             return
 
         self.session["measured_optics"] = optics
+        self._set_progress(100)
 
         msg = f"Completed using {transport_source} transport."
         if diagnostic_note:

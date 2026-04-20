@@ -554,6 +554,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             #         self.selected_correctors.append(cname)
             print("Starting correction...")
             self.log("Starting correction...")
+            '''
+            Only for the robustness check.
+            '''
+            self.interface.set_failed_bpms(["MB1X", "MB2X"])
             self._cancel = False
             self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
             w1, w2, w3, rcond, iters, gain,beta = self._read_params()
@@ -1008,7 +1012,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         line=f"[{timestamp}] {text}"
         if self.log_console is None:
             self.log_console=LogConsole(self)
-            self.log_console.show()
+            #self.log_console.show()
         self.log_console.log(line)
 
     def _clear_graphs(self):
@@ -1104,10 +1108,6 @@ if __name__ == "__main__":
     I.align_everything()
     nominal_state = I.get_state()
     I.misalign_bpms()
-    '''
-    Only for the robustness check.
-    '''
-    I.set_failed_bpms(["MB1X", "MB2X"])
     start_state = I.get_state()
     project_name = I.get_name()
 
