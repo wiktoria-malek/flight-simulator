@@ -2,6 +2,14 @@ import numpy as np
 from scipy.optimize import least_squares
 
 class MeasureOptics:
+'''
+From data from a quadrupole scan, this class computes:
+how twiss parameters change with K1 and what is the transport between reference screen and further screens.
+
+Merit function is built from residuals:
+r = (sigma_model^2 - sigma_meas^2) / delta sigma^2
+'''
+
 
     def __init__(self, interface, n_starts=5, rng_seed=42, transport_source="model"): #every time it's the same random set of numbers, pseudorandom
         self.interface = interface
@@ -172,6 +180,12 @@ class MeasureOptics:
         return result
 
     def _fit_plane(self, K1_values, sigma, sigma_std, K1_nom, plane, model_twiss=None, measured_fitted_transport=None, screens=None):
+        '''
+        beta_0(K) = exp(p0 + p1 * delta K + p2 * delta K^2)
+        alpha_0(K) = a0 + a1 * delta K + a2 * delta K^2
+        gamma_0(K) = (1 + alpha_0(K) ^2) / beta_0(K)
+        '''
+
         nsteps, nscreens = sigma.shape
         dK1_values = K1_values - K1_nom
 

@@ -445,7 +445,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         if quality_msg is None:
             QMessageBox.information(self, "Scan", "Scan completed.")
         else:
-            QMessageBox.information(self, "Scan", f"Scan completed.\n\n{quality_msg}")
+            QMessageBox.information(self, "Scan", f"Scan completed.")
 
     def _run_measure_optics(self):
         if self.session is None:
@@ -497,7 +497,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             msg += "\n\nTrajectory-response diagnostic:\n" + diagnostic_note
         if fitted_note:
             msg += "\n\nMeasured-fitted transport:\n" + fitted_note
-        QMessageBox.information(self, "Measure Optics", msg)
+        QMessageBox.information(self, "Measure Optics", "Measurements obtained.")
 
     @staticmethod
     def _fmt_float(value, digits=3):
@@ -997,12 +997,7 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
         quality = self.session.get("scan_quality", {})
         if not quality.get("is_good_for_joint_fit", False):
             msg = self._describe_scan_quality()
-            QMessageBox.information(
-                self,
-                "Fit",
-                "This scan does not excite both planes strongly enough for a reliable joint emittance/Twiss fit.\n\n"
-                + (msg if msg is not None else "Choose another quadrupole or a larger scan range.")
-            )
+            QMessageBox.information(self,"Fit","This scan does not excite both planes strongly enough.")
             return
 
         screens = list(self.session["screens"])
@@ -1084,9 +1079,6 @@ class MainWindow(QMainWindow, SaveOrLoad, EmittanceMeasurement):
             f"βᵧ0 = {beta_y0:.4f} m, αᵧ0 = {alpha_y0:.4f}\n"
             f"measured βₓ0 = {fit_x['beta0_measured']:.4f}, αₓ0 = {fit_x['alpha0_measured']:.4f}\n"
             f"measured βᵧ0 = {fit_y['beta0_measured']:.4f}, αᵧ0 = {fit_y['alpha0_measured']:.4f}\n\n"
-            f"Scan quality: {quality.get('recommendation', 'unknown')}\n"
-            f"Fit quality: {result.get('fit_quality_status', 'unknown')}\n"
-            f"Notes: {reasons_text}"
         )
 
         self.session["fit_result_twiss_emit"] = result

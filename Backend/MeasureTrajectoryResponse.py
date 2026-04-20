@@ -261,23 +261,23 @@ class MeasureTrajectoryResponse:
             data_res[valid] = (pred[valid] - R_fit[valid]) / data_scale
             res.extend(data_res[valid].ravel().tolist())
 
-            # priors around model
+
             res.extend((dlogb / 0.35).tolist())
             res.extend((dmu / 0.03).tolist())
             res.extend((dphi / 0.05).tolist())
             res.extend((log_amp / 2.0).tolist())
 
-            # smoothness
+
             if nmon >= 3:
                 res.extend((np.diff(dlogb, n=2) / 0.10).tolist())
                 res.extend((np.diff(dmu, n=2) / 0.01).tolist())
 
-            # monotonic phase advance
+
             dmu_abs = np.diff(mu)
             for v in dmu_abs:
                 res.append(max(0.002 - v, 0.0) / 0.001)
 
-            # beta range
+
             for b in beta:
                 res.append(max(1e-3 - b, 0.0) / 1e-3)
                 res.append(max(b - 1e3, 0.0) / 50.0)
@@ -580,6 +580,11 @@ class MeasureTrajectoryResponse:
         }
 
     def fit_measured_transport_from_session(self, session):
+
+        '''
+        R_11 = np.sqrt(beta_i/beta0)(cos delta(mu) + alpha0 sin (delta(mu))
+        R_12 = np.sqrt(beta_i * beta_0) sin (delta(mu))
+        '''
         traj = session.get("measured_transport")
         if not isinstance(traj, dict) or traj.get("type") != "trajectory_response_scan":
             traj = self.get_from_session(session)
