@@ -201,6 +201,23 @@
           <property name="spacing">
            <number>12</number>
           </property>
+          <item row="1" column="3">
+           <widget class="QPushButton" name="pushButton">
+            <property name="layoutDirection">
+             <enum>Qt::RightToLeft</enum>
+            </property>
+            <property name="text">
+             <string>Restore quadrupole settings</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="4">
+           <widget class="QPushButton" name="load_session_button">
+            <property name="text">
+             <string>...</string>
+            </property>
+           </widget>
+          </item>
           <item row="3" column="0">
            <widget class="QLabel" name="label_2">
             <property name="text">
@@ -218,34 +235,10 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="4">
-           <widget class="QPushButton" name="load_session_button">
-            <property name="text">
-             <string>...</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="3">
-           <widget class="QPushButton" name="pushButton">
-            <property name="layoutDirection">
-             <enum>Qt::RightToLeft</enum>
-            </property>
-            <property name="text">
-             <string>Restore quadrupole settings</string>
-            </property>
-           </widget>
-          </item>
           <item row="1" column="2">
-           <widget class="QPushButton" name="fit_emm_twiss_button">
+           <widget class="QPushButton" name="run_optimization_button">
             <property name="text">
-             <string>Fit emittance / Twiss at reference screen</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QPushButton" name="measure_optics_button">
-            <property name="text">
-             <string>Measure Transport / Optics</string>
+             <string>Run optimization</string>
             </property>
            </widget>
           </item>

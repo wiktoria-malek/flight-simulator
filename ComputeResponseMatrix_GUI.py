@@ -9,6 +9,7 @@ try:
         QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
         )
     from PyQt6.QtCore import Qt,QTimer
+    from PyQt6.QtGui import QPixmap
     pyqt_version = 6
 
 except ImportError:
@@ -19,6 +20,7 @@ except ImportError:
         QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
         )
     from PyQt5.QtCore import Qt,QTimer
+    from PyQt5.QtGui import QPixmap
     pyqt_version = 5
 
 import numpy as np
@@ -40,6 +42,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
     def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
         super().__init__()
         uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)
+        self._load_logo()
         self.cwd = os.getcwd()
         self.R=None
         self.data_dir_1=data_dir_1
@@ -297,6 +300,32 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         filename, _ = QFileDialog.getSaveFileName(None, "Save Response Matrix", dir_name, "Pickle Files (*.pkl)")
         if filename:
             self.R.save(filename)
+    def _load_logo(self):
+        if not hasattr(self, "logo_label"):
+            return
+
+        self.logo_label.setText("")
+        self.logo_label.setScaledContents(False)
+
+        transform_mode = (
+            Qt.TransformationMode.SmoothTransformation
+            if pyqt_version == 6
+            else Qt.SmoothTransformation
+        )
+
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(base_dir, "UI files", "Assets", "CERN_logo.png")
+
+        if not os.path.isfile(logo_path):
+            return
+
+        pixmap = QPixmap(logo_path)
+        if pixmap.isNull():
+            return
+
+        scaled = pixmap.scaledToHeight(80, transform_mode)
+        self.logo_label.setPixmap(scaled)
+        self.logo_label.setToolTip(logo_path)
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description='Compute Response Matrix GUI')
@@ -316,3 +345,4 @@ if __name__ == '__main__':
         auto_click_compute=args.compute,)
     window.show()
     sys.exit(app.exec())
+

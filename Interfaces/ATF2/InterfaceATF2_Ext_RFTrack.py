@@ -45,15 +45,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.failed_bpms = set()
         self.fail_bpm_tmit = False
 
-    '''
-    Only for the robustness check.
-    '''
-    def set_failed_bpms(self, names, fail_tmit = False ):
-        if isinstance(names, str):
-            names = [names]
-        self.failed_bpms = set(names or [])
-        self.fail_bpm_tmit = bool(fail_tmit)
-
     def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
         with open(self.twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
@@ -646,6 +637,94 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def misalign_bpms(self, sigma_x=0.100, sigma_y=0.100):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
+
+    def _build_bunch_from_guesses(self, plane, emit, beta0, alpha0):
+        gamma_rel, beta_rel = self.get_beam_factors()
+        beta_gamma = gamma_rel * beta_rel
+        if not np.isfinite(beta_gamma) or beta_gamma <= 0:
+            raise RuntimeError(f"Invalid beam factors for emittance conversion.")
+        emit_norm = float(emit) * beta_gamma
+
+        nominal = {
+            "emit_x_norm": 5.2,
+            "emit_y_norm": 0.03,
+            "beta_x": 6.848560987,
+            "beta_y": 2.935758992,
+            "alpha_x": 1.108024744,
+            "alpha_y": -1.907222942,
+        }
+
+        T= rft.Bunch6d_twiss()
+
+        if plane == "x":
+            T.emitt_x = float(emit_norm)
+            T.beta_x = float(beta0)
+            T.alpha_x = float(alpha0)
+
+            T.emitt_y = float(nominal["emit_y_norm"])
+            T.beta_y = float(nominal["beta_y"])
+            T.alpha_y = float(nominal["alpha_y"])
+
+        elif plane == "y":
+            T.emitt_x = float(nominal["emit_x_norm"])
+            T.beta_x = float(nominal["beta_x"])
+            T.alpha_x = float(nominal["alpha_x"])
+
+            T.emitt_y = float(emit_norm)
+            T.beta_y = float(beta0)
+            T.alpha_y = float(alpha0)
+        T.sigma_t = 8
+        T.sigma_pt = 0.8
+
+        bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
+        return bunch
+
+    def _read_tracked_bunch_screen_sigmas(self, screens):
+        screen_data = self.get_screens(names = screens)
+        name_to_index = {name: i for i, name in enumerate(screen_data["names"])}
+        sigx = np.full(len(screens), np.nan, dtype=float)
+        sigy = np.full(len(screens), np.nan, dtype=float)
+        for i, screen in enumerate(screens):
+            idx = name_to_index.get(screen)
+            if idx is None:
+                continue
+            sigx[i] = float(screen_data["sigx"][idx])
+            sigy[i] = float(screen_data["sigy"][idx])
+        return sigx, sigy
+
+    def predict_emittance_scan_response(self, plane,quad_name, screens, K1_values, emit, beta0, alpha0):
+        screens = list(screens)
+        K1_values = np.asarray(K1_values, dtype=float)
+
+        if quad_name not in self.quadrupoles:
+            raise ValueError(f"Quadrupole {quad_name} not found in quadrupoles")
+        if len(screens) == 0:
+            raise ValueError("No screens")
+
+        original_quads = self.get_quadrupoles(names=[quad_name])
+        if len(original_quads["bdes"]) == 0:
+            raise RuntimeError(f"Could not find original strength for quad {quad_name}")
+        K1_original = float(original_quads["bdes"][0])
+
+        B0_original = self.B0
+        output = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
+
+        try:
+            for k,K1 in enumerate(K1_values):
+                self.set_quadrupoles([quad_name], [float(K1)])
+                new_bunch = self._build_bunch_from_guesses(plane = plane, emit = float(emit), beta0 = float(beta0), alpha0 = float(alpha0))
+                self.lattice.track(new_bunch)
+                sigx, sigy = self._read_tracked_bunch_screen_sigmas(screens)
+                if plane == "x":
+                    output[k, :] = sigx
+                else:
+                    output[k, :] = sigy
+        finally:
+            self.set_quadrupoles([quad_name], [float(K1_original)])
+            self.B0 = B0_original
+            self.__track_bunch()
+
+        return output
 
     def get_twiss_at_screen(self, name): # for emittance measurement, can be deleted later
         if name not in self.screens:

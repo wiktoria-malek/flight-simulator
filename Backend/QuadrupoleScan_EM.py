@@ -1,6 +1,5 @@
 import os, sys, matplotlib, pickle
 from datetime import datetime
-from Backend.MeasureOptics import MeasureOptics
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import numpy as np
 matplotlib.use("QtAgg")
@@ -20,8 +19,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from scipy.optimize import least_squares
 
-class EmittanceMeasurement:
-
+class QuadrupoleScan_EM:
     def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, bpms=None, reference_screen=None, progress_callback=None):
         screens = list(screens)
         if bpms is None:

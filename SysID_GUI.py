@@ -4,14 +4,16 @@ from Backend.SaveOrLoad import SaveOrLoad
 import time, sys, os,matplotlib
 try:
     from PyQt6 import uic
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget,QMessageBox
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox
     from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt6.QtGui import QPixmap
     from PyQt6.QtTest import QTest
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
-    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget,QMessageBox
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox
     from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
+    from PyQt5.QtGui import QPixmap
     from PyQt5.QtTest import QTest
     pyqt_version = 5
 from enum import Enum
@@ -251,7 +253,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
         # Load the interface
         uic.loadUi("UI files/SysID_GUI.ui", self)
-
+        self._load_logo()
         # Replace the placeholder with your real widget
         self.right_layout.removeWidget(self.plot_widget)
         self.plot_widget.deleteLater()
@@ -306,6 +308,30 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.initial_hkick_settings.setText(str(self.sysid_kick))
         self.initial_vkick_settings.setText(str(self.sysid_kick))
         self._set_directory_edit_enabled(True)
+
+    def _load_logo(self):
+        self.logo_label.setText("")
+        self.logo_label.setScaledContents(False)
+
+        transform_mode = (
+            Qt.TransformationMode.SmoothTransformation
+            if pyqt_version == 6
+            else Qt.SmoothTransformation
+        )
+
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(base_dir, "UI files", "Assets", "CERN_logo.png")
+
+        if not os.path.isfile(logo_path):
+            return
+
+        pixmap = QPixmap(logo_path)
+        if pixmap.isNull():
+            return
+
+        scaled = pixmap.scaledToHeight(56, transform_mode)
+        self.logo_label.setPixmap(scaled)
+        self.logo_label.setToolTip(logo_path)
 
     def _set_directory_edit_enabled(self, enabled):
         self.working_directory_input.setEnabled(enabled)

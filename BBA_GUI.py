@@ -5,13 +5,13 @@ try:
     from PyQt6 import uic
     from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
     from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget)
-    from PyQt6.QtGui import QPainter
+    from PyQt6.QtGui import QPainter, QPixmap
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
     from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget)
-    from PyQt5.QtGui import QPainter
+    from PyQt5.QtGui import QPainter, QPixmap
     pyqt_version = 5
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -87,6 +87,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.reset_reference_orbit=False
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
         uic.loadUi(ui_path, self)
+        self._load_logo()
         self.bpms_list.setItemDelegate(BpmWeightsDelegate(self.bpms_list))
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
         self._hist_orbit, self._hist_disp,self._hist_wake=[],[],[]
@@ -169,6 +170,30 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
+    def _load_logo(self):
+        self.logo_label.setText("")
+        self.logo_label.setScaledContents(False)
+
+        transform_mode = (
+            Qt.TransformationMode.SmoothTransformation
+            if pyqt_version == 6
+            else Qt.SmoothTransformation
+        )
+
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(base_dir, "UI files", "Assets", "CERN_logo.png")
+
+        if not os.path.isfile(logo_path):
+            return
+
+        pixmap = QPixmap(logo_path)
+        if pixmap.isNull():
+            return
+
+        scaled = pixmap.scaledToHeight(80, transform_mode)
+        self.logo_label.setPixmap(scaled)
+        self.logo_label.setToolTip(logo_path)
 
     def _plot_double_clicks(self):
         if getattr(self, "traj_canvas", None) is not None: # mpl connect watches/listens to events in matplotlib popup
@@ -378,11 +403,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             ax.legend(fontsize=7,loc="upper right")
         if title is not None:
             ax.set_title(title)
-        ax.set_xlabel("Iteration", fontsize=6)
+        ax.set_xlabel("Iteration", fontsize=10)
         if ylabel is not None:
-            ax.set_ylabel(ylabel, fontsize=6)
-        ax.tick_params(axis="both", which="major", labelsize=7)
-        ax.yaxis.get_offset_text().set_fontsize(7)
+            ax.set_ylabel(ylabel, fontsize=10)
+        ax.tick_params(axis="both", which="major", labelsize=10)
+        ax.yaxis.get_offset_text().set_fontsize(10)
         ax.grid(True, alpha=0.3)
         canvas.draw_idle()
 
@@ -554,10 +579,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             #         self.selected_correctors.append(cname)
             print("Starting correction...")
             self.log("Starting correction...")
-            '''
-            Only for the robustness check.
-            '''
-            self.interface.set_failed_bpms(["MB1X", "MB2X"])
             self._cancel = False
             self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
             w1, w2, w3, rcond, iters, gain,beta = self._read_params()
@@ -953,7 +974,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.setWindowTitle("BBA GUI")
             QMessageBox.critical(self, "Correction error", str(e))
             self.log(f"Correction error: {e}")
-            print_exception(e)
+            print_exception(e) # it shows even the line that generated that error
 
     def _stop_correction(self):
         self._cancel = True
