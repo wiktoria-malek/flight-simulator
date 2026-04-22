@@ -9,8 +9,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def get_name(self):
         return 'ATF2_Ext_RFT'
-
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
+                                                                                    # only for EM tests, instead of 1000
+    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=100):
         super().__init__()
         self.log = print
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
@@ -429,7 +429,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return quadrupoles
 
-    def set_quadrupoles(self, names, values_range):
+    def set_quadrupoles(self, names, values_range, track = True):
         if isinstance(names, str):
             names = [names]
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
@@ -439,7 +439,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
                 element.set_K1(self.Pref / self.Q,float(value))
-        self.__track_bunch()
+
+        if track:
+        # AS A TEST!
+            self.__track_bunch()
 
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -711,7 +714,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         try:
             for k,K1 in enumerate(K1_values):
-                self.set_quadrupoles([quad_name], [float(K1)])
+                self.set_quadrupoles([quad_name], [float(K1)], track = False)
                 new_bunch = self._build_bunch_from_guesses(plane = plane, emit = float(emit), beta0 = float(beta0), alpha0 = float(alpha0))
                 self.lattice.track(new_bunch)
                 sigx, sigy = self._read_tracked_bunch_screen_sigmas(screens)
@@ -720,7 +723,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 else:
                     output[k, :] = sigy
         finally:
-            self.set_quadrupoles([quad_name], [float(K1_original)])
+            self.set_quadrupoles([quad_name], [float(K1_original)], track=False)
             self.B0 = B0_original
             self.__track_bunch()
 

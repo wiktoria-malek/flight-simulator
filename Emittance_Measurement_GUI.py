@@ -1,21 +1,25 @@
-import os, sys, pickle
+import os, sys, pickle, time
 import numpy as np
 import matplotlib
 matplotlib.use("QtAgg")
 import matplotlib.colors as mcolors
 from datetime import datetime
 try:
+    pyqt_version = 6
     from PyQt6 import uic
     from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QMessageBox, QVBoxLayout
+        QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
     )
-    from PyQt6.QtCore import Qt, QTimer
+    from PyQt6.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
+    from PyQt6.QtGui import QPainter, QPixmap, QFont
 except ImportError:
+    pyqt_version = 5
     from PyQt5 import uic
     from PyQt5.QtWidgets import (
-        QApplication, QMainWindow, QMessageBox, QVBoxLayout
+        QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
     )
-    from PyQt5.QtCore import Qt, QTimer
+    from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
+    from PyQt5.QtGui import QPainter, QPixmap, QFont
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -23,13 +27,96 @@ from Backend.SaveOrLoad import SaveOrLoad
 from Backend.Optimization_EM import Optimization_EM
 from Backend.QuadrupoleScan_EM import QuadrupoleScan_EM
 
+
+class SPositionDelegate(QStyledItemDelegate):
+    S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+    def paint(self, painter: QPainter, option, index):
+        painter.save()
+        try:
+            opt = option
+            self.initStyleOption(opt, index)
+            style = opt.widget.style() if opt.widget is not None else None
+            if style is not None:
+                opt_no_text = opt
+                opt_no_text.text = ""
+                style.drawControl(style.ControlElement.CE_ItemViewItem, opt_no_text, painter, opt.widget)
+
+            device_name = str(index.data(Qt.ItemDataRole.UserRole) or index.data(Qt.ItemDataRole.DisplayRole) or "")
+            s_text = str(index.data(self.S_ROLE) or "")
+            r = opt.rect
+            margin = 8
+            painter.setFont(opt.font)
+            painter.setPen(opt.palette.color(opt.palette.ColorRole.Text))
+
+            fm = painter.fontMetrics()
+            s_column_width = max(fm.horizontalAdvance("S = 000.000 m"), 90)
+
+            left_rect = QRect(
+                r.left() + margin,
+                r.top(),
+                max(10, r.width() - s_column_width - 3 * margin),
+                r.height(),
+            )
+
+            right_rect = QRect(
+                r.left() + r.width() - s_column_width - margin,
+                r.top(),
+                s_column_width,
+                r.height(),
+            )
+
+            elided_name = fm.elidedText(
+                device_name,
+                Qt.TextElideMode.ElideRight,
+                max(10, left_rect.width())
+            )
+
+            painter.drawText(
+                left_rect,
+                int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+                elided_name
+            )
+
+            if s_text:
+                painter.drawText(
+                    right_rect,
+                    int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+                    s_text
+                )
+        finally:
+            painter.restore()
+
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None):
         self.figure = Figure(figsize=(6, 4), tight_layout=True)
         super().__init__(self.figure)
         self.setParent(parent)
 
+class OptimizationWorker(QObject):
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
+    optimizer_ready = pyqtSignal(object)
+    done = pyqtSignal()
+
+    def __init__(self, interface, session, n_starts = 3):
+        super().__init__()
+        self.interface = interface
+        self.session = session
+        self.n_starts = n_starts
+
+    def run(self):
+        try:
+            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts)
+            self.optimizer_ready.emit(tool)
+            output = tool.fit_from_session(self.session)
+            self.finished.emit(output)
+        except Exception as e:
+            self.error.emit(str(e))
+        finally:
+            self.done.emit()
+
 class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
+
     def _describe_scan_quality(self):
         if self.session is None:
             return None
@@ -178,48 +265,97 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.interface = interface
         self.dir_name = dir_name
         self.session = None
-        self.screen_response_file = None
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
-        self.run_optimization_button.clicked.connect(self._run_optimization)
+        self._load_logo()
+        self.start_optimization_button.clicked.connect(self._run_optimization)
+        self.stop_optimization_button.clicked.connect(self._stop_optimization)
         self.setWindowTitle("Emittance Measurement GUI")
         self.fitResultsVBox.setStretch(0, 0)
         self.fitResultsVBox.setStretch(1, 1)
         self.progressBar.setValue(0)
-
+        self.quadrupoles_list.setItemDelegate(SPositionDelegate(self.quadrupoles_list))
+        self.screens_list.setItemDelegate(SPositionDelegate(self.screens_list))
+        self._optimization_t0 = None
+        self._scan_stop_requested = False
+        self._is_scanning = False
+        self._is_optimizing = False
+        self._current_optimizer = None
+        self._optimization_thread = None
+        self._optimization_worker = None
         self.canvas = MatplotlibWidget(self.plotPlaceholder)
         layout = self.plotPlaceholder.layout()
         if layout is None:
             layout = QVBoxLayout(self.plotPlaceholder)
         layout.addWidget(self.canvas)
-
         quadrupoles = list(self.interface.get_quadrupoles()["names"])
-
         screens_data = self.interface.get_screens()
         screens = list(screens_data["names"])
         screens_S = np.asarray(screens_data["S"], dtype=float)
-
         screen_pairs = sorted(zip(screens, screens_S),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf) # assigns S position to each screen
         screens_sorted = [name for name, _ in screen_pairs] # only names
 
-        self.quadrupoles_list.insertItems(0, quadrupoles)
-        self.screens_list.insertItems(0, screens_sorted)
-
-        self.first_screen_choice.clear()
-        self.first_screen_choice.addItems(screens_sorted)
-
+        self._show_s_values_and_device_lists(self.quadrupoles_list, quadrupoles)
+        self._show_s_values_and_device_lists(self.screens_list, screens_sorted)
         self.quad_on_plot.clear()
         self.quad_on_plot.addItems(quadrupoles)
-
         self.screen_on_plot.clear()
         self.screen_on_plot.addItems(screens_sorted)
-
-        self.start_button.clicked.connect(self._run_scan)
+        self.start_button_scan.clicked.connect(self._run_scan)
+        self.stop_button_scan.clicked.connect(self._stop_scan)
         self._set_progress(0)
         self._clear_fit_panel()
         self._reset_canvas()
         self.screens_list.itemSelectionChanged.connect(self._screen_selection_changed)
         self._filter_quadrupoles_in_gui()
+
+    def _stop_scan(self):
+        if self._is_scanning:
+            self._scan_stop_requested = True
+
+    def _stop_optimization(self):
+        if self._is_optimizing and self._current_optimizer is not None:
+            self._current_optimizer.request_stop()
+
+    def _show_s_values_and_device_lists(self, list_widget, names):
+        names = list(names)
+        s_positions = self._get_twiss_s_positions(names)
+        list_widget.clear()
+
+        for name, s_value in zip(names, s_positions):
+            item = QListWidgetItem(str(name))
+            item.setData(Qt.ItemDataRole.UserRole, str(name))
+            list_widget.addItem(item)
+            if s_value is not None:
+                try:
+                    s_value = float(s_value)
+                except (ValueError, TypeError):
+                    s_text = ""
+                else:
+                    s_text = f"S = {s_value:.3f} m" if np.isfinite(s_value) else ""
+            else:
+                s_text = ""
+            item.setData(SPositionDelegate.S_ROLE, s_text)
+
+    def _load_logo(self):
+        self.logo_label.setText("")
+        self.logo_label.setScaledContents(False)
+
+        transform_mode = (
+            Qt.TransformationMode.SmoothTransformation
+            if pyqt_version == 6
+            else Qt.SmoothTransformation
+        )
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(base_dir, "UI files", "Assets", "CERN_logo.png")
+        if not os.path.isfile(logo_path):
+            return
+        pixmap = QPixmap(logo_path)
+        if pixmap.isNull():
+            return
+        scaled = pixmap.scaledToHeight(80, transform_mode)
+        self.logo_label.setPixmap(scaled)
+        self.logo_label.setToolTip(logo_path)
 
     def _set_progress(self, value):
         self.progressBar.setRange(0, 100)
@@ -227,7 +363,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         QApplication.processEvents()
 
     def _clear_fit_panel(self):
-        self.result_reference_screen.setText("-")
         self.result_quad.setText("-")
         self.result_emit_x_norm.setText("-")
         self.result_emit_y_norm.setText("-")
@@ -237,7 +372,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.result_alpha_y0.setText("-")
 
     def _update_fit_panel(self, result):
-        self.result_reference_screen.setText(str(result["screen0"]))
         self.result_quad.setText(str(result["quad_name"]))
 
         self.result_emit_x_norm.setText(f"{result['emit_x_norm']:.4f} mm·mrad")
@@ -259,15 +393,14 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.canvas.draw()
 
     def _get_sorted_selected_screens(self):
-        selected = [it.text() for it in self.screens_list.selectedItems()]
-
+        selected = []
+        for item in self.screens_list.selectedItems():
+            selected.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
         all_screens_data = self.interface.get_screens()
         all_names = list(all_screens_data["names"])
         all_S = np.asarray(all_screens_data["S"], dtype=float)
-
         if not selected:
             selected = all_names
-
         screen_to_S = {n: s for n, s in zip(all_names, all_S)}
         selected = sorted(selected,key=lambda name: screen_to_S.get(name, np.inf)) # lambda is a function def key(name)
         return selected
@@ -387,22 +520,62 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         if self.session is None:
             QMessageBox.information(self, "Optimization", "No session.")
             return
+        if self._is_optimizing:
+            return
+        self._is_optimizing = True
+        self._current_optimizer = None
         self._set_progress(0)
-        try:
-            tool = Optimization_EM(self.interface, n_starts=3)
-            self._set_progress(30)
-            output = tool.fit_from_session(self.session)
-            self._set_progress(85)
-            result = output["result"]
-            pred_x = np.asarray(output["pred_x"], dtype=float)
-            pred_y = np.asarray(output["pred_y"], dtype=float)
-            self.session["optimization_result"] = result
-            self.session["optimization_pred_x"] = pred_x.tolist()
-            self.session["optimization_pred_y"] = pred_y.tolist()
-            self._update_fit_panel(result)
-            self._plot_fit_overlay(pred_x, pred_y, result)
-            self._set_progress(100)
+        self._optimization_t0 = time.perf_counter()
+        thread = QThread(self)
 
+        worker = OptimizationWorker(self.interface, self.session, n_starts=3)
+        worker.moveToThread(thread)
+        worker.optimizer_ready.connect(self._store_current_optimizer)
+        worker.finished.connect(self._on_optimization_output)
+        worker.error.connect(self._on_optimization_error)
+        worker.done.connect(thread.quit)
+        worker.done.connect(worker.deleteLater)
+
+        thread.finished.connect(self._on_optimization_finished)
+        thread.finished.connect(thread.deleteLater)
+        thread.started.connect(worker.run)
+
+        self._optimization_thread = thread
+        self._optimization_worker = worker
+        self._set_progress(30)
+        thread.start()
+
+    def _store_current_optimizer(self, optimizer):
+        self._current_optimizer = optimizer
+
+    def _on_optimization_output(self, output):
+        self._set_progress(85)
+
+        result = output["result"]
+        pred_x = np.asarray(output["pred_x"], dtype=float)
+        pred_y = np.asarray(output["pred_y"], dtype=float)
+
+        self.session["optimization_result"] = result
+        self.session["optimization_pred_x"] = pred_x.tolist()
+        self.session["optimization_pred_y"] = pred_y.tolist()
+
+        self._update_fit_panel(result)
+        self._plot_fit_overlay(pred_x, pred_y, result)
+        self._set_progress(100)
+
+        elapsed = time.perf_counter() - self._optimization_t0
+
+        if result.get("stopped", False):
+            QMessageBox.information(
+                self,
+                "Optimization stopped",
+                f"Showing best solution found so far.\n\n"
+                f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
+                f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
+                f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}\n"
+                f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
+            )
+        else:
             QMessageBox.information(
                 self,
                 "Optimization complete",
@@ -412,16 +585,28 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
                 f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
             )
 
-        except Exception as e:
-            self._set_progress(0)
-            QMessageBox.information(self, "Optimization", str(e))
+        print(f"Elapsed time: {elapsed}s = {elapsed / 60}min")
 
-    def _scan_progress_callback(self, session_partial, current_step, total_steps): # refreshes plot in the gui
+    def _on_optimization_error(self, message):
+        self._set_progress(0)
+        QMessageBox.information(self, "Optimization", message)
+
+    def _on_optimization_finished(self):
+        self._is_optimizing = False
+        self._current_optimizer = None
+        self._optimization_worker = None
+        self._optimization_thread = None
+
+    def _scan_progress_callback(self, session_partial, current_step, total_steps):  # refreshes plot in the gui
+        if self._scan_stop_requested:
+            raise KeyboardInterrupt("Scan stopped by user.")
         self.session = session_partial
         self._draw_live_scan(session_partial)
         if total_steps:
             self._set_progress(100.0 * float(current_step) / float(total_steps))
         QApplication.processEvents()
+        if self._scan_stop_requested:
+            raise KeyboardInterrupt("Scan stopped by user.")
 
     def _run_scan(self):
         current_quad = self.quadrupoles_list.currentItem()
@@ -429,7 +614,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             QMessageBox.information(self, "Scan error", "No quadrupole selected.")
             return
 
-        quad_name = current_quad.text()
+        quad_name = current_quad.data(Qt.ItemDataRole.UserRole) or current_quad.text()
         self.quad_on_plot.clear()
         self.quad_on_plot.addItem(quad_name)
         self.quad_on_plot.setCurrentText(quad_name)
@@ -447,6 +632,9 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         steps = int(self.steps_settings.value())
         nshots = int(self.meas_per_step.value())
 
+        self._scan_stop_requested = False
+        self._is_scanning = True
+
         self._clear_fit_panel()
         self._set_progress(0)
         try:
@@ -461,6 +649,11 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
                 bpms=[],
                 progress_callback=self._scan_progress_callback
             )
+        except KeyboardInterrupt as e:
+            self._set_progress(0)
+            QMessageBox.information(self, "Scan", str(e))
+            return
+
         except TypeError:
             self._set_progress(0)
             QMessageBox.information(self,"Scan error","Error")
@@ -469,14 +662,8 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             self._set_progress(0)
             QMessageBox.information(self, "Scan error", str(e))
             return
-
-        self._draw_live_scan(self.session)
-        self._set_progress(90)
-        try:
-            self.session["screen_response_scans"] = self._measure_screen_response()
-        except Exception as e:
-            self.session["screen_response_scans"] = None
-            QMessageBox.information(self, "Scan error", str(e))
+        finally:
+            self._is_scanning = False
 
         quality_msg = self._describe_scan_quality()
         if quality_msg is None:
@@ -525,56 +712,41 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             return
 
         screen_position = self._get_twiss_s_positions(selected_screens)
-        finite_screen_S = [float(s) for s in screen_position if np.isfinite(s)]
-        if not finite_screen_S:
+        finite_screen_positions = [float(s) for s in screen_position if np.isfinite(s)]
+        if not finite_screen_positions:
             return
-        last_screen_position = max(finite_screen_S)
-        current_quad = None
-        this_quad = self.quadrupoles_list.currentItem()
-        if this_quad is not None:
-            current_quad = this_quad.text()
 
-        all_quadrupoles = list(self.interface.get_quadrupoles().get("names",[]))
+        first_screen_position = min(finite_screen_positions)
+        last_screen_position = max(finite_screen_positions)
+        all_quadrupoles = list(self.interface.get_quadrupoles().get("names", []))
+
         quad_S = self._get_twiss_s_positions(all_quadrupoles)
 
-        before_last_screen_quads = [name for name, s in zip(all_quadrupoles, quad_S) if np.isfinite(s) and float(s) < last_screen_position]
-        self.quadrupoles_list.blockSignals(True)
-        self.quadrupoles_list.clear()
-        self.quadrupoles_list.addItems(before_last_screen_quads)
+        quad_pos = {name: float(s) for name, s in zip(all_quadrupoles, quad_S) if np.isfinite(s)}
 
-        if current_quad in before_last_screen_quads:
-            try:
-                match_flag = Qt.MatchFlag.MatchExactly
-            except AttributeError:
-                match_flag = Qt.MatchExactly
-            matching = self.quadrupoles_list.findItems(current_quad, match_flag)
-            if matching:
-                self.quadrupoles_list.setCurrentItem(matching[0])
-            elif self.quadrupoles_list.count() > 0:
-                self.quadrupoles_list.setCurrentRow(0)
-            self.quadrupoles_list.blockSignals(False)
+        before_last_screen_quads = [
+            name for name in all_quadrupoles
+            if name in quad_pos and quad_pos[name] < last_screen_position
+        ]
+        self.quadrupoles_list.blockSignals(True)
+        self._show_s_values_and_device_lists(self.quadrupoles_list, before_last_screen_quads)
+
+        upstream_to_first_screen_quads = [name for name in before_last_screen_quads if quad_pos[name] < first_screen_position]
+
+        if upstream_to_first_screen_quads:
+            closest_quad = max(upstream_to_first_screen_quads, key = lambda name: quad_pos[name])
+            for i in range(self.quadrupoles_list.count()):
+                item = self.quadrupoles_list.item(i)
+                item_name = item.data(Qt.ItemDataRole.UserRole) or item.text()
+                if item_name == closest_quad:
+                    self.quadrupoles_list.setCurrentItem(item)
+                    break
+        elif self.quadrupoles_list.count() > 0:
+            self.quadrupoles_list.setCurrentRow(0)
+        self.quadrupoles_list.blockSignals(False)
 
     def _screen_selection_changed(self):
         self._filter_quadrupoles_in_gui()
-
-    @staticmethod
-    def _mean_bpm_axis(bpms, axis):
-        names = list(bpms.get("names", []))
-        arr = np.asarray(bpms.get(axis, []), dtype=float)
-        if arr.ndim == 2:
-            values = np.nanmean(arr, axis=0)
-        elif arr.ndim == 1:
-            values = arr
-        else:
-            values = np.full(len(names), np.nan, dtype=float)
-
-        if values.size != len(names):
-            fixed = np.full(len(names), np.nan, dtype=float)
-            n = min(fixed.size, values.size)
-            if n:
-                fixed[:n] = values[:n]
-            values = fixed
-        return values
 
     def _safe_sigma2_errors(self, sig, sig_std):
         sig = np.asarray(sig, dtype=float)
@@ -594,136 +766,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         sigma2_err[~np.isfinite(sigma2_err)] = 1e-6
 
         return sigma2_err
-
-    def _beam_factors(self):
-        gamma_rel, beta_rel = self.interface.get_beam_factors()
-        return gamma_rel, beta_rel
-
-    def _measure_screen_response_current_state(self,correctors, delta_corr = 1e-4):
-        screens = list(self.session["screens"])
-        corr_data0 = self.interface.get_correctors(correctors)
-        corr_names = list(corr_data0["names"])
-        corr_bdes0 = np.asarray(corr_data0["bdes"], dtype=float)
-
-        configured_bpms = self.session.get("bpms", [])
-        bpm_names = [] if configured_bpms is None else list(configured_bpms)
-        if not bpm_names:
-            try:
-                bpm_names = list(self.interface.get_bpms()["names"])
-            except Exception:
-                bpm_names = []
-
-        ns = len(screens)
-        nb = len(bpm_names)
-        nc = len(corr_names)
-        Rxx = np.full((ns, nc), np.nan, dtype=float)
-        Ryy = np.full((ns, nc), np.nan, dtype=float)
-        bpm_Rxx = np.full((nb, nc), np.nan, dtype=float)
-        bpm_Ryy = np.full((nb, nc), np.nan, dtype=float)
-
-        try:
-            for j, _ in enumerate(corr_names):
-                vals_p = corr_bdes0.copy()
-                vals_m = corr_bdes0.copy()
-                vals_p[j] += delta_corr
-                vals_m[j] -= delta_corr
-
-                self.interface.set_correctors(corr_names, vals_p.tolist())
-                state_p = self.interface.get_state()
-
-                self.interface.set_correctors(corr_names, vals_m.tolist())
-                state_m = self.interface.get_state()
-
-                sp = state_p.get_screens(screens)
-                sm = state_m.get_screens(screens)
-
-                dx = (np.asarray(sp["x"], dtype=float) - np.asarray(sm["x"], dtype=float)) / (2.0 * delta_corr)
-                dy = (np.asarray(sp["y"], dtype=float) - np.asarray(sm["y"], dtype=float)) / (2.0 * delta_corr)
-
-                Rxx[:, j] = dx
-                Ryy[:, j] = dy
-
-                if nb:
-                    bp = state_p.get_bpms(bpm_names)
-                    bm = state_m.get_bpms(bpm_names)
-                    bpm_dx = (self._mean_bpm_axis(bp, "x") - self._mean_bpm_axis(bm, "x")) / (2.0 * delta_corr)
-                    bpm_dy = (self._mean_bpm_axis(bp, "y") - self._mean_bpm_axis(bm, "y")) / (2.0 * delta_corr)
-                    n_bpm = min(nb, bpm_dx.size, bpm_dy.size)
-                    if n_bpm:
-                        bpm_Rxx[:n_bpm, j] = bpm_dx[:n_bpm]
-                        bpm_Ryy[:n_bpm, j] = bpm_dy[:n_bpm]
-
-        finally:
-            self.interface.set_correctors(corr_names, corr_bdes0.tolist())
-
-        return {
-            "Rxx": Rxx.tolist(),
-            "Ryy": Ryy.tolist(),
-            "correctors": corr_names,
-            "screens": screens,
-            "bpm_Rxx": bpm_Rxx.tolist(),
-            "bpm_Ryy": bpm_Ryy.tolist(),
-            "bpm_names": bpm_names,
-            "bpm_S": self._get_twiss_s_positions(bpm_names),
-            "delta_corr": float(delta_corr),
-        }
-
-    def _set_scan_quad_to_step(self, step_index):
-        quad_name = self.session["quad_name"]
-        K1_values = np.asarray(self.session["K1_values"], dtype=float)
-        target_K1 = float(K1_values[step_index])
-
-        quads = self.interface.get_quadrupoles([quad_name])
-        names = list(quads["names"])
-        if not names:
-            raise RuntimeError("Quadrupole not found")
-        self.interface.set_quadrupoles(names, [target_K1])
-        return target_K1
-
-    def _measure_screen_response(self):
-        if self.session is None:
-            raise RuntimeError("No session")
-        quad_name = self.session["quad_name"]
-        K1_values = np.asarray(self.session["K1_values"], dtype=float)
-        deltas = np.asarray(self.session["deltas"], dtype=float)
-
-        nom_idx = int(np.argmin(np.abs(deltas)))
-        indexes = [0, nom_idx, len(K1_values) - 1]
-
-        all_corrs = self.interface.get_correctors()["names"]
-        correctors = [c for c in all_corrs if str(c).lower().startswith(("zh", "zx", "zv"))][:6]
-
-        if not correctors:
-            raise RuntimeError("No correctors found")
-
-        quad_data0 = self.interface.get_quadrupoles([quad_name])
-        quad_names0 = list(quad_data0["names"])
-        if not quad_names0:
-            raise RuntimeError("Quadrupole not found")
-        quad_bdes0 = np.asarray(quad_data0["bdes"], dtype=float)
-
-        output = {
-            "correctors": correctors,
-            "screen_names": list(self.session["screens"]),
-            "bpm_names": [],
-            "bpm_S": [],
-            "K1_indices": indexes,
-            "K1_values": [],
-            "responses": [],
-        }
-        try:
-            for idx in indexes:
-                K1 = self._set_scan_quad_to_step(idx)
-                resp = self._measure_screen_response_current_state(correctors = correctors, delta_corr = 1e-4)
-                output["K1_values"].append(K1)
-                output["responses"].append(resp)
-                if not output["bpm_names"] and resp.get("bpm_names"):
-                    output["bpm_names"] = list(resp.get("bpm_names", []))
-                    output["bpm_S"] = list(resp.get("bpm_S", []))
-        finally:
-            self.interface.set_quadrupoles(quad_names0,quad_bdes0.tolist())
-        self.session["screen_response_scans"] = output
-        return output
 
 if __name__ == "__main__":
 

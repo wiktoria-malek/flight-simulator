@@ -2,14 +2,34 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.stats import median_abs_deviation
 
+class OptimizationStopped(Exception):
+    def __init__(self, message = "Optimization stopped", payload = None):
+        super().__init__(message)
+        self.payload = payload
+
 
 class Optimization_EM:
     def __init__(self, interface, n_starts=8, rng_seed=42):
         self.interface = interface
         self.n_starts = int(n_starts)
         self.rng = np.random.default_rng(rng_seed)
+        self._stop_requested = False
+        self.best_out_so_far = None
+        self._last_completed_output = None
+        self.print_M = True
+
+    def request_stop(self):
+        self._stop_requested = True
+
+    def clear_stop(self):
+        self._stop_requested = False
+        self.best_out_so_far = None
+        self._last_completed_output = None
 
     def fit_from_session(self, session):
+        self.clear_stop()
+        if self.print_M:
+            print("Starting to fit Twiss parameters and emittance...")
         screens = list(session.get("screens", []))
         quad_name = session.get("quad_name")
         K1_values = np.asarray(session.get("K1_values", []), dtype=float)
@@ -32,27 +52,61 @@ class Optimization_EM:
         if sigx.shape[0] != K1_values.size:
             raise ValueError("K1_values and sigma arrays have incompatible lengths")
 
-        fit_x = self._fit_plane(
-            plane="x",
-            screens=screens,
-            quad_name=quad_name,
-            K1_values=K1_values,
-            sigma=sigx,
-            sigma_std=sigx_std,
-        )
+        fit_x = None
+        fit_y = None
 
-        fit_y = self._fit_plane(
-            plane="y",
-            screens=screens,
-            quad_name=quad_name,
-            K1_values=K1_values,
-            sigma=sigy,
-            sigma_std=sigy_std,
-        )
+        try:
+            fit_x = self._fit_plane(
+                plane="x",
+                screens=screens,
+                quad_name=quad_name,
+                K1_values=K1_values,
+                sigma=sigx,
+                sigma_std=sigx_std,
+            )
+
+            if self.print_M:
+                print(
+                    f"Plane x done: "
+                    f"success={fit_x['success']}, "
+                    f"cost={fit_x['cost']:.6g}, "
+                    f"stopped={fit_x.get('stopped', False)}, "
+                    f"emit={fit_x['emit']:.6g}, "
+                    f"beta0={fit_x['beta0']:.6g}, "
+                    f"alpha0={fit_x['alpha0']:.6g}"
+                )
+
+            fit_y = self._fit_plane(
+                plane="y",
+                screens=screens,
+                quad_name=quad_name,
+                K1_values=K1_values,
+                sigma=sigy,
+                sigma_std=sigy_std,
+            )
+
+            if self.print_M:
+                print(
+                    f"Plane y done: "
+                    f"success={fit_y['success']}, "
+                    f"cost={fit_y['cost']:.6g}, "
+                    f"stopped={fit_y.get('stopped', False)}, "
+                    f"emit={fit_y['emit']:.6g}, "
+                    f"beta0={fit_y['beta0']:.6g}, "
+                    f"alpha0={fit_y['alpha0']:.6g}"
+                )
+
+        except OptimizationStopped:
+            if fit_x is None or fit_y is None:
+                raise
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
-        emit_x_norm = gamma_rel * beta_rel * fit_x["emit"] if np.isfinite(gamma_rel) and np.isfinite(beta_rel) else np.nan
-        emit_y_norm = gamma_rel * beta_rel * fit_y["emit"] if np.isfinite(gamma_rel) and np.isfinite(beta_rel) else np.nan
+        emit_x_norm = gamma_rel * beta_rel * fit_x["emit"] if np.isfinite(gamma_rel) and np.isfinite(
+            beta_rel) else np.nan
+        emit_y_norm = gamma_rel * beta_rel * fit_y["emit"] if np.isfinite(gamma_rel) and np.isfinite(
+            beta_rel) else np.nan
+
+        stopped = bool(fit_x.get("stopped", False) or fit_y.get("stopped", False) or self._stop_requested)
 
         result = {
             "screen0": screens[0],
@@ -81,13 +135,29 @@ class Optimization_EM:
             "fit_y_residual_rms_per_screen": fit_y["residual_rms_per_screen"],
             "worst_screen_x": fit_x["worst_screen"],
             "worst_screen_y": fit_y["worst_screen"],
+            "stopped": stopped,
         }
 
-        return {
+        output = {
             "result": result,
             "pred_x": fit_x["pred"],
             "pred_y": fit_y["pred"],
         }
+        self.best_out_so_far = output
+        self._last_completed_output = output
+
+        if self.print_M:
+            print(
+                f"Final result: "
+                f"stopped={result['stopped']}, "
+                f"emit_x_norm={result['emit_x_norm']:.6g}, "
+                f"emit_y_norm={result['emit_y_norm']:.6g}, "
+                f"fit_x_cost={result['fit_x_cost']:.6g}, "
+                f"fit_y_cost={result['fit_y_cost']:.6g}"
+            )
+
+        return output
+
 
     def _safe_sigma2_errors(self, sig, sig_std):
         sig = np.asarray(sig, dtype=float)
@@ -153,7 +223,7 @@ class Optimization_EM:
             beta0 = np.exp(log_beta0)
             return emit, beta0, alpha0
 
-        def predict(p):
+        def predict_raw(p):
             emit, beta0, alpha0 = unpack(p)
             pred_sigma = self.interface.predict_emittance_scan_response(
                 plane=plane,
@@ -167,13 +237,20 @@ class Optimization_EM:
             pred_sigma = np.asarray(pred_sigma, dtype=float)
             if pred_sigma.shape != sigma.shape:
                 raise RuntimeError(
-                    f"Predicted sigma shape {pred_sigma.shape} does not match measured shape {sigma.shape}"
+                    f"Sigma shape {pred_sigma.shape} does not match measured shape {sigma.shape}"
                 )
             return pred_sigma ** 2
+
+        def predict(p):
+            if self._stop_requested:
+                raise OptimizationStopped("Optimization stopped.")
+            return predict_raw(p)
 
         valid = np.isfinite(sigma2) & np.isfinite(sigma2_err) & (sigma2_err > 0)
 
         def residuals(p):
+            if self._stop_requested:
+                raise OptimizationStopped("Optimization stopped.")
             pred2 = predict(p)
             data_res = (pred2 - sigma2) / sigma2_err
             return np.asarray(data_res[valid].ravel(), dtype=float)
@@ -198,29 +275,67 @@ class Optimization_EM:
 
         best = None
         best_cost = np.inf
+        stopped_during_fit = False
+        completed_starts = 0
+
+        if self.print_M:
+            print(f"Plane {plane}: trying start {completed_starts + 1}/{len(starts)}")
 
         for x0 in starts:
+            if self._stop_requested:
+                if best is not None:
+                    stopped_during_fit = True
+                    break
+                continue
             x0 = np.minimum(np.maximum(x0, lower + 1e-12), upper - 1e-12)
+            try:
+                fit = least_squares(
+                    residuals,
+                    x0,
+                    method="trf",
+                    loss="soft_l1",
+                    f_scale=1.0,
+                    bounds=(lower, upper),
+                    max_nfev=50,
+                )
 
-            fit = least_squares(
-                residuals,
-                x0,
-                method="trf",
-                loss="soft_l1",
-                f_scale=1.0,
-                bounds=(lower, upper),
-                max_nfev=50,
-            )
+                completed_starts += 1
+                if self.print_M:
+                    print(
+                        f"Plane {plane}: "
+                        f"start {completed_starts}/{len(starts)} finished, "
+                        f"success={fit.success}, "
+                        f"cost={float(fit.cost):.6g}, "
+                        f"message={str(fit.message)}"
+                    )
+            except OptimizationStopped:
+                if best is not None:
+                    stopped_during_fit = True
+                    break
+                continue
 
             if fit.cost < best_cost:
                 best_cost = float(fit.cost)
                 best = fit
+                if self.print_M:
+                    print(
+                        f"Plane {plane}: "
+                        f"new best after {completed_starts}/{len(starts)} starts, "
+                        f"best_cost={best_cost:.6g}"
+                    )
 
+        if self.print_M:
+            print(
+                f"Plane {plane}: "
+                f"completed_starts={completed_starts}/{len(starts)}, "
+                f"best_found={best is not None}, "
+                f"stopped={stopped_during_fit}"
+            )
         if best is None:
             raise RuntimeError(f"Direct fit failed for plane {plane}")
 
         emit, beta0, alpha0 = unpack(best.x)
-        pred2 = predict(best.x)
+        pred2 = predict_raw(best.x)
 
         data_res = []
         per_screen_res = {screen: [] for screen in screens}
@@ -260,4 +375,5 @@ class Optimization_EM:
             "success": bool(best.success),
             "message": str(best.message),
             "cost": float(best.cost),
+            "stopped": bool(stopped_during_fit),
         }

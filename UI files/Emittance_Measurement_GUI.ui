@@ -1,44 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>EmittanceMainWindow</class>
- <widget class="QMainWindow" name="EmittanceMainWindow">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1873</width>
-    <height>868</height>
+    <width>1612</width>
+    <height>847</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Emittance Measurement</string>
+   <string>Emittance Measurement GUI</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout">
     <item>
-     <widget class="QGroupBox" name="leftPanelGroup">
+     <widget class="QGroupBox" name="leftGroup">
       <property name="title">
        <string/>
       </property>
       <layout class="QVBoxLayout" name="leftVBox">
        <item>
-        <widget class="QGroupBox" name="elementsGroup">
+        <widget class="QGroupBox" name="devicesGroup">
          <property name="title">
           <string>Devices</string>
          </property>
-         <layout class="QVBoxLayout" name="elementsVBox">
+         <layout class="QVBoxLayout" name="devicesVBox">
           <item>
-           <layout class="QHBoxLayout" name="quadsScreensHBox">
+           <layout class="QHBoxLayout" name="devicesHBox">
             <item>
-             <widget class="QGroupBox" name="quadsGroup">
+             <widget class="QGroupBox" name="quadrupolesGroup">
               <property name="title">
                <string>Quadrupoles</string>
               </property>
-              <layout class="QVBoxLayout" name="quadsVBox">
+              <layout class="QVBoxLayout" name="quadrupolesVBox">
                <item>
                 <widget class="QListWidget" name="quadrupoles_list">
                  <property name="selectionMode">
-                  <enum>QAbstractItemView::ExtendedSelection</enum>
+                  <enum>QAbstractItemView::SingleSelection</enum>
                  </property>
                 </widget>
                </item>
@@ -77,20 +77,6 @@
             </item>
            </layout>
           </item>
-          <item>
-           <layout class="QHBoxLayout" name="firstScreenHBox">
-            <item>
-             <widget class="QLabel" name="labelFirstScreen">
-              <property name="text">
-               <string>First (reference) screen</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QComboBox" name="first_screen_choice"/>
-            </item>
-           </layout>
-          </item>
          </layout>
         </widget>
        </item>
@@ -100,62 +86,10 @@
           <string>Quadrupole scan settings</string>
          </property>
          <layout class="QGridLayout" name="gridScan">
-          <item row="0" column="1">
-           <widget class="QDoubleSpinBox" name="delta_min_scan">
-            <property name="decimals">
-             <number>4</number>
-            </property>
-            <property name="minimum">
-             <double>-10.000000000000000</double>
-            </property>
-            <property name="maximum">
-             <double>10.000000000000000</double>
-            </property>
-            <property name="value">
-             <double>-0.250000000000000</double>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="labelDeltaMax">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label">
             <property name="text">
-             <string>Delta max</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QDoubleSpinBox" name="delta_max_scan">
-            <property name="decimals">
-             <number>4</number>
-            </property>
-            <property name="minimum">
-             <double>-10.000000000000000</double>
-            </property>
-            <property name="maximum">
-             <double>10.000000000000000</double>
-            </property>
-            <property name="value">
-             <double>0.250000000000000</double>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="labelSteps">
-            <property name="text">
-             <string>Steps</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QSpinBox" name="steps_settings">
-            <property name="minimum">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <number>101</number>
-            </property>
-            <property name="value">
-             <number>11</number>
+             <string>Delta min</string>
             </property>
            </widget>
           </item>
@@ -179,10 +113,62 @@
             </property>
            </widget>
           </item>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label">
+          <item row="2" column="0">
+           <widget class="QLabel" name="labelSteps">
             <property name="text">
-             <string>Delta min</string>
+             <string>Steps</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="steps_settings">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>101</number>
+            </property>
+            <property name="value">
+             <number>11</number>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="delta_min_scan">
+            <property name="decimals">
+             <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>-10.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>-0.250000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="delta_max_scan">
+            <property name="decimals">
+             <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>-10.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.250000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="labelDeltaMax">
+            <property name="text">
+             <string>Delta max</string>
             </property>
            </widget>
           </item>
@@ -191,26 +177,13 @@
        </item>
        <item>
         <widget class="QGroupBox" name="actionsGroup">
-         <property name="layoutDirection">
-          <enum>Qt::LeftToRight</enum>
-         </property>
          <property name="title">
-          <string>Measurement</string>
+          <string>Session</string>
          </property>
          <layout class="QGridLayout" name="gridActions">
           <property name="spacing">
            <number>12</number>
           </property>
-          <item row="1" column="3">
-           <widget class="QPushButton" name="pushButton">
-            <property name="layoutDirection">
-             <enum>Qt::RightToLeft</enum>
-            </property>
-            <property name="text">
-             <string>Restore quadrupole settings</string>
-            </property>
-           </widget>
-          </item>
           <item row="3" column="4">
            <widget class="QPushButton" name="load_session_button">
             <property name="text">
@@ -232,13 +205,6 @@
               <width>420</width>
               <height>0</height>
              </size>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="2">
-           <widget class="QPushButton" name="run_optimization_button">
-            <property name="text">
-             <string>Run optimization</string>
             </property>
            </widget>
           </item>
@@ -305,224 +271,350 @@
            </widget>
           </item>
           <item>
-           <widget class="QGroupBox" name="fit_results_group">
-            <property name="title">
-             <string>Fit results</string>
+           <widget class="QGroupBox" name="fit_results_wrapper_group">
+            <property name="styleSheet">
+             <string notr="true">QGroupBox#fit_results_wrapper_group {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#fit_results_wrapper_group::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
             </property>
-            <layout class="QVBoxLayout" name="fitResultsVBox">
+            <property name="title">
+             <string>Solution</string>
+            </property>
+            <layout class="QVBoxLayout" name="fit_results_wrapper_vbox">
              <property name="spacing">
               <number>8</number>
              </property>
+             <property name="leftMargin">
+              <number>8</number>
+             </property>
+             <property name="topMargin">
+              <number>8</number>
+             </property>
+             <property name="rightMargin">
+              <number>8</number>
+             </property>
+             <property name="bottomMargin">
+              <number>8</number>
+             </property>
              <item>
-              <layout class="QGridLayout" name="fitResultsInfoGrid">
-               <property name="horizontalSpacing">
-                <number>12</number>
+              <widget class="QGroupBox" name="fit_results_group">
+               <property name="title">
+                <string>Fit results</string>
                </property>
-               <property name="verticalSpacing">
-                <number>6</number>
-               </property>
-               <item row="0" column="0">
-                <widget class="QLabel" name="label_fit_result_screen_title">
-                 <property name="text">
-                  <string>Reference screen</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="0" column="1">
-                <widget class="QLabel" name="result_reference_screen">
-                 <property name="text">
-                  <string>-</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="0">
-                <widget class="QLabel" name="label_fit_result_quad_title">
-                 <property name="text">
-                  <string>Quadrupole</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="1">
-                <widget class="QLabel" name="result_quad">
-                 <property name="text">
-                  <string>-</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="fitResultsPlanesHBox">
-               <property name="spacing">
-                <number>12</number>
-               </property>
-               <item>
-                <widget class="QGroupBox" name="fit_results_x_group">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="title">
-                  <string>x</string>
-                 </property>
-                 <layout class="QGridLayout" name="fitResultsXGrid">
+               <layout class="QVBoxLayout" name="fitResultsVBox">
+                <property name="spacing">
+                 <number>8</number>
+                </property>
+                <item>
+                 <layout class="QGridLayout" name="fitResultsInfoGrid">
                   <property name="horizontalSpacing">
-                   <number>10</number>
+                   <number>12</number>
                   </property>
                   <property name="verticalSpacing">
                    <number>6</number>
                   </property>
                   <item row="0" column="0">
-                   <widget class="QLabel" name="result_emit_x_title">
-                    <property name="font">
-                     <font>
-                      <pointsize>13</pointsize>
-                     </font>
-                    </property>
+                   <widget class="QLabel" name="label_fit_result_screen_title">
                     <property name="text">
-                     <string>ε (normalised)</string>
+                     <string>Reference screen</string>
                     </property>
                    </widget>
                   </item>
                   <item row="0" column="1">
-                   <widget class="QLabel" name="result_emit_x_norm">
+                   <widget class="QLabel" name="result_reference_screen">
                     <property name="text">
                      <string>-</string>
                     </property>
                    </widget>
                   </item>
                   <item row="1" column="0">
-                   <widget class="QLabel" name="label_beta_x_title">
-                    <property name="font">
-                     <font>
-                      <pointsize>13</pointsize>
-                     </font>
-                    </property>
+                   <widget class="QLabel" name="label_fit_result_quad_title">
                     <property name="text">
-                     <string>β</string>
+                     <string>Quadrupole</string>
                     </property>
                    </widget>
                   </item>
                   <item row="1" column="1">
-                   <widget class="QLabel" name="result_beta_x0">
-                    <property name="text">
-                     <string>-</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="0">
-                   <widget class="QLabel" name="label_alpha_x0_title">
-                    <property name="font">
-                     <font>
-                      <pointsize>13</pointsize>
-                     </font>
-                    </property>
-                    <property name="text">
-                     <string>α</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="1">
-                   <widget class="QLabel" name="result_alpha_x0">
+                   <widget class="QLabel" name="result_quad">
                     <property name="text">
                      <string>-</string>
                     </property>
                    </widget>
                   </item>
                  </layout>
-                </widget>
-               </item>
-               <item>
-                <widget class="QGroupBox" name="fit_results_y_group">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="title">
-                  <string>y</string>
-                 </property>
-                 <layout class="QGridLayout" name="fitResultsYGrid">
-                  <property name="horizontalSpacing">
-                   <number>10</number>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="fitResultsPlanesHBox">
+                  <property name="spacing">
+                   <number>12</number>
                   </property>
-                  <property name="verticalSpacing">
-                   <number>6</number>
-                  </property>
-                  <item row="0" column="0">
-                   <widget class="QLabel" name="label_emit_y_title">
-                    <property name="font">
-                     <font>
-                      <pointsize>13</pointsize>
-                     </font>
+                  <item>
+                   <widget class="QGroupBox" name="fit_results_x_group">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
                     </property>
-                    <property name="text">
-                     <string>ε (normalised)</string>
+                    <property name="title">
+                     <string>x</string>
                     </property>
+                    <layout class="QGridLayout" name="fitResultsXGrid">
+                     <property name="horizontalSpacing">
+                      <number>10</number>
+                     </property>
+                     <property name="verticalSpacing">
+                      <number>6</number>
+                     </property>
+                     <item row="0" column="0">
+                      <widget class="QLabel" name="result_emit_x_title">
+                       <property name="font">
+                        <font>
+                         <pointsize>13</pointsize>
+                        </font>
+                       </property>
+                       <property name="text">
+                        <string>ε (normalised)</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="1">
+                      <widget class="QLabel" name="result_emit_x_norm">
+                       <property name="text">
+                        <string>-</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="label_beta_x_title">
+                       <property name="font">
+                        <font>
+                         <pointsize>13</pointsize>
+                        </font>
+                       </property>
+                       <property name="text">
+                        <string>β</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QLabel" name="result_beta_x0">
+                       <property name="text">
+                        <string>-</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="label_alpha_x0_title">
+                       <property name="font">
+                        <font>
+                         <pointsize>13</pointsize>
+                        </font>
+                       </property>
+                       <property name="text">
+                        <string>α</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="1">
+                      <widget class="QLabel" name="result_alpha_x0">
+                       <property name="text">
+                        <string>-</string>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
                    </widget>
                   </item>
-                  <item row="0" column="1">
-                   <widget class="QLabel" name="result_emit_y_norm">
-                    <property name="text">
-                     <string>-</string>
+                  <item>
+                   <widget class="QGroupBox" name="fit_results_y_group">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
                     </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="0">
-                   <widget class="QLabel" name="label_beta_y0_title">
-                    <property name="font">
-                     <font>
-                      <pointsize>13</pointsize>
-                     </font>
+                    <property name="title">
+                     <string>y</string>
                     </property>
-                    <property name="text">
-                     <string>β</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="1">
-                   <widget class="QLabel" name="result_beta_y0">
-                    <property name="text">
-                     <string>-</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="0">
-                   <widget class="QLabel" name="label_alpha_y0_title">
-                    <property name="font">
-                     <font>
-                      <pointsize>13</pointsize>
-                     </font>
-                    </property>
-                    <property name="text">
-                     <string>α</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="1">
-                   <widget class="QLabel" name="result_alpha_y0">
-                    <property name="text">
-                     <string>-</string>
-                    </property>
+                    <layout class="QGridLayout" name="fitResultsYGrid">
+                     <property name="horizontalSpacing">
+                      <number>10</number>
+                     </property>
+                     <property name="verticalSpacing">
+                      <number>6</number>
+                     </property>
+                     <item row="0" column="0">
+                      <widget class="QLabel" name="label_emit_y_title">
+                       <property name="font">
+                        <font>
+                         <pointsize>13</pointsize>
+                        </font>
+                       </property>
+                       <property name="text">
+                        <string>ε (normalised)</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="1">
+                      <widget class="QLabel" name="result_emit_y_norm">
+                       <property name="text">
+                        <string>-</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QLabel" name="label_beta_y0_title">
+                       <property name="font">
+                        <font>
+                         <pointsize>13</pointsize>
+                        </font>
+                       </property>
+                       <property name="text">
+                        <string>β</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QLabel" name="result_beta_y0">
+                       <property name="text">
+                        <string>-</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QLabel" name="label_alpha_y0_title">
+                       <property name="font">
+                        <font>
+                         <pointsize>13</pointsize>
+                        </font>
+                       </property>
+                       <property name="text">
+                        <string>α</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="1">
+                      <widget class="QLabel" name="result_alpha_y0">
+                       <property name="text">
+                        <string>-</string>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
                    </widget>
                   </item>
                  </layout>
-                </widget>
-               </item>
-              </layout>
+                </item>
+               </layout>
+              </widget>
              </item>
              <item>
-              <spacer name="verticalSpacer_fit_results">
+              <widget class="QPushButton" name="clear_plots_button">
+               <property name="layoutDirection">
+                <enum>Qt::RightToLeft</enum>
+               </property>
+               <property name="text">
+                <string>Clear plots</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="log_console_button">
+               <property name="text">
+                <string>Log Console</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="fit_results_logo_top_spacer">
                <property name="orientation">
                 <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Expanding</enum>
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
                  <width>20</width>
-                 <height>40</height>
+                 <height>30</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="fit_results_logo_layout">
+               <item>
+                <spacer name="fit_results_logo_left_spacer">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item>
+                <widget class="QLabel" name="logo_label">
+                 <property name="minimumSize">
+                  <size>
+                   <width>120</width>
+                   <height>60</height>
+                  </size>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>220</width>
+                   <height>120</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string/>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="fit_results_logo_right_spacer">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <spacer name="fit_results_logo_bottom_spacer">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Expanding</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>30</height>
                 </size>
                </property>
               </spacer>
@@ -534,8 +626,27 @@
         </item>
         <item>
          <layout class="QHBoxLayout" name="startStopHBox">
+          <property name="spacing">
+           <number>6</number>
+          </property>
           <item>
-           <widget class="QPushButton" name="start_button">
+           <widget class="QWidget" name="scan_tooltip_spacer" native="true">
+            <property name="minimumSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="start_button_scan">
             <property name="styleSheet">
              <string notr="true">background-color: red; color: white;</string>
             </property>
@@ -545,12 +656,106 @@
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="stop_button">
+           <widget class="QPushButton" name="stop_button_scan">
             <property name="styleSheet">
              <string notr="true">background-color: green; color: white;</string>
             </property>
             <property name="text">
-             <string>STOP</string>
+             <string>STOP SCAN</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="startStopHBox_opt">
+          <property name="spacing">
+           <number>6</number>
+          </property>
+          <item>
+           <widget class="QToolButton" name="ToolTip_opt">
+            <property name="minimumSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+            <property name="font">
+             <font>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="focusPolicy">
+             <enum>Qt::NoFocus</enum>
+            </property>
+            <property name="toolTip">
+             <string>Run quadrupole scan first or upload data from one of recents quadrupole scans.</string>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QToolButton#ToolTip_opt {
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#ToolTip_opt:hover {
+    background-color: #e6e6e6;
+}</string>
+            </property>
+            <property name="text">
+             <string>?</string>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="start_optimization_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: red; color: white;</string>
+            </property>
+            <property name="text">
+             <string>START OPTIMIZATION</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="stop_optimization_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: green; color: white;</string>
+            </property>
+            <property name="text">
+             <string>STOP OPTIMIZATION</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="pause_and_resume_HBox">
+          <item>
+           <widget class="QPushButton" name="stop_button">
+            <property name="text">
+             <string>Pause</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="resume_button">
+            <property name="text">
+             <string>Resume</string>
             </property>
            </widget>
           </item>

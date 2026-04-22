@@ -4,12 +4,14 @@ from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import numpy as np
 matplotlib.use("QtAgg")
 try:
+    pyqt_version = 6
     from PyQt6.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
         QRadioButton, QLabel,QFileDialog
         )
     from PyQt6.QtCore import QEvent, Qt
 except ImportError:
+    pyqt_version = 5
     from PyQt5.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
         QRadioButton, QLabel, QFileDialog
