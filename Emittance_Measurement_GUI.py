@@ -26,7 +26,7 @@ from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
 from Backend.Optimization_EM import Optimization_EM
 from Backend.QuadrupoleScan_EM import QuadrupoleScan_EM
-
+from Backend.LogConsole import LogConsole
 
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -98,17 +98,18 @@ class OptimizationWorker(QObject):
     optimizer_ready = pyqtSignal(object)
     done = pyqtSignal()
 
-    def __init__(self, interface, session, n_starts = 3):
+    def __init__(self, interface, session, n_starts = 3, initial_guess = None):
         super().__init__()
         self.interface = interface
         self.session = session
         self.n_starts = n_starts
+        self.initial_guess = initial_guess
 
     def run(self):
         try:
             tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts)
             self.optimizer_ready.emit(tool)
-            output = tool.fit_from_session(self.session)
+            output = tool.fit_from_session(self.session, initial_guess = self.initial_guess)
             self.finished.emit(output)
         except Exception as e:
             self.error.emit(str(e))
@@ -294,7 +295,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         screens_S = np.asarray(screens_data["S"], dtype=float)
         screen_pairs = sorted(zip(screens, screens_S),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf) # assigns S position to each screen
         screens_sorted = [name for name, _ in screen_pairs] # only names
-
         self._show_s_values_and_device_lists(self.quadrupoles_list, quadrupoles)
         self._show_s_values_and_device_lists(self.screens_list, screens_sorted)
         self.quad_on_plot.clear()
@@ -308,12 +308,68 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self._reset_canvas()
         self.screens_list.itemSelectionChanged.connect(self._screen_selection_changed)
         self._filter_quadrupoles_in_gui()
+        self.clear_plots_button.clicked.connect(self._clear_plots)
+        self.log_console=None
+        self.log_console_button.clicked.connect(self._show_console_log)
+        self.pause_button.clicked.connect(self._pause_task)
+        self.resume_button.clicked.connect(self._resume_task)
+        self._scan_pause_requested = False
+        self._scan_is_paused = False
+        self._optimization_paused = False
+
+    def _pause_task(self):
+        if self._is_scanning:
+            self.log("Pausing scan...")
+            self._scan_pause_requested = True
+            return
+
+        if self._is_optimizing and self._current_optimizer is not None:
+            self.log("Pausing optimization...")
+            self._current_optimizer.request_pause()
+            return
+
+    def _resume_task(self):
+        if self._is_scanning and (self._scan_pause_requested or self._scan_is_paused):
+            self.log("Resuming scan...")
+            self._scan_pause_requested = False
+            self._scan_is_paused = False
+            return
+        if self._optimization_paused and not self._is_optimizing and self.session is not None:
+            self.log("Resuming optimization...")
+            self._optimization_paused = False
+            self._run_optimization()
+            return
 
     def _stop_scan(self):
+        self.log("Stopping scan...")
         if self._is_scanning:
             self._scan_stop_requested = True
+            self._scan_pause_requested = False
+            self._scan_is_paused = False
+
+    def _clear_plots(self):
+        self.session = None
+        self._scan_stop_requested = False
+        self._scan_pause_requested = False
+        self._optimization_paused=False
+        self._scan_is_paused = False
+        self.quad_on_plot.clear()
+        self.screen_on_plot.clear()
+        quadrupoles = list(self.interface.get_quadrupoles()["names"])
+        screens_data = self.interface.get_screens()
+        screens = list(screens_data["names"])
+        screens_S = np.asarray(screens_data["S"], dtype=float)
+        screen_pairs = sorted(zip(screens, screens_S), key = lambda x: x[1] if np.isfinite(x[1]) else np.inf)
+        screens_sorted = [name for name, _ in screen_pairs]
+        self.quad_on_plot.addItems(quadrupoles)
+        self.screen_on_plot.addItems(screens_sorted)
+        self._clear_fit_panel()
+        self._reset_canvas()
+        self._set_progress(0)
 
     def _stop_optimization(self):
+        self.log("Stopping optimization...")
+        self._optimization_paused = False
         if self._is_optimizing and self._current_optimizer is not None:
             self._current_optimizer.request_stop()
 
@@ -374,13 +430,21 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
     def _update_fit_panel(self, result):
         self.result_quad.setText(str(result["quad_name"]))
 
-        self.result_emit_x_norm.setText(f"{result['emit_x_norm']:.4f} mm·mrad")
-        self.result_emit_y_norm.setText(f"{result['emit_y_norm']:.4f} mm·mrad")
+        def fmt_value(value, suffix=""): # formats numbers to text
+            try:
+                value = float(value)
+            except Exception:
+                return "-"
+            if not np.isfinite(value):
+                return "-"
+            return f"{value:.4f}{suffix}"
 
-        self.result_beta_x0.setText(f"{result['beta_x0']:.4f} m")
-        self.result_alpha_x0.setText(f"{result['alpha_x0']:.4f}")
-        self.result_beta_y0.setText(f"{result['beta_y0']:.4f} m")
-        self.result_alpha_y0.setText(f"{result['alpha_y0']:.4f}")
+        self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), " mm·mrad"))
+        self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), " mm·mrad"))
+        self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), " m"))
+        self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0")))
+        self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), " m"))
+        self.result_alpha_y0.setText(fmt_value(result.get("alpha_y0")))
 
     def _reset_canvas(self):
         fig = self.canvas.figure
@@ -484,12 +548,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
                 label=f"{screen} data"
             )
             fit_x = np.sqrt(np.maximum(pred_x[:, i], 0.0))
-            ax1.plot(
-                K1_values, fit_x, '-',
-                color=fit_color,
-                linewidth=2.0,
-                label=f"{screen} fit"
-            )
+            ax1.plot(K1_values, fit_x, '-', color=fit_color, linewidth=2.0, label=f"{screen} fit")
 
             ax2.plot(
                 K1_values, sigy[:, i], 'o',
@@ -517,6 +576,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.canvas.draw()
 
     def _run_optimization(self):
+        self.log("Fitting emittance and twiss parameters at first selected screen started...")
         if self.session is None:
             QMessageBox.information(self, "Optimization", "No session.")
             return
@@ -528,7 +588,11 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self._optimization_t0 = time.perf_counter()
         thread = QThread(self)
 
-        worker = OptimizationWorker(self.interface, self.session, n_starts=3)
+        initial_guess = None
+        if isinstance(self.session, dict):
+            initial_guess = self.session.get("optimization_guess")
+        worker = OptimizationWorker(self.interface, self.session, n_starts=3, initial_guess=initial_guess)
+
         worker.moveToThread(thread)
         worker.optimizer_ready.connect(self._store_current_optimizer)
         worker.finished.connect(self._on_optimization_output)
@@ -559,23 +623,106 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.session["optimization_pred_x"] = pred_x.tolist()
         self.session["optimization_pred_y"] = pred_y.tolist()
 
+        self.session["optimization_guess"] = {
+            "x": {
+                "emit_norm": result.get("emit_x_norm"),
+                "beta0": result.get("beta_x0"),
+                "alpha0": result.get("alpha_x0"),
+                "found": bool(result.get("fit_x_found", False)),
+            },
+
+            "y": {
+                "emit_norm": result.get("emit_y_norm"),
+                "beta0": result.get("beta_y0"),
+                "alpha0": result.get("alpha_y0"),
+                "found": bool(result.get("fit_y_found", False)),
+            },
+
+        }
+
         self._update_fit_panel(result)
         self._plot_fit_overlay(pred_x, pred_y, result)
         self._set_progress(100)
 
         elapsed = time.perf_counter() - self._optimization_t0
 
-        if result.get("stopped", False):
-            QMessageBox.information(
-                self,
-                "Optimization stopped",
-                f"Showing best solution found so far.\n\n"
-                f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
-                f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
-                f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}\n"
-                f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
-            )
+        fit_x_found = bool(result.get("fit_x_found", False))
+        fit_y_found = bool(result.get("fit_y_found", False))
+        paused = bool(result.get("paused", False))
+
+        if paused:
+            if fit_x_found and fit_y_found:
+                message = (
+                    "Best solution found so far.\n\n"
+                    f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
+                    f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
+                    f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}\n"
+                    f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
+                )
+            elif fit_x_found and not fit_y_found:
+                message = (
+                    "Optimization was paused.\n\n"
+                    "A solution was found only for plane x.\n"
+                    "No solution has been found yet for plane y.\n\n"
+                    f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
+                    f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}"
+                )
+            elif fit_y_found and not fit_x_found:
+                message = (
+                    "Optimization was paused.\n\n"
+                    "A solution was found only for plane y.\n"
+                    "No solution has been found yet for plane x.\n\n"
+                    f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
+                    f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
+                )
+            else:
+                message = (
+                    "Optimization was paused.\n\n"
+                    "No solution has been found yet for plane x.\n"
+                    "No solution has been found yet for plane y."
+                )
+
+            self._optimization_paused = True
+            QMessageBox.information(self, "Optimization paused", message)
+
+        elif result.get("stopped", False):
+            self._optimization_paused = False
+
+            if fit_x_found and fit_y_found:
+                message = (
+                    "Best solution found so far.\n\n"
+                    f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
+                    f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
+                    f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}\n"
+                    f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
+                )
+            elif fit_x_found and not fit_y_found:
+                message = (
+                    "Optimization was stopped.\n\n"
+                    "A solution was found only for plane x.\n"
+                    "No solution has been found yet for plane y.\n\n"
+                    f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
+                    f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}"
+                )
+            elif fit_y_found and not fit_x_found:
+                message = (
+                    "Optimization was stopped.\n\n"
+                    "A solution was found only for plane y.\n"
+                    "No solution has been found yet for plane x.\n\n"
+                    f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
+                    f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
+                )
+            else:
+                message = (
+                    "Optimization was stopped.\n\n"
+                    "No solution has been found yet for plane x.\n"
+                    "No solution has been found yet for plane y."
+                )
+
+            QMessageBox.information(self, "Optimization stopped", message)
+
         else:
+            self._optimization_paused = False
             QMessageBox.information(
                 self,
                 "Optimization complete",
@@ -589,7 +736,16 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
 
     def _on_optimization_error(self, message):
         self._set_progress(0)
-        QMessageBox.information(self, "Optimization", message)
+        self._optimization_paused = False
+        if message == "Optimization stopped.":
+            QMessageBox.information(
+                self,
+                "Optimization stopped",
+                "Optimization was stopped before any solution was found."
+            )
+            self.log("Optimization was stopped before any solution was found.")
+        else:
+            QMessageBox.information(self, "Optimization", message)
 
     def _on_optimization_finished(self):
         self._is_optimizing = False
@@ -609,6 +765,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             raise KeyboardInterrupt("Scan stopped by user.")
 
     def _run_scan(self):
+        self.log("Running quadrupole scan...")
         current_quad = self.quadrupoles_list.currentItem()
         if current_quad is None:
             QMessageBox.information(self, "Scan error", "No quadrupole selected.")
@@ -618,6 +775,12 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.quad_on_plot.clear()
         self.quad_on_plot.addItem(quad_name)
         self.quad_on_plot.setCurrentText(quad_name)
+        selected_items = self.screens_list.selectedItems()
+        if not selected_items:
+            self.screens_list.blockSignals(True)
+            self.screens_list.selectAll()
+            self.screens_list.blockSignals(False)
+
         screens = self._get_sorted_selected_screens()
         self.screen_on_plot.clear()
         self.screen_on_plot.addItems(screens)
@@ -649,6 +812,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
                 bpms=[],
                 progress_callback=self._scan_progress_callback
             )
+            self.log("Quadrupole scan finished.")
         except KeyboardInterrupt as e:
             self._set_progress(0)
             QMessageBox.information(self, "Scan", str(e))
@@ -672,15 +836,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         else:
             QMessageBox.information(self, "Scan", f"Scan completed.")
             self._set_progress(100)
-
-
-    @staticmethod
-    def _fmt_float(value, digits=3):
-        try:
-            value = float(value)
-        except (TypeError, ValueError):
-            return "n/a"
-        return f"{value:.{digits}f}" if np.isfinite(value) else "n/a"
 
     def _get_twiss_s_positions(self, names):
         names = list(names)
@@ -766,6 +921,21 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         sigma2_err[~np.isfinite(sigma2_err)] = 1e-6
 
         return sigma2_err
+
+    def _show_console_log(self):
+        if self.log_console is None:
+            self.log_console=LogConsole(self)
+        self.log_console.show()
+        self.log_console.raise_()
+        self.log_console.activateWindow()
+
+    def log(self,text):
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        line=f"[{timestamp}] {text}"
+        if self.log_console is None:
+            self.log_console=LogConsole(self)
+            #self.log_console.show()
+        self.log_console.log(line)
 
 if __name__ == "__main__":
 

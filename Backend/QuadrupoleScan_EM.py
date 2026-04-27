@@ -1,4 +1,4 @@
-import os, sys, matplotlib, pickle
+import os, sys, matplotlib, pickle, time
 from datetime import datetime
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import numpy as np
@@ -7,14 +7,14 @@ try:
     pyqt_version = 6
     from PyQt6.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel,QFileDialog
+        QRadioButton, QLabel,QFileDialog, QApplication
         )
     from PyQt6.QtCore import QEvent, Qt
 except ImportError:
     pyqt_version = 5
     from PyQt5.QtWidgets import (
         QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel, QFileDialog
+        QRadioButton, QLabel, QFileDialog, QApplication
     )
     from PyQt5.QtCore import QEvent, Qt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -70,6 +70,15 @@ class QuadrupoleScan_EM:
 
         try:
             for i, K1 in enumerate(K1_values):
+                while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
+                    setattr(self, "_scan_is_paused", True)
+                    QApplication.processEvents()
+                    time.sleep(0.05)
+
+                setattr(self, "_scan_is_paused", False)
+
+                if getattr(self, "_scan_stop_requested", False):
+                    raise KeyboardInterrupt("Scan stopped by user.")
                 if getattr(self, "_cancel", False):
                     cancel_requested = True
                     break
@@ -83,10 +92,15 @@ class QuadrupoleScan_EM:
                 by_shots = np.full((nshots, nbpms), np.nan, dtype=float)
 
                 for j in range(nshots):
-                    if getattr(self, "_cancel", False):
-                        cancel_requested = True
-                        break
+                    while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
+                        setattr(self, "_scan_is_paused", True)
+                        QApplication.processEvents()
+                        time.sleep(0.05)
 
+                    setattr(self, "_scan_is_paused", False)
+
+                    if getattr(self, "_scan_stop_requested", False):
+                        raise KeyboardInterrupt("Scan stopped by user.")
                     state = self.interface.get_state()
                     state_filename = os.path.join(output_dir,f"step_{i:04d}_shot_{j:04d}.pkl")
                     state.save(filename=state_filename)

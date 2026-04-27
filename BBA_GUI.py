@@ -16,7 +16,7 @@ except ImportError:
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from Backend.LogConsole_BBA import LogConsole
+from Backend.LogConsole import LogConsole
 from Backend.TestOrbits_BBA import TestOrbits
 from Backend.RMS_Plots_BBA import RMS_Plots
 from Backend.SaveOrLoad import SaveOrLoad

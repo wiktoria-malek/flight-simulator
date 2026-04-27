@@ -1,7 +1,7 @@
 import RF_Track as rft
 import numpy as np
 import time,os
-from Backend.LogConsole_BBA import LogConsole
+from Backend.LogConsole import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
@@ -554,3 +554,76 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                 strengths[2] = complex(float(value), 0.0)
                 element.set_strengths(strengths)
         self.__track_bunch()
+
+    def _get_optics_from_twiss_file(self,names=None):
+        with open(self.twiss_path, "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+
+        cols=["NAME","S","BETX","ALFX","BETY","ALFY","MUX","MUY","L"]
+        index={}
+        for col in cols:
+            try:
+                index[col]=columns.index(col)
+            except ValueError:
+                raise RuntimeError(f"Column {col} not found in twiss file")
+        result={k: [] for k in cols}
+
+        duplicated={}
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            if len(data) <= max(index.values()):  # if a line has less column than needed, it is omitted
+                continue
+            name = data[index["NAME"]].strip('"')
+            result["NAME"].append(name)
+
+            if name not in duplicated:
+                duplicated[name]={col:[] for col in cols[1:]}
+            for col in cols[1:]:
+                try:
+                    duplicated[name][col].append(float(data[index[col]]))
+                except ValueError:
+                    duplicated[name][col].append(float("nan"))
+        result_names=list(duplicated.keys())
+        result={col:[] for col in cols[1:]}
+
+        for name in result_names:
+            vals=duplicated[name]
+            result["S"].append(vals["S"][0])
+            result["BETX"].append(vals["BETX"][0])
+            result["ALFX"].append(vals["ALFX"][0])
+            result["MUX"].append(vals["MUX"][0])
+            result["L"].append(sum(vals["L"]))
+            result["BETY"].append(vals["BETY"][0])
+            result["ALFY"].append(vals["ALFY"][0])
+            result["MUY"].append(vals["MUY"][0])
+        return {
+            "names":result_names,
+            "S": np.array(result["S"]),
+            "betx": np.array(result["BETX"]),
+            "alfx": np.array(result["ALFX"]),
+            "bety": np.array(result["BETY"]),
+            "alfy": np.array(result["ALFY"]),
+            "mux": np.array(result["MUX"]),
+            "muy": np.array(result["MUY"]),
+            "L": np.array(result["L"]),
+        }
+
+    def get_twiss_at_element(self,name):
+        optics=self._get_optics_from_twiss_file()
+        names=list(optics["names"])
+        if name not in names:
+            raise ValueError(f"Element {name} not found in twiss file")
+        i=names.index(name)
+        return {
+            "name": names[i],
+            "S": float(optics["S"][i]),
+            "betx": float(optics["betx"][i]),
+            "alfx": float(optics["alfx"][i]),
+            "bety": float(optics["bety"][i]),
+            "alfy": float(optics["alfy"][i]),
+
+        }

@@ -484,3 +484,5 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 element.set_strengths(strengths)
         self.__track_bunch()
 
+
+

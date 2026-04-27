@@ -1,7 +1,7 @@
 import RF_Track as rft
 import numpy as np
 import time, os, re
-from Backend.LogConsole_BBA import LogConsole
+from Backend.LogConsole import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
@@ -695,7 +695,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             sigy[i] = float(screen_data["sigy"][idx])
         return sigx, sigy
 
-    def predict_emittance_scan_response(self, plane,quad_name, screens, K1_values, emit, beta0, alpha0):
+    def predict_emittance_scan_response(self, plane,quad_name, screens, K1_values, emit, beta0, alpha0, stop_checker = None):
         screens = list(screens)
         K1_values = np.asarray(K1_values, dtype=float)
 
@@ -714,6 +714,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         try:
             for k,K1 in enumerate(K1_values):
+                if callable(stop_checker) and stop_checker():
+                    raise RuntimeError("__OPTIMIZATION_STOP__")
                 self.set_quadrupoles([quad_name], [float(K1)], track = False)
                 new_bunch = self._build_bunch_from_guesses(plane = plane, emit = float(emit), beta0 = float(beta0), alpha0 = float(alpha0))
                 self.lattice.track(new_bunch)

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1295</width>
-    <height>847</height>
+    <height>819</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -35,6 +35,20 @@
          <layout class="QVBoxLayout" name="verticalLayout_7">
           <item>
            <widget class="QGroupBox" name="session_group_3">
+            <property name="styleSheet">
+             <string notr="true">QGroupBox#session_group_3 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#session_group_3::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+            </property>
             <property name="title">
              <string>Restore desired session's settings</string>
             </property>
@@ -90,6 +104,20 @@
           </item>
           <item>
            <widget class="QGroupBox" name="trajectory_group_3">
+            <property name="styleSheet">
+             <string notr="true">QGroupBox#trajectory_group_3 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#trajectory_group_3::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+            </property>
             <property name="title">
              <string>Trajectory Correction</string>
             </property>
@@ -145,6 +173,20 @@
           </item>
           <item>
            <widget class="QGroupBox" name="groupBox_6">
+            <property name="styleSheet">
+             <string notr="true">QGroupBox#groupBox_6 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_6::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+            </property>
             <property name="title">
              <string>Dispersion-Free Steering</string>
             </property>
@@ -197,12 +239,6 @@
                  </item>
                 </layout>
                </item>
-               <item>
-                <layout class="QHBoxLayout" name="horizontalLayout_17"/>
-               </item>
-               <item>
-                <layout class="QHBoxLayout" name="horizontalLayout_18"/>
-               </item>
               </layout>
              </item>
             </layout>
@@ -210,6 +246,20 @@
           </item>
           <item>
            <widget class="QGroupBox" name="groupBox_7">
+            <property name="styleSheet">
+             <string notr="true">QGroupBox#groupBox_7 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_7::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+            </property>
             <property name="title">
              <string>Wakefield-Free Steering</string>
             </property>
@@ -260,17 +310,25 @@
                </item>
               </layout>
              </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_20"/>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_21"/>
-             </item>
             </layout>
            </widget>
           </item>
           <item>
            <widget class="QGroupBox" name="groupBox_9">
+            <property name="styleSheet">
+             <string notr="true">QGroupBox#groupBox_9 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_9::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+            </property>
             <property name="title">
              <string>Computation</string>
             </property>
@@ -315,6 +373,20 @@
                 <height>750</height>
                </size>
               </property>
+              <property name="styleSheet">
+               <string notr="true">QGroupBox#groupBox_5 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_5::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+              </property>
               <property name="title">
                <string>Correctors</string>
               </property>
@@ -353,6 +425,20 @@
                 <width>16777215</width>
                 <height>750</height>
                </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QGroupBox#groupBox_8 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_8::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
               </property>
               <property name="title">
                <string>BPMs (click twice to adjust weights)</string>
@@ -394,6 +480,20 @@
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QGroupBox#groupBox_10 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_10::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
             </property>
             <property name="title">
              <string>Compute Response Matrix</string>
@@ -481,6 +581,20 @@
            <layout class="QVBoxLayout" name="plots_column_layout">
             <item>
              <widget class="QGroupBox" name="groupBox_2">
+              <property name="styleSheet">
+               <string notr="true">QGroupBox#groupBox_2 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_2::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+              </property>
               <property name="title">
                <string>Trajectory (Residual to response matrix reference)</string>
               </property>
@@ -506,6 +620,20 @@
             </item>
             <item>
              <widget class="QGroupBox" name="groupBox_3">
+              <property name="styleSheet">
+               <string notr="true">QGroupBox#groupBox_3 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_3::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+              </property>
               <property name="title">
                <string>Dispersion (Residual to response matrix reference)</string>
               </property>
@@ -531,6 +659,20 @@
             </item>
             <item>
              <widget class="QGroupBox" name="groupBox_4">
+              <property name="styleSheet">
+               <string notr="true">QGroupBox#groupBox_4 {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox_4::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+              </property>
               <property name="title">
                <string>Wakefield (Residual to response matrix reference)</string>
               </property>
@@ -600,9 +742,6 @@
              </property>
              <item>
               <widget class="QGroupBox" name="options_wrapper_group">
-               <property name="title">
-                <string>Options</string>
-               </property>
                <property name="styleSheet">
                 <string notr="true">QGroupBox#options_wrapper_group {
     background-color: rgb(245, 245, 245);
@@ -616,6 +755,9 @@ QGroupBox#options_wrapper_group::title {
     left: 10px;
     padding: 0 4px 0 4px;
 }</string>
+               </property>
+               <property name="title">
+                <string>Options</string>
                </property>
                <layout class="QVBoxLayout" name="options_wrapper_layout">
                 <property name="spacing">
@@ -635,6 +777,20 @@ QGroupBox#options_wrapper_group::title {
                 </property>
                 <item>
                  <widget class="QGroupBox" name="groupBox">
+                  <property name="styleSheet">
+                   <string notr="true">QGroupBox#groupBox {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#groupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+                  </property>
                   <property name="title">
                    <string>Settings</string>
                   </property>
@@ -989,6 +1145,20 @@ QToolButton#beta_tooltip:hover {
                 </item>
                 <item>
                  <widget class="QGroupBox" name="correction_controls_group">
+                  <property name="styleSheet">
+                   <string notr="true">QGroupBox#correction_controls_group {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#correction_controls_group::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+                  </property>
                   <property name="title">
                    <string>Controls</string>
                   </property>
@@ -1056,6 +1226,20 @@ QToolButton#beta_tooltip:hover {
                    </item>
                    <item>
                     <widget class="QGroupBox" name="current_groupbox_right">
+                     <property name="styleSheet">
+                      <string notr="true">QGroupBox#current_groupbox_right {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#current_groupbox_right::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+                     </property>
                      <property name="title">
                       <string>Max strength (gauss*m)</string>
                      </property>
@@ -1113,100 +1297,96 @@ QToolButton#beta_tooltip:hover {
                   </layout>
                  </widget>
                 </item>
-
-
-<item>
- <spacer name="logo_top_spacer">
-  <property name="orientation">
-   <enum>Qt::Vertical</enum>
-  </property>
-  <property name="sizeType">
-   <enum>QSizePolicy::Expanding</enum>
-  </property>
-  <property name="sizeHint" stdset="0">
-   <size>
-    <width>20</width>
-    <height>40</height>
-   </size>
-  </property>
- </spacer>
-</item>
-<item>
- <layout class="QHBoxLayout" name="logo_center_layout">
-  <item>
-   <spacer name="logo_left_spacer">
-    <property name="orientation">
-     <enum>Qt::Horizontal</enum>
-    </property>
-    <property name="sizeHint" stdset="0">
-     <size>
-      <width>40</width>
-      <height>20</height>
-     </size>
-    </property>
-   </spacer>
-  </item>
-  <item>
-   <widget class="QLabel" name="logo_label">
-    <property name="minimumSize">
-     <size>
-      <width>120</width>
-      <height>80</height>
-     </size>
-    </property>
-    <property name="maximumSize">
-     <size>
-      <width>180</width>
-      <height>60</height>
-     </size>
-    </property>
-    <property name="layoutDirection">
-     <enum>Qt::LeftToRight</enum>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-    <property name="indent">
-     <number>0</number>
-    </property>
-   </widget>
-  </item>
-  <item>
-   <spacer name="logo_right_spacer">
-    <property name="orientation">
-     <enum>Qt::Horizontal</enum>
-    </property>
-    <property name="sizeHint" stdset="0">
-     <size>
-      <width>40</width>
-      <height>20</height>
-     </size>
-    </property>
-   </spacer>
-  </item>
- </layout>
-</item>
-<item>
- <spacer name="controls_vertical_spacer">
-  <property name="orientation">
-   <enum>Qt::Vertical</enum>
-  </property>
-  <property name="sizeType">
-   <enum>QSizePolicy::Expanding</enum>
-  </property>
-  <property name="sizeHint" stdset="0">
-   <size>
-    <width>20</width>
-    <height>40</height>
-   </size>
-  </property>
- </spacer>
-</item>
-
-
+                <item>
+                 <spacer name="logo_top_spacer">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeType">
+                   <enum>QSizePolicy::Expanding</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>40</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="logo_center_layout">
+                  <item>
+                   <spacer name="logo_left_spacer">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="logo_label">
+                    <property name="minimumSize">
+                     <size>
+                      <width>120</width>
+                      <height>80</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>180</width>
+                      <height>60</height>
+                     </size>
+                    </property>
+                    <property name="layoutDirection">
+                     <enum>Qt::LeftToRight</enum>
+                    </property>
+                    <property name="text">
+                     <string/>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                    <property name="indent">
+                     <number>0</number>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="logo_right_spacer">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <spacer name="controls_vertical_spacer">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeType">
+                   <enum>QSizePolicy::Expanding</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>40</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
                </layout>
               </widget>
              </item>

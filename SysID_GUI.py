@@ -329,13 +329,14 @@ class MainWindow(QMainWindow, SaveOrLoad):
         if pixmap.isNull():
             return
 
-        scaled = pixmap.scaledToHeight(56, transform_mode)
+        scaled = pixmap.scaledToHeight(80, transform_mode)
         self.logo_label.setPixmap(scaled)
         self.logo_label.setToolTip(logo_path)
 
     def _set_directory_edit_enabled(self, enabled):
         self.working_directory_input.setEnabled(enabled)
         self.working_directory_dialog.setEnabled(enabled)
+
 
     def _current_measuring_mode(self):
         if self.mode == Mode.All:

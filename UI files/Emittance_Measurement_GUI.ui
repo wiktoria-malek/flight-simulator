@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1612</width>
-    <height>847</height>
+    <width>1604</width>
+    <height>792</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,12 +17,40 @@
    <layout class="QHBoxLayout" name="horizontalLayout">
     <item>
      <widget class="QGroupBox" name="leftGroup">
+      <property name="styleSheet">
+       <string notr="true">QGroupBox#leftGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#leftGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+      </property>
       <property name="title">
        <string/>
       </property>
       <layout class="QVBoxLayout" name="leftVBox">
        <item>
         <widget class="QGroupBox" name="devicesGroup">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox#devicesGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#devicesGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+         </property>
          <property name="title">
           <string>Devices</string>
          </property>
@@ -31,6 +59,20 @@
            <layout class="QHBoxLayout" name="devicesHBox">
             <item>
              <widget class="QGroupBox" name="quadrupolesGroup">
+              <property name="styleSheet">
+               <string notr="true">QGroupBox#quadrupolesGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#quadrupolesGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+              </property>
               <property name="title">
                <string>Quadrupoles</string>
               </property>
@@ -54,6 +96,20 @@
             </item>
             <item>
              <widget class="QGroupBox" name="screensGroup">
+              <property name="styleSheet">
+               <string notr="true">QGroupBox#screensGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#screensGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+              </property>
               <property name="title">
                <string>Screens</string>
               </property>
@@ -82,6 +138,20 @@
        </item>
        <item>
         <widget class="QGroupBox" name="scanGroup">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox#scanGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#scanGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+         </property>
          <property name="title">
           <string>Quadrupole scan settings</string>
          </property>
@@ -177,6 +247,20 @@
        </item>
        <item>
         <widget class="QGroupBox" name="actionsGroup">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox#actionsGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#actionsGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+         </property>
          <property name="title">
           <string>Session</string>
          </property>
@@ -223,6 +307,32 @@
     </item>
     <item>
      <widget class="QTabWidget" name="tabs">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>200</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>1000</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QTabWidget#tabs {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QTabWidget#tabs::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+      </property>
       <property name="currentIndex">
        <number>0</number>
       </property>
@@ -307,6 +417,20 @@ QGroupBox#fit_results_wrapper_group::title {
              </property>
              <item>
               <widget class="QGroupBox" name="fit_results_group">
+               <property name="styleSheet">
+                <string notr="true">QGroupBox#fit_results_group {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#fit_results_group::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+               </property>
                <property name="title">
                 <string>Fit results</string>
                </property>
@@ -727,7 +851,7 @@ QToolButton#ToolTip_opt:hover {
              <string notr="true">background-color: red; color: white;</string>
             </property>
             <property name="text">
-             <string>START OPTIMIZATION</string>
+             <string>START FITTING EMITTANCE AND TWISS PARAMETERS</string>
             </property>
            </widget>
           </item>
@@ -737,7 +861,7 @@ QToolButton#ToolTip_opt:hover {
              <string notr="true">background-color: green; color: white;</string>
             </property>
             <property name="text">
-             <string>STOP OPTIMIZATION</string>
+             <string>STOP FITTING EMITTANCE AND TWISS PARAMETERS</string>
             </property>
            </widget>
           </item>
@@ -746,7 +870,7 @@ QToolButton#ToolTip_opt:hover {
         <item>
          <layout class="QHBoxLayout" name="pause_and_resume_HBox">
           <item>
-           <widget class="QPushButton" name="stop_button">
+           <widget class="QPushButton" name="pause_button">
             <property name="text">
              <string>Pause</string>
             </property>

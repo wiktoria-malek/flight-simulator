@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 import time, math
-from Backend.LogConsole_BBA import LogConsole
+from Backend.LogConsole import LogConsole
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 from epics import PV, ca

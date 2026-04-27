@@ -1,7 +1,7 @@
 import RF_Track as rft
 import numpy as np
 import time, os, re, copy
-from Backend.LogConsole_BBA import LogConsole
+from Backend.LogConsole import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
@@ -864,3 +864,180 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
                 strengths[2] = complex(float(value), 0.0)
                 element.set_strengths(strengths)
         self.__track_bunch()
+
+    def _get_optics_from_twiss_file(self,names=None):
+
+        quad_specifics = [
+            # name, LQ, pos_quad, strength
+            ('QA1L', 0.132, 1.356, 1.1835109401030304),
+            ('QA2L', 0.182, 1.703, -9.264115425347802),
+            ('QA3L', 0.182, 2.128, 7.601904693021979),
+            ('QA4L', 0.182, 4.774, -8.309547432909891),
+            ('QA5L', 0.132, 5.171, 10.368563413319697),
+            ('QD1L', 0.132, 9.548499999999997, -6.394111798396212),
+            ('QF1L', 0.182, 9.948499999999996, 8.468997394013186),
+            ('QD2L', 0.132, 10.348499999999994, -6.415397177518939),
+            ('QF2L', 0.125, 14.143499999999994, 4.6362775786152),
+            ('QD3L', 0.125, 14.894999999999994, -4.7315774972976),
+            ('QF3L', 0.125, 18.986999999999995, 5.8107864654864),
+            ('QD4L', 0.125, 19.73699999999999, -5.1676165334704),
+            ('QF4L', 0.125, 23.84099999999999, 7.6235715827536),
+            ('QD5L', 0.125, 24.491999999999987, -6.7358412875152),
+            ('QF5L', 0.125, 28.486499999999985, 7.6898162668192),
+            ('QD6L', 0.125, 29.13649999999998, -6.8687757100048),
+            ('QF6L', 0.125, 36.74699999999999, 4.4820119116136),
+            ('QD7L', 0.125, 37.397, -4.4944090948816),
+            ('QS5L', 0.125, 45.298760000000016, 0.9884761807816),
+            ('QS6L', 0.125, 53.137260000000026, -1.1188273572312),
+            ('QS7L', 0.125, 60.66226000000003, 0.8013307329232),
+            ('QS8L', 0.125, 71.47405000000003, -0.522816766032),
+            ('QM1L', 0.175, 78.59605000000002, 1.4909714285714286),
+            ('QM2L', 0.325, 79.61655000000002, -1.894584615384615),
+            ('QM3L', 0.175, 81.59355000000002, 3.646114285714286),
+        ]
+
+        cavity_specifics = [
+            ('CA1L', 7.3835, 'TW'),
+            ('CA2L', 12.142714999999995, 'TW'),
+            ('CA3L', 17.006999999999994, 'TW'),
+            ('CA4L', 21.87099999999999, 'TW'),
+            ('CB1L', 26.520499999999988, 'TWB1'),
+            ('CA5L', 31.180499999999984, 'TW'),
+            ('CA6L', 34.78399999999999, 'TW'),
+            ('CA7L', 39.43000000000001, 'TW'),
+            ('CA8L', 43.03397000000001, 'TW'),
+            ('CA9L', 47.26726000000002, 'TW'),
+            ('CA10L', 50.872260000000026, 'TW'),
+            ('CA11L', 55.10826000000003, 'TW'),
+            ('CA12L', 58.397760000000034, 'TW'),
+            ('CB2L', 62.63276000000003, 'TWB2'),
+            ('CA13L', 65.91976000000003, 'TW'),
+            ('CA14L', 69.20926000000003, 'TW'),
+            ('CA15L', 73.44305000000003, 'TW'),
+            ('CA16L', 76.73305000000002, 'TW'),
+        ]
+
+        tw = self._make_tw('tw')
+        twb1 = self._make_tw('twb1')
+        twb2 = self._make_tw('twb2')
+        cavity_length = {
+            'TW': float(tw.get_length()),
+            'TWB1': float(twb1.get_length()),
+            'TWB2': float(twb2.get_length()),
+        }
+        combined = {}
+
+        for name, length, pos, k1 in quad_specifics:
+            combined[name] = {
+                'S': float(pos),
+                'betx': np.nan,
+                'alfx': np.nan,
+                'bety': np.nan,
+                'alfy': np.nan,
+                'mux': np.nan,
+                'muy': np.nan,
+                'L': float(length),
+            }
+
+        for name, pos, ctype in cavity_specifics:
+            combined[name] = {
+                'S': float(pos),
+                'betx': np.nan,
+                'alfx': np.nan,
+                'bety': np.nan,
+                'alfy': np.nan,
+                'mux': np.nan,
+                'muy': np.nan,
+                'L': float(cavity_length[ctype]),
+            }
+
+        combined['IPZL'] = {
+            'S': 83.40465000000002,
+            'betx': np.nan,
+            'alfx': np.nan,
+            'bety': np.nan,
+            'alfy': np.nan,
+            'mux': np.nan,
+            'muy': np.nan,
+            'L': 0.0,
+        }
+
+        with open(self.twiss_path, "r") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
+        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
+        columns = lines[star_symbol].lstrip("*").split()
+
+        cols=["NAME", "S" , "BETX" , "ALFX" , "BETY" , "ALFY" , "MUX" , "MUY" , "L"]
+        index={}
+        for col in cols:
+            try:
+                index[col]=columns.index(col)
+            except ValueError:
+                raise RuntimeError(f"Column {col} not found in twiss file")
+        duplicated={}
+        for line in lines[dollar_sign + 1:]:
+            data = line.split()
+            if len(data) <= max(index.values()):  # if a line has less column than needed, it is omitted
+                continue
+            name = data[index["NAME"]].strip('"')
+
+            if name not in duplicated:
+                duplicated[name]={col:[] for col in cols[1:]}
+            for col in cols[1:]:
+                try:
+                    duplicated[name][col].append(float(data[index[col]]))
+                except ValueError:
+                    duplicated[name][col].append(float("nan"))
+        endlinac_s_offset = 83.40465000000002
+
+        for name, vals in duplicated.items():
+            local_s = float(vals["S"][0]) if len(vals["S"]) > 0 else np.nan
+            global_s = local_s + endlinac_s_offset if np.isfinite(local_s) else np.nan
+
+            combined[name] = {
+                'S': global_s,
+                'betx': float(vals["BETX"][0]) if len(vals["BETX"]) > 0 else np.nan,
+                'alfx': float(vals["ALFX"][0]) if len(vals["ALFX"]) > 0 else np.nan,
+                'bety': float(vals["BETY"][0]) if len(vals["BETY"]) > 0 else np.nan,
+                'alfy': float(vals["ALFY"][0]) if len(vals["ALFY"]) > 0 else np.nan,
+                'mux': float(vals["MUX"][0]) if len(vals["MUX"]) > 0 else np.nan,
+                'muy': float(vals["MUY"][0]) if len(vals["MUY"]) > 0 else np.nan,
+                'L': float(np.nansum(vals["L"])) if len(vals["L"]) > 0 else np.nan,
+            }
+
+        out_names = list(combined.keys())
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            requested = set(names)
+            out_names = [name for name in out_names if name in requested]
+
+        return {
+            "names": out_names,
+            "S": np.array([combined[name]["S"] for name in out_names], dtype=float),
+            "betx": np.array([combined[name]["betx"] for name in out_names], dtype=float),
+            "alfx": np.array([combined[name]["alfx"] for name in out_names], dtype=float),
+            "bety": np.array([combined[name]["bety"] for name in out_names], dtype=float),
+            "alfy": np.array([combined[name]["alfy"] for name in out_names], dtype=float),
+            "mux": np.array([combined[name]["mux"] for name in out_names], dtype=float),
+            "muy": np.array([combined[name]["muy"] for name in out_names], dtype=float),
+            "L": np.array([combined[name]["L"] for name in out_names], dtype=float),
+        }
+
+    def get_twiss_at_element(self,name):
+        optics=self._get_optics_from_twiss_file(name)
+        names=list(optics["names"])
+        if name not in names:
+            raise ValueError(f"Element {name} not found in optics map")
+        i=names.index(name)
+        return {
+            "name": names[i],
+            "S": float(optics["S"][i]),
+            "betx": float(optics["betx"][i]),
+            "alfx": float(optics["alfx"][i]),
+            "bety": float(optics["bety"][i]),
+            "alfy": float(optics["alfy"][i]),
+
+        }

@@ -7,6 +7,11 @@ class OptimizationStopped(Exception):
         super().__init__(message)
         self.payload = payload
 
+class OptimizationPaused(Exception):
+    def __init__(self, message="Optimization paused", payload=None):
+        super().__init__(message)
+        self.payload = payload
+
 
 class Optimization_EM:
     def __init__(self, interface, n_starts=8, rng_seed=42):
@@ -14,9 +19,16 @@ class Optimization_EM:
         self.n_starts = int(n_starts)
         self.rng = np.random.default_rng(rng_seed)
         self._stop_requested = False
+        self._pause_requested = False
         self.best_out_so_far = None
         self._last_completed_output = None
         self.print_M = True
+
+    def request_pause(self):
+        self._pause_requested = True
+
+    def clear_pause(self):
+        self._pause_requested = False
 
     def request_stop(self):
         self._stop_requested = True
@@ -25,9 +37,12 @@ class Optimization_EM:
         self._stop_requested = False
         self.best_out_so_far = None
         self._last_completed_output = None
+        self._pause_requested = False
 
-    def fit_from_session(self, session):
+    def fit_from_session(self, session, initial_guess = None):
+        was_pause_requested = bool(self._pause_requested)
         self.clear_stop()
+        self._pause_requested = was_pause_requested
         if self.print_M:
             print("Starting to fit Twiss parameters and emittance...")
         screens = list(session.get("screens", []))
@@ -52,18 +67,30 @@ class Optimization_EM:
         if sigx.shape[0] != K1_values.size:
             raise ValueError("K1_values and sigma arrays have incompatible lengths")
 
+        sigma2_template_x = np.asarray(sigx ** 2 if sigx.size else np.empty((0, len(screens))), dtype=float)
+        sigma2_template_y = np.asarray(sigy ** 2 if sigy.size else np.empty((0, len(screens))), dtype=float)
+
+        def _plane_no_solution(plane_name, sigma2_template):
+            return {
+                "emit": np.nan,
+                "beta0": np.nan,
+                "alpha0": np.nan,
+                "pred": np.full_like(sigma2_template, np.nan, dtype=float),
+                "residual_rms": np.nan,
+                "residual_mad": np.nan,
+                "residual_rms_per_screen": {screen: np.nan for screen in screens},
+                "worst_screen": None,
+                "success": False,
+                "message": f"No solution found yet for plane {plane_name}",
+                "cost": np.nan,
+                "stopped": True,
+            }
+
         fit_x = None
         fit_y = None
-
         try:
-            fit_x = self._fit_plane(
-                plane="x",
-                screens=screens,
-                quad_name=quad_name,
-                K1_values=K1_values,
-                sigma=sigx,
-                sigma_std=sigx_std,
-            )
+            fit_x = self._fit_plane(plane="x", screens=screens, quad_name=quad_name, K1_values=K1_values, sigma=sigx, sigma_std=sigx_std,
+                                    initial_guess = (initial_guess or {}).get("x") if isinstance(initial_guess, dict) else None)
 
             if self.print_M:
                 print(
@@ -75,15 +102,11 @@ class Optimization_EM:
                     f"beta0={fit_x['beta0']:.6g}, "
                     f"alpha0={fit_x['alpha0']:.6g}"
                 )
-
-            fit_y = self._fit_plane(
-                plane="y",
-                screens=screens,
-                quad_name=quad_name,
-                K1_values=K1_values,
-                sigma=sigy,
-                sigma_std=sigy_std,
-            )
+        except (OptimizationStopped, OptimizationPaused):
+            fit_x = None
+        try:
+            fit_y = self._fit_plane(plane="y", screens=screens, quad_name=quad_name, K1_values=K1_values, sigma=sigy, sigma_std=sigy_std,
+                                    initial_guess = (initial_guess or {}).get("y") if isinstance(initial_guess, dict) else None)
 
             if self.print_M:
                 print(
@@ -95,16 +118,25 @@ class Optimization_EM:
                     f"beta0={fit_y['beta0']:.6g}, "
                     f"alpha0={fit_y['alpha0']:.6g}"
                 )
+        except (OptimizationStopped, OptimizationPaused):
+            fit_y = None
 
-        except OptimizationStopped:
-            if fit_x is None or fit_y is None:
-                raise
+        if fit_x is None:
+            fit_x = _plane_no_solution("x", sigma2_template_x)
+        if fit_y is None:
+            fit_y = _plane_no_solution("y", sigma2_template_y)
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
-        emit_x_norm = gamma_rel * beta_rel * fit_x["emit"] if np.isfinite(gamma_rel) and np.isfinite(
-            beta_rel) else np.nan
-        emit_y_norm = gamma_rel * beta_rel * fit_y["emit"] if np.isfinite(gamma_rel) and np.isfinite(
-            beta_rel) else np.nan
+        emit_x_norm = (
+            gamma_rel * beta_rel * fit_x["emit"]
+            if np.isfinite(gamma_rel) and np.isfinite(beta_rel) and np.isfinite(fit_x["emit"])
+            else np.nan
+        )
+        emit_y_norm = (
+            gamma_rel * beta_rel * fit_y["emit"]
+            if np.isfinite(gamma_rel) and np.isfinite(beta_rel) and np.isfinite(fit_y["emit"])
+            else np.nan
+        )
 
         stopped = bool(fit_x.get("stopped", False) or fit_y.get("stopped", False) or self._stop_requested)
 
@@ -135,6 +167,9 @@ class Optimization_EM:
             "fit_y_residual_rms_per_screen": fit_y["residual_rms_per_screen"],
             "worst_screen_x": fit_x["worst_screen"],
             "worst_screen_y": fit_y["worst_screen"],
+            "fit_x_found": bool(np.isfinite(fit_x["emit"])),
+            "fit_y_found": bool(np.isfinite(fit_y["emit"])),
+            "paused": bool(self._pause_requested),
             "stopped": stopped,
         }
 
@@ -145,6 +180,7 @@ class Optimization_EM:
         }
         self.best_out_so_far = output
         self._last_completed_output = output
+        self._pause_requested = False
 
         if self.print_M:
             print(
@@ -154,6 +190,11 @@ class Optimization_EM:
                 f"emit_y_norm={result['emit_y_norm']:.6g}, "
                 f"fit_x_cost={result['fit_x_cost']:.6g}, "
                 f"fit_y_cost={result['fit_y_cost']:.6g}"
+            )
+            print(
+                f"Partial solution: "
+                f"fit_x_found={result['fit_x_found']}, "
+                f"fit_y_found={result['fit_y_found']}"
             )
 
         return output
@@ -197,7 +238,7 @@ class Optimization_EM:
             return (1.0, 5.0, 0.0)
         return (1.0, 5.0, 0.0)
 
-    def _fit_plane(self, plane, screens, quad_name, K1_values, sigma, sigma_std):
+    def _fit_plane(self, plane, screens, quad_name, K1_values, sigma, sigma_std, initial_guess = None):
         sigma = np.asarray(sigma, dtype=float)
         sigma_std = np.asarray(sigma_std, dtype=float)
         sigma2 = sigma ** 2
@@ -206,11 +247,11 @@ class Optimization_EM:
         nominal_emit_norm, nominal_beta0, nominal_alpha0 = self._get_nominal_guess(plane)
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
-        gb = gamma_rel * beta_rel
-        if not np.isfinite(gb) or gb <= 0:
+        beta_gamma = gamma_rel * beta_rel
+        if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")
 
-        nominal_emit_geom = float(nominal_emit_norm) / gb
+        nominal_emit_geom = float(nominal_emit_norm) / beta_gamma
         if not np.isfinite(nominal_emit_geom) or nominal_emit_geom <= 0:
             nominal_emit_geom = 1e-6
 
@@ -223,17 +264,25 @@ class Optimization_EM:
             beta0 = np.exp(log_beta0)
             return emit, beta0, alpha0
 
-        def predict_raw(p):
+        def predict_raw(p, allow_stop = True):
             emit, beta0, alpha0 = unpack(p)
-            pred_sigma = self.interface.predict_emittance_scan_response(
-                plane=plane,
-                quad_name=quad_name,
-                screens=screens,
-                K1_values=K1_values,
-                emit=emit,
-                beta0=beta0,
-                alpha0=alpha0,
-            )
+            try:
+                pred_sigma = self.interface.predict_emittance_scan_response(
+                    plane=plane,
+                    quad_name=quad_name,
+                    screens=screens,
+                    K1_values=K1_values,
+                    emit=emit,
+                    beta0=beta0,
+                    alpha0=alpha0,
+                    stop_checker=(lambda: self._stop_requested or self._pause_requested) if allow_stop else None,
+                )
+            except RuntimeError as e:
+                if str(e) == "__OPTIMIZATION_STOP__":
+                    raise OptimizationStopped("Optimization stopped.")
+                # elif str(e) == "__OPTIMIZATION_PAUSED__":
+                #     raise OptimizationPaused("Optimization paused.")
+                raise
             pred_sigma = np.asarray(pred_sigma, dtype=float)
             if pred_sigma.shape != sigma.shape:
                 raise RuntimeError(
@@ -244,6 +293,8 @@ class Optimization_EM:
         def predict(p):
             if self._stop_requested:
                 raise OptimizationStopped("Optimization stopped.")
+            if self._pause_requested:
+                raise OptimizationPaused("Optimization paused.")
             return predict_raw(p)
 
         valid = np.isfinite(sigma2) & np.isfinite(sigma2_err) & (sigma2_err > 0)
@@ -251,23 +302,56 @@ class Optimization_EM:
         def residuals(p):
             if self._stop_requested:
                 raise OptimizationStopped("Optimization stopped.")
+            if self._pause_requested:
+                raise OptimizationPaused("Optimization paused.")
             pred2 = predict(p)
             data_res = (pred2 - sigma2) / sigma2_err
             return np.asarray(data_res[valid].ravel(), dtype=float)
 
+        last_emit_geom = nominal_emit_geom
+        last_beta0 = max(float(nominal_beta0), 1e-8)
+        last_alpha0 = float(nominal_alpha0)
+
+        if isinstance(initial_guess, dict) and bool(initial_guess.get("found", False)):
+            try:
+                last_emit_norm = float(initial_guess.get("emit_norm"))
+                last_beta0_cand = float(initial_guess.get("beta0"))
+                last_alpha0_cand = float(initial_guess.get("alpha0"))
+            except Exception:
+                last_emit_norm = np.nan
+                last_beta0_cand = np.nan
+                last_alpha0_cand = np.nan
+
+            if np.isfinite(last_emit_norm) and last_emit_norm > 0 and np.isfinite(beta_gamma) and beta_gamma > 0:
+                last_emit_geom = max(last_emit_norm / beta_gamma, 1e-10)
+
+            if np.isfinite(last_beta0_cand) and last_beta0_cand > 0:
+                last_beta0 = max(last_beta0_cand, 1e-8)
+
+            if np.isfinite(last_alpha0_cand):
+                last_alpha0 = last_alpha0_cand
+
+            if self.print_M:
+                print(
+                    f"Plane {plane}: resuming fitting, starting from last values before pausing. "
+                    f"emit_norm={last_emit_norm:.6g}, "
+                    f"beta0={last_beta0:.6g}, "
+                    f"alpha0={last_alpha0:.6g}"
+                )
+
         starts = [
             np.array([
-                np.log(nominal_emit_geom),
-                np.log(max(float(nominal_beta0), 1e-8)),
-                float(nominal_alpha0),
+                np.log(last_emit_geom),
+                np.log(last_beta0),
+                float(last_alpha0),
             ], dtype=float)
         ]
 
         for _ in range(self.n_starts - 1):
             starts.append(np.array([
-                np.log(nominal_emit_geom) + self.rng.normal(0.0, 0.8),
-                np.log(max(float(nominal_beta0), 1e-8)) + self.rng.normal(0.0, 0.5),
-                float(nominal_alpha0) + self.rng.normal(0.0, 1.0),
+                np.log(last_emit_geom) + self.rng.normal(0.0, 0.8),
+                np.log(last_beta0) + self.rng.normal(0.0, 0.5),
+                float(last_alpha0) + self.rng.normal(0.0, 1.0),
             ], dtype=float))
 
         lower = np.array([np.log(1e-10), np.log(1e-4), -10.0], dtype=float)
@@ -278,15 +362,22 @@ class Optimization_EM:
         stopped_during_fit = False
         completed_starts = 0
 
-        if self.print_M:
-            print(f"Plane {plane}: trying start {completed_starts + 1}/{len(starts)}")
-
         for x0 in starts:
+            if self.print_M:
+                print(f"Plane {plane}: trying start {completed_starts + 1}/{len(starts)}")
+
             if self._stop_requested:
                 if best is not None:
                     stopped_during_fit = True
                     break
-                continue
+                raise OptimizationStopped("Optimization stopped.")
+
+            if self._pause_requested:
+                if best is not None:
+                    stopped_during_fit = True
+                    break
+                raise OptimizationPaused("Optimization paused.")
+
             x0 = np.minimum(np.maximum(x0, lower + 1e-12), upper - 1e-12)
             try:
                 fit = least_squares(
@@ -312,7 +403,12 @@ class Optimization_EM:
                 if best is not None:
                     stopped_during_fit = True
                     break
-                continue
+                raise
+            except OptimizationPaused:
+                if best is not None:
+                    stopped_during_fit = True
+                    break
+                raise
 
             if fit.cost < best_cost:
                 best_cost = float(fit.cost)
@@ -335,7 +431,7 @@ class Optimization_EM:
             raise RuntimeError(f"Direct fit failed for plane {plane}")
 
         emit, beta0, alpha0 = unpack(best.x)
-        pred2 = predict_raw(best.x)
+        pred2 = predict_raw(best.x, allow_stop = False)
 
         data_res = []
         per_screen_res = {screen: [] for screen in screens}
