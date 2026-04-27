@@ -426,9 +426,11 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.result_alpha_x0.setText("-")
         self.result_beta_y0.setText("-")
         self.result_alpha_y0.setText("-")
+        self.result_reference_screen.setText("-")
 
     def _update_fit_panel(self, result):
         self.result_quad.setText(str(result["quad_name"]))
+        self.result_reference_screen.setText(result["screen0"])
 
         def fmt_value(value, suffix=""): # formats numbers to text
             try:
@@ -445,6 +447,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0")))
         self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), " m"))
         self.result_alpha_y0.setText(fmt_value(result.get("alpha_y0")))
+        self.result_reference_screen.setText(result["screen0"])
 
     def _reset_canvas(self):
         fig = self.canvas.figure
