@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import median_abs_deviation
+from scipy.optimize import minimize
 import pandas as pd
 from xopt import Xopt
 from xopt.vocs import VOCS, select_best
@@ -26,8 +27,13 @@ class Optimization_EM:
         self.best_out_so_far = None
         self._last_completed_output = None
         self.print_M = True
-        self.xopt_initial_points = max(3, int(n_starts))
+        self.xopt_initial_points = max(8, int(n_starts))
         self.xopt_steps = max(30, 10 * int(n_starts))
+        self.xopt_local_seed_fraction = 0.25
+        self.xopt_use_global_seed = True
+        self.xopt_local_alpha_sigma = 0.8
+        self.xopt_local_refine = False
+        self.xopt_local_refine_maxiter = 25
 
     def request_pause(self):
         self._pause_requested = True
@@ -61,8 +67,8 @@ class Optimization_EM:
 
         if not quad_name:
             raise ValueError("Session does not contain quad_name")
-        if len(screens) < 2:
-            raise ValueError("At least two screens are required")
+        if len(screens) < 1:
+            raise ValueError("At least one screen is required")
         if K1_values.size == 0:
             raise ValueError("Session does not contain K1_values")
         if sigx.ndim != 2 or sigy.ndim != 2:
@@ -224,32 +230,13 @@ class Optimization_EM:
 
         return sigma2_err
 
-    def _get_nominal_guess(self, plane):
-        if hasattr(self.interface, "get_nominal_beam_twiss"):
-            tw = self.interface.get_nominal_beam_twiss()
-            if plane == "x":
-                return (
-                    tw["emit_x_norm"],
-                    tw["beta_x"],
-                    tw["alpha_x"],
-                )
-            return (
-                tw["emit_y_norm"],
-                tw["beta_y"],
-                tw["alpha_y"],
-            )
-
-        if plane == "x":
-            return (1.0, 5.0, 0.0)
-        return (1.0, 5.0, 0.0)
-
     def _fit_plane(self, plane, screens, quad_name, K1_values, sigma, sigma_std, initial_guess = None):
         sigma = np.asarray(sigma, dtype=float)
         sigma_std = np.asarray(sigma_std, dtype=float)
         sigma2 = sigma ** 2
         sigma2_err = self._safe_sigma2_errors(sigma, sigma_std)
 
-        nominal_emit_norm, nominal_beta0, nominal_alpha0 = self._get_nominal_guess(plane)
+        nominal_emit_norm, nominal_beta0, nominal_alpha0 = 1.0, 1.0, 0.0
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
         beta_gamma = gamma_rel * beta_rel
@@ -321,6 +308,10 @@ class Optimization_EM:
             It compares how well a scan is predicting a model, how much it differs from data and
             minimizes f, so that it's as small as possible.
             '''
+            if allow_stop and (self._stop_requested or self._pause_requested):
+                if self._pause_requested:
+                    raise OptimizationPaused("Optimization paused.")
+                raise OptimizationStopped("Optimization stopped.")
             pred2 = predict_raw(emit_norm, beta0, alpha0, allow_stop = allow_stop)
             data_res = (pred2 - sigma2) / sigma2_err # predicted - measured / error^2
             res = np.asarray(data_res[valid].ravel(), dtype=float) # the better the match, the smaller the number
@@ -359,15 +350,14 @@ class Optimization_EM:
                     f"alpha0={last_alpha0:.6g}"
                 )
 
-        emit_low = max(1e-5, min(last_emit_norm, nominal_emit_norm) * 0.05) # minimal = 1e-5
-        emit_high = max(emit_low * 10.0, max(last_emit_norm, nominal_emit_norm) * 20.0)
-
-        beta_low = max(1e-4, min(last_beta0, nominal_beta0) * 0.05)
-        beta_high = max(beta_low * 10.0, max(last_beta0, nominal_beta0) * 20.0)
-
-        alpha_span = max(10.0, abs(last_alpha0), abs(nominal_alpha0))
-        alpha_low = float(last_alpha0 - 2.0 * alpha_span)
-        alpha_high = float(last_alpha0 + 2.0 * alpha_span)
+        if plane == "x":
+            emit_low, emit_high = 0.5, 12.0
+            beta_low, beta_high = 1.0, 15.0
+            alpha_low, alpha_high = -5.0, 5.0
+        else:
+            emit_low, emit_high = 0.005, 0.2
+            beta_low, beta_high = 0.5, 8.0
+            alpha_low, alpha_high = -5.0, 5.0
 
         vocs = VOCS( # degrees of freedom
             variables = {
@@ -407,22 +397,68 @@ class Optimization_EM:
         generator = ExpectedImprovementGenerator(vocs = vocs) # how to choose the next point
         X = Xopt(generator = generator, evaluator = evaluator, vocs = vocs)
 
-        seeds = [
-            {
+        seeds = []
+
+
+        base_seed = {
                 "emit_norm" : float(np.clip(last_emit_norm, emit_low, emit_high)),
                 "beta0" : float(np.clip(last_beta0, beta_low, beta_high)),
                 "alpha0" : float(np.clip(last_alpha0, alpha_low, alpha_high)),
-            }
-        ]
+                    }
 
-        for _ in range(self.xopt_initial_points - 1):
-            seeds.append(
-                {
-                    "emit_norm": float(np.clip(last_emit_norm * np.exp(self.rng.normal(0.0, 0.6)), emit_low, emit_high)),
-                    "beta0": float(np.clip(last_beta0 * np.exp(self.rng.normal(0.0, 0.4)), beta_low, beta_high)),
-                    "alpha0": float(np.clip(last_alpha0 + self.rng.normal(0.0, 1.0), alpha_low, alpha_high)),
-                }
+
+        seeds.append(base_seed)
+        total_initial = max(1, int(self.xopt_initial_points))
+        remaining = max(0, total_initial - 1)
+
+        n_local = int(round(remaining * float(self.xopt_local_seed_fraction)))
+        n_local = max(0, min(n_local, remaining))
+        n_global = remaining - n_local
+
+        def _add_seed(guess):
+            seeds.append({
+                "emit_norm": float(np.clip(guess["emit_norm"], emit_low, emit_high)),
+                "beta0": float(np.clip(guess["beta0"], beta_low, beta_high)),
+                "alpha0": float(np.clip(guess["alpha0"], alpha_low, alpha_high)),
+            })
+
+        for _ in range(n_local): # a few local seeds around current guess / resume point
+            _add_seed({
+                "emit_norm": last_emit_norm * np.exp(self.rng.normal(0.0, 0.6)),
+                "beta0": last_beta0 * np.exp(self.rng.normal(0.0, 0.4)),
+                "alpha0": last_alpha0 + self.rng.normal(0.0, float(self.xopt_local_alpha_sigma)),
+            })
+
+        if self.xopt_use_global_seed and n_global > 0: # one global solution near the middle of the bounds
+            global_seed = {
+                "emit_norm": float(np.sqrt(emit_low * emit_high)),
+                "beta0": float(np.sqrt(beta_low * beta_high)),
+                "alpha0": float(0.5 * (alpha_low + alpha_high)),
+            }
+            _add_seed(global_seed)
+            n_global -= 1
+
+        for _ in range(n_global):
+            _add_seed({
+                "emit_norm": float(np.exp(self.rng.uniform(np.log(emit_low), np.log(emit_high)))),
+                "beta0": float(np.exp(self.rng.uniform(np.log(beta_low), np.log(beta_high)))),
+                "alpha0": float(self.rng.uniform(alpha_low, alpha_high)),
+            })
+
+        if self.print_M:
+            print(
+                f"Plane {plane}: initial seeds -> total={len(seeds)}, "
+                f"local={n_local}, global={max(0, len(seeds) - 1 - n_local)}, "
+                f"base=1"
             )
+
+        def _row_to_vector(row):
+            return np.array([
+                float(row["emit_norm"]),
+                float(row["beta0"]),
+                float(row["alpha0"]),
+            ], dtype=float)
+
 
         best_row = None # from X.data
         best_cost = np.inf
@@ -494,6 +530,53 @@ class Optimization_EM:
             else:
                 raise
 
+        if self.xopt_local_refine and best_row is not None and not stopped_during_fit:
+            x0 = _row_to_vector(best_row)
+            local_bounds = [(emit_low, emit_high), (beta_low, beta_high), (alpha_low, alpha_high)]
+
+            def _local_objective(x):
+                if self._stop_requested or self._pause_requested:
+                    if self._pause_requested:
+                        raise OptimizationPaused("Optimization paused.")
+                    raise OptimizationStopped("Optimization stopped.")
+                try:
+                    f, _ = compute_cost(float(x[0]), float(x[1]), float(x[2]), allow_stop=True)
+                except (OptimizationStopped, OptimizationPaused):
+                    raise
+                except Exception:
+                    return 1e30
+                if not np.isfinite(f):
+                    return 1e30
+                return float(f)
+
+            try:
+                local_fit = minimize(_local_objective, x0, method="Powell", bounds=local_bounds, options={"maxiter": int(self.xopt_local_refine_maxiter), "disp": False})
+                local_x = np.asarray(local_fit.x, dtype=float)
+                local_cost = float(_local_objective(local_x))
+
+                if np.isfinite(local_cost) and local_cost < best_cost:
+                    best_cost = local_cost
+                    best_row = pd.Series(
+                        {
+                            "emit_norm": float(local_x[0]),
+                            "beta0": float(local_x[1]),
+                            "alpha0": float(local_x[2]),
+                            "f": float(local_cost),
+                        }
+                    )
+                    if self.print_M:
+                        print(
+                            f"Plane {plane}: local refinement improved best to cost={best_cost:.6g}, "
+                            f"emit_norm={float(local_x[0]):.6g}, "
+                            f"beta0={float(local_x[1]):.6g}, "
+                            f"alpha0={float(local_x[2]):.6g}"
+                        )
+            except Exception(OptimizationStopped, OptimizationPaused):
+                raise
+            except Exception as e:
+                if self.print_M:
+                    print(f"Plane {plane}: local refinement failed: {e}")
+
         if self.print_M:
             print(
                 f"Plane {plane}: Xopt finished."
@@ -509,7 +592,7 @@ class Optimization_EM:
         alpha0_best = float(best_row["alpha0"])
         emit_geom_best = max(emit_norm_best / beta_gamma, 1e-12)
 
-        pred2 = predict_raw(emit_norm_best, beta0_best, alpha0_best, allow_stop = False)
+        pred2 = predict_raw(emit_norm_best, beta0_best, alpha0_best, allow_stop = True)
         data_res = []
         per_screen_res = {screen: [] for screen in screens}
 

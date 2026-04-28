@@ -40,17 +40,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.__track_bunch()
         self._saved_sextupoles_state = None
 
-
-    def get_nominal_beam_twiss(self): # initial guess for optimizer
-        return {
-            "emit_x_norm": 5.2,
-            "emit_y_norm": 0.03,
-            "beta_x": 6.848560987,
-            "beta_y": 2.935758992,
-            "alpha_x": 1.108024744,
-            "alpha_y": -1.907222942,
-        }
-
     def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
         with open(self.twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]

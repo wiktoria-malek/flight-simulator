@@ -23,6 +23,97 @@ from scipy.optimize import least_squares
 
 class QuadrupoleScan_EM:
     def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, bpms=None, reference_screen=None, progress_callback=None):
+        if isinstance(quad_name, str):
+            quad_names = [quad_name]
+        else:
+            quad_names = list(quad_name)
+        if len(quad_names) == 0:
+            raise ValueError("At least one quadrupole must be provided")
+
+        if len(quad_names) == 1:
+            return self._run_single_scan(quad_name=quad_names[0],
+                                        screens=screens,
+                                         delta_min=delta_min,
+                                         delta_max=delta_max,
+                                         steps=steps,
+                                         nshots=nshots,
+                                         bpms=bpms,
+                                         reference_screen=reference_screen,
+                                         progress_callback=progress_callback)
+        per_quad_sessions = []
+        cancelled = False
+        skipped_quadrupoles = []
+        completed_quadrupoles = []
+
+        total_quads = len(quad_names)
+        for quad_idx, quad_name in enumerate(quad_names):
+            if getattr(self, "_scan_stop_requested", False) or getattr(self, "_cancel", False):
+                cancelled = True
+                break
+
+            def _wrapped_progress(session_partial, i, nsteps, _quad_idx=quad_idx, _quad_name=quad_name):
+                merged_partial = {
+                    "mode": "multi_quad_scan",
+                    "quadrupoles": quad_names,
+                    "current_quadrupole": _quad_name,
+                    "current_quadrupole_index": int(_quad_idx),
+                    "total_quadrupoles": int(total_quads),
+                    "completed_quadrupoles": list(completed_quadrupoles),
+                    "skipped_quadrupoles": list(skipped_quadrupoles),
+                    "per_quad_sessions": per_quad_sessions + [session_partial],
+                    "cancelled": bool(session_partial.get("cancelled", False)),
+                }
+                if progress_callback is not None:
+                    progress_callback(merged_partial, i, nsteps)
+
+            try:
+                single_session = self._run_single_scan(
+                    quad_name=quad_name,
+                    screens=screens,
+                    delta_min=delta_min,
+                    delta_max=delta_max,
+                    steps=steps,
+                    nshots=nshots,
+                    bpms=bpms,
+                    reference_screen=reference_screen,
+                    progress_callback=_wrapped_progress,
+                )
+            except ValueError as e:
+                msg = str(e)
+                if "zero K1_0" in msg:
+                    skipped_quadrupoles.append({"quad_name": quad_name, "reason": msg})
+                    continue
+                raise
+
+            per_quad_sessions.append(single_session)
+            completed_quadrupoles.append(quad_name)
+
+            if bool(single_session.get("cancelled", False)):
+                cancelled = True
+                break
+
+            if bool(single_session.get("cancelled", False)):
+                cancelled = True
+                break
+
+        return {
+            "mode": "multi_quad_scan",
+            "quadrupoles": quad_names,
+            "screens": list(screens),
+            "reference_screen": reference_screen if reference_screen is not None else (
+                list(screens)[0] if len(list(screens)) > 0 else None),
+            "bpms": list(bpms) if bpms is not None else None,
+            "delta_min": float(delta_min),
+            "delta_max": float(delta_max),
+            "steps": int(steps),
+            "nshots": int(nshots),
+            "per_quad_sessions": per_quad_sessions,
+            "completed_quadrupoles": list(completed_quadrupoles),
+            "skipped_quadrupoles": list(skipped_quadrupoles),
+            "cancelled": bool(cancelled),
+        }
+
+    def _run_single_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, bpms = None, reference_screen=None, progress_callback=None):
         screens = list(screens)
         if bpms is None:
             bpms = list(self.interface.get_bpms()["names"])
@@ -130,6 +221,7 @@ class QuadrupoleScan_EM:
                 })
 
                 session_partial = {
+                    "mode": "single_quad_scan",
                     "delta_min": float(delta_min),
                     "delta_max": float(delta_max),
                     "steps": int(steps),
@@ -162,6 +254,7 @@ class QuadrupoleScan_EM:
             self.interface.set_quadrupoles([quad_name], [float(K1_0)])
 
         session = {
+            "mode": "single_quad_scan",
             "delta_min": float(delta_min),
             "delta_max": float(delta_max),
             "steps": int(steps),

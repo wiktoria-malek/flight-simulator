@@ -51,38 +51,12 @@ class SPositionDelegate(QStyledItemDelegate):
             fm = painter.fontMetrics()
             s_column_width = max(fm.horizontalAdvance("S = 000.000 m"), 90)
 
-            left_rect = QRect(
-                r.left() + margin,
-                r.top(),
-                max(10, r.width() - s_column_width - 3 * margin),
-                r.height(),
-            )
-
-            right_rect = QRect(
-                r.left() + r.width() - s_column_width - margin,
-                r.top(),
-                s_column_width,
-                r.height(),
-            )
-
-            elided_name = fm.elidedText(
-                device_name,
-                Qt.TextElideMode.ElideRight,
-                max(10, left_rect.width())
-            )
-
-            painter.drawText(
-                left_rect,
-                int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
-                elided_name
-            )
-
+            left_rect = QRect(r.left() + margin, r.top(), max(10, r.width() - s_column_width - 3 * margin), r.height())
+            right_rect = QRect(r.left() + r.width() - s_column_width - margin, r.top(), s_column_width, r.height())
+            elided_name = fm.elidedText(device_name, Qt.TextElideMode.ElideRight, max(10, left_rect.width()))
+            painter.drawText(left_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), elided_name)
             if s_text:
-                painter.drawText(
-                    right_rect,
-                    int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
-                    s_text
-                )
+                painter.drawText(right_rect, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), s_text)
         finally:
             painter.restore()
 
@@ -117,150 +91,6 @@ class OptimizationWorker(QObject):
             self.done.emit()
 
 class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
-
-    def _describe_scan_quality(self):
-        if self.session is None:
-            return None
-        quality = self.session.get("scan_quality")
-        if not quality:
-            return None
-
-        best_x = quality.get("best_rel_var_x")
-        best_y = quality.get("best_rel_var_y")
-        best_screen_x = quality.get("best_screen_x")
-        best_screen_y = quality.get("best_screen_y")
-        recommendation = quality.get("recommendation", "unknown")
-
-        def fmt(v):
-            return "n/a" if v is None else f"{100.0 * float(v):.1f}%"
-
-        return (
-            f"Scan quality\n"
-            f"best x variation: {fmt(best_x)} at {best_screen_x}\n"
-            f"best y variation: {fmt(best_y)} at {best_screen_y}\n"
-            f"recommendation: {recommendation}"
-        )
-
-    def _assess_fit_quality(self, result):
-        fit_x_rms = result.get("fit_x_residual_rms")
-        fit_y_rms = result.get("fit_y_residual_rms")
-        fit_x_rms_per_screen = result.get("fit_x_residual_rms_per_screen", {})
-        fit_y_rms_per_screen = result.get("fit_y_residual_rms_per_screen", {})
-        worst_screen_x = result.get("worst_screen_x")
-        worst_screen_y = result.get("worst_screen_y")
-        emit_x = result.get("emit_x_norm")
-        emit_y = result.get("emit_y_norm")
-        beta_x = result.get("beta_x0")
-        beta_y = result.get("beta_y0")
-        alpha_x = result.get("alpha_x0")
-        alpha_y = result.get("alpha_y0")
-        beta_x_scale = result.get("beta_x_scale_vs_measured")
-        beta_y_scale = result.get("beta_y_scale_vs_measured")
-        alpha_x_offset = result.get("alpha_x_offset_vs_measured")
-        alpha_y_offset = result.get("alpha_y_offset_vs_measured")
-
-        physical = True
-        trustworthy = True
-        reasons = []
-
-        def bad(v):
-            return v is None or (not np.isfinite(float(v)))
-
-        for label, value in [
-            ("emit_x_norm", emit_x),
-            ("emit_y_norm", emit_y),
-            ("beta_x0", beta_x),
-            ("beta_y0", beta_y),
-            ("alpha_x0", alpha_x),
-            ("alpha_y0", alpha_y),
-        ]:
-            if bad(value):
-                physical = False
-                trustworthy = False
-                reasons.append(f"{label} is not finite")
-
-        if physical:
-            if emit_x <= 0 or emit_y <= 0:
-                physical = False
-                trustworthy = False
-                reasons.append("non-positive emittance")
-
-            if beta_x <= 0 or beta_y <= 0:
-                physical = False
-                trustworthy = False
-                reasons.append("non-positive beta")
-
-            if beta_x > 50.0 or beta_y > 50.0:
-                trustworthy = False
-                reasons.append("beta is very large")
-
-            if abs(alpha_x) > 5.0 or abs(alpha_y) > 5.0:
-                trustworthy = False
-                reasons.append("alpha is very large")
-
-            if emit_x > 50.0 or emit_y > 50.0:
-                trustworthy = False
-                reasons.append("emittance is very large")
-
-        for label, value in [
-            ("fit_x_residual_rms", fit_x_rms),
-            ("fit_y_residual_rms", fit_y_rms),
-            ("beta_x_scale_vs_measured", beta_x_scale),
-            ("beta_y_scale_vs_measured", beta_y_scale),
-            ("alpha_x_offset_vs_measured", alpha_x_offset),
-            ("alpha_y_offset_vs_measured", alpha_y_offset),
-        ]:
-            if bad(value):
-                trustworthy = False
-                reasons.append(f"{label} is not finite")
-
-        if not bad(fit_x_rms) and float(fit_x_rms) > 5.0:
-            trustworthy = False
-            reasons.append("x residual RMS is large")
-        if not bad(fit_y_rms) and float(fit_y_rms) > 5.0:
-            trustworthy = False
-            reasons.append("y residual RMS is large")
-
-        if worst_screen_x is not None:
-            wx = fit_x_rms_per_screen.get(worst_screen_x)
-            if wx is not None and np.isfinite(float(wx)) and float(wx) > 6.0:
-                trustworthy = False
-                reasons.append(f"worst x screen is {worst_screen_x}")
-
-        if worst_screen_y is not None:
-            wy = fit_y_rms_per_screen.get(worst_screen_y)
-            if wy is not None and np.isfinite(float(wy)) and float(wy) > 6.0:
-                trustworthy = False
-                reasons.append(f"worst y screen is {worst_screen_y}")
-
-        if not bad(beta_x_scale) and not (0.4 <= float(beta_x_scale) <= 2.5):
-            trustworthy = False
-            reasons.append("x beta scale drifted too far from measured optics")
-        if not bad(beta_y_scale) and not (0.4 <= float(beta_y_scale) <= 2.5):
-            trustworthy = False
-            reasons.append("y beta scale drifted too far from measured optics")
-
-        if not bad(alpha_x_offset) and abs(float(alpha_x_offset)) > 2.0:
-            trustworthy = False
-            reasons.append("x alpha offset is large")
-        if not bad(alpha_y_offset) and abs(float(alpha_y_offset)) > 1.0:
-            trustworthy = False
-            reasons.append("y alpha offset is large")
-
-        if physical and trustworthy:
-            status = "trusted"
-        elif physical:
-            status = "physical_but_untrusted"
-        else:
-            status = "non_physical"
-
-        return {
-            "fit_is_physical": bool(physical),
-            "fit_is_trustworthy": bool(trustworthy),
-            "fit_quality_status": status,
-            "fit_quality_reasons": reasons,
-        }
-
     def __init__(self, interface, dir_name):
         super().__init__()
         self.interface = interface
@@ -297,16 +127,21 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         screens_sorted = [name for name, _ in screen_pairs] # only names
         self._show_s_values_and_device_lists(self.quadrupoles_list, quadrupoles)
         self._show_s_values_and_device_lists(self.screens_list, screens_sorted)
+        self.show_scan_on_all_screens.toggled.connect(self._on_show_all_screens_toggled)
+        self.screen_on_plot.setEnabled(not self.show_scan_on_all_screens.isChecked())
         self.quad_on_plot.clear()
         self.quad_on_plot.addItems(quadrupoles)
         self.screen_on_plot.clear()
         self.screen_on_plot.addItems(screens_sorted)
         self.start_button_scan.clicked.connect(self._run_scan)
         self.stop_button_scan.clicked.connect(self._stop_scan)
+        self.quad_on_plot.currentIndexChanged.connect(lambda _=None: self._draw_live_scan(self.session))
+        self.screen_on_plot.currentIndexChanged.connect(lambda _=None: self._draw_live_scan(self.session))
         self._set_progress(0)
         self._clear_fit_panel()
         self._reset_canvas()
         self.screens_list.itemSelectionChanged.connect(self._screen_selection_changed)
+        self._last_selected_quadrupoles = []
         self._filter_quadrupoles_in_gui()
         self.clear_plots_button.clicked.connect(self._clear_plots)
         self.log_console=None
@@ -316,6 +151,48 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self._scan_pause_requested = False
         self._scan_is_paused = False
         self._optimization_paused = False
+        self._last_scan_status = None
+
+    def _log_scan_status(self, session_partial, current_step, total_steps):
+        if not isinstance(session_partial, dict):
+            return
+
+        if session_partial.get("mode") == "multi_quad_scan":
+            current_quad = str(session_partial.get("current_quadrupole", "-")).strip() or "-"
+            quad_idx = int(session_partial.get("current_quadrupole_index", 0)) + 1
+            total_quads = int(session_partial.get("total_quadrupoles", 0))
+            completed = list(session_partial.get("completed_quadrupoles", []))
+            skipped = list(session_partial.get("skipped_quadrupoles", []))
+            skipped_names = [str(item.get("quad_name", "")).strip() for item in skipped if isinstance(item, dict)]
+
+            status = ("multi", current_quad, quad_idx, int(current_step), int(total_steps), tuple(completed), tuple(skipped_names))
+            if status == self._last_scan_status:
+                return
+            self._last_scan_status = status
+            finished_msg = ", ".join(completed) if completed else "none yet"
+            skipped_msg = ", ".join(skipped_names) if skipped_names else "none"
+
+            self.log(
+                f"Scanning quadrupole {quad_idx}/{total_quads}: {current_quad} | "
+                f"step {int(current_step) + 1}/{int(total_steps)} | "
+                f"finished: {finished_msg} | skipped, because of K1_0 = 0: {skipped_msg}"
+            )
+
+        else:
+            quad_name = str(session_partial.get("quad_name", "-")).strip() or "-"
+            status = ("single", quad_name, int(current_step), int(total_steps))
+            if status == self._last_scan_status:
+                return
+            self._last_scan_status = status
+            self.log(f"Scanning quadrupole {quad_name} | step {int(current_step) + 1}/{int(total_steps)}")
+
+
+
+
+
+    def _on_show_all_screens_toggled(self, checked):
+        self.screen_on_plot.setEnabled(not bool(checked))
+        self._draw_live_scan(self.session)
 
     def _pause_task(self):
         if self._is_scanning:
@@ -459,28 +336,46 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         ax.grid(True, alpha=0.3)
         self.canvas.draw()
 
-    def _get_sorted_selected_screens(self):
-        selected = []
-        for item in self.screens_list.selectedItems():
-            selected.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
-        all_screens_data = self.interface.get_screens()
-        all_names = list(all_screens_data["names"])
-        all_S = np.asarray(all_screens_data["S"], dtype=float)
-        if not selected:
-            selected = all_names
-        screen_to_S = {n: s for n, s in zip(all_names, all_S)}
-        selected = sorted(selected,key=lambda name: screen_to_S.get(name, np.inf)) # lambda is a function def key(name)
-        return selected
+    def _get_selection(self):
+        quadrupoles_all = []
+        for i in range(self.quadrupoles_list.count()):
+            it = self.quadrupoles_list.item(i)
+            quadrupoles_all.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+
+        screens_all = []
+        for i in range(self.screens_list.count()):
+            it = self.screens_list.item(i)
+            screens_all.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+
+        selected_quadrupoles = []
+        for i in range(self.quadrupoles_list.count()):
+            it = self.quadrupoles_list.item(i)
+            if it.isSelected():
+                selected_quadrupoles.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+
+        selected_screens = []
+        for i in range(self.screens_list.count()):
+            it = self.screens_list.item(i)
+            if it.isSelected():
+                selected_screens.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+
+        quadrupoles = selected_quadrupoles or quadrupoles_all
+        screens = selected_screens or screens_all
+
+        return quadrupoles, screens
 
     def _draw_live_scan(self, session):
         if session is None:
             return
-
-        K1_values = np.asarray(session["K1_values"], dtype=float)
-        sigx = np.asarray(session["sigx_mean"], dtype=float)
-        sigy = np.asarray(session["sigy_mean"], dtype=float)
-        screens = list(session["screens"])
-        quad_name = session.get("quad_name", "-")
+        self._refresh_plot_comboboxes_from_session(session)
+        session_to_plot = self._get_session_for_selected_quad(session)
+        if session_to_plot is None:
+            return
+        K1_values = np.asarray(session_to_plot["K1_values"], dtype=float)
+        sigx = np.asarray(session_to_plot["sigx_mean"], dtype=float)
+        sigy = np.asarray(session_to_plot["sigy_mean"], dtype=float)
+        screens = list(session_to_plot["screens"])
+        quad_name = session_to_plot.get("quad_name", "-")
 
         fig = self.canvas.figure
         fig.clear()
@@ -496,7 +391,18 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         if not color_cycle:
             color_cycle = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
 
-        for i, screen in enumerate(screens):
+
+        if self.show_scan_on_all_screens.isChecked():
+            screen_indices = list(range(len(screens)))
+        else:
+            selected_screen = self.screen_on_plot.currentText().strip()
+            if selected_screen in screens:
+                screen_indices = [screens.index(selected_screen)]
+            else:
+                screen_indices = list(range(len(screens)))
+
+        for i in screen_indices:
+            screen = screens[i]
             mask_x = np.isfinite(sigx[:, i])
             mask_y = np.isfinite(sigy[:, i])
 
@@ -545,26 +451,12 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             base_color = color_cycle[i % len(color_cycle)]
             fit_color = lighten_color(base_color, amount=0.45)
 
-            ax1.plot(
-                K1_values, sigx[:, i], 'o',
-                color=base_color,
-                label=f"{screen} data"
-            )
+            ax1.plot(K1_values, sigx[:, i], 'o', color=base_color, label=f"{screen} data")
             fit_x = np.sqrt(np.maximum(pred_x[:, i], 0.0))
             ax1.plot(K1_values, fit_x, '-', color=fit_color, linewidth=2.0, label=f"{screen} fit")
-
-            ax2.plot(
-                K1_values, sigy[:, i], 'o',
-                color=base_color,
-                label=f"{screen} data"
-            )
+            ax2.plot(K1_values, sigy[:, i], 'o', color=base_color, label=f"{screen} data")
             fit_y = np.sqrt(np.maximum(pred_y[:, i], 0.0))
-            ax2.plot(
-                K1_values, fit_y, '-',
-                color=fit_color,
-                linewidth=2.0,
-                label=f"{screen} fit"
-            )
+            ax2.plot(K1_values, fit_y, '-', color=fit_color, linewidth=2.0, label=f"{screen} fit")
 
         ax1.set_ylabel("sigx")
         ax2.set_ylabel("sigy")
@@ -760,6 +652,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         if self._scan_stop_requested:
             raise KeyboardInterrupt("Scan stopped by user.")
         self.session = session_partial
+        self._log_scan_status(session_partial, current_step, total_steps)
         self._draw_live_scan(session_partial)
         if total_steps:
             self._set_progress(100.0 * float(current_step) / float(total_steps))
@@ -768,27 +661,31 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             raise KeyboardInterrupt("Scan stopped by user.")
 
     def _run_scan(self):
-        self.log("Running quadrupole scan...")
-        current_quad = self.quadrupoles_list.currentItem()
-        if current_quad is None:
+        quadrupoles, _ = self._get_selection()
+        if len(quadrupoles) == 0:
             QMessageBox.information(self, "Scan error", "No quadrupole selected.")
             return
-
-        quad_name = current_quad.data(Qt.ItemDataRole.UserRole) or current_quad.text()
+        quad_label = quadrupoles[0] if len(quadrupoles) == 1 else f"multi-quad scan ({len(quadrupoles)} quadrupoles)"
+        self.log(f"Running quadrupole scan for {quad_label}...")
+        self.quad_on_plot.blockSignals(True)
         self.quad_on_plot.clear()
-        self.quad_on_plot.addItem(quad_name)
-        self.quad_on_plot.setCurrentText(quad_name)
+        self.quad_on_plot.addItems(quadrupoles)
+        if quadrupoles:
+            self.quad_on_plot.setCurrentIndex(0)
+        self.quad_on_plot.blockSignals(False)
         selected_items = self.screens_list.selectedItems()
         if not selected_items:
             self.screens_list.blockSignals(True)
             self.screens_list.selectAll()
             self.screens_list.blockSignals(False)
 
-        screens = self._get_sorted_selected_screens()
+        _, screens = self._get_selection()
+        self.screen_on_plot.blockSignals(True)
         self.screen_on_plot.clear()
         self.screen_on_plot.addItems(screens)
         if screens:
-            self.screen_on_plot.setCurrentText(screens[0])
+            self.screen_on_plot.setCurrentIndex(0)
+        self.screen_on_plot.blockSignals(False)
         if not screens:
             QMessageBox.information(self, "Scan error", "No screens available.")
             return
@@ -798,6 +695,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         steps = int(self.steps_settings.value())
         nshots = int(self.meas_per_step.value())
 
+        self._last_scan_status = None
         self._scan_stop_requested = False
         self._is_scanning = True
 
@@ -805,7 +703,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self._set_progress(0)
         try:
             self.session = self.run_scan(
-                quad_name=quad_name,
+                quad_name=quadrupoles,
                 delta_min=delta_min,
                 delta_max=delta_max,
                 steps=steps,
@@ -831,14 +729,8 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             return
         finally:
             self._is_scanning = False
-
-        quality_msg = self._describe_scan_quality()
-        if quality_msg is None:
-            QMessageBox.information(self, "Scan", "Scan completed.")
-            self._set_progress(100)
-        else:
-            QMessageBox.information(self, "Scan", f"Scan completed.")
-            self._set_progress(100)
+        QMessageBox.information(self, "Scan", f"Scan completed.")
+        self._set_progress(100)
 
     def _get_twiss_s_positions(self, names):
         names = list(names)
@@ -860,12 +752,96 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             positions = [np.nan] * len(names)
         return positions
 
+    def _get_session_for_selected_quad(self, session):
+        if not isinstance(session, dict):
+            return session
+        if session.get("mode") != "multi_quad_scan":
+            return session
+        per_quad = list(session.get("per_quad_sessions", []))
+        if len(per_quad) == 0:
+            return None
+        combo_index = int(self.quad_on_plot.currentIndex())
+        if 0 <= combo_index < len(per_quad):
+            return per_quad[combo_index]
+        selected_quad = self.quad_on_plot.currentText().strip()
+        if selected_quad:
+            for quad_session in per_quad:
+                if str(quad_session.get("quad_name", "")).strip() == selected_quad:
+                    return quad_session
+
+        return per_quad[0]
+
+    def _refresh_plot_comboboxes_from_session(self, session):
+        if not isinstance(session, dict):
+            return
+        if session.get("mode") == "multi_quad_scan":
+            per_quad = list(session.get("per_quad_sessions", []))
+            quad_names = [str(qs.get("quad_name", "")).strip() for qs in per_quad if isinstance(qs, dict)]
+            if quad_names:
+                current_quad = self.quad_on_plot.currentText().strip()
+                self.quad_on_plot.blockSignals(True)
+                self.quad_on_plot.clear()
+                self.quad_on_plot.addItems(quad_names)
+                if current_quad in quad_names:
+                    self.quad_on_plot.setCurrentText(current_quad)
+                else:
+                    self.quad_on_plot.setCurrentIndex(0)
+                self.quad_on_plot.blockSignals(False)
+
+            session_to_plot = self._get_session_for_selected_quad(session)
+            if isinstance(session_to_plot, dict):
+                screens = list(session_to_plot.get("screens", []))
+                current_screen = self.screen_on_plot.currentText().strip()
+                self.screen_on_plot.blockSignals(True)
+                self.screen_on_plot.clear()
+                self.screen_on_plot.addItems(screens)
+                if current_screen in screens:
+                    self.screen_on_plot.setCurrentText(current_screen)
+                elif screens:
+                    self.screen_on_plot.setCurrentIndex(0)
+                self.screen_on_plot.blockSignals(False)
+
+        else:
+            quad_name = str(session.get("quad_name", "")).strip()
+            screens = list(session.get("screens", []))
+
+            if quad_name:
+                self.quad_on_plot.blockSignals(True)
+                self.quad_on_plot.clear()
+                self.quad_on_plot.addItem(quad_name)
+                self.quad_on_plot.setCurrentIndex(0)
+                self.quad_on_plot.blockSignals(False)
+
+            current_screen = self.screen_on_plot.currentText().strip()
+            self.screen_on_plot.blockSignals(True)
+            self.screen_on_plot.clear()
+            self.screen_on_plot.addItems(screens)
+            if current_screen in screens:
+                self.screen_on_plot.setCurrentText(current_screen)
+            elif screens:
+                self.screen_on_plot.setCurrentIndex(0)
+            self.screen_on_plot.blockSignals(False)
+
+        self.screen_on_plot.setEnabled(not self.show_scan_on_all_screens.isChecked())
+
     def _filter_quadrupoles_in_gui(self):
-        if not hasattr(self,"quadrupoles_list") or self.quadrupoles_list is None:
+        if not hasattr(self, "quadrupoles_list") or self.quadrupoles_list is None:
             return
-        if not hasattr(self,"screens_list") or self.screens_list is None:
+        if not hasattr(self, "screens_list") or self.screens_list is None:
             return
-        selected_screens = self._get_sorted_selected_screens()
+
+        previously_selected = []
+        for i in range(self.quadrupoles_list.count()):
+            item = self.quadrupoles_list.item(i)
+            if item.isSelected():
+                previously_selected.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
+
+        if previously_selected:
+            self._last_selected_quadrupoles = list(previously_selected)
+        else:
+            self._last_selected_quadrupoles = list(getattr(self, "_last_selected_quadrupoles", []))
+
+        _, selected_screens = self._get_selection()
         if not selected_screens:
             return
 
@@ -877,30 +853,45 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         first_screen_position = min(finite_screen_positions)
         last_screen_position = max(finite_screen_positions)
         all_quadrupoles = list(self.interface.get_quadrupoles().get("names", []))
-
         quad_S = self._get_twiss_s_positions(all_quadrupoles)
-
         quad_pos = {name: float(s) for name, s in zip(all_quadrupoles, quad_S) if np.isfinite(s)}
 
         before_last_screen_quads = [
             name for name in all_quadrupoles
             if name in quad_pos and quad_pos[name] < last_screen_position
         ]
+
+        valid_previous = [q for q in getattr(self, "_last_selected_quadrupoles", []) if q in before_last_screen_quads]
+        upstream_to_first_screen_quads = [name for name in before_last_screen_quads if quad_pos[name] < first_screen_position]
+
         self.quadrupoles_list.blockSignals(True)
         self._show_s_values_and_device_lists(self.quadrupoles_list, before_last_screen_quads)
 
-        upstream_to_first_screen_quads = [name for name in before_last_screen_quads if quad_pos[name] < first_screen_position]
-
-        if upstream_to_first_screen_quads:
-            closest_quad = max(upstream_to_first_screen_quads, key = lambda name: quad_pos[name])
+        if valid_previous:
+            for i in range(self.quadrupoles_list.count()):
+                item = self.quadrupoles_list.item(i)
+                item_name = item.data(Qt.ItemDataRole.UserRole) or item.text()
+                if item_name in valid_previous:
+                    item.setSelected(True)
+            self._last_selected_quadrupoles = list(valid_previous)
+        elif upstream_to_first_screen_quads:
+            closest_quad = max(upstream_to_first_screen_quads, key=lambda name: quad_pos[name])
             for i in range(self.quadrupoles_list.count()):
                 item = self.quadrupoles_list.item(i)
                 item_name = item.data(Qt.ItemDataRole.UserRole) or item.text()
                 if item_name == closest_quad:
-                    self.quadrupoles_list.setCurrentItem(item)
+                    item.setSelected(True)
+                    self._last_selected_quadrupoles = [closest_quad]
                     break
         elif self.quadrupoles_list.count() > 0:
-            self.quadrupoles_list.setCurrentRow(0)
+            item = self.quadrupoles_list.item(0)
+            if item is not None:
+                item.setSelected(True)
+                item_name = item.data(Qt.ItemDataRole.UserRole) or item.text()
+                self._last_selected_quadrupoles = [item_name]
+        else:
+            self._last_selected_quadrupoles = []
+
         self.quadrupoles_list.blockSignals(False)
 
     def _screen_selection_changed(self):
@@ -937,7 +928,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         line=f"[{timestamp}] {text}"
         if self.log_console is None:
             self.log_console=LogConsole(self)
-            #self.log_console.show()
         self.log_console.log(line)
 
 if __name__ == "__main__":
