@@ -486,8 +486,8 @@ class Optimization_EM:
                     raise OptimizationPaused("Optimization paused.")
                 raise OptimizationStopped("Optimization stopped.")
             pred2_x, pred2_y = predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop)
-            rx = ((pred2_x - sig_x2) / sig_x2_err)[valid_x] if np.any(valid_x) else np.array([], dtype=float)
-            ry = ((pred2_y - sig_y2) / sig_y2_err)[valid_y] if np.any(valid_y) else np.array([], dtype=float)
+            rx = (pred2_x - sig_x2)[valid_x] if np.any(valid_x) else np.array([], dtype=float)
+            ry = (pred2_y - sig_y2)[valid_y] if np.any(valid_y) else np.array([], dtype=float)
             res = np.concatenate([np.asarray(rx, dtype = float).ravel(), np.asarray(ry, dtype = float).ravel()]) # the better the match, the smaller the number
 
             if res.size == 0:
