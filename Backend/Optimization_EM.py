@@ -413,11 +413,11 @@ class Optimization_EM:
                 pass
 
         bounds = {
-            "emit_x_norm": [1.0, 10.0],
-            "beta_x0": [0.3, 25.0],
+            "emit_x_norm": [0.0, 10.0],
+            "beta_x0": [0.0, 25.0],
             "alpha_x0": [-10.0, 10.0],
-            "emit_y_norm": [0.005, 0.2],
-            "beta_y0": [0.3, 30.0],
+            "emit_y_norm": [0.0, 0.2],
+            "beta_y0": [0.0, 30.0],
             "alpha_y0": [-10.0, 10.0],
         }
 
@@ -443,10 +443,10 @@ class Optimization_EM:
             beta_y0 = float(beta_y0)
             alpha_y0 = float(alpha_y0)
 
-            if emit_x_norm <= 0.0 or emit_y_norm <= 0.0 or beta_x0 <= 0.0 or beta_y0 <= 0.0:
+            if emit_x_norm < 0.0 or emit_y_norm < 0.0 or beta_x0 < 0.0 or beta_y0 < 0.0:
                 raise RuntimeError("Invalid joint fit paramaters. Emittance and beta should be positive.")
-            emit_x_geom = max(emit_x_norm / beta_gamma, 1e-12)
-            emit_y_geom = max(emit_y_norm / beta_gamma, 1e-12)
+            emit_x_geom = emit_x_norm / beta_gamma
+            emit_y_geom = emit_y_norm / beta_gamma
 
             try:
                 pred_sigx, pred_sigy = self.interface.predict_emittance_scan_response(
@@ -528,12 +528,12 @@ class Optimization_EM:
 
         for _ in range(max(0, total_initial - 1)):
             seeds.append({
-                "emit_x_norm": float(np.exp(self.rng.uniform(np.log(bounds["emit_x_norm"][0]), np.log(bounds["emit_x_norm"][1])))),
-                "beta_x0": float(np.exp(self.rng.uniform(np.log(bounds["beta_x0"][0]), np.log(bounds["beta_x0"][1])))),
-                "alpha_x0": float(self.rng.uniform(bounds["alpha_x0"][0], bounds["alpha_x0"][1])),
-                "emit_y_norm": float(np.exp(self.rng.uniform(np.log(bounds["emit_y_norm"][0]), np.log(bounds["emit_y_norm"][1])))),
-                "beta_y0": float(np.exp(self.rng.uniform(np.log(bounds["beta_y0"][0]), np.log(bounds["beta_y0"][1])))),
-                "alpha_y0": float(self.rng.uniform(bounds["alpha_y0"][0], bounds["alpha_y0"][1])),
+                "emit_x_norm": self.rng.uniform(bounds["emit_x_norm"][0], bounds["emit_x_norm"][1]),
+                "beta_x0": self.rng.uniform(bounds["beta_x0"][0], bounds["beta_x0"][1]),
+                "alpha_x0": self.rng.uniform(bounds["alpha_x0"][0], bounds["alpha_x0"][1]),
+                "emit_y_norm": self.rng.uniform(bounds["emit_y_norm"][0], bounds["emit_y_norm"][1]),
+                "beta_y0": self.rng.uniform(bounds["beta_y0"][0], bounds["beta_y0"][1]),
+                "alpha_y0": self.rng.uniform(bounds["alpha_y0"][0], bounds["alpha_y0"][1]),
             })
 
         best_row = None # from X.data
