@@ -7,10 +7,28 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
+# For OTR0X:
+# emit x 5.02
+# beta x 6.305152438
+# alpha x -4.494292895
+
+# emit y 0.03
+# beta y 6.190329503
+# alpha y 2.576336962
+
+# For QD18X end:
+# emit x 5.02
+# beta x 1.105221776
+# alpha x -0.7752115812
+
+# emit y 0.03
+# beta y 10.34240856
+# alpha y -3.739163822
+
     def get_name(self):
         return 'ATF2_Ext_RFT'
-                                                                                    # only for EM tests, instead of 1000
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=100):
+
+    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
@@ -21,7 +39,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             screen.set_name(s.get_name())
             s.replace_with(screen)
         self.sequence = [e.get_name() for e in self.lattice['*']]
-        self._attach_wake_data_to_elements(wake_scale=1000,nsteps=20)
+        self._attach_wake_data_to_elements(wake_scale=0,nsteps=20)
         self.bpms = [e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [e.get_name() for e in self.lattice.get_screens()]
@@ -103,6 +121,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         T.alpha_y = -1.907222942
         T.sigma_t = 8  # mm/c
         T.sigma_pt = 0.8  # permille
+        # T_sigma_pt = 0.0001 # for test
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
 
     def __setup_beam1(self):
@@ -285,7 +304,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return bpms
 
     def get_screens(self, names=None):
-        self.log('Reading screens...')
+        #self.log('Reading screens...')
         if isinstance(names, str):
             names = [names]  # allows passing a single screen name
         hpixel = 0.001  # mm, horizontal size of a pixel
@@ -380,7 +399,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return screens
 
     def get_quadrupoles(self, names=None):
-        self.log("Reading quadrupoles' strengths...")
+        #self.log("Reading quadrupoles' strengths...")
         bdes = np.zeros(len(self.quadrupoles), dtype=float)
 
         for i, quadrupole_name in enumerate(self.quadrupoles):
@@ -628,44 +647,16 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
-    def _build_bunch_from_guesses(self, plane, emit, beta0, alpha0):
-        gamma_rel, beta_rel = self.get_beam_factors()
-        beta_gamma = gamma_rel * beta_rel
-        if not np.isfinite(beta_gamma) or beta_gamma <= 0:
-            raise RuntimeError(f"Invalid beam factors for emittance conversion.")
-        emit_norm = float(emit) * beta_gamma
-
-        nominal = {
-            "emit_x_norm": 5.2,
-            "emit_y_norm": 0.03,
-            "beta_x": 6.848560987,
-            "beta_y": 2.935758992,
-            "alpha_x": 1.108024744,
-            "alpha_y": -1.907222942,
-        }
-
-        T= rft.Bunch6d_twiss()
-
-        if plane == "x":
-            T.emitt_x = float(emit_norm)
-            T.beta_x = float(beta0)
-            T.alpha_x = float(alpha0)
-
-            T.emitt_y = float(nominal["emit_y_norm"])
-            T.beta_y = float(nominal["beta_y"])
-            T.alpha_y = float(nominal["alpha_y"])
-
-        elif plane == "y":
-            T.emitt_x = float(nominal["emit_x_norm"])
-            T.beta_x = float(nominal["beta_x"])
-            T.alpha_x = float(nominal["alpha_x"])
-
-            T.emitt_y = float(emit_norm)
-            T.beta_y = float(beta0)
-            T.alpha_y = float(alpha0)
-        T.sigma_t = 8
-        T.sigma_pt = 0.8
-
+    def _build_bunch_from_guesses(self, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
+        T = rft.Bunch6d_twiss()
+        T.emitt_x = float(emit_x)  # mm.mrad normalised emittance
+        T.emitt_y = float(emit_y)  # mm.mrad
+        T.beta_x = float(beta_x0)  # m
+        T.beta_y = float(beta_y0)  # m
+        T.alpha_x = float(alpha_x0)
+        T.alpha_y = float(alpha_y0)
+        T.sigma_t = 8  # mm/c
+        T.sigma_pt = 0.8  # permille
         bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
         return bunch
 
@@ -682,9 +673,19 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             sigy[i] = float(screen_data["sigy"][idx])
         return sigx, sigy
 
-    def predict_emittance_scan_response(self, plane,quad_name, screens, K1_values, emit, beta0, alpha0, stop_checker = None):
+    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
         screens = list(screens)
         K1_values = np.asarray(K1_values, dtype=float)
+        screens = list(screens)
+        if len(screens) == 0:
+            raise RuntimeError("No screens provided for emittance scan prediction.")
+        if reference_screen is None:
+            reference_screen = screens[0]
+        if reference_screen not in screens:
+            raise RuntimeError("reference_screen must be one of the selected screens.")
+
+        start_element_name = str(quad_name)
+        end_element_name = str(screens[-1])
 
         if quad_name not in self.quadrupoles:
             raise ValueError(f"Quadrupole {quad_name} not found in quadrupoles")
@@ -697,26 +698,39 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         K1_original = float(original_quads["bdes"][0])
 
         B0_original = self.B0
-        output = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
+        output_x = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
+        output_y = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
 
         try:
             for k,K1 in enumerate(K1_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
                 self.set_quadrupoles([quad_name], [float(K1)], track = False)
-                new_bunch = self._build_bunch_from_guesses(plane = plane, emit = float(emit), beta0 = float(beta0), alpha0 = float(alpha0))
-                self.lattice.track(new_bunch)
-                sigx, sigy = self._read_tracked_bunch_screen_sigmas(screens)
-                if plane == "x":
-                    output[k, :] = sigx
-                else:
-                    output[k, :] = sigy
+
+                start_element = self.lattice[start_element_name]
+                if isinstance(start_element, list):
+                    start_element = start_element[0]
+                for si, screen_name in enumerate(screens):
+                    screen_elem = self.lattice[screen_name]
+                    if isinstance(screen_elem, list):
+                        screen_elem = screen_elem[-1]
+                    temp_bunch = self._build_bunch_from_guesses(
+                        emit_x=float(emit_x), emit_y=float(emit_y),
+                        beta_x0=float(beta_x0), beta_y0=float(beta_y0),
+                        alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
+                    )
+
+                    tracked = self.lattice.track(temp_bunch, start_element, screen_elem)
+                    m = tracked.get_phase_space('%x %y')
+                    if m is not None and len(m) > 0:
+                        output_x[k, si] = float(np.std(m[:, 0]))
+                        output_y[k, si] = float(np.std(m[:, 1]))
         finally:
             self.set_quadrupoles([quad_name], [float(K1_original)], track=False)
             self.B0 = B0_original
             self.__track_bunch()
 
-        return output
+        return output_x, output_y
 
     def get_twiss_at_screen(self, name): # for emittance measurement, can be deleted later
         if name not in self.screens:
@@ -801,4 +815,3 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 strengths[2] = complex(float(value), 0.0)
                 element.set_strengths(strengths)
         self.__track_bunch()
-

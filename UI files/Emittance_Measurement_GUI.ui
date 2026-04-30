@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>819</height>
+    <height>1022</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -249,7 +249,7 @@ QToolButton#delta_min_info_button:hover {
              <number>101</number>
             </property>
             <property name="value">
-             <number>11</number>
+             <number>15</number>
             </property>
            </widget>
           </item>
@@ -265,7 +265,7 @@ QToolButton#delta_min_info_button:hover {
              <double>10.000000000000000</double>
             </property>
             <property name="value">
-             <double>-0.250000000000000</double>
+             <double>-1.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -281,7 +281,7 @@ QToolButton#delta_min_info_button:hover {
              <double>10.000000000000000</double>
             </property>
             <property name="value">
-             <double>0.250000000000000</double>
+             <double>1.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -341,6 +341,75 @@ QToolButton#delta_max_info_button:hover {
              </widget>
             </item>
            </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="xoptSettingsGroup">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox#xoptSettingsGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#xoptSettingsGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+         </property>
+         <property name="title">
+          <string>Bayesian optimization settings</string>
+         </property>
+         <layout class="QGridLayout" name="gridXoptSettings">
+          <property name="horizontalSpacing">
+           <number>12</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>6</number>
+          </property>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="xopt_initial_points_spin">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>500</number>
+            </property>
+            <property name="value">
+             <number>25</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="xopt_steps_spin">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>5000</number>
+            </property>
+            <property name="value">
+             <number>150</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_xopt_steps">
+            <property name="text">
+             <string>Optimization steps</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_xopt_initial_points">
+            <property name="text">
+             <string>Initial points</string>
+            </property>
+           </widget>
           </item>
          </layout>
         </widget>
@@ -467,6 +536,9 @@ QTabWidget#tabs::title {
            <widget class="QCheckBox" name="show_scan_on_all_screens">
             <property name="text">
              <string>Show scan results at all selected screens</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
             </property>
            </widget>
           </item>

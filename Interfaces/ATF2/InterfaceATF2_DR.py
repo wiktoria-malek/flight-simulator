@@ -1,5 +1,5 @@
 import numpy as np
-import time, math
+import time, math,os
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 from epics import PV, ca, caget
@@ -53,13 +53,14 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         bpm_ok = all(bpm in monitors for bpm in monitors_from_sequence)
         if not bpm_ok:
             bpms_unknown = [bpm for bpm in monitors_from_sequence if bpm not in monitors]
-            print(f'Unknown bpms {bpms_unknown} removed from list')
+            log(f'Unknown bpms {bpms_unknown} removed from list')
         # Only retain BPMs in config file which are known by Epics
         sequence_filtered = [element for element in sequence if (element in monitors) or element.lower().startswith('z')]
         # Subset of BPMs and correctors from the config file
         self.sequence = sequence_filtered
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
+        self.screens = []
         # Index of the selected BPMs in the Epics PV ATF2:monitors
         self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
@@ -70,7 +71,9 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         self.nominal_laser_intensity = nominal_intensity
         self.test_laser_intensity = wfs_intensity
         #self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
-
+        self.twiss_path = os.path.join(os.path.dirname(__file__), "DR_ATF2", "ATF_DR_twiss_file.tws")
+        self.log = log
+        
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
         Pref = 1.2999999e3
@@ -130,153 +133,6 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                 return value
         return float(default)
 
-    def _read_screen_status(self, screen_pv_name):
-        return self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
-
-    def _read_screen_calibration(self, screen_pv_name, plane):
-        if plane.lower()=='h':
-            pvs = [
-                f'{screen_pv_name}:H:x1:Calibration:Factor',
-                f'{screen_pv_name}:H:X1:Calibration:Factor',
-            ]
-        else:
-            pvs = [
-                f'{screen_pv_name}:V:y1:Calibration:Factor',
-                f'{screen_pv_name}:V:Y1:Calibration:Factor',
-            ]
-        return self._valid_pv_value(pvs, default = np.nan)
-
-    def _acquire_screen_image(self, screen_pv_name):
-        try:
-            PV(f'{screen_pv_name}:CAMERA:Acquire').put(1)
-            time.sleep(2)
-        except Exception:
-            pass
-
-        raw_img = caget(f'{screen_pv_name}:IMAGE:ArrayData')
-        if raw_img is None:
-            return None
-        raw_img = np.asanyarray(raw_img)
-        if raw_img.size == 0:
-            return None
-
-        nx, ny = self.screen_image_shape
-        correct_image_size = ny * nx
-        if raw_img.size < correct_image_size:
-            return None
-        raw_img = raw_img[:correct_image_size]
-
-        image = raw_img.reshape((ny, nx)).astype(float)
-        return image
-
-    @staticmethod
-    def _screen_data_from_image(image,hpixel,vpixel):
-        if image is None:
-            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1,1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
-        img = np.asarray(image, dtype=float)
-        img[~np.isfinite(img)] = 0.0
-        total = float(np.sum(img)) # intensity
-        ny ,nx  = img.shape # rows, columns
-
-        if total <= 0.0 or nx == 0 or ny == 0:
-            hedges = np.arange(nx + 1, dtype = float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1)
-            vedges = np.arange(ny + 1, dtype = float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1)
-
-            return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
-
-        if not np.isfinite(hpixel) or hpixel <= 0:
-            hpixel = 1e-3
-        if not np.isfinite(vpixel) or vpixel <= 0:
-            vpixel = 1e-3
-
-        x_centers = (np.arange(nx, dtype = float) - 0.5 * (nx -1)) * hpixel # middle of the pixel
-        y_centers = (np.arange(ny, dtype = float) - 0.5 * (ny -1) ) * vpixel
-
-        proj_x = np.sum(img, axis = 0)
-        proj_y = np.sum(img, axis = 1)
-
-        x_mean = float(np.sum(x_centers * proj_x) / total)
-        y_mean = float(np.sum(y_centers * proj_y) / total)
-        sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
-        sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
-
-        hedges = (np.arange(nx + 1, dtype = float) - 0.5 * nx) * hpixel
-        vedges = (np.arange(ny + 1, dtype = float) - 0.5 * ny) * vpixel
-
-        return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
-
-    def get_screens(self, names=None):
-        print('Reading screens...')
-
-        if isinstance(names, str):
-            names = [names]
-        selected_names = self.screen_names if names is None else [name for name in self.screen_names if name in names]
-
-        s_positions = self._get_twiss_s_positions(selected_names)
-
-        hpixel_list = []
-        vpixel_list = []
-        xb_list = []
-        yb_list = []
-        sigx_list = []
-        sigy_list = []
-        sum_list = []
-        images = []
-        hedges_all = []
-        vedges_all = []
-        inout_list = [] # is screen in or out
-
-        for screen_name in selected_names:
-            screen_pv_name = self.screen_pv_names.get(screen_name)
-            if screen_pv_name is None:
-                hpixel_list.append(np.nan)
-                vpixel_list.append(np.nan)
-                xb_list.append(np.nan)
-                yb_list.append(np.nan)
-                sigx_list.append(np.nan)
-                sigy_list.append(np.nan)
-                sum_list.append(0.0)
-                images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0.0, 1.0]))
-                vedges_all.append(np.array([0.0, 1.0]))
-                inout_list.append(np.nan)
-                continue
-
-            status = self._read_screen_status(screen_pv_name)
-            hpixel = self._read_screen_calibration(screen_pv_name, 'h')
-            vpixel = self._read_screen_calibration(screen_pv_name, 'v')
-            image = self._acquire_screen_image(screen_pv_name)
-            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel)
-
-            hpixel_list.append(hpixel)
-            vpixel_list.append(vpixel)
-            xb_list.append(x_mean)
-            yb_list.append(y_mean)
-            sigx_list.append(sigx)
-            sigy_list.append(sigy)
-            sum_list.append(total)
-            images.append(image)
-            hedges_all.append(hedges)
-            vedges_all.append(vedges)
-            inout_list.append(status)
-
-        screens = {
-            "names": selected_names,
-            "hpixel": np.asarray(hpixel_list, dtype=float),
-            "vpixel": np.asarray(vpixel_list, dtype=float),
-            "x": np.asarray(xb_list, dtype=float),
-            "y": np.asarray(yb_list, dtype=float),
-            "sigx": np.asarray(sigx_list, dtype=float),
-            "sigy": np.asarray(sigy_list, dtype=float),
-            "sum": np.asarray(sum_list, dtype=float),
-            "hedges": hedges_all,
-            "vedges": vedges_all,
-            "images": images,
-            "S": np.asarray(s_positions, dtype=float),
-            "inout": np.asarray(inout_list, dtype=float),
-        }
-        return screens
-
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
         time.sleep(2)
@@ -296,7 +152,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
     def change_intensity(self):
         new_laser_intensity = self.test_laser_intensity
-        print(f'Changing laser intensity to {new_laser_intensity}...')
+        log(f'Changing laser intensity to {new_laser_intensity}...')
         laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
@@ -304,7 +160,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
     def reset_intensity(self):
         new_laser_intensity = self.nominal_laser_intensity
-        print(f'Resetting laser intensity to {new_laser_intensity}...')
+        log(f'Resetting laser intensity to {new_laser_intensity}...')
         laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
@@ -322,8 +178,11 @@ class InterfaceATF2_DR(AbstractMachineInterface):
     def get_elements_position(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
+    def log_messages(self, console):
+        self.log = console or log
+
     def get_target_dispersion(self, names=None):
-        with open('Interfaces/ATF2/DR_ATF2/ATF_DR_twiss_file.tws', "r") as file:
+        with open(self.twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
@@ -346,7 +205,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         return target_disp_x, target_disp_y
 
     def get_icts(self, names=None):
-        print("Reading ict's...")
+        log("Reading ict's...")
         charge = []
         for ict in self.ict_names:
             pv = PV(f'{ict}')
@@ -372,7 +231,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         return icts
 
     def get_correctors(self, names=None):
-        print("Reading correctors' strengths...")
+        log("Reading correctors' strengths...")
         bdes, bact = [], []
         for corrector in self.corrs:
             pv_des = PV(f'{corrector}:currentWrite')
@@ -399,22 +258,22 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         return correctors
 
     def get_bpms(self, names=None):
-        print('Reading bpms...')
+        log('Reading bpms...')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
             try:
-                print(f'Sample = {sample}')
+                log(f'Sample = {sample}')
                 m = caget('DR:monitors')
                 a = m.reshape((-1, 10))
                 status = a[self.bpm_indexes, 0]
                 status[status != 1] = 0
                 x.append(a[self.bpm_indexes, 1])
                 y.append(a[self.bpm_indexes, 2])
-                print('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
+                log('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
                 tmit.append(status * a[self.bpm_indexes, 3])
                 time.sleep(1)
             except Exception as e:
-                print(f'An error occurred: {e}')
+                log(f'An error occurred: {e}')
                 sample = sample - 1
 
         bpms = {
@@ -443,7 +302,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
-            print('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
+            log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
@@ -455,7 +314,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
-            print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)') 
+            log('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)') 
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             curr_val = pv_des.get()

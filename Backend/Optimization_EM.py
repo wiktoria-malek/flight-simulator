@@ -8,17 +8,17 @@ from xopt.evaluator import Evaluator
 from xopt.generators.bayesian import ExpectedImprovementGenerator
 
 class OptimizationStopped(Exception):
-    def __init__(self, message = "Optimization stopped", payload = None):
+    def __init__(self, message = "Optimization stopped", solution = None):
         super().__init__(message)
-        self.payload = payload
+        self.solution = solution
 
 class OptimizationPaused(Exception):
-    def __init__(self, message="Optimization paused", payload=None):
+    def __init__(self, message="Optimization paused", solution=None):
         super().__init__(message)
-        self.payload = payload
+        self.solution = solution
 
 class Optimization_EM:
-    def __init__(self, interface, n_starts=8, rng_seed=42):
+    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50):
         self.interface = interface
         self.n_starts = int(n_starts)
         self.rng = np.random.default_rng(rng_seed)
@@ -27,8 +27,10 @@ class Optimization_EM:
         self.best_out_so_far = None
         self._last_completed_output = None
         self.print_M = True
-        self.xopt_initial_points = max(8, int(n_starts))
-        self.xopt_steps = max(30, 10 * int(n_starts))
+        #self.xopt_initial_points = max(8, int(n_starts))
+        #self.xopt_steps = max(50, 10 * int(n_starts))
+        self.xopt_initial_points = xopt_initial_points
+        self.xopt_steps = xopt_steps
         self.xopt_local_seed_fraction = 0.25
         self.xopt_use_global_seed = True
         self.xopt_local_alpha_sigma = 0.8
@@ -96,41 +98,97 @@ class Optimization_EM:
                 "cost": np.nan,
                 "stopped": True,
             }
-
+        joint_fit = None
         fit_x = None
         fit_y = None
+        joint_initial_guess = None
+        if isinstance(initial_guess, dict):
+            guess_x = (initial_guess or {}).get("x") if isinstance((initial_guess or {}).get("x"), dict) else {}
+            guess_y = (initial_guess or {}).get("y") if isinstance((initial_guess or {}).get("y"), dict) else {}
+
+            joint_initial_guess = {
+                "emit_x_norm": guess_x.get("emit_norm"),
+                "beta_x0": guess_x.get("beta0"),
+                "alpha_x0": guess_x.get("alpha0"),
+                "emit_y_norm": guess_y.get("emit_norm"),
+                "beta_y0": guess_y.get("beta0"),
+                "alpha_y0": guess_y.get("alpha0"),
+            }
+
         try:
-            fit_x = self._fit_plane(plane="x", screens=screens, quad_name=quad_name, K1_values=K1_values, sigma=sigx, sigma_std=sigx_std,
-                                    initial_guess = (initial_guess or {}).get("x") if isinstance(initial_guess, dict) else None)
+            joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1_values=K1_values,
+                                    sigx=sigx, sigx_std=sigx_std, sigy=sigy, sigy_std=sigy_std,
+                                    initial_guess=joint_initial_guess)
+            fit_x = {
+                "emit": joint_fit["emit_x"],
+                "beta0": joint_fit["beta_x0"],
+                "alpha0": joint_fit["alpha_x0"],
+                "pred": joint_fit["pred_x"],
+                "residual_rms": joint_fit["residual_rms_x"],
+                "residual_mad": joint_fit["residual_mad_x"],
+                "residual_rms_per_screen": joint_fit["residual_rms_per_screen_x"],
+                "worst_screen": joint_fit["worst_screen_x"],
+                "success": joint_fit["success"],
+                "message": joint_fit["message"],
+                "cost": joint_fit["cost"],
+                "stopped": bool(joint_fit.get("stopped", False)),
+            }
+            fit_y = {
+                "emit": joint_fit["emit_y"],
+                "beta0": joint_fit["beta_y0"],
+                "alpha0": joint_fit["alpha_y0"],
+                "pred": joint_fit["pred_y"],
+                "residual_rms": joint_fit["residual_rms_y"],
+                "residual_mad": joint_fit["residual_mad_y"],
+                "residual_rms_per_screen": joint_fit["residual_rms_per_screen_y"],
+                "worst_screen": joint_fit["worst_screen_y"],
+                "success": joint_fit["success"],
+                "message": joint_fit["message"],
+                "cost": joint_fit["cost"],
+                "stopped": bool(joint_fit.get("stopped", False)),
+            }
 
             if self.print_M:
                 print(
-                    f"Plane x done: "
-                    f"success={fit_x['success']}, "
-                    f"cost={fit_x['cost']:.6g}, "
-                    f"stopped={fit_x.get('stopped', False)}, "
-                    f"emit={fit_x['emit']:.6g}, "
-                    f"beta0={fit_x['beta0']:.6g}, "
-                    f"alpha0={fit_x['alpha0']:.6g}"
+                    f"Joint fit done: success={joint_fit['success']}, cost={joint_fit['cost']:.6g}, "
+                    f"emit_x={joint_fit['emit_x']:.6g}, beta_x0={joint_fit['beta_x0']:.6g}, alpha_x0={joint_fit['alpha_x0']:.6g}, "
+                    f"emit_y={joint_fit['emit_y']:.6g}, beta_y0={joint_fit['beta_y0']:.6g}, alpha_y0={joint_fit['alpha_y0']:.6g}"
                 )
-        except (OptimizationStopped, OptimizationPaused):
-            fit_x = None
-        try:
-            fit_y = self._fit_plane(plane="y", screens=screens, quad_name=quad_name, K1_values=K1_values, sigma=sigy, sigma_std=sigy_std,
-                                    initial_guess = (initial_guess or {}).get("y") if isinstance(initial_guess, dict) else None)
 
-            if self.print_M:
-                print(
-                    f"Plane y done: "
-                    f"success={fit_y['success']}, "
-                    f"cost={fit_y['cost']:.6g}, "
-                    f"stopped={fit_y.get('stopped', False)}, "
-                    f"emit={fit_y['emit']:.6g}, "
-                    f"beta0={fit_y['beta0']:.6g}, "
-                    f"alpha0={fit_y['alpha0']:.6g}"
-                )
-        except (OptimizationStopped, OptimizationPaused):
-            fit_y = None
+        except (OptimizationStopped, OptimizationPaused) as e:
+            if isinstance(getattr(e, "solution", None), dict):
+                joint_fit = e.solution
+                fit_x = {
+                        "emit": joint_fit["emit_x"],
+                        "beta0": joint_fit["beta_x0"],
+                        "alpha0": joint_fit["alpha_x0"],
+                        "pred": joint_fit["pred_x"],
+                        "residual_rms": joint_fit["residual_rms_x"],
+                        "residual_mad": joint_fit["residual_mad_x"],
+                        "residual_rms_per_screen": joint_fit["residual_rms_per_screen_x"],
+                        "worst_screen": joint_fit["worst_screen_x"],
+                        "success": joint_fit["success"],
+                        "message": joint_fit["message"],
+                        "cost": joint_fit["cost"],
+                        "stopped": True,
+                    }
+                fit_y = {
+                        "emit": joint_fit["emit_y"],
+                        "beta0": joint_fit["beta_y0"],
+                        "alpha0": joint_fit["alpha_y0"],
+                        "pred": joint_fit["pred_y"],
+                        "residual_rms": joint_fit["residual_rms_y"],
+                        "residual_mad": joint_fit["residual_mad_y"],
+                        "residual_rms_per_screen": joint_fit["residual_rms_per_screen_y"],
+                        "worst_screen": joint_fit["worst_screen_y"],
+                        "success": joint_fit["success"],
+                        "message": joint_fit["message"],
+                        "cost": joint_fit["cost"],
+                        "stopped": True,
+                    }
+            else:
+                fit_x = None
+                fit_y = None
 
         if fit_x is None:
             fit_x = _plane_no_solution("x", sigma2_template_x)
@@ -230,61 +288,178 @@ class Optimization_EM:
 
         return sigma2_err
 
-    def _fit_plane(self, plane, screens, quad_name, K1_values, sigma, sigma_std, initial_guess = None):
-        sigma = np.asarray(sigma, dtype=float)
-        sigma_std = np.asarray(sigma_std, dtype=float)
-        sigma2 = sigma ** 2
-        sigma2_err = self._safe_sigma2_errors(sigma, sigma_std)
+    def _build_joint_partial_output(self, screens, sigma2_x, sigma2_err_x, sigma2_y, sigma2_err_y, pred2_x, pred2_y, best_row, best_cost):
+        if best_row is None or pred2_x is None or pred2_y is None:
+            return None
+        per_screen_res_x = {screen: [] for screen in screens}
+        per_screen_res_y = {screen: [] for screen in screens}
+        data_res_x = []
+        data_res_y = []
 
-        nominal_emit_norm, nominal_beta0, nominal_alpha0 = 1.0, 1.0, 0.0
+        for k in range(pred2_x.shape[0]):
+            for i, screen in enumerate(screens):
+                yx = sigma2_x[k, i]
+                ypx = pred2_x[k, i]
+                ex = sigma2_err_x[k, i]
+                if np.isfinite(yx) and np.isfinite(ypx) and np.isfinite(ex) and ex > 0:
+                    rx = (ypx - yx) / ex
+                    data_res_x.append(rx)
+                    per_screen_res_x[screen].append(rx)
+
+                yy = sigma2_y[k, i]
+                ypy = pred2_y[k, i]
+                ey = sigma2_err_y[k, i]
+                if np.isfinite(yy) and np.isfinite(ypy) and np.isfinite(ey) and ey > 0:
+                    ry = (ypy - yy) / ey
+                    data_res_y.append(ry)
+                    per_screen_res_y[screen].append(ry)
+
+        data_res_x = np.asarray(data_res_x, dtype=float)
+        data_res_y = np.asarray(data_res_y, dtype=float)
+
+        rms_res_x = float(np.sqrt(np.mean(data_res_x ** 2))) if data_res_x.size else np.nan
+        rms_res_y = float(np.sqrt(np.mean(data_res_y ** 2))) if data_res_y.size else np.nan
+        mad_res_x = float(median_abs_deviation(data_res_x, scale="normal")) if data_res_x.size else np.nan
+        mad_res_y = float(median_abs_deviation(data_res_y, scale="normal")) if data_res_y.size else np.nan
+
+        per_screen_rms_x = {}
+        per_screen_rms_y = {}
+        for screen in screens:
+            arrx = np.asarray(per_screen_res_x[screen], dtype=float)
+            arry = np.asarray(per_screen_res_y[screen], dtype=float)
+            per_screen_rms_x[screen] = float(np.sqrt(np.mean(arrx ** 2))) if arrx.size else np.nan
+            per_screen_rms_y[screen] = float(np.sqrt(np.mean(arry ** 2))) if arry.size else np.nan
+
+        finite_x = [(screen, val) for screen, val in per_screen_rms_x.items() if np.isfinite(val)]
+        finite_y = [(screen, val) for screen, val in per_screen_rms_y.items() if np.isfinite(val)]
+        worst_screen_x = max(finite_x, key=lambda x: x[1])[0] if finite_x else None
+        worst_screen_y = max(finite_y, key=lambda x: x[1])[0] if finite_y else None
+
+        gamma_rel, beta_rel = self.interface.get_beam_factors()
+        beta_gamma = gamma_rel * beta_rel
+
+        emit_x_geom = max(float(best_row["emit_x_norm"]) / beta_gamma, 1e-12) if np.isfinite(beta_gamma) and beta_gamma > 0 else np.nan
+        emit_y_geom = max(float(best_row["emit_y_norm"]) / beta_gamma, 1e-12) if np.isfinite(beta_gamma) and beta_gamma > 0 else np.nan
+
+        return {
+            "emit_x": emit_x_geom,
+            "beta_x0": float(best_row["beta_x0"]),
+            "alpha_x0": float(best_row["alpha_x0"]),
+            "emit_y": emit_y_geom,
+            "beta_y0": float(best_row["beta_y0"]),
+            "alpha_y0": float(best_row["alpha_y0"]),
+            "pred_x": pred2_x,
+            "pred_y": pred2_y,
+            "residual_rms_x": rms_res_x,
+            "residual_rms_y": rms_res_y,
+            "residual_mad_x": mad_res_x,
+            "residual_mad_y": mad_res_y,
+            "residual_rms_per_screen_x": per_screen_rms_x,
+            "residual_rms_per_screen_y": per_screen_rms_y,
+            "worst_screen_x": worst_screen_x,
+            "worst_screen_y": worst_screen_y,
+            "success": True,
+            "message": "Best joint solution found so far.",
+            "cost": float(best_cost) if np.isfinite(best_cost) else np.nan,
+            "stopped": True,
+        }
+
+    def _fit_6d(self, screens, quad_name, K1_values, sigx, sigx_std, sigy, sigy_std, initial_guess = None):
+        sigx = np.asarray(sigx, dtype=float)
+        sigy = np.asarray(sigy, dtype=float)
+        sigx_std = np.asarray(sigx_std, dtype=float)
+        sigy_std = np.asarray(sigy_std, dtype=float)
+        sig_x2 = sigx ** 2
+        sig_y2 = sigy ** 2
+        sig_x2_err = self._safe_sigma2_errors(sigx, sigx_std)
+        sig_y2_err = self._safe_sigma2_errors(sigy, sigy_std)
+
+        valid_x = np.isfinite(sig_x2) & np.isfinite(sig_x2_err) & (sig_x2_err > 0)
+        valid_y = np.isfinite(sig_y2) & np.isfinite(sig_y2_err) & (sig_y2_err > 0)
+
+        if not np.any(valid_x) and not np.any(valid_y): # if False
+            raise RuntimeError(f"No valid measurements for joint fit")
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
         beta_gamma = gamma_rel * beta_rel
         if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")
 
-        nominal_emit_norm = float(nominal_emit_norm) if np.isfinite(nominal_emit_norm) else 1.0
-        nominal_emit_norm = max(nominal_emit_norm, 1e-6)
+        emit_x_norm0, emit_y_norm0, beta_x0_0, beta_y0_0, alpha_x0_0, alpha_y0_0 = 2.0, 0.1, 10.0, 10.0, 0.0, 0.0
+        if isinstance(initial_guess, dict):
+            try:
+                emit_x_norm0 = max(float(initial_guess.get("emit_x_norm", emit_x_norm0)), 1e-8)
+            except Exception:
+                pass
+            try:
+                emit_y_norm0 = max(float(initial_guess.get("emit_y_norm", emit_y_norm0)), 1e-8)
+            except Exception:
+                pass
+            try:
+                beta_x0_0 = max(float(initial_guess.get("beta_x0", beta_x0_0)), 1e-8)
+            except Exception:
+                pass
+            try:
+                beta_y0_0 = max(float(initial_guess.get("beta_y0", beta_y0_0)), 1e-8)
+            except Exception:
+                pass
+            try:
+                alpha_x0_0 = float(initial_guess.get("alpha_x0", alpha_x0_0))
+            except Exception:
+                pass
+            try:
+                alpha_y0_0 = float(initial_guess.get("alpha_y0", alpha_y0_0))
+            except Exception:
+                pass
 
-        nominal_beta0 = float(nominal_beta0) if np.isfinite(nominal_beta0) else 5.0
-        nominal_beta0 = max(nominal_beta0, 1e-6)
+        bounds = {
+            "emit_x_norm": [1.0, 10.0],
+            "beta_x0": [0.3, 25.0],
+            "alpha_x0": [-10.0, 10.0],
+            "emit_y_norm": [0.005, 0.2],
+            "beta_y0": [0.3, 30.0],
+            "alpha_y0": [-10.0, 10.0],
+        }
 
-        nominal_alpha0 = float(nominal_alpha0) if np.isfinite(nominal_alpha0) else 0.0
+        vocs = VOCS( # degrees of freedom
+            variables = {i: [float(vals[0]), float(vals[1])] for i, vals in bounds.items()
+        },
+            objectives={"f": "MINIMIZE"},
+        )
 
-        valid = np.isfinite(sigma2) & np.isfinite(sigma2_err) & (sigma2_err > 0)
-        if not np.any(valid): # if False
-            raise RuntimeError(f"No valid measurements for plane {plane}")
-
-        def predict_raw(emit_norm, beta0, alpha0, allow_stop = True):
+        def predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True):
             '''
-            If a beam size on reference screen has certain twiss parameters and given emittance,
+            If the beam at the scanned quadrupole has certain Twiss parameters and given emittance,
             what quadrupole scan should be?
             It's based on implementation in the RFTrack interface, where:
-            it sets a quadrupole to each K1, build a bunch with given Twiss parameters, tracks it and
-            read beam sizes at screens.
+            it sets a quadrupole to each K1, builds a bunch with given Twiss parameters at quad_name,
+            tracks only the lattice view from quad_name to the last selected screen,
+            and reads beam sizes at screens.
             '''
-            emit_norm = float(emit_norm)
-            beta0 = float(beta0)
-            alpha0 = float(alpha0)
+            emit_x_norm = float(emit_x_norm)
+            beta_x0 = float(beta_x0)
+            alpha_x0 = float(alpha_x0)
+            emit_y_norm = float(emit_y_norm)
+            beta_y0 = float(beta_y0)
+            alpha_y0 = float(alpha_y0)
 
-            if not np.isfinite(emit_norm) or emit_norm <= 0:
-                raise RuntimeError(f"Invalid emit norm {emit_norm}")
-            if not np.isfinite(beta0) or beta0 <= 0:
-                raise RuntimeError(f"beta0 {beta0} must be positive")
-            if not np.isfinite(alpha0):
-                raise RuntimeError(f"alpha0 {alpha0} must be finite")
-
-            emit_geom = max(emit_norm / beta_gamma, 1e-12)
+            if emit_x_norm <= 0.0 or emit_y_norm <= 0.0 or beta_x0 <= 0.0 or beta_y0 <= 0.0:
+                raise RuntimeError("Invalid joint fit paramaters. Emittance and beta should be positive.")
+            emit_x_geom = max(emit_x_norm / beta_gamma, 1e-12)
+            emit_y_geom = max(emit_y_norm / beta_gamma, 1e-12)
 
             try:
-                pred_sigma = self.interface.predict_emittance_scan_response(
-                    plane=plane,
+                pred_sigx, pred_sigy = self.interface.predict_emittance_scan_response(
                     quad_name=quad_name,
                     screens=screens,
                     K1_values=K1_values,
-                    emit=emit_geom,
-                    beta0=beta0,
-                    alpha0=alpha0,
+                    emit_x=emit_x_norm,
+                    emit_y=emit_y_norm,
+                    beta_x0=beta_x0,
+                    beta_y0=beta_y0,
+                    alpha_x0=alpha_x0,
+                    alpha_y0=alpha_y0,
+                    reference_screen=screens[0],
                     stop_checker=(lambda: self._stop_requested or self._pause_requested) if allow_stop else None,
                 )
             except RuntimeError as e:
@@ -293,17 +468,15 @@ class Optimization_EM:
                         raise OptimizationPaused("Optimization paused.")
                     raise OptimizationStopped("Optimization stopped.")
                 raise
-            pred_sigma = np.asarray(pred_sigma, dtype=float)
-            if pred_sigma.shape != sigma.shape:
+            pred_sigx = np.asarray(pred_sigx, dtype=float)
+            pred_sigy = np.asarray(pred_sigy, dtype=float)
+            if pred_sigx.shape != sigx.shape or pred_sigy.shape != sigy.shape:
                 raise RuntimeError(
-                    f"Sigma shape {pred_sigma.shape} does not match measured shape {sigma.shape}"
+                    f"Sigma shape does not match measured shape"
                 )
-            return pred_sigma ** 2
+            return pred_sigx ** 2, pred_sigy ** 2
 
-        valid = np.isfinite(sigma2) & np.isfinite(sigma2_err) & (sigma2_err > 0)
-
-
-        def compute_cost(emit_norm, beta0, alpha0, allow_stop = True):
+        def compute_cost(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True):
             '''
             It compares how well a scan is predicting a model, how much it differs from data and
             minimizes f, so that it's as small as possible.
@@ -312,153 +485,56 @@ class Optimization_EM:
                 if self._pause_requested:
                     raise OptimizationPaused("Optimization paused.")
                 raise OptimizationStopped("Optimization stopped.")
-            pred2 = predict_raw(emit_norm, beta0, alpha0, allow_stop = allow_stop)
-            data_res = (pred2 - sigma2) / sigma2_err # predicted - measured / error^2
-            res = np.asarray(data_res[valid].ravel(), dtype=float) # the better the match, the smaller the number
+            pred2_x, pred2_y = predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop)
+            rx = ((pred2_x - sig_x2) / sig_x2_err)[valid_x] if np.any(valid_x) else np.array([], dtype=float)
+            ry = ((pred2_y - sig_y2) / sig_y2_err)[valid_y] if np.any(valid_y) else np.array([], dtype=float)
+            res = np.concatenate([np.asarray(rx, dtype = float).ravel(), np.asarray(ry, dtype = float).ravel()]) # the better the match, the smaller the number
+
             if res.size == 0:
-                return np.inf, pred2
-            return float(np.mean(res**2)), pred2 # so positive and negative residuals are not cancalled and fit doesn't think it's perfect, it also punishes better worse solutions
-
-        last_emit_norm = nominal_emit_norm # nominal starts from the interface
-        last_beta0 = nominal_beta0
-        last_alpha0 = nominal_alpha0
-
-        if isinstance(initial_guess, dict) and bool(initial_guess.get("found", False)): # if it's starting after resuming, starts from best solution so far
-            try:
-                last_emit_norm_cand = float(initial_guess.get("emit_norm"))
-                last_beta0_cand = float(initial_guess.get("beta0"))
-                last_alpha0_cand = float(initial_guess.get("alpha0"))
-            except Exception:
-                last_emit_norm_cand = np.nan
-                last_beta0_cand = np.nan
-                last_alpha0_cand = np.nan
-
-            if np.isfinite(last_emit_norm_cand) and last_emit_norm_cand > 0:
-                last_emit_norm = max(last_emit_norm_cand, 1e-8)
-
-            if np.isfinite(last_beta0_cand) and last_beta0_cand > 0:
-                last_beta0 = max(last_beta0_cand, 1e-8)
-
-            if np.isfinite(last_alpha0_cand):
-                last_alpha0 = last_alpha0_cand
-
-            if self.print_M:
-                print(
-                    f"Plane {plane}: resuming fitting, starting from last values before pausing. "
-                    f"emit_norm={last_emit_norm:.6g}, "
-                    f"beta0={last_beta0:.6g}, "
-                    f"alpha0={last_alpha0:.6g}"
-                )
-
-        if plane == "x":
-            emit_low, emit_high = 0.5, 12.0
-            beta_low, beta_high = 1.0, 15.0
-            alpha_low, alpha_high = -5.0, 5.0
-        else:
-            emit_low, emit_high = 0.005, 0.2
-            beta_low, beta_high = 0.5, 8.0
-            alpha_low, alpha_high = -5.0, 5.0
-
-        vocs = VOCS( # degrees of freedom
-            variables = {
-            "emit_norm": [float(emit_low), float(emit_high)],
-            "beta0": [float(beta_low), float(beta_high)],
-            "alpha0": [float(alpha_low), float(alpha_high)],
-
-        },
-            objectives={"f": "MINIMIZE"},
-        )
-
+                return np.inf, pred2_x, pred2_y
+            return float(np.mean(res**2)), pred2_x, pred2_y # so positive and negative residuals are not cancalled and fit doesn't think it's perfect, it also punishes better worse solutions
 
         def evaluate(inputs):
             if self._stop_requested:
                 raise OptimizationStopped("Optimization stopped.")
-
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.")
 
-            emit_norm = float(inputs["emit_norm"])
-            beta0 = float(inputs["beta0"])
-            alpha0 = float(inputs["alpha0"])
-
-            f, _ = compute_cost(emit_norm, beta0, alpha0, allow_stop = True)
+            f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
+                                float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = True)
 
             if self.print_M:
-                    print(
-                        f"Plane {plane}: "
-                        f"Xopt eval emit_norm={emit_norm:.6g}, "
-                        f"beta0={beta0:.6g}, "
-                        f"alpha0={alpha0:.6g},"
-                        f"f={f:.6g}"
-                    )
+                print(
+                    "Joint fit solution: "
+                    f"emit_x_norm={float(inputs['emit_x_norm']):.6g}, beta_x0={float(inputs['beta_x0']):.6g}, alpha_x0={float(inputs['alpha_x0']):.6g}, "
+                    f"emit_y_norm={float(inputs['emit_y_norm']):.6g}, beta_y0={float(inputs['beta_y0']):.6g}, alpha_y0={float(inputs['alpha_y0']):.6g}, f={f:.6g}"
+                )
             return {"f": f}
 
         evaluator = Evaluator(function = evaluate) # how to calculate merit function
         generator = ExpectedImprovementGenerator(vocs = vocs) # how to choose the next point
         X = Xopt(generator = generator, evaluator = evaluator, vocs = vocs)
 
-        seeds = []
+        seeds = [{
+            "emit_x_norm": float(np.clip(emit_x_norm0, *bounds["emit_x_norm"])),
+            "beta_x0": float(np.clip(beta_x0_0, *bounds["beta_x0"])),
+            "alpha_x0": float(np.clip(alpha_x0_0, *bounds["alpha_x0"])),
+            "emit_y_norm": float(np.clip(emit_y_norm0, *bounds["emit_y_norm"])),
+            "beta_y0": float(np.clip(beta_y0_0, *bounds["beta_y0"])),
+            "alpha_y0": float(np.clip(alpha_y0_0, *bounds["alpha_y0"])),
+        }]
 
-
-        base_seed = {
-                "emit_norm" : float(np.clip(last_emit_norm, emit_low, emit_high)),
-                "beta0" : float(np.clip(last_beta0, beta_low, beta_high)),
-                "alpha0" : float(np.clip(last_alpha0, alpha_low, alpha_high)),
-                    }
-
-
-        seeds.append(base_seed)
         total_initial = max(1, int(self.xopt_initial_points))
-        remaining = max(0, total_initial - 1)
 
-        n_local = int(round(remaining * float(self.xopt_local_seed_fraction)))
-        n_local = max(0, min(n_local, remaining))
-        n_global = remaining - n_local
-
-        def _add_seed(guess):
+        for _ in range(max(0, total_initial - 1)):
             seeds.append({
-                "emit_norm": float(np.clip(guess["emit_norm"], emit_low, emit_high)),
-                "beta0": float(np.clip(guess["beta0"], beta_low, beta_high)),
-                "alpha0": float(np.clip(guess["alpha0"], alpha_low, alpha_high)),
+                "emit_x_norm": float(np.exp(self.rng.uniform(np.log(bounds["emit_x_norm"][0]), np.log(bounds["emit_x_norm"][1])))),
+                "beta_x0": float(np.exp(self.rng.uniform(np.log(bounds["beta_x0"][0]), np.log(bounds["beta_x0"][1])))),
+                "alpha_x0": float(self.rng.uniform(bounds["alpha_x0"][0], bounds["alpha_x0"][1])),
+                "emit_y_norm": float(np.exp(self.rng.uniform(np.log(bounds["emit_y_norm"][0]), np.log(bounds["emit_y_norm"][1])))),
+                "beta_y0": float(np.exp(self.rng.uniform(np.log(bounds["beta_y0"][0]), np.log(bounds["beta_y0"][1])))),
+                "alpha_y0": float(self.rng.uniform(bounds["alpha_y0"][0], bounds["alpha_y0"][1])),
             })
-
-        for _ in range(n_local): # a few local seeds around current guess / resume point
-            _add_seed({
-                "emit_norm": last_emit_norm * np.exp(self.rng.normal(0.0, 0.6)),
-                "beta0": last_beta0 * np.exp(self.rng.normal(0.0, 0.4)),
-                "alpha0": last_alpha0 + self.rng.normal(0.0, float(self.xopt_local_alpha_sigma)),
-            })
-
-        if self.xopt_use_global_seed and n_global > 0: # one global solution near the middle of the bounds
-            global_seed = {
-                "emit_norm": float(np.sqrt(emit_low * emit_high)),
-                "beta0": float(np.sqrt(beta_low * beta_high)),
-                "alpha0": float(0.5 * (alpha_low + alpha_high)),
-            }
-            _add_seed(global_seed)
-            n_global -= 1
-
-        for _ in range(n_global):
-            _add_seed({
-                "emit_norm": float(np.exp(self.rng.uniform(np.log(emit_low), np.log(emit_high)))),
-                "beta0": float(np.exp(self.rng.uniform(np.log(beta_low), np.log(beta_high)))),
-                "alpha0": float(self.rng.uniform(alpha_low, alpha_high)),
-            })
-
-        if self.print_M:
-            print(
-                f"Plane {plane}: initial seeds -> total={len(seeds)}, "
-                f"local={n_local}, global={max(0, len(seeds) - 1 - n_local)}, "
-                f"base=1"
-            )
-
-        def _row_to_vector(row):
-            return np.array([
-                float(row["emit_norm"]),
-                float(row["beta0"]),
-                float(row["alpha0"]),
-            ], dtype=float)
-
 
         best_row = None # from X.data
         best_cost = np.inf
@@ -488,28 +564,17 @@ class Optimization_EM:
                 best_cost = cost
                 best_row = row
 
-                if self.print_M:
-                    print(
-                        f"Plane {plane}: "
-                        f" New best from Xopt, cost={best_cost:.6g}, "
-                        f"emit_norm={float(row['emit_norm']):.6g}, "
-                        f"beta0={float(row['beta0']):.6g}, "
-                        f"alpha0={float(row['alpha0']):.6g}, "
-                    )
-
         try:
             X.evaluate_data(pd.DataFrame(seeds)) # for bayesian optimization to suggest better solutions, it needs some data
             update_best_from_data()
-
             for i in range(self.xopt_steps):
                 if self.print_M:
-                    print(f"Plane {plane}: Xopt step {i + 1}/{self.xopt_steps}")
+                    print(f"Joint Xopt step {i + 1}/{self.xopt_steps}")
                 if self._stop_requested:
                     if best_row is not None:
                         stopped_during_fit = True
                         break
                     raise OptimizationStopped("Optimization stopped.")
-
                 if self._pause_requested:
                     if best_row is not None:
                         stopped_during_fit = True
@@ -529,108 +594,172 @@ class Optimization_EM:
                 stopped_during_fit = True
             else:
                 raise
-
-        if self.xopt_local_refine and best_row is not None and not stopped_during_fit:
-            x0 = _row_to_vector(best_row)
-            local_bounds = [(emit_low, emit_high), (beta_low, beta_high), (alpha_low, alpha_high)]
-
-            def _local_objective(x):
-                if self._stop_requested or self._pause_requested:
-                    if self._pause_requested:
-                        raise OptimizationPaused("Optimization paused.")
-                    raise OptimizationStopped("Optimization stopped.")
-                try:
-                    f, _ = compute_cost(float(x[0]), float(x[1]), float(x[2]), allow_stop=True)
-                except (OptimizationStopped, OptimizationPaused):
-                    raise
-                except Exception:
-                    return 1e30
-                if not np.isfinite(f):
-                    return 1e30
-                return float(f)
-
-            try:
-                local_fit = minimize(_local_objective, x0, method="Powell", bounds=local_bounds, options={"maxiter": int(self.xopt_local_refine_maxiter), "disp": False})
-                local_x = np.asarray(local_fit.x, dtype=float)
-                local_cost = float(_local_objective(local_x))
-
-                if np.isfinite(local_cost) and local_cost < best_cost:
-                    best_cost = local_cost
-                    best_row = pd.Series(
-                        {
-                            "emit_norm": float(local_x[0]),
-                            "beta0": float(local_x[1]),
-                            "alpha0": float(local_x[2]),
-                            "f": float(local_cost),
-                        }
-                    )
-                    if self.print_M:
-                        print(
-                            f"Plane {plane}: local refinement improved best to cost={best_cost:.6g}, "
-                            f"emit_norm={float(local_x[0]):.6g}, "
-                            f"beta0={float(local_x[1]):.6g}, "
-                            f"alpha0={float(local_x[2]):.6g}"
-                        )
-            except Exception(OptimizationStopped, OptimizationPaused):
-                raise
-            except Exception as e:
-                if self.print_M:
-                    print(f"Plane {plane}: local refinement failed: {e}")
+        if best_row is None:
+            raise RuntimeError("Joint Xopt failed to find best fit solution.")
 
         if self.print_M:
             print(
-                f"Plane {plane}: Xopt finished."
-                f"evaluations = {0 if getattr(X, 'data', None) is None else len(X.data)},"
+                f"Joint Xopt finished. "
+                f"evaluations={0 if getattr(X, 'data', None) is None else len(X.data)}, "
                 f"best_found={best_row is not None}, stopped={stopped_during_fit}"
+            )
+
+        emit_x_norm_best = float(best_row["emit_x_norm"])
+        beta_x0_best = float(best_row["beta_x0"])
+        alpha_x0_best = float(best_row["alpha_x0"])
+        emit_y_norm_best = float(best_row["emit_y_norm"])
+        beta_y0_best = float(best_row["beta_y0"])
+        alpha_y0_best = float(best_row["alpha_y0"])
+
+        if self._stop_requested or self._pause_requested:
+            pred2_x_partial, pred2_y_partial = predict_raw(
+                emit_x_norm_best, beta_x0_best, alpha_x0_best,
+                emit_y_norm_best, beta_y0_best, alpha_y0_best,
+                allow_stop=False
+            )
+
+            solution = self._build_joint_partial_output(
+                screens=screens,
+                sigma2_x=sig_x2,
+                sigma2_err_x=sig_x2_err,
+                sigma2_y=sig_y2,
+                sigma2_err_y=sig_y2_err,
+                pred2_x=pred2_x_partial,
+                pred2_y=pred2_y_partial,
+                best_row=best_row,
+                best_cost=best_cost,
+            )
+            if self._pause_requested:
+                raise OptimizationPaused("Optimization paused.", solution=solution)
+            raise OptimizationStopped("Optimization stopped.", solution=solution)
+
+        pred2_x, pred2_y = predict_raw(
+            emit_x_norm_best, beta_x0_best, alpha_x0_best,
+            emit_y_norm_best, beta_y0_best, alpha_y0_best,
+            allow_stop=True,
+        )
+        run_nelder_mead = False # make True to run this algorithm
+        if not run_nelder_mead:
+            solution = self._build_joint_partial_output(
+                screens=screens,
+                sigma2_x=sig_x2,
+                sigma2_err_x=sig_x2_err,
+                sigma2_y=sig_y2,
+                sigma2_err_y=sig_y2_err,
+                pred2_x=pred2_x,
+                pred2_y=pred2_y,
+                best_row=best_row,
+                best_cost=best_cost,
+            )
+            solution["message"] = "Joint x+y Xopt only. Nelder-Mead disabled for test."
+            solution["stopped"] = bool(stopped_during_fit)
+            return solution
+
+        if self.print_M:
+            print(f"Starting local optimization from f={best_cost:.4g}...")
+
+        params_order = ["emit_x_norm", "beta_x0", "alpha_x0",
+                       "emit_y_norm", "beta_y0", "alpha_y0"]
+
+        low_nm = np.array([bounds[p][0] for p in params_order])
+        high_nm = np.array([bounds[p][1] for p in params_order])
+
+        x0_nm = np.array([
+            emit_x_norm_best, beta_x0_best, alpha_x0_best,
+            emit_y_norm_best, beta_y0_best, alpha_y0_best,
+        ])
+
+        nm_best_cost   = [best_cost]
+        nm_best_params = [x0_nm.copy()]
+        nm_stopped     = [False]
+
+        def _f_nm(p):
+            penalty = float(np.sum(
+                np.maximum(low_nm - p, 0.0) ** 2 +
+                np.maximum(p - high_nm, 0.0) ** 2
+            )) * 1e6
+            p_c = np.clip(p, low_nm, high_nm)
+            try:
+                p2x, p2y = predict_raw(
+                    p_c[0], p_c[1], p_c[2], p_c[3], p_c[4], p_c[5],
+                    allow_stop=False,
                 )
+            except Exception:
+                return 1e12 + penalty
+            rx = ((p2x - sig_x2) / sig_x2_err)[valid_x].ravel() if np.any(valid_x) else np.array([], dtype=float)
+            ry = ((p2y - sig_y2) / sig_y2_err)[valid_y].ravel() if np.any(valid_y) else np.array([], dtype=float)
+            res = np.concatenate([rx[np.isfinite(rx)], ry[np.isfinite(ry)]])
+            f = float(np.mean(res ** 2)) if res.size > 0 else 1e12
+            total = f + penalty
+            if np.isfinite(total) and total < nm_best_cost[0]:
+                nm_best_cost[0] = total
+                nm_best_params[0] = p_c.copy()
+            return total
 
-        if best_row is None:
-            raise RuntimeError(f"Xopt failed to find best fit solution for plane {plane}.")
+        def _nm_callback(p):
+            if self.print_M:
+                print(f" NM iteration:  best_f={nm_best_cost[0]:.4g}")
+            if self._stop_requested or self._pause_requested:
+                nm_stopped[0] = True
+                raise StopIteration("NM stop requested")
 
-        emit_norm_best = float(best_row["emit_norm"])
-        beta0_best = float(best_row["beta0"])
-        alpha0_best = float(best_row["alpha0"])
-        emit_geom_best = max(emit_norm_best / beta_gamma, 1e-12)
+        try:
+            res_nm = minimize(
+                _f_nm, x0_nm, method="Nelder-Mead",
+                options={"maxiter": 500, "xatol": 1e-5, "fatol": 1e-5, "adaptive": True},
+                callback=_nm_callback,
+            )
+            p_nm = np.clip(res_nm.x, low_nm, high_nm)
+            if np.isfinite(res_nm.fun) and res_nm.fun < nm_best_cost[0]:
+                nm_best_cost[0] = float(res_nm.fun)
+                nm_best_params[0] = p_nm
+            if self.print_M:
+                print(f"  NM finished: cost={nm_best_cost[0]:.4g}, success={res_nm.success}, "
+                      f"nit={res_nm.nit}")
+        except StopIteration:
+            nm_stopped[0] = True
+            if self.print_M:
+                print("  NM interrupted.")
+        except Exception as e:
+            if self.print_M:
+                print(f"  NM failed ({e}), using BO result.")
 
-        pred2 = predict_raw(emit_norm_best, beta0_best, alpha0_best, allow_stop = True)
-        data_res = []
-        per_screen_res = {screen: [] for screen in screens}
+        p_final = nm_best_params[0]
+        best_cost_final = nm_best_cost[0]
 
-        for k in range(sigma.shape[0]):
-            for i, screen in enumerate(screens):
-                y = sigma2[k, i] # measured
-                yp = pred2[k, i] # model for best fit
-                err = sigma2_err[k, i]
-                if np.isfinite(y) and np.isfinite(yp) and np.isfinite(err) and err > 0:
-                    r = (yp - y) / err
-                    data_res.append(r)
-                    per_screen_res[screen].append(r) # for final best fit
+        best_row = best_row.copy()
+        best_row["emit_x_norm"] = float(p_final[0])
+        best_row["beta_x0"]     = float(p_final[1])
+        best_row["alpha_x0"]    = float(p_final[2])
+        best_row["emit_y_norm"] = float(p_final[3])
+        best_row["beta_y0"]     = float(p_final[4])
+        best_row["alpha_y0"]    = float(p_final[5])
 
-        data_res = np.asarray(data_res, dtype=float)
+        stopped_during_fit = stopped_during_fit or nm_stopped[0]
 
-        rms_res = float(np.sqrt(np.mean(data_res ** 2))) if data_res.size else np.nan
-        mad_res = float(median_abs_deviation(data_res, scale="normal")) if data_res.size else np.nan
+        if stopped_during_fit or self._stop_requested or self._pause_requested:
+            pred2_x_p, pred2_y_p = predict_raw(
+                *p_final.tolist(), allow_stop=False
+            )
+            solution = self._build_joint_partial_output(
+                screens=screens, sigma2_x=sig_x2, sigma2_err_x=sig_x2_err,
+                sigma2_y=sig_y2, sigma2_err_y=sig_y2_err,
+                pred2_x=pred2_x_p, pred2_y=pred2_y_p,
+                best_row=best_row, best_cost=best_cost_final,
+            )
+            if self._pause_requested:
+                raise OptimizationPaused("Optimization paused.", solution=solution)
+            raise OptimizationStopped("Optimization stopped.", solution=solution)
 
-        per_screen_rms = {}
-        for screen, vals in per_screen_res.items():
-            vals = np.asarray(vals, dtype=float)
-            per_screen_rms[screen] = float(np.sqrt(np.mean(vals ** 2))) if vals.size else np.nan
+        pred2_x, pred2_y = predict_raw(*p_final.tolist(), allow_stop=True)
 
-        finite_items = [(screen, val) for screen, val in per_screen_rms.items() if np.isfinite(val)]
-        worst_screen = max(finite_items, key=lambda x: x[1])[0] if finite_items else None
-        message = f"Xopt best after {0 if getattr(X, 'data', None) is None else len(X.data)} evaluations."
+        solution = self._build_joint_partial_output(
+            screens=screens, sigma2_x=sig_x2, sigma2_err_x=sig_x2_err,
+            sigma2_y=sig_y2, sigma2_err_y=sig_y2_err,
+            pred2_x=pred2_x, pred2_y=pred2_y,
+            best_row=best_row, best_cost=best_cost_final,
+        )
+        solution["message"] = "Joint x+y Xopt + Nelder-Mead."
+        solution["stopped"] = bool(stopped_during_fit)
+        return solution
 
-        return {
-            "emit": float(emit_geom_best),
-            "beta0": float(beta0_best),
-            "alpha0": float(alpha0_best),
-            "pred": pred2,
-            "residual_rms": rms_res,
-            "residual_mad": mad_res,
-            "residual_rms_per_screen": per_screen_rms,
-            "worst_screen": worst_screen,
-            "success": True,
-            "message": message,
-            "cost": float(best_cost),
-            "stopped": bool(stopped_during_fit),
-        }

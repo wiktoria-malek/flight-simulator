@@ -31,15 +31,7 @@ class QuadrupoleScan_EM:
             raise ValueError("At least one quadrupole must be provided")
 
         if len(quad_names) == 1:
-            return self._run_single_scan(quad_name=quad_names[0],
-                                        screens=screens,
-                                         delta_min=delta_min,
-                                         delta_max=delta_max,
-                                         steps=steps,
-                                         nshots=nshots,
-                                         bpms=bpms,
-                                         reference_screen=reference_screen,
-                                         progress_callback=progress_callback)
+            return self._run_single_scan(quad_name=quad_names[0], screens=screens, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, bpms=bpms, reference_screen=reference_screen, progress_callback=progress_callback)
         per_quad_sessions = []
         cancelled = False
         skipped_quadrupoles = []
@@ -87,10 +79,6 @@ class QuadrupoleScan_EM:
 
             per_quad_sessions.append(single_session)
             completed_quadrupoles.append(quad_name)
-
-            if bool(single_session.get("cancelled", False)):
-                cancelled = True
-                break
 
             if bool(single_session.get("cancelled", False)):
                 cancelled = True

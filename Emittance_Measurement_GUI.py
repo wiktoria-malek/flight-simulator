@@ -72,16 +72,18 @@ class OptimizationWorker(QObject):
     optimizer_ready = pyqtSignal(object)
     done = pyqtSignal()
 
-    def __init__(self, interface, session, n_starts = 3, initial_guess = None):
+    def __init__(self, interface, session, n_starts = 3, initial_guess = None, xopt_initial_points = None, xopt_steps = None):
         super().__init__()
         self.interface = interface
         self.session = session
         self.n_starts = n_starts
         self.initial_guess = initial_guess
+        self.xopt_initial_points = xopt_initial_points
+        self.xopt_steps = xopt_steps
 
     def run(self):
         try:
-            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts)
+            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps)
             self.optimizer_ready.emit(tool)
             output = tool.fit_from_session(self.session, initial_guess = self.initial_guess)
             self.finished.emit(output)
@@ -185,10 +187,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
                 return
             self._last_scan_status = status
             self.log(f"Scanning quadrupole {quad_name} | step {int(current_step) + 1}/{int(total_steps)}")
-
-
-
-
 
     def _on_show_all_screens_toggled(self, checked):
         self.screen_on_plot.setEnabled(not bool(checked))
@@ -471,7 +469,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.canvas.draw()
 
     def _run_optimization(self):
-        self.log("Fitting emittance and twiss parameters at first selected screen started...")
+        self.log("Fitting emittance and twiss parameters at scanned quadrupole started...")
         if self.session is None:
             QMessageBox.information(self, "Optimization", "No session.")
             return
@@ -486,7 +484,9 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         initial_guess = None
         if isinstance(self.session, dict):
             initial_guess = self.session.get("optimization_guess")
-        worker = OptimizationWorker(self.interface, self.session, n_starts=3, initial_guess=initial_guess)
+        xopt_initial_points = int(self.xopt_initial_points_spin.value())
+        xopt_steps = int(self.xopt_steps_spin.value())
+        worker = OptimizationWorker(self.interface, self.session, n_starts=3, initial_guess=initial_guess, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps)
 
         worker.moveToThread(thread)
         worker.optimizer_ready.connect(self._store_current_optimizer)
@@ -541,41 +541,21 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
 
         elapsed = time.perf_counter() - self._optimization_t0
 
-        fit_x_found = bool(result.get("fit_x_found", False))
-        fit_y_found = bool(result.get("fit_y_found", False))
+        joint_found = bool(
+            np.isfinite(result.get("emit_x_norm", np.nan)) and np.isfinite(result.get("emit_y_norm", np.nan)))
         paused = bool(result.get("paused", False))
 
         if paused:
-            if fit_x_found and fit_y_found:
+            if joint_found:
                 message = (
-                    "Best solution found so far.\n\n"
+                    "Best joint solution found so far.\n\n"
                     f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
                     f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
                     f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}\n"
                     f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
                 )
-            elif fit_x_found and not fit_y_found:
-                message = (
-                    "Optimization was paused.\n\n"
-                    "A solution was found only for plane x.\n"
-                    "No solution has been found yet for plane y.\n\n"
-                    f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
-                    f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}"
-                )
-            elif fit_y_found and not fit_x_found:
-                message = (
-                    "Optimization was paused.\n\n"
-                    "A solution was found only for plane y.\n"
-                    "No solution has been found yet for plane x.\n\n"
-                    f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
-                    f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
-                )
             else:
-                message = (
-                    "Optimization was paused.\n\n"
-                    "No solution has been found yet for plane x.\n"
-                    "No solution has been found yet for plane y."
-                )
+                message = "Optimization was paused before any joint solution was found."
 
             self._optimization_paused = True
             QMessageBox.information(self, "Optimization paused", message)
@@ -583,36 +563,16 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         elif result.get("stopped", False):
             self._optimization_paused = False
 
-            if fit_x_found and fit_y_found:
+            if joint_found:
                 message = (
-                    "Best solution found so far.\n\n"
+                    "Best joint solution found so far.\n\n"
                     f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
                     f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
                     f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}\n"
                     f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
                 )
-            elif fit_x_found and not fit_y_found:
-                message = (
-                    "Optimization was stopped.\n\n"
-                    "A solution was found only for plane x.\n"
-                    "No solution has been found yet for plane y.\n\n"
-                    f"εₓ = {result['emit_x_norm']:.4f} mm·mrad\n"
-                    f"βₓ0 = {result['beta_x0']:.4f} m, αₓ0 = {result['alpha_x0']:.4f}"
-                )
-            elif fit_y_found and not fit_x_found:
-                message = (
-                    "Optimization was stopped.\n\n"
-                    "A solution was found only for plane y.\n"
-                    "No solution has been found yet for plane x.\n\n"
-                    f"εᵧ = {result['emit_y_norm']:.4f} mm·mrad\n"
-                    f"βᵧ0 = {result['beta_y0']:.4f} m, αᵧ0 = {result['alpha_y0']:.4f}"
-                )
             else:
-                message = (
-                    "Optimization was stopped.\n\n"
-                    "No solution has been found yet for plane x.\n"
-                    "No solution has been found yet for plane y."
-                )
+                message = "Optimization was stopped before any joint solution was found."
 
             QMessageBox.information(self, "Optimization stopped", message)
 

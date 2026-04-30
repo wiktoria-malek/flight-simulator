@@ -531,101 +531,6 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
 
         return bpms
 
-    def get_screens(self, names=None):
-        self.log('Reading screens...')
-        if isinstance(names, str):
-            names = [names]  # allows passing a single screen name
-        hpixel = 0.001  # mm, horizontal size of a pixel
-        vpixel = 0.001  # mm, vertical size of a pixel
-        hpixel_list = []
-        vpixel_list = []
-        xb_list = []
-        yb_list = []
-        sigx_list = []
-        sigy_list = []
-        sum_list = []
-        images = []
-        hedges_all = []
-        vedges_all = []
-        screen_names = []
-        s_list=[]
-
-        # get S positions of screens
-        with open(self.twiss_path, "r") as file:
-            lines = [line.strip() for line in file if line.strip()]
-
-        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
-        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
-        columns = lines[star_symbol].lstrip("*").split()
-        try:
-            name_column = columns.index("NAME")
-            s_column = columns.index("S")
-        except ValueError as e:
-            raise RuntimeError("There are no such columns in the twiss file")
-
-        s_values = {}
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            if len(data) <= max(name_column, s_column):  # if a line has less column than needed, it is omitted
-                continue
-            screen_name = data[name_column].strip('"')
-            try:
-                s_values[screen_name] = (float(data[s_column]))
-            except ValueError:
-                continue
-
-        for s in self.lattice.get_screens():
-            screen_name = s.get_name()
-            if names is not None and screen_name not in names:
-                continue
-            screen_names.append(screen_name)
-            s_list.append(s_values.get(screen_name, np.nan))
-            hpixel_list.append(hpixel)
-            vpixel_list.append(vpixel)
-            m = s.get_bunch().get_phase_space('%x %y')
-            if m is None or len(m) == 0:  # empty bunch
-                xb_list.append(np.nan)
-                yb_list.append(np.nan)
-                sigx_list.append(np.nan)
-                sigy_list.append(np.nan)
-                sum_list.append(0)
-                images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0, hpixel]))
-                vedges_all.append(np.array([0, vpixel]))
-                continue
-
-            sumw = len(m[:, 0])  # number of particles in the screen; intensity
-            xb_list.append(np.mean(m[:, 0]))  # mean x of particles
-            yb_list.append(np.mean(m[:, 1]))  # mean y of particles
-            sigx_list.append(np.std(m[:, 0]))  # RMS x beam size
-            sigy_list.append(np.std(m[:, 1]))  # RMS y beam size
-            sum_list.append(sumw)
-
-            nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(
-                m[:, 0]) > 0 else 1  # ceil rounds up, so it can take the whole range
-            ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
-            nx = int(np.clip(nx, 10, 400))
-            ny = int(np.clip(ny, 10, 400))
-            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx,
-                                                                           ny))  # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
-            images.append(image)  # image[i,j] = nparticles in bin i on x axis and nparticles in bin j on y axis
-            hedges_all.append(hedges)  # bin edges in x (nx + 1)
-            vedges_all.append(vedges)  # bin edges in y (ny + 1)
-
-        screens = {"names": screen_names,
-                   "hpixel": np.array(hpixel_list, dtype=float),
-                   "vpixel": np.array(vpixel_list, dtype=float),
-                   "x": np.array(xb_list, dtype=float),
-                   "y": np.array(yb_list, dtype=float),
-                   "sigx": np.array(sigx_list, dtype=float),
-                   "sigy": np.array(sigy_list, dtype=float),
-                   "sum": np.array(sum_list, dtype=float),
-                   "hedges": hedges_all,
-                   "vedges": vedges_all,
-                   "images": images,
-                   "S": np.array(s_list, dtype=float),}
-        return screens
-
     def get_quadrupoles(self, names=None):
         self.log("Reading quadrupoles' strengths...")
         bdes = np.zeros(len(self.quadrupoles), dtype=float)
@@ -663,7 +568,7 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
 
         return quadrupoles
 
-    def set_quadrupoles(self, names, values_range):
+    def set_quadrupoles(self, names, values_range, track = True):
         if isinstance(names, str):
             names = [names]
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
@@ -673,7 +578,8 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
                 element.set_K1(self.Pref0 / self.Q,float(value))
-        self.__track_bunch()
+        if track:
+            self.__track_bunch()
 
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -803,66 +709,6 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
 
     def misalign_bpms(self, sigma_x=0.100, sigma_y=0.100):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch()
-    def get_sextupoles(self, names = None):
-        self.log("Reading sextupoles' strengths...")
-        bdes = np.zeros(len(self.sextupoles), dtype=float)
-
-        for i, sextupole_name in enumerate(self.sextupoles):
-            elements = self.lattice[sextupole_name]
-            if not isinstance(elements, list):
-                elements = [elements]
-
-            k2_values = []
-            for element in elements:
-                try:
-                    strength = element.get_strengths()
-                except Exception:
-                    continue
-                strengths = np.asarray(strength, dtype = complex ).ravel()
-                if strengths.size >= 3:
-                    k2_values.append(float(np.real(strengths[2])))
-                else:
-                    k2_values.append(0.0)
-            if len(k2_values) > 1 and not np.allclose(k2_values, k2_values[0], rtol = 0.0, atol = 1e-12):
-                self.log(f"Parts of sextupole {sextupole_name} are not consistent.")
-
-            bdes[i] = k2_values[0] if k2_values else 0.0
-
-        sextupoles = {"names": self.sextupoles, "bdes": bdes, "bact": bdes.copy()}
-
-        if isinstance(names, str):
-            names = [names]
-        if names is not None:
-            idx = np.array([i for i, s in enumerate(sextupoles["names"]) if s in names])
-            sextupoles = {
-                "names": np.array(sextupoles["names"])[idx],
-                "bdes": np.array(sextupoles["bdes"])[idx],
-                "bact": np.array(sextupoles["bact"])[idx],
-            }
-        return sextupoles
-
-    def set_sextupoles(self, names, values_range):
-        if isinstance(names, str):
-            names = [names]
-        if not (isinstance(values_range, (list, tuple, np.ndarray))):
-            values_range = [values_range]
-        for sextupole_name, value in zip(names, values_range):
-            elements = self.lattice[sextupole_name]
-            if not isinstance(elements, (list)): elements = [elements]
-            for element in elements:
-                try:
-                    strengths = element.get_strengths()
-                except Exception:
-                    continue
-                strengths = np.asarray(strengths, dtype = complex).ravel()
-
-                if strengths.size < 3:
-                    padded = np.zeros(3, dtype = complex)
-                    padded[:strengths.size] = strengths
-                    strengths = padded
-                strengths[2] = complex(float(value), 0.0)
-                element.set_strengths(strengths)
         self.__track_bunch()
 
     def _get_optics_from_twiss_file(self,names=None):

@@ -23,14 +23,10 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                 q.insert(cx)
                 q.insert(cy)
         self.lattice.set_bpm_resolution(bpm_resolution)
-        for s in self.lattice['*OTR*']:
-            screen = rft.Screen()
-            screen.set_name(s.get_name())
-            s.replace_with(screen)
         self.sequence = [ e.get_name() for e in self.lattice['*']]
         self.bpms = [ e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [ e.get_name() for e in self.lattice.get_correctors()]
-        self.screens = [ e.get_name() for e in self.lattice.get_screens()]
+        self.screens = []
         self.quadrupoles = list(dict.fromkeys(e.get_name() for e in self.lattice.get_quadrupoles()))
         self.Pref = 1.2999999e3 # 1.3 GeV/c
         self.population = population
@@ -174,8 +170,8 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.log(f"εz = {I.emitt_z}[mm.permille]")
 
     def get_beam_factors(self):
-        gamma_rel = (self.Pref + self.electronmass) / self.electronmass
-        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel**2)
+        gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
+        beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
         return gamma_rel, beta_rel
 
     def change_energy(self):
@@ -314,101 +310,6 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
 
         return bpms
 
-    def get_screens(self, names=None):
-        self.log('Reading screens...')
-        if isinstance(names, str):
-            names = [names]  # allows passing a single screen name
-        hpixel = 0.001  # mm, horizontal size of a pixel
-        vpixel = 0.001  # mm, vertical size of a pixel
-        hpixel_list = []
-        vpixel_list = []
-        xb_list = []
-        yb_list = []
-        sigx_list = []
-        sigy_list = []
-        sum_list = []
-        images = []
-        hedges_all = []
-        vedges_all = []
-        screen_names = []
-        s_list=[]
-
-        # get S positions of screens
-        with open(self.twiss_path, "r") as file:
-            lines = [line.strip() for line in file if line.strip()]
-
-        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
-        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
-        columns = lines[star_symbol].lstrip("*").split()
-        try:
-            name_column = columns.index("NAME")
-            s_column = columns.index("S")
-        except ValueError as e:
-            raise RuntimeError("There are no such columns in the twiss file")
-
-        s_values = {}
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            if len(data) <= max(name_column, s_column):  # if a line has less column than needed, it is omitted
-                continue
-            screen_name = data[name_column].strip('"')
-            try:
-                s_values[screen_name] = (float(data[s_column]))
-            except ValueError:
-                continue
-
-        for s in self.lattice.get_screens():
-            screen_name = s.get_name()
-            if names is not None and screen_name not in names:
-                continue
-            screen_names.append(screen_name)
-            s_list.append(s_values.get(screen_name, np.nan))
-            hpixel_list.append(hpixel)
-            vpixel_list.append(vpixel)
-            m = s.get_bunch().get_phase_space('%x %y')
-            if m is None or len(m) == 0:  # empty bunch
-                xb_list.append(np.nan)
-                yb_list.append(np.nan)
-                sigx_list.append(np.nan)
-                sigy_list.append(np.nan)
-                sum_list.append(0)
-                images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0, hpixel]))
-                vedges_all.append(np.array([0, vpixel]))
-                continue
-
-            sumw = len(m[:, 0])  # number of particles in the screen; intensity
-            xb_list.append(np.mean(m[:, 0]))  # mean x of particles
-            yb_list.append(np.mean(m[:, 1]))  # mean y of particles
-            sigx_list.append(np.std(m[:, 0]))  # RMS x beam size
-            sigy_list.append(np.std(m[:, 1]))  # RMS y beam size
-            sum_list.append(sumw)
-
-            nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(
-                m[:, 0]) > 0 else 1  # ceil rounds up, so it can take the whole range
-            ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
-            nx = int(np.clip(nx, 10, 400))
-            ny = int(np.clip(ny, 10, 400))
-            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx,
-                                                                           ny))  # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
-            images.append(image)  # image[i,j] = nparticles in bin i on x axis and nparticles in bin j on y axis
-            hedges_all.append(hedges)  # bin edges in x (nx + 1)
-            vedges_all.append(vedges)  # bin edges in y (ny + 1)
-
-        screens = {"names": screen_names,
-                   "hpixel": np.array(hpixel_list, dtype=float),
-                   "vpixel": np.array(vpixel_list, dtype=float),
-                   "x": np.array(xb_list, dtype=float),
-                   "y": np.array(yb_list, dtype=float),
-                   "sigx": np.array(sigx_list, dtype=float),
-                   "sigy": np.array(sigy_list, dtype=float),
-                   "sum": np.array(sum_list, dtype=float),
-                   "hedges": hedges_all,
-                   "vedges": vedges_all,
-                   "images": images,
-                   "S": np.array(s_list, dtype=float),}
-        return screens
-
     def get_quadrupoles(self, names=None):
         self.log("Reading quadrupoles' strengths...")
         bdes = np.zeros(len(self.quadrupoles), dtype=float)
@@ -446,7 +347,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
 
         return quadrupoles
 
-    def set_quadrupoles(self, names, values_range):
+    def set_quadrupoles(self, names, values_range, track = True):
         if isinstance(names, str):
             names = [names]
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
@@ -456,7 +357,8 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
                 element.set_K1(self.Pref / self.Q,float(value))
-        self.__track_bunch()
+        if track:
+            self.__track_bunch()
 
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -480,6 +382,28 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                 self.lattice[corr].vary_strength(val / 10, 0.0)
             elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val / 10)
+        self.__track_bunch()
+
+    def vary_quadrupoles(self, names, delta_values):
+        if not isinstance(names, list):
+            names = [names]
+        if not isinstance(delta_values, (list, tuple, np.ndarray)):
+            delta_values = [delta_values]
+        for quadrupole_name, val in zip(names, delta_values):
+            elements = self.lattice[quadrupole_name]
+            if not isinstance(elements, list):
+                elements = [elements]
+            current_values=[]
+            for element in elements:
+                current=element.get_K1(self.Pref / self.Q)
+                current=float(current[0]) if isinstance(current, (list, tuple,np.ndarray)) else float(current)
+                current_values.append(current)
+            if len(current_values)>1 and not np.allclose(current_values, current_values[0], rtol=0.0, atol=1e-12):
+                self.log(f"Parts of quadrupole {quadrupole_name} have different values")
+            target_value=(current_values[0] if len(current_values)>0 else 0.0) +float(val)
+            for element in elements:
+                element.set_K1(self.Pref / self.Q,target_value)
+
         self.__track_bunch()
 
     def align_everything(self):
