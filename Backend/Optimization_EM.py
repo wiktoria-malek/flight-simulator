@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import median_abs_deviation
-from scipy.optimize import minimize
+from scipy.optimize import minimize, least_squares
 import pandas as pd
 from xopt import Xopt
 from xopt.vocs import VOCS, select_best
@@ -388,12 +388,12 @@ class Optimization_EM:
                 pass
 
         bounds = {
-            "emit_x_norm": [0.0, 10.0],
-            "beta_x0": [0.0, 25.0],
-            "alpha_x0": [-10.0, 10.0],
-            "emit_y_norm": [0.0, 0.2],
-            "beta_y0": [0.0, 30.0],
-            "alpha_y0": [-10.0, 10.0],
+            "emit_x_norm": [3.0, 7.0],
+            "beta_x0": [0.4, 2.5],
+            "alpha_x0": [-2.5, 1.0],
+            "emit_y_norm": [0.015, 0.06],
+            "beta_y0": [6.0, 15.0],
+            "alpha_y0": [-6.0, -1.5],
         }
 
         vocs = VOCS( # degrees of freedom
@@ -626,8 +626,14 @@ class Optimization_EM:
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
             allow_stop=True,
         )
-        run_nelder_mead = True # make True to run this algorithm
-        if not run_nelder_mead:
+
+
+
+
+        local_max_nfev = int(getattr(self, "nm_steps", 500))
+        run_local_ls = local_max_nfev > 0
+
+        if not run_local_ls:
             solution = self._build_joint_partial_output(
                 screens=screens,
                 sigma2_x=sig_x2,
@@ -637,7 +643,7 @@ class Optimization_EM:
                 best_row=best_row,
                 best_cost=best_cost,
             )
-            solution["message"] = "Joint x+y Xopt only. Nelder-Mead disabled for test."
+            solution["message"] = "Joint x+y Xopt only. No least squares."
             solution["stopped"] = bool(stopped_during_fit)
             return solution
 
@@ -647,104 +653,119 @@ class Optimization_EM:
         params_order = ["emit_x_norm", "beta_x0", "alpha_x0",
                        "emit_y_norm", "beta_y0", "alpha_y0"]
 
-        low_nm = np.array([bounds[p][0] for p in params_order])
-        high_nm = np.array([bounds[p][1] for p in params_order])
+        low_bounds = np.array([bounds[p][0] for p in params_order], dtype=float)
+        high_bounds = np.array([bounds[p][1] for p in params_order], dtype=float)
 
-        x0_nm = np.array([
+        x0 = np.array([
             emit_x_norm_best, beta_x0_best, alpha_x0_best,
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
-        ])
+        ], dtype=float)
+        x0 = np.clip(x0, low_bounds, high_bounds)
 
-        nm_maxiter = self.nm_steps
-        nm_best_cost   = [best_cost]
-        nm_best_params = [x0_nm.copy()]
-        nm_stopped     = [False]
-        nm_iter        = [0]
+        local_max_nfev = int(getattr(self, "nm_steps", 500))
+        ls_best_cost = [float(best_cost)]
+        ls_best_params = [x0.copy()]
+        ls_stopped = [False]
+        ls_eval = [0]
 
-        def _f_nm(p):
-            penalty = float(np.sum(
-                np.maximum(low_nm - p, 0.0) ** 2 +
-                np.maximum(p - high_nm, 0.0) ** 2
-            )) * 1e6
-            p_c = np.clip(p, low_nm, high_nm)
+        scale_x = np.nanmedian(np.abs(sig_x2[valid_x])) ** 2 if np.any(valid_x) else 1.0
+        scale_y = np.nanmedian(np.abs(sig_y2[valid_y])) ** 2 if np.any(valid_y) else 1.0
+        scale_x = max(float(scale_x), 1e-30)
+        scale_y = max(float(scale_y), 1e-30)
+        n_x = max(int(np.count_nonzero(valid_x)), 1)
+        n_y = max(int(np.count_nonzero(valid_y)), 1)
+
+        def _ls_residuals(z):
+            if self._stop_requested or self._pause_requested:
+                ls_stopped[0] = True
+                raise StopIteration("Local least-squares stop requested")
+
+            p_c = np.asarray(z, dtype=float)
             try:
                 p2x, p2y = predict_raw(
-                    p_c[0], p_c[1], p_c[2], p_c[3], p_c[4], p_c[5],
+                    p_c[0], p_c[1], p_c[2],
+                    p_c[3], p_c[4], p_c[5],
                     allow_stop=False,
                 )
             except Exception:
-                return 1e12 + penalty
+                return np.full(n_x + n_y, 1e6, dtype=float)
+
             rx = (p2x - sig_x2)[valid_x].ravel() if np.any(valid_x) else np.array([], dtype=float)
             ry = (p2y - sig_y2)[valid_y].ravel() if np.any(valid_y) else np.array([], dtype=float)
-
             rx = rx[np.isfinite(rx)]
             ry = ry[np.isfinite(ry)]
 
             if rx.size == 0 and ry.size == 0:
-                return 1e12 + penalty
+                return np.full(n_x + n_y, 1e6, dtype=float)
 
-            scale_x = np.nanmedian(np.abs(sig_x2[valid_x])) ** 2 if np.any(valid_x) else 1.0
-            scale_y = np.nanmedian(np.abs(sig_y2[valid_y])) ** 2 if np.any(valid_y) else 1.0
+            rx_scaled = np.sqrt(0.5 / n_x) * rx / np.sqrt(scale_x) if rx.size else np.array([], dtype=float)
+            ry_scaled = np.sqrt(0.5 / n_y) * ry / np.sqrt(scale_y) if ry.size else np.array([], dtype=float)
+            residuals = np.concatenate([rx_scaled, ry_scaled])
 
-            scale_x = max(float(scale_x), 1e-30)
-            scale_y = max(float(scale_y), 1e-30)
+            f = float(np.sum(residuals ** 2))
+            if np.isfinite(f) and f < ls_best_cost[0]:
+                ls_best_cost[0] = f
+                ls_best_params[0] = p_c.copy()
 
-            cost_x = float(np.mean(rx ** 2)) / scale_x if rx.size else 0.0
-            cost_y = float(np.mean(ry ** 2)) / scale_y if ry.size else 0.0
-
-            f = 0.5 * (cost_x + cost_y)
-            total = f + penalty
-            if np.isfinite(total) and total < nm_best_cost[0]:
-                nm_best_cost[0] = total
-                nm_best_params[0] = p_c.copy()
-            return total
-
-        def _nm_callback(p):
-            nm_iter[0] += 1
+            ls_eval[0] += 1
             if self.print_M:
-                p_c = np.clip(np.asarray(p, dtype=float), low_nm, high_nm)
                 print(
-                    f" NM iteration {nm_iter[0]}/{nm_maxiter}: "
-                    f"best_f={nm_best_cost[0]:.4g}, "
+                    f" LS evaluation {ls_eval[0]}/{local_max_nfev}: "
+                    f"best_f={ls_best_cost[0]:.4g}, "
                     f"current_emit_x={p_c[0]:.6g}, current_beta_x={p_c[1]:.6g}, current_alpha_x={p_c[2]:.6g}, "
                     f"current_emit_y={p_c[3]:.6g}, current_beta_y={p_c[4]:.6g}, current_alpha_y={p_c[5]:.6g}"
                 )
-            if self._stop_requested or self._pause_requested:
-                nm_stopped[0] = True
-                raise StopIteration("NM stop requested")
+
+            return residuals
+
         try:
-            res_nm = minimize(
-                _f_nm, x0_nm, method="Nelder-Mead",
-                options={"maxiter": nm_maxiter, "xatol": 1e-5, "fatol": 1e-5, "adaptive": True},
-                callback=_nm_callback,
+            res_ls = least_squares(
+                _ls_residuals,
+                x0,
+                bounds=(low_bounds, high_bounds),
+                method="trf",
+                loss="soft_l1",
+                f_scale=1.0,
+                max_nfev=local_max_nfev,
+                x_scale="jac",
+                ftol=1e-6,
+                xtol=1e-6,
+                gtol=1e-6,
             )
-            p_nm = np.clip(res_nm.x, low_nm, high_nm)
-            if np.isfinite(res_nm.fun) and res_nm.fun < nm_best_cost[0]:
-                nm_best_cost[0] = float(res_nm.fun)
-                nm_best_params[0] = p_nm
+            p_ls = np.asarray(res_ls.x, dtype=float)
+            f_ls, _, _ = compute_cost(*p_ls.tolist(), allow_stop=False)
+            if np.isfinite(f_ls) and f_ls < ls_best_cost[0]:
+                ls_best_cost[0] = float(f_ls)
+                ls_best_params[0] = p_ls.copy()
             if self.print_M:
-                print(f"  NM finished: cost={nm_best_cost[0]:.4g}, success={res_nm.success}, "
-                      f"nit={res_nm.nit}/{nm_maxiter}")
+                print(
+                    f"  LS finished: cost={ls_best_cost[0]:.4g}, "
+                    f"success={res_ls.success}, "
+                    f"nfev={res_ls.nfev}/{local_max_nfev}, "
+                    f"message={res_ls.message}"
+                )
+
         except StopIteration:
-            nm_stopped[0] = True
+            ls_stopped[0] = True
             if self.print_M:
-                print("  NM interrupted.")
+                print("  LS interrupted.")
+
         except Exception as e:
             if self.print_M:
-                print(f"  NM failed ({e}), using BO result.")
+                print(f"  LS failed ({e}), using BO result.")
 
-        p_final = nm_best_params[0]
-        best_cost_final = nm_best_cost[0]
+        p_final = ls_best_params[0]
+        best_cost_final = ls_best_cost[0]
 
         best_row = best_row.copy()
         best_row["emit_x_norm"] = float(p_final[0])
-        best_row["beta_x0"]     = float(p_final[1])
-        best_row["alpha_x0"]    = float(p_final[2])
+        best_row["beta_x0"] = float(p_final[1])
+        best_row["alpha_x0"] = float(p_final[2])
         best_row["emit_y_norm"] = float(p_final[3])
-        best_row["beta_y0"]     = float(p_final[4])
-        best_row["alpha_y0"]    = float(p_final[5])
+        best_row["beta_y0"] = float(p_final[4])
+        best_row["alpha_y0"] = float(p_final[5])
 
-        stopped_during_fit = stopped_during_fit or nm_stopped[0]
+        stopped_during_fit = stopped_during_fit or ls_stopped[0]
 
         if stopped_during_fit or self._stop_requested or self._pause_requested:
             pred2_x_p, pred2_y_p = predict_raw(
@@ -768,7 +789,6 @@ class Optimization_EM:
             pred2_x=pred2_x, pred2_y=pred2_y,
             best_row=best_row, best_cost=best_cost_final,
         )
-        solution["message"] = "Joint x+y Xopt + Nelder-Mead."
+        solution["message"] = "Joint x+y Bayesian optimization + least-squares."
         solution["stopped"] = bool(stopped_during_fit)
         return solution
-

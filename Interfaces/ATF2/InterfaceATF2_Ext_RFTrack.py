@@ -8,7 +8,7 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
 # For OTR0X:
-# emit x 5.02
+# emit x 5.2
 # beta x 6.305152438
 # alpha x -4.494292895
 
@@ -17,7 +17,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 # alpha y 2.576336962
 
 # For QD18X end:
-# emit x 5.02
+# emit x 5.2
 # beta x 1.105221776
 # alpha x -0.7752115812
 

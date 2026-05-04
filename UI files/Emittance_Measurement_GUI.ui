@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>819</height>
+    <height>791</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -443,7 +443,7 @@ QGroupBox#localOptimizationSettingsGroup::title {
           <item row="0" column="0">
            <widget class="QLabel" name="label_nm_steps">
             <property name="text">
-             <string>Nelder-Mead steps</string>
+             <string>Least squares steps</string>
             </property>
            </widget>
           </item>
