@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>1022</height>
+    <height>819</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -249,7 +249,7 @@ QToolButton#delta_min_info_button:hover {
              <number>101</number>
             </property>
             <property name="value">
-             <number>15</number>
+             <number>5</number>
             </property>
            </widget>
           </item>
@@ -265,7 +265,7 @@ QToolButton#delta_min_info_button:hover {
              <double>10.000000000000000</double>
             </property>
             <property name="value">
-             <double>-1.000000000000000</double>
+             <double>-0.250000000000000</double>
             </property>
            </widget>
           </item>
@@ -281,7 +281,7 @@ QToolButton#delta_min_info_button:hover {
              <double>10.000000000000000</double>
             </property>
             <property name="value">
-             <double>1.000000000000000</double>
+             <double>0.250000000000000</double>
             </property>
            </widget>
           </item>
@@ -380,7 +380,7 @@ QGroupBox#xoptSettingsGroup::title {
              <number>500</number>
             </property>
             <property name="value">
-             <number>25</number>
+             <number>15</number>
             </property>
            </widget>
           </item>
@@ -393,7 +393,7 @@ QGroupBox#xoptSettingsGroup::title {
              <number>5000</number>
             </property>
             <property name="value">
-             <number>150</number>
+             <number>30</number>
             </property>
            </widget>
           </item>
@@ -408,6 +408,55 @@ QGroupBox#xoptSettingsGroup::title {
            <widget class="QLabel" name="label_xopt_initial_points">
             <property name="text">
              <string>Initial points</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="localOptimizationSettingsGroup">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox#localOptimizationSettingsGroup {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+QGroupBox#localOptimizationSettingsGroup::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+         </property>
+         <property name="title">
+          <string>Local optimization settings</string>
+         </property>
+         <layout class="QGridLayout" name="gridLocalOptimizationSettings">
+          <property name="horizontalSpacing">
+           <number>12</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>6</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_nm_steps">
+            <property name="text">
+             <string>Nelder-Mead steps</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="nm_steps_spin">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>5000</number>
+            </property>
+            <property name="value">
+             <number>500</number>
             </property>
            </widget>
           </item>

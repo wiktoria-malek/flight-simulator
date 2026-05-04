@@ -72,7 +72,7 @@ class OptimizationWorker(QObject):
     optimizer_ready = pyqtSignal(object)
     done = pyqtSignal()
 
-    def __init__(self, interface, session, n_starts = 3, initial_guess = None, xopt_initial_points = None, xopt_steps = None):
+    def __init__(self, interface, session, n_starts = 3, initial_guess = None, xopt_initial_points = None, xopt_steps = None, nm_steps = None):
         super().__init__()
         self.interface = interface
         self.session = session
@@ -80,10 +80,11 @@ class OptimizationWorker(QObject):
         self.initial_guess = initial_guess
         self.xopt_initial_points = xopt_initial_points
         self.xopt_steps = xopt_steps
+        self.nm_steps = nm_steps
 
     def run(self):
         try:
-            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps)
+            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps, nm_steps = self.nm_steps)
             self.optimizer_ready.emit(tool)
             output = tool.fit_from_session(self.session, initial_guess = self.initial_guess)
             self.finished.emit(output)
@@ -486,7 +487,8 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             initial_guess = self.session.get("optimization_guess")
         xopt_initial_points = int(self.xopt_initial_points_spin.value())
         xopt_steps = int(self.xopt_steps_spin.value())
-        worker = OptimizationWorker(self.interface, self.session, n_starts=3, initial_guess=initial_guess, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps)
+        nm_steps = int(self.nm_steps_spin.value())
+        worker = OptimizationWorker(self.interface, self.session, n_starts=3, initial_guess=initial_guess, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps)
 
         worker.moveToThread(thread)
         worker.optimizer_ready.connect(self._store_current_optimizer)
@@ -856,25 +858,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
 
     def _screen_selection_changed(self):
         self._filter_quadrupoles_in_gui()
-
-    def _safe_sigma2_errors(self, sig, sig_std):
-        sig = np.asarray(sig, dtype=float)
-        sig_std = np.asarray(sig_std, dtype=float)
-
-        sigma2 = sig ** 2
-        sigma2_err = 2.0 * np.abs(sig) * np.abs(sig_std)
-
-        screen_scale = np.nanmedian(sigma2, axis=0)
-        screen_scale = np.where(np.isfinite(screen_scale), screen_scale, np.nan)
-
-        floor_per_screen = np.maximum(0.03 * np.abs(screen_scale), 1e-6)
-        floor_per_screen = np.where(np.isfinite(floor_per_screen), floor_per_screen, 1e-6)
-
-        sigma2_err = np.where(np.isfinite(sigma2_err), sigma2_err, np.nan)
-        sigma2_err = np.maximum(sigma2_err, floor_per_screen[None, :])
-        sigma2_err[~np.isfinite(sigma2_err)] = 1e-6
-
-        return sigma2_err
 
     def _show_console_log(self):
         if self.log_console is None:
