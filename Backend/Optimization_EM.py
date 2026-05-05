@@ -387,13 +387,22 @@ class Optimization_EM:
             except Exception:
                 pass
 
+        # bounds = {
+        #     "emit_x_norm": [3.0, 7.0],
+        #     "beta_x0": [0.4, 2.5],
+        #     "alpha_x0": [-2.5, 1.0],
+        #     "emit_y_norm": [0.015, 0.06],
+        #     "beta_y0": [6.0, 15.0],
+        #     "alpha_y0": [-6.0, -1.5],
+        # }
+
         bounds = {
-            "emit_x_norm": [3.0, 7.0],
-            "beta_x0": [0.4, 2.5],
-            "alpha_x0": [-2.5, 1.0],
-            "emit_y_norm": [0.015, 0.06],
-            "beta_y0": [6.0, 15.0],
-            "alpha_y0": [-6.0, -1.5],
+            "emit_x_norm": [0.5, 8.0],
+            "beta_x0": [0.2, 5.0],
+            "alpha_x0": [-4.0, 2.0],
+            "emit_y_norm": [0.005, 0.12],
+            "beta_y0": [2.0, 20.0],
+            "alpha_y0": [-8.0, 2.0],
         }
 
         vocs = VOCS( # degrees of freedom
@@ -710,7 +719,7 @@ class Optimization_EM:
             ls_eval[0] += 1
             if self.print_M:
                 print(
-                    f" LS evaluation {ls_eval[0]}/{local_max_nfev}: "
+                    f" LS {ls_eval[0]} (max_nfev={local_max_nfev}):: "
                     f"best_f={ls_best_cost[0]:.4g}, "
                     f"current_emit_x={p_c[0]:.6g}, current_beta_x={p_c[1]:.6g}, current_alpha_x={p_c[2]:.6g}, "
                     f"current_emit_y={p_c[3]:.6g}, current_beta_y={p_c[4]:.6g}, current_alpha_y={p_c[5]:.6g}"
