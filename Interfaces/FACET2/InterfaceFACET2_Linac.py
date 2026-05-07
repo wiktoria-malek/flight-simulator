@@ -91,7 +91,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
 
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
-        Pref = np.sqrt(125.0**2 - 0.51099895*2)
+        Pref = np.sqrt(125.0**2 - 0.51099895**2)
         gamma_rel = np.sqrt((Pref / 0.51099895) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
         return gamma_rel, beta_rel

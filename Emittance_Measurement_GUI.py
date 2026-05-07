@@ -27,6 +27,7 @@ from Backend.SaveOrLoad import SaveOrLoad
 from Backend.Optimization_EM import Optimization_EM
 from Backend.QuadrupoleScan_EM import QuadrupoleScan_EM
 from Backend.LogConsole import LogConsole
+from Backend.PhaseSpaceGraphs_EM import PhaseSpaces
 
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -148,7 +149,9 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self._filter_quadrupoles_in_gui()
         self.clear_plots_button.clicked.connect(self._clear_plots)
         self.log_console=None
+        self.phase_spaces = None
         self.log_console_button.clicked.connect(self._show_console_log)
+        self.phase_spaces_button.clicked.connect(self._show_phase_spaces)
         self.pause_button.clicked.connect(self._pause_task)
         self.resume_button.clicked.connect(self._resume_task)
         self._scan_pause_requested = False
@@ -697,17 +700,17 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
     def _get_twiss_s_positions(self, names):
         names = list(names)
         positions = [np.nan] * len(names)
-        if not hasattr(self.interface, "_get_optics_from_twiss_file"):
+        if not hasattr(self.interface, "_get_elements_positions"):
             return positions
 
         try:
-            optics = self.interface._get_optics_from_twiss_file()
-            optics_names = list(optics.get("names", []))
-            optics_s = np.asarray(optics.get("S", []), dtype=float)
+            pos = self.interface._get_elements_positions()
+            pos_names = list(pos.get("names", []))
+            s = np.asarray(pos.get("S", []), dtype=float)
             lookup = {
-                name: float(optics_s[i])
-                for i, name in enumerate(optics_names)
-                if i < optics_s.size and np.isfinite(optics_s[i])
+                name: float(s[i])
+                for i, name in enumerate(pos_names)
+                if i < s.size and np.isfinite(s[i])
             }
             positions = [lookup.get(name, np.nan) for name in names]
         except Exception:
@@ -865,6 +868,25 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.log_console.show()
         self.log_console.raise_()
         self.log_console.activateWindow()
+
+    def _show_phase_spaces(self):
+        result = None
+        reference_name = None
+
+        if isinstance(self.session, dict):
+            result = self.session.get("optimization_result")
+            reference_name = self.session.get("quad_name") or self.session.get("current_quadrupole")
+
+        if not isinstance(result, dict):
+            QMessageBox.information(self, "Phase Space", "Run the emittance/Twiss optimization first." )
+            return
+
+        if self.phase_spaces is None:
+            self.phase_spaces = PhaseSpaces(self)
+        self.phase_spaces.plot_from_result(result, reference_name=reference_name)
+        self.phase_spaces.show()
+        self.phase_spaces.raise_()
+        self.phase_spaces.activateWindow()
 
     def log(self,text):
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")

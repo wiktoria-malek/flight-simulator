@@ -69,7 +69,7 @@ Returns the subset of correctors that are **horizontal** (prefixes need to be sp
 
 Returns the subset of correctors that are **vertical** (prefixes need to be specified, e.g `ZV`).
 
-### `get_elements_position(names: list[str] | str) -> list[int]`
+### `get_elements_indices(names: list[str] | str) -> list[int]`
 
 Returns the **sequence indices** of the specified element name(s). Useful to map devices to their lattice order.
 

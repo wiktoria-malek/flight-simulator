@@ -327,6 +327,8 @@ class Optimization_EM:
             "alpha_y0": float(best_row["alpha_y0"]),
             "pred_x": pred2_x,
             "pred_y": pred2_y,
+            "emit_x_norm": float(best_row["emit_x_norm"]),
+            "emit_y_norm": float(best_row["emit_y_norm"]),
             "residual_rms_x": rms_res_x,
             "residual_rms_y": rms_res_y,
             "residual_mad_x": mad_res_x,
@@ -513,27 +515,7 @@ class Optimization_EM:
         evaluator = Evaluator(function = evaluate) # how to calculate merit function
         generator = ExpectedImprovementGenerator(vocs = vocs) # how to choose the next point
         X = Xopt(generator = generator, evaluator = evaluator, vocs = vocs)
-
-        seeds = [{
-            "emit_x_norm": float(np.clip(emit_x_norm0, *bounds["emit_x_norm"])),
-            "beta_x0": float(np.clip(beta_x0_0, *bounds["beta_x0"])),
-            "alpha_x0": float(np.clip(alpha_x0_0, *bounds["alpha_x0"])),
-            "emit_y_norm": float(np.clip(emit_y_norm0, *bounds["emit_y_norm"])),
-            "beta_y0": float(np.clip(beta_y0_0, *bounds["beta_y0"])),
-            "alpha_y0": float(np.clip(alpha_y0_0, *bounds["alpha_y0"])),
-        }]
-
         total_initial = max(1, int(self.xopt_initial_points))
-
-        for _ in range(max(0, total_initial - 1)):
-            seeds.append({
-                "emit_x_norm": self.rng.uniform(bounds["emit_x_norm"][0], bounds["emit_x_norm"][1]),
-                "beta_x0": self.rng.uniform(bounds["beta_x0"][0], bounds["beta_x0"][1]),
-                "alpha_x0": self.rng.uniform(bounds["alpha_x0"][0], bounds["alpha_x0"][1]),
-                "emit_y_norm": self.rng.uniform(bounds["emit_y_norm"][0], bounds["emit_y_norm"][1]),
-                "beta_y0": self.rng.uniform(bounds["beta_y0"][0], bounds["beta_y0"][1]),
-                "alpha_y0": self.rng.uniform(bounds["alpha_y0"][0], bounds["alpha_y0"][1]),
-            })
 
         best_row = None # from X.data
         best_cost = np.inf
@@ -564,7 +546,7 @@ class Optimization_EM:
                 best_row = row
 
         try:
-            X.evaluate_data(pd.DataFrame(seeds)) # for bayesian optimization to suggest better solutions, it needs some data
+            X.random_evaluate(total_initial) # for bayesian optimization to suggest better solutions, it needs some data
             update_best_from_data()
             for i in range(self.xopt_steps):
                 if self.print_M:
@@ -719,7 +701,7 @@ class Optimization_EM:
             ls_eval[0] += 1
             if self.print_M:
                 print(
-                    f" LS {ls_eval[0]} (max_nfev={local_max_nfev}):: "
+                    f" LS {ls_eval[0]} (max_nfev={local_max_nfev}): "
                     f"best_f={ls_best_cost[0]:.4g}, "
                     f"current_emit_x={p_c[0]:.6g}, current_beta_x={p_c[1]:.6g}, current_alpha_x={p_c[2]:.6g}, "
                     f"current_emit_y={p_c[3]:.6g}, current_beta_y={p_c[4]:.6g}, current_alpha_y={p_c[5]:.6g}"

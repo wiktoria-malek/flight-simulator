@@ -201,41 +201,41 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
 
-    def get_elements_position(self,names):
+    def get_elements_indices(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None):
         if names is None:
-            names = self.get_bpms()["names"]
+            names = self.bpms
+        if isinstance(names, str):
+            names = [names]
         with open(self.twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
-
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
         dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
         columns = lines[star_symbol].lstrip("*").split()
         try:
-            DX_column = columns.index("DX")
-            DY_column = columns.index("DY")
-            elements_names = columns.index("NAME")
-        except ValueError as e:
-            raise RuntimeError("There are no such columns in the twiss file")
+            dx_column = columns.index("DX")
+            dy_column = columns.index("DY")
+            name_column = columns.index("NAME")
+        except ValueError:
+            raise RuntimeError("There are no DX, DY or NAME columns in the twiss file")
         disp_values = {}
-        target_disp_x, target_disp_y = [], []
         for line in lines[dollar_sign + 1:]:
             data = line.split()
-            if len(data) <= max(DX_column, DY_column,
-                                elements_names):  # if a line has less column than needed, it is omitted
+            if len(data) <= max(dx_column, dy_column, name_column):
                 continue
-            bpms_name = data[elements_names].strip('"')
+            bpm_name = data[name_column].strip('"')
             try:
-                disp_values[bpms_name] = (float(data[DX_column]), float(data[DY_column]))
+                disp_values[bpm_name] = (
+                    float(data[dx_column]),
+                    float(data[dy_column]),
+                )
             except ValueError:
                 continue
+        target_disp_x, target_disp_y = [], []
         for bpm in names:
-            if bpm in disp_values:
-                dx, dy = disp_values[bpm]
-            else:
-                dx, dy = float("nan"), float("nan")
+            dx, dy = disp_values.get(bpm, (float("nan"), float("nan")))
             target_disp_x.append(dx)
             target_disp_y.append(dy)
         return target_disp_x, target_disp_y

@@ -324,30 +324,46 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
 
-    def get_elements_position(self,names):
+    def get_elements_indices(self,names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
-    def get_target_dispersion(self, names=None):
-        with open('Interfaces/ATF2/Ext_ATF2/ATF2_EXT_FF_v5.2.twiss', "r") as file:
+    def get_target_dispersion(self, names=None): # for DR too
+        if names is None:
+            names = self.bpms
+        if isinstance(names, str):
+            names = [names]
+        twiss_path = self.twiss_path
+        with open(twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
         star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
         dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
         columns = lines[star_symbol].lstrip("*").split()
-
-        DX_column = columns.index("DX")
-        DY_column = columns.index("DY")
-        elements_names = columns.index("NAME")
-
+        try:
+            DX_column = columns.index("DX")
+            DY_column = columns.index("DY")
+            elements_names = columns.index("NAME")
+        except ValueError as e:
+            raise RuntimeError("There are no such columns in the twiss file")
+        disp_values = {}
         target_disp_x, target_disp_y = [], []
         for line in lines[dollar_sign + 1:]:
             data = line.split()
+            if len(data) <= max(DX_column, DY_column,
+                                elements_names):  # if a line has less column than needed, it is omitted
+                continue
             bpms_name = data[elements_names].strip('"')
-
-            if names is None or bpms_name in names:
-                target_disp_x.append(float(data[DX_column]))
-                target_disp_y.append(float(data[DY_column]))
-
+            try:
+                disp_values[bpms_name] = (float(data[DX_column]), float(data[DY_column]))
+            except ValueError:
+                continue
+        for bpm in names:
+            if bpm in disp_values:
+                dx, dy = disp_values[bpm]
+            else:
+                dx, dy = float("nan"), float("nan")
+            target_disp_x.append(dx)
+            target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
     def get_icts(self, names=None):

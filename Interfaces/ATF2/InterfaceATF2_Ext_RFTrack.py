@@ -193,13 +193,15 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
 
-    def get_elements_position(self, names):
+    def get_elements_indices(self, names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def get_target_dispersion(self, names=None): # for DR too
         if names is None:
-            names = self.get_bpms()["names"]
-        twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
+            names = self.bpms
+        if isinstance(names, str):
+            names = [names]
+        twiss_path = self.twiss_path
         with open(twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]
 
@@ -562,77 +564,33 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 except Exception:
                     pass
 
-    def _get_optics_from_twiss_file(self,names=None):
-        with open(self.twiss_path, "r") as file:
-            lines = [line.strip() for line in file if line.strip()]
+    def _get_elements_positions(self, names=None):
+        if isinstance(names, str):
+            names = [names]
 
-        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
-        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
-        columns = lines[star_symbol].lstrip("*").split()
+        all_names = []
+        all_s = []
+        all_l = []
+        s_pos = 0.0
 
-        cols=["NAME","S","BETX","ALFX","BETY","ALFY","MUX","MUY","L"]
-        index={}
-        for col in cols:
+        for element in self.lattice['*']:
+            element_name = element.get_name()
             try:
-                index[col]=columns.index(col)
-            except ValueError:
-                raise RuntimeError(f"Column {col} not found in twiss file")
-        result={k: [] for k in cols}
+                element_length = float(element.get_length())
+            except Exception:
+                element_length = 0.0
 
-        duplicated={}
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            if len(data) <= max(index.values()):  # if a line has less column than needed, it is omitted
-                continue
-            name = data[index["NAME"]].strip('"')
-            result["NAME"].append(name)
+            if names is None or element_name in names:
+                all_names.append(element_name)
+                all_s.append(s_pos)
+                all_l.append(element_length)
 
-            if name not in duplicated:
-                duplicated[name]={col:[] for col in cols[1:]}
-            for col in cols[1:]:
-                try:
-                    duplicated[name][col].append(float(data[index[col]]))
-                except ValueError:
-                    duplicated[name][col].append(float("nan"))
-        result_names=list(duplicated.keys())
-        result={col:[] for col in cols[1:]}
+            s_pos += element_length
 
-        for name in result_names:
-            vals=duplicated[name]
-            result["S"].append(vals["S"][0])
-            result["BETX"].append(vals["BETX"][0])
-            result["ALFX"].append(vals["ALFX"][0])
-            result["MUX"].append(vals["MUX"][0])
-            result["L"].append(sum(vals["L"]))
-            result["BETY"].append(vals["BETY"][0])
-            result["ALFY"].append(vals["ALFY"][0])
-            result["MUY"].append(vals["MUY"][0])
         return {
-            "names":result_names,
-            "S": np.array(result["S"]),
-            "betx": np.array(result["BETX"]),
-            "alfx": np.array(result["ALFX"]),
-            "bety": np.array(result["BETY"]),
-            "alfy": np.array(result["ALFY"]),
-            "mux": np.array(result["MUX"]),
-            "muy": np.array(result["MUY"]),
-            "L": np.array(result["L"]),
-        }
-
-    def get_twiss_at_element(self,name):
-        optics=self._get_optics_from_twiss_file()
-        names=list(optics["names"])
-        if name not in names:
-            raise ValueError(f"Element {name} not found in twiss file")
-        i=names.index(name)
-        return {
-            "name": names[i],
-            "S": float(optics["S"][i]),
-            "betx": float(optics["betx"][i]),
-            "alfx": float(optics["alfx"][i]),
-            "bety": float(optics["bety"][i]),
-            "alfy": float(optics["alfy"][i]),
-
+            "names": all_names,
+            "S": np.array(all_s, dtype=float),
+            "L": np.array(all_l, dtype=float),
         }
 
     def align_everything(self):
@@ -769,7 +727,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return output_x, output_y
 
-    def get_twiss_at_screen(self, name): # for emittance measurement, can be deleted later
+    def get_twiss_at_screen(self, name): # for printing emittance after bba using rft interface, can be deleted later
         if name not in self.screens:
             raise ValueError(f"Screen {name} not found")
 

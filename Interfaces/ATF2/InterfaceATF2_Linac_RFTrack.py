@@ -34,66 +34,6 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
         self.quadrupoles = list(dict.fromkeys(e.get_name() for e in self.lattice.get_quadrupoles()))
         self.__setup_beam0()
         self.__track_bunch()
-        self.sextupoles = self._get_element_names_from_twiss_types({"SEXTUPOLE"})
-        self._saved_sextupoles_state = None
-
-    def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
-        with open(self.twiss_path, "r") as file:
-            lines = [line.strip() for line in file if line.strip()]
-
-        header_idx = None
-        format_idx = None
-        name_column = None
-        type_column = None
-
-        for i, line in enumerate(lines):
-            if not line.startswith("*"):
-                continue
-
-            columns = line.lstrip("*").split()
-            if "NAME" not in columns:
-                continue
-
-            type_col_name = None
-            if "KEYWORD" in columns:
-                type_col_name = "KEYWORD"
-            elif "TYPE" in columns:
-                type_col_name = "TYPE"
-            else:
-                continue
-
-            header_idx = i
-            name_column = columns.index("NAME")
-            type_column = columns.index(type_col_name)
-
-            for j in range(i + 1, len(lines)):
-                if lines[j].startswith("$"):
-                    format_idx = j
-                    break
-            break
-
-        if header_idx is None or format_idx is None:
-            return []
-
-        names = []
-        seen = set()
-
-        for line in lines[format_idx + 1:]:
-            if line.startswith("@") or line.startswith("*") or line.startswith("$"):
-                continue
-
-            data = line.split()
-            if len(data) <= max(name_column, type_column):
-                continue
-
-            elem_name = data[name_column].strip('"')
-            elem_type = data[type_column].strip('"').upper()
-
-            if elem_type in allowed_types and elem_name not in seen:
-                names.append(elem_name)
-                seen.add(elem_name)
-
-        return names
 
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref0 / self.electronmass) ** 2 + 1.0)
@@ -184,7 +124,7 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
 
-    def get_elements_position(self, names):
+    def get_elements_indices(self, names):
         return [index for index, string in enumerate(self.sequence) if string in names]
 
     def _set_name(self, element, name):
@@ -426,7 +366,9 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
 
     def get_target_dispersion(self, names=None): # for DR too
         if names is None:
-            names = self.get_bpms()["names"]
+            names = self.bpms
+        if isinstance(names, str):
+            names = [names]
         twiss_path = os.path.join(os.path.dirname(__file__), 'Linac_ATF2', 'linacend.tws')
         with open(twiss_path, "r") as file:
             lines = [line.strip() for line in file if line.strip()]

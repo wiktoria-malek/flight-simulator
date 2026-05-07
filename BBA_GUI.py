@@ -656,10 +656,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     print(f"Sigy: {screens0['sigy']}")
                     print("Emittance before correction:")
                     for screen_name in screens0["names"]:
-                        tw = self.interface.get_twiss_at_screen(screen_name)
-                        print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
-                        print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
-
+                        if hasattr(self.interface, "get_twiss_at_screen"):
+                            tw = self.interface.get_twiss_at_screen(screen_name)
+                            print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
+                            print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
+                        else:
+                            pass
                 O0 = state0.get_orbit(bpms) #because axis=1 is mean from one whole measurement, not for 1 bpm
                 O0x=np.asarray(O0['x'],dtype=float).reshape(-1,1)
                 O0y=np.asarray(O0['y'],dtype=float).reshape(-1,1)
@@ -943,11 +945,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             print("Screen values after correction:")
             print(f"Sigx: {screens_f['sigx']}")
             print(f"Sigy: {screens_f['sigy']}")
-            print("Emittance after correction:")
-            for screen_name in screens_f["names"]:
-                tw = self.interface.get_twiss_at_screen(screen_name)
-                print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
-                print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
+            if hasattr(self.interface, "get_twiss_at_screen"):
+                print("Emittance after correction:")
+                for screen_name in screens_f["names"]:
+                    tw = self.interface.get_twiss_at_screen(screen_name)
+                    print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
+                    print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
+            else:
+                pass
             final_bpms = final_state.get_bpms(bpms)
             final_x_vals = np.asarray(final_bpms["x"], dtype=float)
             final_y_vals = np.asarray(final_bpms["y"], dtype=float)

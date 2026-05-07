@@ -46,8 +46,10 @@ class AbstractMachineInterface(ABC):
 
     def get_target_dispersion(self, names=None):
         if names is None:
-            names = self.get_bpms()["names"]
-        return [0.0] * len(names), [0.0] * len(names)
+            names = self.bpms
+        if isinstance(names, str):
+            names = [names]
+        return np.zeros(len(names)), np.zeros(len(names))
 
     @abstractmethod
     def get_hcorrectors_names(self):

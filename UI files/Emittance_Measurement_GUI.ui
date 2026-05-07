@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>763</height>
+    <height>789</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -884,6 +884,13 @@ QGroupBox#fit_results_group::title {
               <widget class="QPushButton" name="log_console_button">
                <property name="text">
                 <string>Log Console</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="phase_spaces_button">
+               <property name="text">
+                <string>Show fitted phase space</string>
                </property>
               </widget>
              </item>

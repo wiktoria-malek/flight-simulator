@@ -351,7 +351,10 @@ def load_FACET():
 
         return E
 
-    from . import lattice
+    try:
+        from . import lattice
+    except ImportError:
+        import lattice
     lattice.add_marker = add_marker
     lattice.add_quad = add_quad
     lattice.add_drift = add_drift
