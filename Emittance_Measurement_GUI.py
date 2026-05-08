@@ -73,6 +73,7 @@ class OptimizationWorker(QObject):
     error = pyqtSignal(str)
     optimizer_ready = pyqtSignal(object)
     done = pyqtSignal()
+    progress = pyqtSignal(str, int, int)
 
     def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False):
         super().__init__()
@@ -83,6 +84,10 @@ class OptimizationWorker(QObject):
         self.xopt_steps = xopt_steps
         self.nm_steps = nm_steps
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
+
+
+    def _emit_progress(self, phase, current, total):
+        self.progress.emit(str(phase), int(current), int(total))
 
     def _get_interface_initial_settings(self):
         interface_class_name=self.interface.__class__.__name__
@@ -102,7 +107,8 @@ class OptimizationWorker(QObject):
 
     def run(self):
         try:
-            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps, nm_steps = self.nm_steps, fit_quadrupole_strength = self.fit_quadrupole_strength)
+            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps, nm_steps = self.nm_steps, fit_quadrupole_strength = self.fit_quadrupole_strength,
+                                   progress_callback=self._emit_progress)
             self.optimizer_ready.emit(tool)
             bounds = self._get_interface_bounds()
             output = tool.fit_from_session(self.session, bounds = bounds)
@@ -527,6 +533,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         worker.optimizer_ready.connect(self._store_current_optimizer)
         worker.finished.connect(self._on_optimization_output)
         worker.error.connect(self._on_optimization_error)
+        worker.progress.connect(self._on_optimization_progress)
         worker.done.connect(thread.quit)
         worker.done.connect(worker.deleteLater)
 
@@ -538,6 +545,18 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self._optimization_worker = worker
         self._set_progress(30)
         thread.start()
+
+    def _on_optimization_progress(self, phase, current, total):
+        total = max(int(total), 1)
+        current = max(0, min(int(current), total))
+
+        if str(phase).lower().startswith("xopt"):
+            value = 30 + 40 * current / total
+        else:
+            value = 70 + 25 * current / total
+
+        self._set_progress(value)
+        self.progressBar.setFormat(f"{phase}: {current}/{total}")
 
     def _store_current_optimizer(self, optimizer):
         self._current_optimizer = optimizer

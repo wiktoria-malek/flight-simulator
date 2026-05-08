@@ -691,6 +691,28 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
 
+    def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
+        readback_param = self.corrector_get_params[corrector]
+        t0 = time.perf_counter()
+        last_value = np.nan
+
+        while time.perf_counter() - t0 < timeout:
+            try:
+                last_value = self.make_safe_float(self.japc.getParam(readback_param), default=np.nan)
+            except Exception:
+                last_value = np.nan
+
+            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
+                return True
+
+            time.sleep(poll_interval)
+
+        self.log(
+            f'Warning: {readback_param} did not reach target {float(target):.6g} '
+            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
+        )
+        return False
+
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
@@ -700,8 +722,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
             self.log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
             return
         for corrector, corr_val in zip(names, corr_vals):
-            self.japc.setParam(self.corrector_set_params[corrector], float(corr_val))
-        time.sleep(1)
+            target = float(corr_val)
+            self.japc.setParam(self.corrector_set_params[corrector], target)
+            self._wait_for_corrector_readback(corrector, target)
 
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):

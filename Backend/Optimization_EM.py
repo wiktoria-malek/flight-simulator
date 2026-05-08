@@ -18,7 +18,8 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization_EM:
-    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False):
+    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None):
+        self.progress_callback = progress_callback
         self.interface = interface
         self.n_starts = int(n_starts)
         self.rng = np.random.default_rng(rng_seed)
@@ -36,6 +37,11 @@ class Optimization_EM:
         self.xopt_local_refine = False
         self.xopt_local_refine_maxiter = 25
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
+
+    def _emit_progress(self, phase, current, total):
+        if self.progress_callback is None:
+            return
+        self.progress_callback(str(phase), int(current), int(total))
 
     def request_pause(self):
         self._pause_requested = True
@@ -525,6 +531,7 @@ class Optimization_EM:
             for i in range(self.xopt_steps):
                 if self.print_M:
                     print(f"Joint Xopt step {i + 1}/{self.xopt_steps}")
+                self._emit_progress("Xopt", i + 1, self.xopt_steps)
                 if self._stop_requested:
                     if best_row is not None:
                         stopped_during_fit = True
@@ -680,6 +687,7 @@ class Optimization_EM:
                 ls_best_params[0] = p_c.copy()
 
             ls_eval[0] += 1
+            self._emit_progress("Least squares", min(ls_eval[0], local_max_nfev), local_max_nfev)
             if self.print_M:
                 print(
                     f" LS {ls_eval[0]} (max_nfev={local_max_nfev}): "

@@ -227,6 +227,37 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
 
         return bpms
 
+    @staticmethod
+    def make_safe_float(value, default=np.nan):
+        try:
+            if value is None:
+                return float(default)
+            arr = np.asarray(value)
+            if arr.size == 0:
+                return float(default)
+            return float(arr.flat[0])
+        except Exception:
+            return float(default)
+
+    def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
+        readback_pv = PV(f'{corrector}:currentRead')
+        t0 = time.perf_counter()
+        last_value = np.nan
+
+        while time.perf_counter() - t0 < timeout:
+            last_value = self.make_safe_float(readback_pv.get(), default=np.nan)
+
+            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
+                return True
+
+            time.sleep(poll_interval)
+
+        self.log(
+            f'Warning: {corrector}:currentRead did not reach target {float(target):.6g} '
+            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
+        )
+        return False
+
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
@@ -237,7 +268,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
-        time.sleep(1)
+            self._wait_for_corrector_readback(corrector, corr_val)
 
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -248,6 +279,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
             print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
-            curr_val = pv_des.get()
-            pv_des.put(curr_val + corr_val)
-        time.sleep(1)
+            curr_val = self.make_safe_float(pv_des.get(), default=np.nan)
+            target = curr_val + float(corr_val)
+            pv_des.put(target)
+            self._wait_for_corrector_readback(corrector, target)

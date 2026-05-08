@@ -82,6 +82,40 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
     def log_messages(self,console):
         self.log=console or print
 
+    @staticmethod
+    def _safe_float(value, default=np.nan):
+        try:
+            if value is None:
+                return float(default)
+            arr = np.asarray(value)
+            if arr.size == 0:
+                return float(default)
+            return float(arr.flat[0])
+        except Exception:
+            return float(default)
+
+    def _wait_for_magnet_readback(self, devname, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
+        bact_pv = get_pv(f'{devname}:BACT')
+        t0 = time.perf_counter()
+        last_value = np.nan
+
+        while time.perf_counter() - t0 < timeout:
+            try:
+                last_value = self._safe_float(bact_pv.get(), default=np.nan)
+            except Exception:
+                last_value = np.nan
+
+            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
+                return True
+
+            time.sleep(poll_interval)
+
+        self.log(
+            f'Warning: {devname}:BACT did not reach target {float(target):.6g} '
+            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
+        )
+        return False
+
     def _meascharge(self):
         qraw = []
         for j in range(self.nsamples):
@@ -243,7 +277,8 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
             raise ValueError('len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
         devnames = [self.f2m.device_names[self.f2m.ix[name]] for name in names]
         set_magnets(devnames, corr_vals, perturb=True)
-        time.sleep(1)
+        for devname, target in zip(devnames, corr_vals):
+            self._wait_for_magnet_readback(devname, target)
 
     def vary_correctors(self, names, corr_vals):
         """ write deltas to correctors """
@@ -257,5 +292,6 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         bdes_init = [get_pv(f'{devname}:BDES').get() for devname in devnames]
         updated_corr_vals = [bdes+delta for bdes,delta in zip(bdes_init, corr_vals)]
         set_magnets(devnames, updated_corr_vals, perturb=True)
-        time.sleep(1)
+        for devname, target in zip(devnames, updated_corr_vals):
+            self._wait_for_magnet_readback(devname, target)
 
