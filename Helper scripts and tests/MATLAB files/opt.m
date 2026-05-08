@@ -45,7 +45,7 @@ B0 = Bunch6d_QR (Part.mass, 0.0, Part.Q, Part.P, Twiss, Nparticles, -1);
 
 B1 = FODO.track(B0);
 
-function S_ = eval_response(FODO, B0) % quadrupole scan
+function S_ = eval_response(FODO, B0)
     Q = FODO.get_quadrupoles();
     S_ = [];
     for s = Q{1}.get_strength() * linspace(0.8, 1.2, 11)
@@ -60,27 +60,28 @@ function S_ = eval_response(FODO, B0) % quadrupole scan
         S_(end+1,:) = S;
         Q{1}.set_strength(s0);
     end
+endfunction
 
 S_ref = eval_response(FODO, B0)
 
 %% Part 1, measures the twiss parameters and emittances
 
 function M = merit(X, S_ref, FODO)
-
+    
     RF_Track;
-
+    
     emitt = constrain(X(1), 0, 5);
     betax = constrain(X(2), 0, 5);
     betay = constrain(X(3), 0, 5);
     alphax = constrain(X(4), -5, 5);
     alphay = constrain(X(5), -5, 5);
-
+    
     %% Define reference particle, and rigidity
     Part.mass = RF_Track.electronmass; % MeV/c^2
     Part.P = 100; % MeV/c
     Part.Q = -1; % e+
     B_rho = Part.P / Part.Q; % MV/c, reference rigidity
-
+    
     Nparticles = 10000;
     Twiss = Bunch6d_twiss();
     Twiss.emitt_x = emitt; % mm.mrad normalised emittance
@@ -90,11 +91,11 @@ function M = merit(X, S_ref, FODO)
     Twiss.alpha_x = alphax;
     Twiss.alpha_y = alphay;
     B0 = Bunch6d_QR (Part.mass, 0.0, Part.Q, Part.P, Twiss, Nparticles, -1);
-
+    
     S = eval_response(FODO, B0);
-
+    
     M = sumsq(S(:) - S_ref(:))
-
+    
 end
 
 X = fminsearch(@(X) merit(X, S_ref, FODO), zeros(1,5));
@@ -108,9 +109,9 @@ alphay = constrain(X(5), -5, 5)
 %% Part 2, infers also the first quadrupole strength
 
 function M = merit(X, S_ref, FODO)
-
+    
     RF_Track;
-
+    
     emitt = constrain(X(1), 0, 5);
     betax = constrain(X(2), 0, 5);
     betay = constrain(X(3), 0, 5);
@@ -123,7 +124,7 @@ function M = merit(X, S_ref, FODO)
     Part.P = 100; % MeV/c
     Part.Q = -1; % e+
     B_rho = Part.P / Part.Q; % MV/c, reference rigidity
-
+    
     Nparticles = 10000;
     Twiss = Bunch6d_twiss();
     Twiss.emitt_x = emitt; % mm.mrad normalised emittance
@@ -133,17 +134,17 @@ function M = merit(X, S_ref, FODO)
     Twiss.alpha_x = alphax;
     Twiss.alpha_y = alphay;
     B0 = Bunch6d_QR (Part.mass, 0.0, Part.Q, Part.P, Twiss, Nparticles, -1);
-
+    
     Q = FODO.get_quadrupoles();
     Q{1}.set_strength(strength);
-
+        
     S = eval_response(FODO, B0);
-
+    
     M = sumsq(S(:) - S_ref(:))
-
+    
 end
 
-X = fminsearch(@(X) merit(X, S_ref, FODO), zeros(1,6));
+X = fminsearch(@(X) merit(X, S_ref, FODO), randn(1,6));
 
 expected_strength = strength/2
 
