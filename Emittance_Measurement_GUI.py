@@ -1,4 +1,4 @@
-import os, sys, pickle, time
+import os, sys, time, copy
 import numpy as np
 import matplotlib
 matplotlib.use("QtAgg")
@@ -21,6 +21,7 @@ except ImportError:
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 
+from Interfaces.interface_setup import INTERFACE_SETUP
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
@@ -73,21 +74,38 @@ class OptimizationWorker(QObject):
     optimizer_ready = pyqtSignal(object)
     done = pyqtSignal()
 
-    def __init__(self, interface, session, n_starts = 3, initial_guess = None, xopt_initial_points = None, xopt_steps = None, nm_steps = None):
+    def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False):
         super().__init__()
         self.interface = interface
         self.session = session
         self.n_starts = n_starts
-        self.initial_guess = initial_guess
         self.xopt_initial_points = xopt_initial_points
         self.xopt_steps = xopt_steps
         self.nm_steps = nm_steps
+        self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
+
+    def _get_interface_initial_settings(self):
+        interface_class_name=self.interface.__class__.__name__
+        interface_module_name=self.interface.__class__.__module__
+
+        for machine_interfaces in INTERFACE_SETUP.values():
+            for interface_defaults in machine_interfaces:
+                if (interface_defaults.get("class_name")==interface_class_name) and (interface_defaults.get("module")==interface_module_name):
+                    return interface_defaults
+        return None
+
+    def _get_interface_bounds(self):
+        interface_defaults=self._get_interface_initial_settings()
+        if interface_defaults is None:
+            return {}
+        return dict(interface_defaults.get("bounds", {}))
 
     def run(self):
         try:
-            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps, nm_steps = self.nm_steps)
+            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps, nm_steps = self.nm_steps, fit_quadrupole_strength = self.fit_quadrupole_strength)
             self.optimizer_ready.emit(tool)
-            output = tool.fit_from_session(self.session, initial_guess = self.initial_guess)
+            bounds = self._get_interface_bounds()
+            output = tool.fit_from_session(self.session, bounds = bounds)
             self.finished.emit(output)
         except Exception as e:
             self.error.emit(str(e))
@@ -299,6 +317,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
 
     def _clear_fit_panel(self):
         self.result_quad.setText("-")
+        self.result_quad_strength.setText("-")
         self.result_emit_x_norm.setText("-")
         self.result_emit_y_norm.setText("-")
         self.result_beta_x0.setText("-")
@@ -320,6 +339,12 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
                 return "-"
             return f"{value:.4f}{suffix}"
 
+        quad_strength_text = fmt_value(result.get("quad_k1_0"), " 1/m²")
+        if result.get("quad_k1_0_is_fitted", False) and quad_strength_text != "-":
+            quad_strength_text += " (fit)"
+        elif quad_strength_text != "-":
+            quad_strength_text += " (nominal)"
+        self.result_quad_strength.setText(quad_strength_text)
         self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), " mm·mrad"))
         self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), " mm·mrad"))
         self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), " m"))
@@ -484,14 +509,19 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self._set_progress(0)
         self._optimization_t0 = time.perf_counter()
         thread = QThread(self)
-
-        initial_guess = None
-        if isinstance(self.session, dict):
-            initial_guess = self.session.get("optimization_guess")
         xopt_initial_points = int(self.xopt_initial_points_spin.value())
         xopt_steps = int(self.xopt_steps_spin.value())
         nm_steps = int(self.nm_steps_spin.value())
-        worker = OptimizationWorker(self.interface, self.session, n_starts=3, initial_guess=initial_guess, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps)
+
+        # FOR TESTS!!!
+        # scale = 0.8
+        # session_bad = copy.deepcopy(self.session)
+        # session_bad["K1_0"] = self.session["K1_0"] * scale
+        # session_bad["K1_values"] = (np.asarray(self.session["K1_values"]) * scale).tolist()
+        # FOR TESTS!!! in order to test again, pass sessios_bad to the worker, instead of self.session
+
+
+        worker = OptimizationWorker(self.interface, self.session, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()))
 
         worker.moveToThread(thread)
         worker.optimizer_ready.connect(self._store_current_optimizer)
@@ -522,24 +552,6 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         self.session["optimization_result"] = result
         self.session["optimization_pred_x"] = pred_x.tolist()
         self.session["optimization_pred_y"] = pred_y.tolist()
-
-        self.session["optimization_guess"] = {
-            "x": {
-                "emit_norm": result.get("emit_x_norm"),
-                "beta0": result.get("beta_x0"),
-                "alpha0": result.get("alpha_x0"),
-                "found": bool(result.get("fit_x_found", False)),
-            },
-
-            "y": {
-                "emit_norm": result.get("emit_y_norm"),
-                "beta0": result.get("beta_y0"),
-                "alpha0": result.get("alpha_y0"),
-                "found": bool(result.get("fit_y_found", False)),
-            },
-
-        }
-
         self._update_fit_panel(result)
         self._plot_fit_overlay(pred_x, pred_y, result)
         self._set_progress(100)

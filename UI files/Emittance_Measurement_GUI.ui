@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>789</height>
+    <height>1064</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -371,16 +371,17 @@ QGroupBox#xoptSettingsGroup::title {
           <property name="verticalSpacing">
            <number>6</number>
           </property>
-          <item row="0" column="1">
-           <widget class="QSpinBox" name="xopt_initial_points_spin">
-            <property name="minimum">
-             <number>1</number>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_xopt_initial_points">
+            <property name="text">
+             <string>Initial points</string>
             </property>
-            <property name="maximum">
-             <number>500</number>
-            </property>
-            <property name="value">
-             <number>15</number>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_xopt_steps">
+            <property name="text">
+             <string>Optimization steps</string>
             </property>
            </widget>
           </item>
@@ -397,17 +398,16 @@ QGroupBox#xoptSettingsGroup::title {
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_xopt_steps">
-            <property name="text">
-             <string>Optimization steps</string>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="xopt_initial_points_spin">
+            <property name="minimum">
+             <number>1</number>
             </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_xopt_initial_points">
-            <property name="text">
-             <string>Initial points</string>
+            <property name="maximum">
+             <number>500</number>
+            </property>
+            <property name="value">
+             <number>15</number>
             </property>
            </widget>
           </item>
@@ -459,6 +459,69 @@ QGroupBox#localOptimizationSettingsGroup::title {
              <number>50</number>
             </property>
            </widget>
+          </item>
+          <item row="1" column="0">
+           <layout class="QHBoxLayout" name="fitK1ScaleLabelHBox">
+            <item>
+             <widget class="QCheckBox" name="fit_quadrupole_strength_checkbox">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fit effective K1₀ together with emittance and Twiss parameters.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>Fit quadrupole strength</string>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="fit_k1_scale_info_button">
+              <property name="minimumSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="cursor">
+               <cursorShape>PointingHandCursor</cursorShape>
+              </property>
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add the nominal quadrupole strength K1₀ as an extra fit parameter.&lt;/p&gt;&lt;p&gt;Without this option, the optimizer assumes that the measured/read K1 values are exactly correct.&lt;/p&gt;&lt;p&gt;With this option, the optimizer can compensate a mismatch between the readback K1 and the quadrupole strength used by the beam.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QToolButton#fit_k1_scale_info_button {
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#fit_k1_scale_info_button:hover {
+    background-color: #e6e6e6;
+}</string>
+              </property>
+              <property name="text">
+               <string>?</string>
+              </property>
+              <property name="toolButtonStyle">
+               <enum>Qt::ToolButtonTextOnly</enum>
+              </property>
+              <property name="autoRaise">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
          </layout>
         </widget>
@@ -702,8 +765,26 @@ QGroupBox#fit_results_group::title {
                     </property>
                    </widget>
                   </item>
+                                        <item row="2" column="0">
+ <widget class="QLabel" name="label_fit_result_quad_strength_title">
+  <property name="text">
+   <string>Quadrupole strength</string>
+  </property>
+ </widget>
+</item>
+<item row="2" column="1">
+ <widget class="QLabel" name="result_quad_strength">
+  <property name="text">
+   <string>-</string>
+  </property>
+ </widget>
+</item>
+
                  </layout>
                 </item>
+
+
+
                 <item>
                  <layout class="QHBoxLayout" name="fitResultsPlanesHBox">
                   <property name="spacing">
@@ -891,6 +972,20 @@ QGroupBox#fit_results_group::title {
               <widget class="QPushButton" name="phase_spaces_button">
                <property name="text">
                 <string>Show fitted phase space</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="beta_function_button">
+               <property name="text">
+                <string>Show beta function evolution</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="emittance_evolution_button">
+               <property name="text">
+                <string>Show emittance evolution</string>
                </property>
               </widget>
              </item>

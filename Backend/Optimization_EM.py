@@ -18,7 +18,7 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization_EM:
-    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100):
+    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False):
         self.interface = interface
         self.n_starts = int(n_starts)
         self.rng = np.random.default_rng(rng_seed)
@@ -35,6 +35,7 @@ class Optimization_EM:
         self.xopt_local_alpha_sigma = 0.8
         self.xopt_local_refine = False
         self.xopt_local_refine_maxiter = 25
+        self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
 
     def request_pause(self):
         self._pause_requested = True
@@ -51,7 +52,7 @@ class Optimization_EM:
         self._last_completed_output = None
         self._pause_requested = False
 
-    def fit_from_session(self, session, initial_guess = None):
+    def fit_from_session(self, session, bounds):
         was_pause_requested = bool(self._pause_requested)
         self.clear_stop()
         self._pause_requested = was_pause_requested
@@ -60,6 +61,11 @@ class Optimization_EM:
         screens = list(session.get("screens", []))
         quad_name = session.get("quad_name")
         K1_values = np.asarray(session.get("K1_values", []), dtype=float)
+
+        try:
+            quad_k1_0_readback = np.asarray(session.get("K1_0", K1_values[len(K1_values)//2] if K1_values.size else np.nan))
+        except Exception:
+            quad_k1_0_readback = np.nan
 
         sigx = np.asarray(session.get("sigx_mean", []), dtype=float)
         sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
@@ -78,6 +84,8 @@ class Optimization_EM:
             raise ValueError("sigx and sigy shapes do not match")
         if sigx.shape[0] != K1_values.size:
             raise ValueError("K1_values and sigma arrays have incompatible lengths")
+        if not bounds:
+            raise ValueError("Add bounds for optimizer to interface_setup.py")
 
         sigma2_template_x = np.asarray(sigx ** 2 if sigx.size else np.empty((0, len(screens))), dtype=float)
         sigma2_template_y = np.asarray(sigy ** 2 if sigy.size else np.empty((0, len(screens))), dtype=float)
@@ -100,24 +108,10 @@ class Optimization_EM:
         joint_fit = None
         fit_x = None
         fit_y = None
-        joint_initial_guess = None
-        if isinstance(initial_guess, dict):
-            guess_x = (initial_guess or {}).get("x") if isinstance((initial_guess or {}).get("x"), dict) else {}
-            guess_y = (initial_guess or {}).get("y") if isinstance((initial_guess or {}).get("y"), dict) else {}
-
-            joint_initial_guess = {
-                "emit_x_norm": guess_x.get("emit_norm"),
-                "beta_x0": guess_x.get("beta0"),
-                "alpha_x0": guess_x.get("alpha0"),
-                "emit_y_norm": guess_y.get("emit_norm"),
-                "beta_y0": guess_y.get("beta0"),
-                "alpha_y0": guess_y.get("alpha0"),
-            }
 
         try:
             joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1_values=K1_values,
-                                    sigx=sigx, sigx_std=sigx_std, sigy=sigy, sigy_std=sigy_std,
-                                    initial_guess=joint_initial_guess)
+                                    sigx=sigx, sigx_std=sigx_std, sigy=sigy, sigy_std=sigy_std, bounds = bounds)
             fit_x = {
                 "emit": joint_fit["emit_x"],
                 "beta0": joint_fit["beta_x0"],
@@ -211,16 +205,12 @@ class Optimization_EM:
         result = {
             "screen0": screens[0],
             "quad_name": quad_name,
-            "optimizer": "xopt_based_optimization",
-            "transport_source": "rftrack_forward_scan",
-
             "emit_x_norm": emit_x_norm,
             "emit_y_norm": emit_y_norm,
             "beta_x0": fit_x["beta0"],
             "alpha_x0": fit_x["alpha0"],
             "beta_y0": fit_y["beta0"],
             "alpha_y0": fit_y["alpha0"],
-
             "fit_x_success": fit_x["success"],
             "fit_y_success": fit_y["success"],
             "fit_x_message": fit_x["message"],
@@ -239,6 +229,13 @@ class Optimization_EM:
             "fit_y_found": bool(np.isfinite(fit_y["emit"])),
             "paused": bool(self._pause_requested),
             "stopped": stopped,
+            "fit_quadrupole_strength": bool(self.fit_quadrupole_strength),
+            "quad_k1_0": (
+                float(joint_fit.get("quad_k1_0", np.nan))
+                if bool(self.fit_quadrupole_strength) and isinstance(joint_fit, dict)
+                else quad_k1_0_readback
+            ),
+            "quad_k1_0_is_fitted": bool(self.fit_quadrupole_strength),
         }
 
         output = {
@@ -343,7 +340,7 @@ class Optimization_EM:
             "stopped": True,
         }
 
-    def _fit_6d(self, screens, quad_name, K1_values, sigx, sigx_std, sigy, sigy_std, initial_guess = None):
+    def _fit_6d(self, screens, quad_name, K1_values, sigx, sigx_std, sigy, sigy_std, bounds):
         sigx = np.asarray(sigx, dtype=float)
         sigy = np.asarray(sigy, dtype=float)
         sigx_std = np.asarray(sigx_std, dtype=float)
@@ -362,41 +359,20 @@ class Optimization_EM:
         if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")
 
-        emit_x_norm0, emit_y_norm0, beta_x0_0, beta_y0_0, alpha_x0_0, alpha_y0_0 = 2.0, 0.1, 10.0, 10.0, 0.0, 0.0
-        if isinstance(initial_guess, dict):
-            try:
-                emit_x_norm0 = max(float(initial_guess.get("emit_x_norm", emit_x_norm0)), 1e-8)
-            except Exception:
-                pass
-            try:
-                emit_y_norm0 = max(float(initial_guess.get("emit_y_norm", emit_y_norm0)), 1e-8)
-            except Exception:
-                pass
-            try:
-                beta_x0_0 = max(float(initial_guess.get("beta_x0", beta_x0_0)), 1e-8)
-            except Exception:
-                pass
-            try:
-                beta_y0_0 = max(float(initial_guess.get("beta_y0", beta_y0_0)), 1e-8)
-            except Exception:
-                pass
-            try:
-                alpha_x0_0 = float(initial_guess.get("alpha_x0", alpha_x0_0))
-            except Exception:
-                pass
-            try:
-                alpha_y0_0 = float(initial_guess.get("alpha_y0", alpha_y0_0))
-            except Exception:
-                pass
+        bounds = dict(bounds or {})
+        required_bounds = ["emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0"]
+        missing_bounds = [name for name in required_bounds if name not in bounds]
+        if missing_bounds:
+            raise ValueError(f"Missing optimizer bounds in interface_setup.py: {missing_bounds}")
+        K1_values = np.asarray(K1_values, dtype=float)
+        K1_0_readback = float(K1_values[len(K1_values)//2])
+        deltas_for_fit = K1_values / K1_0_readback - 1.0
 
-        bounds = {
-            "emit_x_norm": [0.5, 8.0],
-            "beta_x0": [0.2, 5.0],
-            "alpha_x0": [-4.0, 2.0],
-            "emit_y_norm": [0.005, 0.12],
-            "beta_y0": [2.0, 20.0],
-            "alpha_y0": [-8.0, 2.0],
-        }
+        if self.fit_quadrupole_strength:
+            low = 0.7 * K1_0_readback
+            high = 1.3 * K1_0_readback
+            bounds["quad_k1_0"] = [min(low,high), max(low,high)]
+
 
         vocs = VOCS( # degrees of freedom
             variables = {i: [float(vals[0]), float(vals[1])] for i, vals in bounds.items()
@@ -404,7 +380,7 @@ class Optimization_EM:
             objectives={"f": "MINIMIZE"},
         )
 
-        def predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True):
+        def predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
             '''
             If the beam at the scanned quadrupole has certain Twiss parameters and given emittance,
             what quadrupole scan should be?
@@ -425,11 +401,18 @@ class Optimization_EM:
             emit_x_geom = emit_x_norm / beta_gamma
             emit_y_geom = emit_y_norm / beta_gamma
 
+            if self.fit_quadrupole_strength:
+                if quad_k1_0 is None:
+                    raise RuntimeError("quad_k1_0 must be provided when fitting quadrupole strength.")
+                K1_values_used = float(quad_k1_0) * (1.0 + deltas_for_fit)
+            else:
+                K1_values_used = K1_values
+
             try:
                 pred_sigx, pred_sigy = self.interface.predict_emittance_scan_response(
                     quad_name=quad_name,
                     screens=screens,
-                    K1_values=K1_values,
+                    K1_values=K1_values_used,
                     emit_x=emit_x_norm,
                     emit_y=emit_y_norm,
                     beta_x0=beta_x0,
@@ -453,7 +436,7 @@ class Optimization_EM:
                 )
             return pred_sigx ** 2, pred_sigy ** 2
 
-        def compute_cost(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True):
+        def compute_cost(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
             '''
             It compares how well a scan is predicting a model, how much it differs from data and
             minimizes f, so that it's as small as possible.
@@ -462,7 +445,7 @@ class Optimization_EM:
                 if self._pause_requested:
                     raise OptimizationPaused("Optimization paused.")
                 raise OptimizationStopped("Optimization stopped.")
-            pred2_x, pred2_y = predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop)
+            pred2_x, pred2_y = predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop, quad_k1_0 = quad_k1_0)
             rx = (pred2_x - sig_x2)[valid_x] if np.any(valid_x) else np.array([], dtype=float)
             ry = (pred2_y - sig_y2)[valid_y] if np.any(valid_y) else np.array([], dtype=float)
             # res = np.concatenate([np.asarray(rx, dtype = float).ravel(), np.asarray(ry, dtype = float).ravel()]) # the better the match, the smaller the number
@@ -491,9 +474,9 @@ class Optimization_EM:
                 raise OptimizationStopped("Optimization stopped.")
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.")
-
+            quad_k1_0 = float(inputs["quad_k1_0"]) if self.fit_quadrupole_strength else None
             f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
-                                float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = True)
+                                float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = True, quad_k1_0 = quad_k1_0)
 
             if self.print_M:
                 print(
@@ -582,12 +565,13 @@ class Optimization_EM:
         emit_y_norm_best = float(best_row["emit_y_norm"])
         beta_y0_best = float(best_row["beta_y0"])
         alpha_y0_best = float(best_row["alpha_y0"])
+        quad_k1_0_best = float(best_row["quad_k1_0"]) if self.fit_quadrupole_strength else None
 
         if self._stop_requested or self._pause_requested:
             pred2_x_partial, pred2_y_partial = predict_raw(
                 emit_x_norm_best, beta_x0_best, alpha_x0_best,
                 emit_y_norm_best, beta_y0_best, alpha_y0_best,
-                allow_stop=False
+                allow_stop=False, quad_k1_0 = quad_k1_0_best,
             )
 
             solution = self._build_joint_partial_output(
@@ -606,11 +590,8 @@ class Optimization_EM:
         pred2_x, pred2_y = predict_raw(
             emit_x_norm_best, beta_x0_best, alpha_x0_best,
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
-            allow_stop=True,
+            allow_stop=True, quad_k1_0 = quad_k1_0_best,
         )
-
-
-
 
         local_max_nfev = int(getattr(self, "nm_steps", 500))
         run_local_ls = local_max_nfev > 0
@@ -635,13 +616,21 @@ class Optimization_EM:
         params_order = ["emit_x_norm", "beta_x0", "alpha_x0",
                        "emit_y_norm", "beta_y0", "alpha_y0"]
 
+        if self.fit_quadrupole_strength:
+            params_order.append("quad_k1_0")
+
         low_bounds = np.array([bounds[p][0] for p in params_order], dtype=float)
         high_bounds = np.array([bounds[p][1] for p in params_order], dtype=float)
 
-        x0 = np.array([
+        x0_values = [
             emit_x_norm_best, beta_x0_best, alpha_x0_best,
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
-        ], dtype=float)
+        ]
+
+        if self.fit_quadrupole_strength:
+            x0_values.append(quad_k1_0_best)
+
+        x0 = np.array(x0_values, dtype=float)
         x0 = np.clip(x0, low_bounds, high_bounds)
 
         local_max_nfev = int(getattr(self, "nm_steps", 500))
@@ -667,6 +656,7 @@ class Optimization_EM:
                 p2x, p2y = predict_raw(
                     p_c[0], p_c[1], p_c[2],
                     p_c[3], p_c[4], p_c[5],
+                    quad_k1_0=(p_c[6] if self.fit_quadrupole_strength else None),
                     allow_stop=False,
                 )
             except Exception:
@@ -696,6 +686,7 @@ class Optimization_EM:
                     f"best_f={ls_best_cost[0]:.4g}, "
                     f"current_emit_x={p_c[0]:.6g}, current_beta_x={p_c[1]:.6g}, current_alpha_x={p_c[2]:.6g}, "
                     f"current_emit_y={p_c[3]:.6g}, current_beta_y={p_c[4]:.6g}, current_alpha_y={p_c[5]:.6g}"
+                    + (f", current_quad_k1_0={p_c[6]:.6g}" if self.fit_quadrupole_strength else "")
                 )
 
             return residuals
@@ -715,7 +706,12 @@ class Optimization_EM:
                 gtol=1e-6,
             )
             p_ls = np.asarray(res_ls.x, dtype=float)
-            f_ls, _, _ = compute_cost(*p_ls.tolist(), allow_stop=False)
+            f_ls, _, _ = compute_cost(
+                p_ls[0], p_ls[1], p_ls[2],
+                p_ls[3], p_ls[4], p_ls[5],
+                quad_k1_0=(p_ls[6] if self.fit_quadrupole_strength else None),
+                allow_stop=False,
+            )
             if np.isfinite(f_ls) and f_ls < ls_best_cost[0]:
                 ls_best_cost[0] = float(f_ls)
                 ls_best_params[0] = p_ls.copy()
@@ -740,6 +736,8 @@ class Optimization_EM:
         best_cost_final = ls_best_cost[0]
 
         best_row = best_row.copy()
+        if self.fit_quadrupole_strength:
+            best_row["quad_k1_0"] = float(p_final[6])
         best_row["emit_x_norm"] = float(p_final[0])
         best_row["beta_x0"] = float(p_final[1])
         best_row["alpha_x0"] = float(p_final[2])
@@ -751,7 +749,10 @@ class Optimization_EM:
 
         if stopped_during_fit or self._stop_requested or self._pause_requested:
             pred2_x_p, pred2_y_p = predict_raw(
-                *p_final.tolist(), allow_stop=False
+                p_final[0], p_final[1], p_final[2],
+                p_final[3], p_final[4], p_final[5],
+                quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None),
+                allow_stop=False,
             )
             solution = self._build_joint_partial_output(
                 screens=screens, sigma2_x=sig_x2,
@@ -763,7 +764,12 @@ class Optimization_EM:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             raise OptimizationStopped("Optimization stopped.", solution=solution)
 
-        pred2_x, pred2_y = predict_raw(*p_final.tolist(), allow_stop=True)
+        pred2_x, pred2_y = predict_raw(
+            p_final[0], p_final[1], p_final[2],
+            p_final[3], p_final[4], p_final[5],
+            quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None),
+            allow_stop=True,
+        )
 
         solution = self._build_joint_partial_output(
             screens=screens, sigma2_x=sig_x2,

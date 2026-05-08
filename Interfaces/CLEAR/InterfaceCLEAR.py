@@ -24,19 +24,19 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 198 # MeV/c
-        self.energy_param_candidates = [
+        self.energy_param = [
             'CA.BEAM/Acquisition#momentum',
             'CA.BEAM/Acquisition#energy',
         ]
         self.laser_attenuator_set_param = 'CA.GUN-ATTN/CMD#requestedPosition'
-        self.laser_attenuator_readback_candidates = [
+        self.laser_attenuator_readback = [
             'CA.GUN-ATTN/AQN#actualPosition',
             'CA.GUN-ATTN/CMD#requestedPosition',
         ]
         self.laser_attenuator_min = 0.0
         self.laser_attenuator_max = 3000.0
         self.laser_motor_attenuator_set_param = 'CTF2Motor2B/Setting#targetPosition'
-        self.laser_motor_attenuator_readback_candidates = [
+        self.laser_motor_attenuator_readback = [
             'CTF2Motor2B/Acquisition#position',
             'CTF2Motor2B/Acquisition#actualPosition',
             'CTF2Motor2B/Status#position',
@@ -170,7 +170,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def get_beam_factors(self):
         pref = self.Pref
-        for param in self.energy_param_candidates:
+        for param in self.energy_param:
             try:
                 value = self.japc.getParam(param)
                 value = self.make_safe_float(value, default=np.nan)
@@ -248,9 +248,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 return value
         return float(default)
 
-    def _valid_pv_value(self, param_names, default=np.nan):
-        return self._valid_japc_value(param_names, default=default)
-
     def change_energy(self):
         self.log('Function change_energy needs implementation.')
         return 0.0
@@ -265,7 +262,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return float(np.clip(value, self.laser_attenuator_min, self.laser_attenuator_max))
 
     def get_laser_attenuator_position(self):
-        value = self._valid_japc_value(self.laser_attenuator_readback_candidates, default=np.nan)
+        value = self._valid_japc_value(self.laser_attenuator_readback, default=np.nan)
         return value / 1e3 if np.isfinite(value) else np.nan
 
     def set_laser_attenuator_position(self, position):
@@ -277,7 +274,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return position
 
     def get_laser_motor_attenuator_position(self):
-        return self._valid_japc_value(self.laser_motor_attenuator_readback_candidates, default=np.nan)
+        return self._valid_japc_value(self.laser_motor_attenuator_readback, default=np.nan)
 
     def set_laser_motor_attenuator_position(self, position):
         position = float(np.clip(float(position), 0.0, 3000.0))
