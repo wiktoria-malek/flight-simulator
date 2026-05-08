@@ -99,8 +99,6 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
 
         return names
 
-
-
     def log_messages(self,console):
         self.log=console or print
 

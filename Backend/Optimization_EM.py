@@ -389,15 +389,6 @@ class Optimization_EM:
             except Exception:
                 pass
 
-        # bounds = {
-        #     "emit_x_norm": [3.0, 7.0],
-        #     "beta_x0": [0.4, 2.5],
-        #     "alpha_x0": [-2.5, 1.0],
-        #     "emit_y_norm": [0.015, 0.06],
-        #     "beta_y0": [6.0, 15.0],
-        #     "alpha_y0": [-6.0, -1.5],
-        # }
-
         bounds = {
             "emit_x_norm": [0.5, 8.0],
             "beta_x0": [0.2, 5.0],

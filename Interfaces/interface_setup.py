@@ -11,6 +11,14 @@ INTERFACE_SETUP = {
                 "corrector_strength":"T*mm",
                 "bpm_position": "mm",
                 "sysid_corrector_kick": 0.01
+            },
+            "bounds": {
+                "emit_x_norm": [1.0, 10.0],
+                "beta_x0": [1.0, 12.0],
+                "alpha_x0": [-10.0, 3.0],
+                "emit_y_norm": [0.005, 0.15],
+                "beta_y0": [0.5, 8.0],
+                "alpha_y0": [-4.0, 6.0],
             }
         },
         {
@@ -24,7 +32,15 @@ INTERFACE_SETUP = {
                     "corrector_strength": "T*mm",
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.01
-                }
+                },
+            "bounds": {
+                "emit_x_norm": [1.0, 10.0],
+                "beta_x0": [1.0, 12.0],
+                "alpha_x0": [-10.0, 3.0],
+                "emit_y_norm": [0.005, 0.15],
+                "beta_y0": [0.5, 8.0],
+                "alpha_y0": [-4.0, 6.0],
+            }
         },
         {
             "display_name": "ATF2 Extraction Line",
@@ -38,6 +54,15 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.01
                 },
+            "bounds":
+                {
+                    "emit_x_norm": [0.5, 8.0],
+                    "beta_x0": [0.2, 5.0],
+                    "alpha_x0": [-4.0, 2.0],
+                    "emit_y_norm": [0.005, 0.12],
+                    "beta_y0": [2.0, 20.0],
+                    "alpha_y0": [-8.0, 2.0],
+                }
         },
         {
             "display_name": "ATF2 Extraction Line RFTrack",
@@ -50,6 +75,15 @@ INTERFACE_SETUP = {
                     "corrector_strength": "T*mm",
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.01
+                },
+            "bounds":
+                {
+                    "emit_x_norm": [0.5, 8.0],
+                    "beta_x0": [0.2, 5.0],
+                    "alpha_x0": [-4.0, 2.0],
+                    "emit_y_norm": [0.005, 0.12],
+                    "beta_y0": [2.0, 20.0],
+                    "alpha_y0": [-8.0, 2.0],
                 }
         },
         {
@@ -64,6 +98,14 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.01
                 },
+            "bounds": {
+                "emit_x_norm": [1e-4, 0.05],
+                "beta_x0": [0.05, 5.0],
+                "alpha_x0": [-6.0, 2.0],
+                "emit_y_norm": [1e-4, 0.05],
+                "beta_y0": [0.2, 8.0],
+                "alpha_y0": [-15.0, 2.0],
+            }
         },
         {
             "display_name": "ATF2 Linac RFTrack",
@@ -76,7 +118,15 @@ INTERFACE_SETUP = {
                     "corrector_strength": "T*mm",
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.01
-                }
+                },
+            "bounds": {
+                "emit_x_norm": [1e-4, 0.05],
+                "beta_x0": [0.05, 5.0],
+                "alpha_x0": [-6.0, 2.0],
+                "emit_y_norm": [1e-4, 0.05],
+                "beta_y0": [0.2, 8.0],
+                "alpha_y0": [-15.0, 2.0],
+            }
         },
     ],
 
@@ -93,6 +143,14 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.0001
                 },
+            "bounds": {
+                "emit_x_norm": [0.5, 8.0],
+                "beta_x0": [0.5, 12.0],
+                "alpha_x0": [-5.0, 3.0],
+                "emit_y_norm": [0.5, 8.0],
+                "beta_y0": [0.5, 12.0],
+                "alpha_y0": [-5.0, 5.0],
+            }
         },
         {
             "display_name": "FACET2 Linac",
@@ -106,6 +164,14 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.0001
                 },
+            "bounds": {
+                "emit_x_norm": [0.5, 8.0],
+                "beta_x0": [0.5, 12.0],
+                "alpha_x0": [-5.0, 3.0],
+                "emit_y_norm": [0.5, 8.0],
+                "beta_y0": [0.5, 12.0],
+                "alpha_y0": [-5.0, 5.0],
+            }
         },],
 
     "CLEAR": [
@@ -121,6 +187,15 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.0001
                 },
+            "bounds":
+                {
+                    "emit_x_norm": [0.5, 10.0],
+                    "beta_x0": [0.2, 20.0],
+                    "alpha_x0": [-4.0, 2.0],
+                    "emit_y_norm": [0.5, 10.0],
+                    "beta_y0": [10.0, 30.0],
+                    "alpha_y0": [-8.0, 2.0],
+                }
         },
         {
             "display_name": "CLEAR RFTrack",
@@ -134,6 +209,15 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.0001
                 },
+            "bounds":
+                {
+                    "emit_x_norm": [0.5, 10.0],
+                    "beta_x0": [0.2, 20.0],
+                    "alpha_x0": [-4.0, 2.0],
+                    "emit_y_norm": [0.5, 10.0],
+                    "beta_y0": [10.0, 30.0],
+                    "alpha_y0": [-8.0, 2.0],
+                }
         },
     ],
 }
