@@ -10,7 +10,7 @@ B_rho = Part.P / Part.Q; % MV/c, reference rigidity
 %% FODO cell with Lcell = 2 m, Lq = 24 cm, Ld = 76 cm, mu = 90 degress
 Lcell = 2; % m
 Lquad = 0.01; % m
-mu = 90; % deg
+mu = 20; % deg
 
 % focusing params
 k1L = sind(mu/2) / (Lcell/4); % 1/m
@@ -23,6 +23,7 @@ QD = Quadrupole(Lquad, -strength);
 D  = Drift(Lcell/2 - Lquad);
 
 FODO = Lattice();
+FODO.append(Screen());
 FODO.append(Qf);
 FODO.append(Screen());
 FODO.append(D);
@@ -98,16 +99,23 @@ function M = merit(X, S_ref, FODO)
     
 end
 
-X = fminsearch(@(X) merit(X, S_ref, FODO), zeros(1,5));
+%% We simulate a difference between model and real machine (which
+% was used to provide S_ref)
+Q = FODO.get_quadrupoles();
+Q{1}.set_strength(-72.0);
 
-emitt = constrain(X(1), 0, 5)
-betax = constrain(X(2), 0, 5)
-betay = constrain(X(3), 0, 5)
-alphax = constrain(X(4), -5, 5)
-alphay = constrain(X(5), -5, 5)
+if 0
+    X = fminsearch(@(X) merit(X, S_ref, FODO), randn(1,5));
+    
+    emitt = constrain(X(1), 0, 5)
+    betax = constrain(X(2), 0, 5)
+    betay = constrain(X(3), 0, 5)
+    alphax = constrain(X(4), -5, 5)
+    alphay = constrain(X(5), -5, 5)
+end
+
 
 %% Part 2, infers also the first quadrupole strength
-
 function M = merit(X, S_ref, FODO)
     
     RF_Track;
@@ -154,3 +162,46 @@ betay = constrain(X(3), 0, 5)
 alphax = constrain(X(4), -5, 5)
 alphay = constrain(X(5), -5, 5)
 strength = constrain(X(6), -200, 0)
+
+%% Make plots
+Q{1}.set_strength(strength);
+
+M = [ 1 -10 0 0 0 Part.P ;
+      1 +10 0 0 0 Part.P ];
+
+B0 = Bunch6d(RF_Track.electronmass, 0.0, -1, M);
+
+FODO.track(B0);
+
+B = FODO.get_bunch_at_screens();
+
+clf ; hold on
+for b = B
+    m = b{1}.get_phase_space();
+    line(m(:,1), m(:,2));
+end
+
+%% Second method with just 1 particle
+M = [ 0.5 0 0 0 0 Part.P ]
+B0 = Bunch6d(RF_Track.electronmass, 0.0, -1, M);
+
+FODO.track(B0);
+
+B = FODO.get_bunch_at_screens();
+
+clf ; hold on
+for b = B
+    m = b{1}.get_phase_space();
+    x0 = m(1);
+    xp0 = m(2);
+    
+    b = -m(2);
+    a =  m(1);
+    
+    t = linspace(-10, 10, 2);
+    
+    plot(x0 + t*b, xp0 + t*a);
+end
+
+xlim([ -1 1 ])
+ylim([ -1 1 ])
