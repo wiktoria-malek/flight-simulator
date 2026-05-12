@@ -150,8 +150,8 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         quadrupoles = list(self.interface.get_quadrupoles()["names"])
         screens_data = self.interface.get_screens()
         screens = list(screens_data["names"])
-        screens_S = np.asarray(screens_data["S"], dtype=float)
-        screen_pairs = sorted(zip(screens, screens_S),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf) # assigns S position to each screen
+        screen_order, screen_order_type = self._get_element_order_values(screens)
+        screen_pairs = sorted(zip(screens, screen_order),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf) # assigns S position to each screen
         screens_sorted = [name for name, _ in screen_pairs] # only names
         self._show_s_values_and_device_lists(self.quadrupoles_list, quadrupoles)
         self._show_s_values_and_device_lists(self.screens_list, screens_sorted)
@@ -261,8 +261,8 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         quadrupoles = list(self.interface.get_quadrupoles()["names"])
         screens_data = self.interface.get_screens()
         screens = list(screens_data["names"])
-        screens_S = np.asarray(screens_data["S"], dtype=float)
-        screen_pairs = sorted(zip(screens, screens_S), key = lambda x: x[1] if np.isfinite(x[1]) else np.inf)
+        screen_order, screen_order_type = self._get_element_order_values(screens)
+        screen_pairs = sorted(zip(screens, screen_order),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf)
         screens_sorted = [name for name, _ in screen_pairs]
         self.quad_on_plot.addItems(quadrupoles)
         self.screen_on_plot.addItems(screens_sorted)
@@ -276,25 +276,62 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         if self._is_optimizing and self._current_optimizer is not None:
             self._current_optimizer.request_stop()
 
-    def _show_s_values_and_device_lists(self, list_widget, names):
+    def _get_element_order_values(self, names):
         names = list(names)
         s_positions = self._get_twiss_s_positions(names)
-        list_widget.clear()
+        s_values = []
+        for value in s_positions:
+            try:
+                value = float(value)
+            except (ValueError, TypeError):
+                value = np.nan
+            s_values.append(value)
 
-        for name, s_value in zip(names, s_positions):
+        if any(np.isfinite(s_values)):
+            return s_values, "S"
+        sequence_indices = None
+        try:
+            sequence_indices = self.interface.get_elements_indices(names)
+        except Exception:
+            sequence_indices = None
+        if sequence_indices is not None:
+            try:
+                sequence_indices = list(sequence_indices)
+            except TypeError:
+                sequence_indices = None
+        if sequence_indices is not None and len(sequence_indices) == len(names):
+            index_values = []
+            for value in sequence_indices:
+                try:
+                    value = float(value)
+                except (ValueError, TypeError):
+                    value = np.nan
+                index_values.append(value)
+            if any(np.isfinite(index_values)):
+                return index_values, "index"
+        return [np.nan] * len(names), ""
+
+    def _show_s_values_and_device_lists(self, list_widget, names):
+        names = list(names)
+        order_values, order_kind = self._get_element_order_values(names)
+        list_widget.clear()
+        for name, order_value in zip(names, order_values):
             item = QListWidgetItem(str(name))
             item.setData(Qt.ItemDataRole.UserRole, str(name))
             list_widget.addItem(item)
-            if s_value is not None:
-                try:
-                    s_value = float(s_value)
-                except (ValueError, TypeError):
-                    s_text = ""
+            try:
+                order_value = float(order_value)
+            except (ValueError, TypeError):
+                order_value = np.nan
+
+            if np.isfinite(order_value):
+                if order_kind == "index":
+                    order_text = f"index = {int(order_value)}"
                 else:
-                    s_text = f"S = {s_value:.3f} m" if np.isfinite(s_value) else ""
+                    order_text = f"S = {order_value:.3f} m"
             else:
-                s_text = ""
-            item.setData(SPositionDelegate.S_ROLE, s_text)
+                order_text = ""
+            item.setData(SPositionDelegate.S_ROLE, order_text)
 
     def _load_logo(self):
         self.logo_label.setText("")
@@ -841,7 +878,7 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         if not selected_screens:
             return
 
-        screen_position = self._get_twiss_s_positions(selected_screens)
+        screen_position, screen_order_kind = self._get_element_order_values(selected_screens)
         finite_screen_positions = [float(s) for s in screen_position if np.isfinite(s)]
         if not finite_screen_positions:
             return
@@ -849,8 +886,12 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
         first_screen_position = min(finite_screen_positions)
         last_screen_position = max(finite_screen_positions)
         all_quadrupoles = list(self.interface.get_quadrupoles().get("names", []))
-        quad_S = self._get_twiss_s_positions(all_quadrupoles)
-        quad_pos = {name: float(s) for name, s in zip(all_quadrupoles, quad_S) if np.isfinite(s)}
+        quad_order, quad_order_kind = self._get_element_order_values(all_quadrupoles)
+
+        if quad_order_kind != screen_order_kind: # S [m] or index
+            return
+
+        quad_pos = {name: float(s) for name, s in zip(all_quadrupoles, quad_order) if np.isfinite(s)}
 
         before_last_screen_quads = [
             name for name in all_quadrupoles

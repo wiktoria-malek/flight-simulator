@@ -124,9 +124,6 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
 
-    def get_elements_indices(self, names):
-        return [index for index, string in enumerate(self.sequence) if string in names]
-
     def _set_name(self, element, name):
         try:
             element.set_name(name)
@@ -829,3 +826,9 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
             "alfy": float(optics["alfy"][i]),
 
         }
+
+    def get_elements_indices(self, names):
+        if isinstance(names, str):
+            names = [names]
+        name_to_index = {string: index for index, string in enumerate(self.sequence)}
+        return [name_to_index.get(name, np.nan) for name in names]

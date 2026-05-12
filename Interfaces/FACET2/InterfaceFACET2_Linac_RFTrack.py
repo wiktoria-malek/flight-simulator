@@ -473,6 +473,12 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
 
         return sigx, sigy
 
+    def get_elements_indices(self, names):
+        if isinstance(names, str):
+            names = [names]
+        name_to_index = {string: index for index, string in enumerate(self.sequence)}
+        return [name_to_index.get(name, np.nan) for name in names]
+
     def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker=None, reference_screen=None):
         screens = list(screens)
         K1_values = np.asarray(K1_values, dtype=float)

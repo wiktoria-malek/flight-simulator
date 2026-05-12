@@ -336,7 +336,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return [name for name in self.corrs if ("DVG" in name) or ("DVJ" in name) or ("SDV" in name)]
 
     def get_elements_indices(self, names):
-        return [index for index, string in enumerate(self.sequence) if string in names]
+        if isinstance(names, str):
+            names = [names]
+        name_to_index = {string: index for index, string in enumerate(self.sequence)}
+        return [name_to_index.get(name, np.nan) for name in names]
 
     def log_messages(self, console):
         self.log = console or print

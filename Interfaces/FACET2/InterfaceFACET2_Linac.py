@@ -295,3 +295,8 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         for devname, target in zip(devnames, updated_corr_vals):
             self._wait_for_magnet_readback(devname, target)
 
+    def get_elements_indices(self, names):
+        if isinstance(names, str):
+            names = [names]
+        name_to_index = {string: index for index, string in enumerate(self.sequence)}
+        return [name_to_index.get(name, np.nan) for name in names]

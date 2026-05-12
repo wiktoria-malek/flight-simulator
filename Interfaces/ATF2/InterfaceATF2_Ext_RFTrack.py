@@ -194,7 +194,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return [string for string in self.corrs if string.lower().startswith('zv')]
 
     def get_elements_indices(self, names):
-        return [index for index, string in enumerate(self.sequence) if string in names]
+        if isinstance(names, str):
+            names = [names]
+        name_to_index = {string: index for index, string in enumerate(self.sequence)}
+        return [name_to_index.get(name, np.nan) for name in names]
 
     def get_target_dispersion(self, names=None): # for DR too
         if names is None:
@@ -589,7 +592,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return {
             "names": all_names,
-            "S": np.array(all_s, dtype=float),
+            #"S": np.array(all_s, dtype=float),
             "L": np.array(all_l, dtype=float),
         }
 

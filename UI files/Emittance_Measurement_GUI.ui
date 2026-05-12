@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>1064</height>
+    <height>1052</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -52,7 +52,7 @@ QGroupBox#devicesGroup::title {
 }</string>
          </property>
          <property name="title">
-          <string>Devices</string>
+          <string>Devices with position along the lattice</string>
          </property>
          <layout class="QVBoxLayout" name="devicesVBox">
           <item>
@@ -765,26 +765,22 @@ QGroupBox#fit_results_group::title {
                     </property>
                    </widget>
                   </item>
-                                        <item row="2" column="0">
- <widget class="QLabel" name="label_fit_result_quad_strength_title">
-  <property name="text">
-   <string>Quadrupole strength</string>
-  </property>
- </widget>
-</item>
-<item row="2" column="1">
- <widget class="QLabel" name="result_quad_strength">
-  <property name="text">
-   <string>-</string>
-  </property>
- </widget>
-</item>
-
+                  <item row="2" column="0">
+                   <widget class="QLabel" name="label_fit_result_quad_strength_title">
+                    <property name="text">
+                     <string>Quadrupole strength</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="1">
+                   <widget class="QLabel" name="result_quad_strength">
+                    <property name="text">
+                     <string>-</string>
+                    </property>
+                   </widget>
+                  </item>
                  </layout>
                 </item>
-
-
-
                 <item>
                  <layout class="QHBoxLayout" name="fitResultsPlanesHBox">
                   <property name="spacing">
