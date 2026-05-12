@@ -54,6 +54,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.Q = -1
         self.dfs_test_energy = 0.98
         self.wfs_test_charge = 0.90
+        self.coupling_roll = 0.0
         self.__setup_beam0()
         self.__track_bunch()
         self._saved_sextupoles_state = None
@@ -158,12 +159,17 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         I0 = self.B0.get_info()
         dx = self.jitter * I0.sigma_x
         dy = self.jitter * I0.sigma_y
-        dz, dt, roll = 0.0, 0.0, 0.0
+        dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
         pitch = self.jitter * I0.sigma_py
         yaw = self.jitter * I0.sigma_px
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         B1=self.lattice.track(B0_offset)
         I = B0_offset.get_info()
+
+    def set_coupling_roll(self, angle_in_rad = 0.0):
+        self.coupling_roll = float(angle_in_rad)
+        self.__setup_beam0()
+        self.__track_bunch()
 
     def change_energy(self):
         self.__setup_beam1()
@@ -320,6 +326,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         yb_list = []
         sigx_list = []
         sigy_list = []
+        sigxy_list = []
+        tilt_list = []
         sum_list = []
         images = []
         hedges_all = []
@@ -365,6 +373,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 yb_list.append(np.nan)
                 sigx_list.append(np.nan)
                 sigy_list.append(np.nan)
+                sig_xy_list.append(np.nan)
+                tilt_list.append(np.nan)
                 sum_list.append(0)
                 images.append(np.zeros((1, 1)))
                 hedges_all.append(np.array([0, hpixel]))
@@ -372,10 +382,16 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 continue
 
             sumw = len(m[:, 0])  # number of particles in the screen; intensity
-            xb_list.append(np.mean(m[:, 0]))  # mean x of particles
-            yb_list.append(np.mean(m[:, 1]))  # mean y of particles
-            sigx_list.append(np.std(m[:, 0]))  # RMS x beam size
-            sigy_list.append(np.std(m[:, 1]))  # RMS y beam size
+            x_mean = float(np.mean(m[:,0]))
+            y_mean = float(np.mean(m[:,1]))
+            x_centered = m[:,0] - x_mean
+            y_centered = m[:,1] - y_mean
+
+            sigx = float(np.std(m[:, 0])) # RMS x beam size
+            sigy = float(np.std(m[:, 1])) # RMS y beam size
+
+
+
             sum_list.append(sumw)
 
             nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(

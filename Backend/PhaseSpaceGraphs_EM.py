@@ -302,15 +302,10 @@ class PhaseSpaces(QDialog):
                 transport = get_transport(reference_screen=reference_screen, screens=screens)
 
         if not isinstance(transport, dict):
-            ax = self.figure.add_subplot(111)
-            ax.text(
-                0.5, 0.5,
-                "No measured/model transport available for projection lines.",
-                ha="center", va="center",
-                transform=ax.transAxes,
+            self.plot_from_result(
+                result,
+                reference_name=session.get("reference_screen", session.get("quad_name", "fitted scan reference")),
             )
-            ax.axis("off")
-            self.canvas.draw_idle()
             return
 
         sigx = np.asarray(session.get("sigx_mean", []), dtype=float)

@@ -974,10 +974,8 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             return
 
         session_to_plot = self._get_session_for_selected_quad(self.session) if isinstance(self.session, dict) else None
-        has_transport = isinstance(session_to_plot, dict) and isinstance(session_to_plot.get("measured_transport"), dict)
-        has_model_transport = hasattr(self.interface, "get_phase_space_transport_to_screens")
 
-        if isinstance(session_to_plot, dict) and screens and (has_transport or has_model_transport):
+        if isinstance(session_to_plot, dict) and screens:
             self.phase_spaces.plot_projection_constraints(result, session_to_plot, interface=self.interface)
         else:
             self.phase_spaces.plot_from_result(result, reference_name=reference_name)
