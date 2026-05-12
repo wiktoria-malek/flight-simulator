@@ -138,17 +138,13 @@ class QuadrupoleScan_EM:
         sigy_mean = np.full((steps, nscreens), np.nan, dtype=float)
         sigx_std = np.full((steps, nscreens), np.nan, dtype=float)
         sigy_std = np.full((steps, nscreens), np.nan, dtype=float)
-        bpm_x_mean = np.full((steps, nbpms), np.nan, dtype=float)
-        bpm_y_mean = np.full((steps, nbpms), np.nan, dtype=float)
-        bpm_x_std = np.full((steps, nbpms), np.nan, dtype=float)
-        bpm_y_std = np.full((steps, nbpms), np.nan, dtype=float)
         scan_steps = []
 
         output_dir = self._get_scan_dir(quad_name)
         cancel_requested = False
 
         try:
-            for i, K1 in enumerate(K1_values):
+            for k, screen_name in enumerate(screens):
                 while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
                     setattr(self, "_scan_is_paused", True)
                     QApplication.processEvents()
@@ -162,81 +158,109 @@ class QuadrupoleScan_EM:
                     cancel_requested = True
                     break
 
-                self.interface.set_quadrupoles([quad_name], [float(K1)])
+                insert_screen = getattr(self.interface, "insert_screen", None)
+                extract_screen = getattr(self.interface, "extract_screen", None)
+                if callable(insert_screen):
+                    insert_screen(screen_name)
 
-                state_files = []
-                sx_shots = np.full((nshots, nscreens), np.nan, dtype=float)
-                sy_shots = np.full((nshots, nscreens), np.nan, dtype=float)
-                bx_shots = np.full((nshots, nbpms), np.nan, dtype=float)
-                by_shots = np.full((nshots, nbpms), np.nan, dtype=float)
+                try:
+                    for i, K1 in enumerate(K1_values):
+                        while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
+                            setattr(self, "_scan_is_paused", True)
+                            QApplication.processEvents()
+                            time.sleep(0.05)
+                        setattr(self, "_scan_is_paused", False)
 
-                for j in range(nshots):
-                    while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
-                        setattr(self, "_scan_is_paused", True)
-                        QApplication.processEvents()
-                        time.sleep(0.05)
+                        if getattr(self, "_scan_stop_requested", False):
+                            raise KeyboardInterrupt("Scan stopped by user.")
+                        if getattr(self, "_cancel", False):
+                            cancel_requested = True
+                            break
 
-                    setattr(self, "_scan_is_paused", False)
+                        self.interface.set_quadrupoles([quad_name], [float(K1)])
+                        sx_shots = np.full(nshots, np.nan, dtype=float)
+                        sy_shots = np.full(nshots, np.nan, dtype=float)
+                        state_files = []
+                        for j in range(nshots):
+                            while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
+                                setattr(self, "_scan_is_paused", True)
+                                QApplication.processEvents()
+                                time.sleep(0.05)
 
-                    if getattr(self, "_scan_stop_requested", False):
-                        raise KeyboardInterrupt("Scan stopped by user.")
-                    state = self.interface.get_state()
-                    state_filename = os.path.join(output_dir,f"step_{i:04d}_shot_{j:04d}.pkl")
-                    state.save(filename=state_filename)
-                    state_files.append(state_filename) # every shot in every scan step
+                            setattr(self, "_scan_is_paused", False)
+                            if getattr(self, "_scan_stop_requested", False):
+                                raise KeyboardInterrupt("Scan stopped by user.")
+                            if getattr(self, "_cancel", False):
+                                cancel_requested = True
+                                break
 
-                    screens_data = state.get_screens(screens)
-                    screen_name_to_index = {name: index for index, name in enumerate(screens_data["names"])}
+                            state = self.interface.get_state()
+                            state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
+                            state.save(filename=state_filename)
+                            state_files.append(state_filename)
+                            screens_data = state.get_screens([screen_name])
+                            screen_name_to_index = {name: index for index, name in enumerate(screens_data["names"])}
+                            idx = screen_name_to_index.get(screen_name)
+                            if idx is not None:
+                                sx_shots[j] = float(screens_data["sigx"][idx])
+                                sy_shots[j] = float(screens_data["sigy"][idx])
+                        if state_files:
+                            sigx_mean[i, k] = np.nanmean(sx_shots)
+                            sigy_mean[i, k] = np.nanmean(sy_shots)
+                            sigx_std[i, k] = np.nanstd(sx_shots)
+                            sigy_std[i, k] = np.nanstd(sy_shots)
+                        existing_step = next((step for step in scan_steps if int(step.get("step_index", -1)) == int(i)), None)
+                        if existing_step is None:
+                            existing_step = {
+                                "step_index": int(i),
+                                "delta": float(deltas[i]),
+                                "K1": float(K1),
+                                "state_files": [],
+                            }
+                            scan_steps.append(existing_step)
+                        existing_step["state_files"].extend(state_files)
 
-                    for k, screen_name in enumerate(screens):
-                        idx = screen_name_to_index.get(screen_name)
-                        if idx is None:
-                            continue
-                        sx_shots[j, k] = float(screens_data["sigx"][idx])
-                        sy_shots[j, k] = float(screens_data["sigy"][idx]) # shot j screen k
+                        session_partial = {
+                            "mode": "single_quad_scan",
+                            "delta_min": float(delta_min),
+                            "delta_max": float(delta_max),
+                            "steps": int(steps),
+                            "nshots": int(nshots),
+                            "quad_name": quad_name,
+                            "quadrupoles": [quad_name],
+                            "screens": screens,
+                            "reference_screen": reference_screen,
+                            "K1_0": float(K1_0),
+                            "sigx_mean": sigx_mean.tolist(),
+                            "sigy_mean": sigy_mean.tolist(),
+                            "sigx_std": sigx_std.tolist(),
+                            "sigy_std": sigy_std.tolist(),
+                            "deltas": deltas.tolist(),
+                            "K1_values": K1_values.tolist(),
+                            "scan_steps": scan_steps,
+                            "states_dir": output_dir,
+                            "measured_optics": None,
+                            "fit_result_twiss_emit": None,
+                            "cancelled": bool(cancel_requested),
+                            "current_screen": screen_name,
+                            "current_screen_index": int(k),
+                        }
 
-                if state_files:
-                    sigx_mean[i, :] = np.nanmean(sx_shots, axis=0) # ignores nan, gives mean sig value at screens
-                    sigy_mean[i, :] = np.nanmean(sy_shots, axis=0)
-                    sigx_std[i, :] = np.nanstd(sx_shots, axis=0)
-                    sigy_std[i, :] = np.nanstd(sy_shots, axis=0)
+                        if progress_callback is not None:
+                            completed = k * len(K1_values) + i + 1
+                            total = len(screens) * len(K1_values)
+                            progress_callback(session_partial, completed, total)
 
-                scan_steps.append({
-                    "step_index": int(i),
-                    "delta": float(deltas[i]),
-                    "K1": float(K1),
-                    "state_files": state_files,
-                })
+                        if cancel_requested:
+                            break
 
-                session_partial = {
-                    "mode": "single_quad_scan",
-                    "delta_min": float(delta_min),
-                    "delta_max": float(delta_max),
-                    "steps": int(steps),
-                    "nshots": int(nshots),
-                    "quad_name": quad_name,
-                    "quadrupoles": [quad_name],
-                    "screens": screens,
-                    "reference_screen": reference_screen,
-                    "K1_0": float(K1_0),
-                    "sigx_mean": sigx_mean.tolist(),
-                    "sigy_mean": sigy_mean.tolist(),
-                    "sigx_std": sigx_std.tolist(),
-                    "sigy_std": sigy_std.tolist(),
-                    "deltas": deltas.tolist(),
-                    "K1_values": K1_values.tolist(),
-                    "scan_steps": scan_steps,
-                    "states_dir": output_dir,
-                    "measured_optics": None,
-                    "fit_result_twiss_emit": None,
-                    "cancelled": bool(cancel_requested),
-                }
+                    if cancel_requested:
+                        break
 
-                if progress_callback is not None:
-                    progress_callback(session_partial, i, len(K1_values))
+                finally:
+                    if callable(extract_screen):
+                        extract_screen(screen_name)
 
-                if cancel_requested:
-                    break
 
         finally:
             self.interface.set_quadrupoles([quad_name], [float(K1_0)])

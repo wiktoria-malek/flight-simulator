@@ -76,6 +76,22 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.test_laser_intensity = wfs_intensity
         #PV('RFGun:LaserIntensity1:Read').get()
 
+    def insert_screen(self, screen_name):
+        screen_pv_name = self.screen_pv_names.get(screen_name)
+        if screen_pv_name is None:
+            raise ValueError(f"Unknown screen: {screen_name}")
+
+        PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
+        time.sleep(2)
+
+    def extract_screen(self, screen_name):
+        screen_pv_name = self.screen_pv_names.get(screen_name)
+        if screen_pv_name is None:
+            raise ValueError(f"Unknown screen: {screen_name}")
+
+        PV(f"{screen_pv_name}:Target:WRITE:OUT").put(1)
+        time.sleep(2)
+
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
