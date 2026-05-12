@@ -813,3 +813,87 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 strengths[2] = complex(float(value), 0.0)
                 element.set_strengths(strengths)
         self.__track_bunch()
+
+
+
+    def get_phase_space_transport_to_screens(self, reference_screen=None, screens=None):
+        if screens is None:
+            screens = list(self.screens)
+        if isinstance(screens, str):
+            screens = [screens]
+        screens = list(screens)
+
+        if reference_screen is None:
+            reference_screen = screens[0]
+
+        original_bunch = self.B0
+
+        result = {
+            "reference_screen": str(reference_screen),
+            "screens": [str(s) for s in screens],
+            "x": {"R11": [], "R12": [], "R21": [], "R22": []},
+            "y": {"R33": [], "R34": [], "R43": [], "R44": []},
+        }
+
+        try:
+            start_element = self.lattice[reference_screen]
+            if isinstance(start_element, list):
+                start_element = start_element[-1]
+
+            end_element = self.lattice[screens[-1]]
+            if isinstance(end_element, list):
+                end_element = end_element[-1]
+
+            bx = np.array([
+                [1.0, 0.0, 0.0, 0.0, 0.0, self.Pref],
+                [0.0, 1.0, 0.0, 0.0, 0.0, self.Pref],
+            ], dtype=float)
+
+            bunch_x = rft.Bunch6d(rft.electronmass, 0.0, self.Q, bx)
+            tracked_x = self.lattice.track(bunch_x, start_element, end_element)
+
+            for screen in screens:
+                screen_element = self.lattice[screen]
+                if isinstance(screen_element, list):
+                    screen_element = screen_element[-1]
+
+                b = screen_element.get_bunch()
+                if b is None and str(screen) == str(screens[-1]):
+                    b = tracked_x
+
+                ps = np.asarray(b.get_phase_space("%x %xp"), dtype=float)
+
+                result["x"]["R11"].append(float(ps[0, 0]))
+                result["x"]["R12"].append(float(ps[1, 0]))
+                result["x"]["R21"].append(float(ps[0, 1]))
+                result["x"]["R22"].append(float(ps[1, 1]))
+
+            by = np.array([
+                [0.0, 0.0, 1.0, 0.0, 0.0, self.Pref],
+                [0.0, 0.0, 0.0, 1.0, 0.0, self.Pref],
+            ], dtype=float)
+
+            bunch_y = rft.Bunch6d(rft.electronmass, 0.0, self.Q, by)
+            tracked_y = self.lattice.track(bunch_y, start_element, end_element)
+
+            for screen in screens:
+                screen_element = self.lattice[screen]
+                if isinstance(screen_element, list):
+                    screen_element = screen_element[-1]
+
+                b = screen_element.get_bunch()
+                if b is None and str(screen) == str(screens[-1]):
+                    b = tracked_y
+
+                ps = np.asarray(b.get_phase_space("%y %yp"), dtype=float)
+
+                result["y"]["R33"].append(float(ps[0, 0]))
+                result["y"]["R34"].append(float(ps[1, 0]))
+                result["y"]["R43"].append(float(ps[0, 1]))
+                result["y"]["R44"].append(float(ps[1, 1]))
+
+        finally:
+            self.B0 = original_bunch
+            self.__track_bunch()
+
+        return result

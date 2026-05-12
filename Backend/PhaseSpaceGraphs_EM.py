@@ -4,14 +4,16 @@ try:
 except ImportError:
     from PyQt5.QtCore import Qt
     from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QDialog, QLabel, QWidget, QComboBox
-
 import numpy as np
-
 import matplotlib
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 
+
+## if beam size at for example OTR2X is sigma,
+## phase space on OTR0X has to fit between the constrain lines
 
 class PhaseSpaces(QDialog):
     def __init__(self, parent=None):
@@ -24,12 +26,10 @@ class PhaseSpaces(QDialog):
         self._plot_data = None
         self.figure = Figure(figsize=(10, 6), constrained_layout=True)
         self.canvas = FigureCanvas(self.figure)
-
         plot_widget = QWidget(self)
         plot_layout = QVBoxLayout(plot_widget)
         plot_layout.setContentsMargins(0, 0, 0, 0)
         plot_layout.addWidget(self.canvas)
-
         self.location_combo = QComboBox(self)
         self.location_combo.currentIndexChanged.connect(self._redraw_current_location)
         header = QWidget(self)
@@ -41,7 +41,6 @@ class PhaseSpaces(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(header)
         layout.addWidget(plot_widget)
-
 
     @staticmethod
     def _ellipse_points(beta0, alpha0):
@@ -138,6 +137,7 @@ class PhaseSpaces(QDialog):
         if idx < 0 or idx >= len(locations):
             idx = 0
         location_name, values = locations[idx]
+
         beta_x = values.get("beta_x", values.get("beta_x0", np.nan))
         alpha_x = values.get("alpha_x", values.get("alpha_x0", np.nan))
         beta_y = values.get("beta_y", values.get("beta_y0", np.nan))
@@ -154,6 +154,7 @@ class PhaseSpaces(QDialog):
             ax.set_aspect("equal", adjustable="box")
             ax.set_xlabel("Position")
             ax.set_ylabel("Angle")
+            ax.set_title(plane_label)
 
             try:
                 ax.set_box_aspect(1.0)
@@ -173,11 +174,79 @@ class PhaseSpaces(QDialog):
             beta0 = float(beta0)
             alpha0 = float(alpha0)
             u, up = self._ellipse_points(beta0, alpha0)
-            ax.plot(u, up, color="blue", linewidth=2.0, label="fitted ellipse")
-            pad = 1.25
-            ax.set_xlim(np.nanmin(u) * pad, np.nanmax(u) * pad)
-            ax.set_ylim(np.nanmin(up) * pad, np.nanmax(up) * pad)
-            ax.legend(fontsize=8)
+
+            theta_ref = np.linspace(0.0, 2.0 * np.pi, 500)
+            ax.plot(np.cos(theta_ref), np.sin(theta_ref), color="black", linestyle="--", linewidth=1.2, alpha=0.7)
+            ax.plot(u, up, color="black", linewidth=2.0)
+
+            reference_name = str(self._plot_data.get("projection_reference", ""))
+            show_projection_lines = str(location_name) == reference_name
+            projection_lines = self._plot_data.get("projection_lines") if show_projection_lines else None
+            plane_key = "x" if "Horizontal" in str(plane_label) else "y"
+            legend_handles = []
+
+            lines_for_plane = []
+            if isinstance(projection_lines, dict):
+                lines_for_plane = list(projection_lines.get(plane_key, []))
+
+            x_values_for_limits = [np.asarray(u, dtype=float), np.cos(theta_ref)]
+            y_values_for_limits = [np.asarray(up, dtype=float), np.sin(theta_ref)]
+
+            for line in lines_for_plane:
+                try:
+                    R11_l = float(line.get("R11", np.nan))
+                    R12_l = float(line.get("R12", np.nan))
+                    c_l = float(line.get("sigma_over_sqrt_emit", np.nan))
+                except Exception:
+                    continue
+                if not (np.isfinite(R11_l) and np.isfinite(R12_l) and np.isfinite(c_l)):
+                    continue
+                if abs(R12_l) < 1e-14:
+                    if abs(R11_l) < 1e-14:
+                        continue
+                    x_const = c_l / R11_l
+                    x_values_for_limits.append(np.asarray([+x_const, -x_const], dtype=float))
+                    y_values_for_limits.append(np.asarray([-1.5, 1.5], dtype=float))
+                else:
+                    x_probe = np.linspace(np.nanmin(u), np.nanmax(u), 200)
+                    y_plus = (+c_l - R11_l * x_probe) / R12_l
+                    y_minus = (-c_l - R11_l * x_probe) / R12_l
+                    x_values_for_limits.append(x_probe)
+                    x_values_for_limits.append(x_probe)
+                    y_values_for_limits.append(y_plus)
+                    y_values_for_limits.append(y_minus)
+
+            all_x = np.concatenate([arr[np.isfinite(arr)] for arr in x_values_for_limits if np.asarray(arr).size > 0])
+            all_y = np.concatenate([arr[np.isfinite(arr)] for arr in y_values_for_limits if np.asarray(arr).size > 0])
+            if all_x.size > 0 and all_y.size > 0:
+                x_abs = max(float(np.nanmax(np.abs(all_x))), 1.0)
+                y_abs = max(float(np.nanmax(np.abs(all_y))), 1.0)
+                x_abs *= 1.10
+                y_abs *= 1.10
+                ax.set_xlim(-x_abs, x_abs)
+                ax.set_ylim(-y_abs, y_abs)
+            else:
+                pad = 1.25
+                ax.set_xlim(np.nanmin(u) * pad, np.nanmax(u) * pad)
+                ax.set_ylim(np.nanmin(up) * pad, np.nanmax(up) * pad)
+
+            if isinstance(projection_lines, dict):
+                color_cycle = ["blue", "lime", "red", "magenta", "orange", "cyan", "purple", "brown"]
+                for line_index, line in enumerate(lines_for_plane):
+                    screen_label = str(line.get("screen", ""))
+                    screen_colors = self._plot_data.get("screen_colors", {})
+                    color = screen_colors.get(screen_label, color_cycle[line_index % len(color_cycle)])
+                    self._draw_projection_lines(
+                        ax,
+                        R11=line.get("R11", np.nan),
+                        R12=line.get("R12", np.nan),
+                        sigma_over_sqrt_emit=line.get("sigma_over_sqrt_emit", np.nan),
+                        color=color,
+                        label=None,
+                    )
+                    legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5, label=screen_label))
+            if legend_handles:
+                ax.legend(handles=legend_handles, fontsize=8)
 
             try:
                 emit_norm_float = float(emit_norm)
@@ -186,29 +255,179 @@ class PhaseSpaces(QDialog):
 
         draw_one(ax_x, beta_x, alpha_x, emit_x_norm, "Normalised Horizontal Phase Space")
         draw_one(ax_y, beta_y, alpha_y, emit_y_norm, "Normalised Vertical Phase Space")
-        self.figure.suptitle(f"Location: {location_name}", fontsize=11)
         self.canvas.draw_idle()
 
     @staticmethod
     def _draw_projection_lines(ax, R11, R12, sigma_over_sqrt_emit, color=None, label=None):
         '''
-        R11 * u0 + R12 * u0' = ± sigma_screen
-        but we draw normalised quantitites, so:
-        U = u0 / sqrt(epsilon)
-        U' = u0' / sqrt(epsilon)
-        So:
-        R11 * U * sqrt(epsilon) + R12 * U' * sqrt(epsilon) = sigma_screen
-        R11 * U + R12 * U' = sigma_screen/sqrt(epsilon)
+        Draw screen projection constraints in normalised phase space:
 
-        horizontal line: U
-        vertical line: U'
-        y = U' = (sigma_screen/sqrt(epsilon) - R11 * U) / R12
+            R11 * U + R12 * U' = ± sigma_screen / sqrt(epsilon)
         '''
-        pass
+        try:
+            R11 = float(R11)
+            R12 = float(R12)
+            c = float(sigma_over_sqrt_emit)
+        except Exception:
+            return
 
-    def _plot(self, interface, screens, quad_name, sigx, sigy, result, step_index=None):
-        '''
-        The colored lines are the constraints from each screen. For one screen i:
-        u_i = R11_i * u0 + R12_i * u0'
-        '''
-        pass
+        if not (np.isfinite(R11) and np.isfinite(R12) and np.isfinite(c)):
+            return
+
+        if abs(R12) < 1e-14:
+            if abs(R11) < 1e-14:
+                return
+            x_const = c / R11
+            ax.axvline(+x_const, color=color, linewidth=1.5, label=label)
+            ax.axvline(-x_const, color=color, linewidth=1.5)
+            return
+
+        x_min, x_max = ax.get_xlim()
+        if not (np.isfinite(x_min) and np.isfinite(x_max)) or x_min == x_max:
+            x_min, x_max = -2.0, 2.0
+        U = np.linspace(x_min, x_max, 200)
+        Up_plus = (+c - R11 * U) / R12
+        Up_minus = (-c - R11 * U) / R12
+        ax.plot(U, Up_plus, linewidth=1.5, color=color, label=label)
+        ax.plot(U, Up_minus, linewidth=1.5, color=color)
+
+    def plot_projection_constraints(self, result, session, interface=None):
+        self.figure.clear()
+        screens = list(session.get("screens", []))
+        reference_screen = session.get("reference_screen", screens[0])
+        transport = session.get("measured_transport")
+        if not isinstance(transport, dict) and interface is not None:
+            get_transport = getattr(interface, "get_phase_space_transport_to_screens", None)
+            if callable(get_transport):
+                transport = get_transport(reference_screen=reference_screen, screens=screens)
+
+        if not isinstance(transport, dict):
+            ax = self.figure.add_subplot(111)
+            ax.text(
+                0.5, 0.5,
+                "No measured/model transport available for projection lines.",
+                ha="center", va="center",
+                transform=ax.transAxes,
+            )
+            ax.axis("off")
+            self.canvas.draw_idle()
+            return
+
+        sigx = np.asarray(session.get("sigx_mean", []), dtype=float)
+        sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
+
+        if sigx.ndim == 2:
+            sigx = sigx[0, :]
+        if sigy.ndim == 2:
+            sigy = sigy[0, :]
+
+        emit_x = float(result.get("emit_x_norm", np.nan))
+        emit_y = float(result.get("emit_y_norm", np.nan))
+
+        if interface is not None and hasattr(interface, "get_beam_factors"):
+            gamma_rel, beta_rel = interface.get_beam_factors()
+            beta_gamma = float(gamma_rel) * float(beta_rel)
+            emit_x = emit_x / beta_gamma
+            emit_y = emit_y / beta_gamma
+
+        tx = transport["x"]
+        ty = transport["y"]
+
+        projection_lines = {"x": [], "y": []}
+        color_cycle = ["blue", "lime", "red", "magenta", "orange", "cyan", "purple", "brown"]
+        screen_colors = {str(screen): color_cycle[i % len(color_cycle)] for i, screen in enumerate(screens)}
+
+        for i, screen in enumerate(screens):
+            projection_lines["x"].append({
+                "screen": screen,
+                "R11": tx["R11"][i],
+                "R12": tx["R12"][i],
+                "sigma_over_sqrt_emit": sigx[i] / np.sqrt(emit_x),
+            })
+
+            projection_lines["y"].append({
+                "screen": screen,
+                "R11": ty["R33"][i],
+                "R12": ty["R34"][i],
+                "sigma_over_sqrt_emit": sigy[i] / np.sqrt(emit_y),
+            })
+
+        def propagate_twiss(beta0, alpha0, R11, R12, R21, R22):
+            try:
+                beta0 = float(beta0)
+                alpha0 = float(alpha0)
+                R11 = float(R11)
+                R12 = float(R12)
+                R21 = float(R21)
+                R22 = float(R22)
+            except Exception:
+                return np.nan, np.nan
+            if not all(np.isfinite(v) for v in [beta0, alpha0, R11, R12, R21, R22]) or beta0 <= 0.0:
+                return np.nan, np.nan
+            gamma0 = (1.0 + alpha0 ** 2) / beta0
+            beta_i = R11 ** 2 * beta0 - 2.0 * R11 * R12 * alpha0 + R12 ** 2 * gamma0
+            alpha_i = -R11 * R21 * beta0 + (R11 * R22 + R12 * R21) * alpha0 - R12 * R22 * gamma0
+            return float(beta_i), float(alpha_i)
+
+        beta_x0 = result.get("beta_x0", np.nan)
+        alpha_x0 = result.get("alpha_x0", np.nan)
+        beta_y0 = result.get("beta_y0", np.nan)
+        alpha_y0 = result.get("alpha_y0", np.nan)
+
+        R21 = np.asarray(tx.get("R21", []), dtype=float)
+        R22 = np.asarray(tx.get("R22", []), dtype=float)
+        R43 = np.asarray(ty.get("R43", []), dtype=float)
+        R44 = np.asarray(ty.get("R44", []), dtype=float)
+
+        screens_twiss = []
+        for i, screen in enumerate(screens):
+            beta_x_i, alpha_x_i = np.nan, np.nan
+            beta_y_i, alpha_y_i = np.nan, np.nan
+            if i < len(tx["R11"]) and i < len(tx["R12"]) and i < R21.size and i < R22.size:
+                beta_x_i, alpha_x_i = propagate_twiss(beta_x0, alpha_x0, tx["R11"][i], tx["R12"][i], R21[i], R22[i])
+            if i < len(ty["R33"]) and i < len(ty["R34"]) and i < R43.size and i < R44.size:
+                beta_y_i, alpha_y_i = propagate_twiss(beta_y0, alpha_y0, ty["R33"][i], ty["R34"][i], R43[i], R44[i])
+            screens_twiss.append((
+                str(screen),
+                {
+                    "beta_x": beta_x_i,
+                    "beta_y": beta_y_i,
+                    "alpha_x": alpha_x_i,
+                    "alpha_y": alpha_y_i,
+                    "emit_x_norm": result.get("emit_x_norm", np.nan),
+                    "emit_y_norm": result.get("emit_y_norm", np.nan),
+                }
+            ))
+
+        if len(screens_twiss) == 0:
+            screens_twiss = [(
+                str(reference_screen),
+                {
+                    "beta_x": beta_x0,
+                    "beta_y": beta_y0,
+                    "alpha_x": alpha_x0,
+                    "alpha_y": alpha_y0,
+                    "emit_x_norm": result.get("emit_x_norm", np.nan),
+                    "emit_y_norm": result.get("emit_y_norm", np.nan),
+                }
+            )]
+
+        self._plot_data = {
+            "result": result,
+            "projection_lines": projection_lines,
+            "projection_reference": str(reference_screen),
+            "screen_colors": screen_colors,
+            "screens_twiss": screens_twiss,
+        }
+
+        self.location_combo.blockSignals(True)
+        self.location_combo.clear()
+        for screen_name, _ in screens_twiss:
+            self.location_combo.addItem(str(screen_name))
+        if str(reference_screen) in [str(screen_name) for screen_name, _ in screens_twiss]:
+            self.location_combo.setCurrentText(str(reference_screen))
+        elif self.location_combo.count() > 0:
+            self.location_combo.setCurrentIndex(0)
+        self.location_combo.blockSignals(False)
+
+        self._redraw_current_location()

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>1052</height>
+    <height>1103</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -243,10 +243,10 @@ QToolButton#delta_min_info_button:hover {
           <item row="2" column="1">
            <widget class="QSpinBox" name="steps_settings">
             <property name="minimum">
-             <number>1</number>
+             <number>0</number>
             </property>
             <property name="maximum">
-             <number>101</number>
+             <number>100</number>
             </property>
             <property name="value">
              <number>5</number>

@@ -125,8 +125,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 element.set_name(name)
                 lattice.append(element)
             return lattice
-        start = 'CA.LINE$START'
-        end = 'CA.LINE$END'
+        start = 'CA.STLINE$START'
+        end = 'CA.STLINE$END'
         quad_currents = np.array([
             0,  # QFD350
             0,  # QDD355

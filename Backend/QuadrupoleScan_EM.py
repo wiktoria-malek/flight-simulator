@@ -22,6 +22,12 @@ from matplotlib.figure import Figure
 from scipy.optimize import least_squares
 
 class QuadrupoleScan_EM:
+
+    # 1 screen, steps = 0: run scan -> otherwise, we get only one sigma2 value, but we need to fit emit, beta and alpha
+    # 2 screens: run scan
+    # 3 screens: no need for scan, but no coupling terms
+    # 4+ screens: no need for scan
+
     def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, bpms=None, reference_screen=None, progress_callback=None):
         if isinstance(quad_name, str):
             quad_names = [quad_name]
@@ -94,6 +100,9 @@ class QuadrupoleScan_EM:
             "delta_min": float(delta_min),
             "delta_max": float(delta_max),
             "steps": int(steps),
+            "nsteps_scan": 1 if int(steps) == 0 else int(steps),
+            "measurement_mode": "conventional_multi_screen_em" if int(steps) == 0 else "quadrupole_scan",
+            "is_conventional_em": bool(int(steps) == 0),
             "nshots": int(nshots),
             "per_quad_sessions": per_quad_sessions,
             "completed_quadrupoles": list(completed_quadrupoles),
@@ -114,7 +123,10 @@ class QuadrupoleScan_EM:
             reference_screen = screens[0]
         if reference_screen not in screens:
             raise ValueError("reference_screen must be one of the selected screens")
-        if delta_max <= delta_min:
+        steps_requested = int(steps)
+        if steps_requested < 0:
+            raise ValueError("steps must be zero or positive")
+        if steps_requested > 0 and delta_max <= delta_min:
             raise ValueError("delta_max must be larger than delta_min")
 
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
@@ -128,16 +140,23 @@ class QuadrupoleScan_EM:
         if np.isclose(K1_0, 0.0):
             raise ValueError("This quadrupole has zero K1_0. You should choose another one.")
 
-        deltas = np.linspace(float(delta_min), float(delta_max), int(steps))
-        K1_values = K1_0 * (1 + deltas)
+        if steps_requested == 0:
+            deltas = np.array([0.0], dtype=float)
+            K1_values = np.array([K1_0], dtype=float)
+            measurement_mode = "conventional_multi_screen_em"
+        else:
+            deltas = np.linspace(float(delta_min), float(delta_max), steps_requested)
+            K1_values = K1_0 * (1 + deltas)
+            measurement_mode = "quadrupole_scan"
 
+        nsteps_scan = len(K1_values)
         nscreens = len(screens)
         nbpms = len(bpms)
 
-        sigx_mean = np.full((steps, nscreens), np.nan, dtype=float)
-        sigy_mean = np.full((steps, nscreens), np.nan, dtype=float)
-        sigx_std = np.full((steps, nscreens), np.nan, dtype=float)
-        sigy_std = np.full((steps, nscreens), np.nan, dtype=float)
+        sigx_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
+        sigy_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
+        sigx_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
+        sigy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         scan_steps = []
 
         output_dir = self._get_scan_dir(quad_name)
@@ -224,7 +243,7 @@ class QuadrupoleScan_EM:
                             "mode": "single_quad_scan",
                             "delta_min": float(delta_min),
                             "delta_max": float(delta_max),
-                            "steps": int(steps),
+                            "steps": int(steps_requested),
                             "nshots": int(nshots),
                             "quad_name": quad_name,
                             "quadrupoles": [quad_name],
@@ -244,24 +263,23 @@ class QuadrupoleScan_EM:
                             "cancelled": bool(cancel_requested),
                             "current_screen": screen_name,
                             "current_screen_index": int(k),
+                            "measurement_mode": measurement_mode,
+                            "is_conventional_em": bool(steps_requested == 0),
+                            "nsteps_scan": int(nsteps_scan),
                         }
 
                         if progress_callback is not None:
                             completed = k * len(K1_values) + i + 1
                             total = len(screens) * len(K1_values)
                             progress_callback(session_partial, completed, total)
-
                         if cancel_requested:
                             break
-
                     if cancel_requested:
                         break
 
                 finally:
                     if callable(extract_screen):
                         extract_screen(screen_name)
-
-
         finally:
             self.interface.set_quadrupoles([quad_name], [float(K1_0)])
 
@@ -269,7 +287,7 @@ class QuadrupoleScan_EM:
             "mode": "single_quad_scan",
             "delta_min": float(delta_min),
             "delta_max": float(delta_max),
-            "steps": int(steps),
+            "steps": int(steps_requested),
             "nshots": int(nshots),
             "quad_name": quad_name,
             "quadrupoles": [quad_name],
@@ -288,76 +306,12 @@ class QuadrupoleScan_EM:
             "measured_optics": None,
             "fit_result_twiss_emit": None,
             "cancelled": bool(cancel_requested),
+            "measurement_mode": measurement_mode,
+            "is_conventional_em": bool(steps_requested == 0),
+            "nsteps_scan": int(nsteps_scan),
         }
-
-        session["scan_quality"] = self._is_quality_scan(sigx_mean=sigx_mean, sigy_mean=sigy_mean, screens=screens)
         return session
 
-    def _is_quality_scan(self, sigx_mean, sigy_mean, screens, threshold=0.05, strong_threshold=0.15):
-        sigx_mean = np.asarray(sigx_mean, dtype=float)
-        sigy_mean = np.asarray(sigy_mean, dtype=float)
-        screens = list(screens)
-
-        x2 = sigx_mean ** 2
-        y2 = sigy_mean ** 2
-
-        x_range = np.nanmax(x2, axis=0) - np.nanmin(x2, axis=0)
-        y_range = np.nanmax(y2, axis=0) - np.nanmin(y2, axis=0)
-
-        x_mean = np.nanmean(x2, axis=0)
-        y_mean = np.nanmean(y2, axis=0)
-
-        x_rel = np.full(len(screens), np.nan, dtype=float)
-        y_rel = np.full(len(screens), np.nan, dtype=float)
-
-        mx = np.isfinite(x_range) & np.isfinite(x_mean) & (np.abs(x_mean) > 0)
-        my = np.isfinite(y_range) & np.isfinite(y_mean) & (np.abs(y_mean) > 0)
-
-        x_rel[mx] = x_range[mx] / x_mean[mx]
-        y_rel[my] = y_range[my] / y_mean[my]
-
-        best_x_idx = int(np.nanargmax(x_rel)) if np.any(np.isfinite(x_rel)) else None
-        best_y_idx = int(np.nanargmax(y_rel)) if np.any(np.isfinite(y_rel)) else None
-
-        best_x_rel = float(x_rel[best_x_idx]) if best_x_idx is not None else np.nan
-        best_y_rel = float(y_rel[best_y_idx]) if best_y_idx is not None else np.nan
-
-        x_good = bool(np.isfinite(best_x_rel) and best_x_rel >= threshold)
-        y_good = bool(np.isfinite(best_y_rel) and best_y_rel >= threshold)
-        x_strong = bool(np.isfinite(best_x_rel) and best_x_rel >= strong_threshold)
-        y_strong = bool(np.isfinite(best_y_rel) and best_y_rel >= strong_threshold)
-
-        if x_strong and y_strong:
-            recommendation = "good_for_joint_fit"
-        elif x_good and y_good:
-            recommendation = "acceptable_but_weak"
-        elif x_good and not y_good:
-            recommendation = "good_mainly_in_x"
-        elif y_good and not x_good:
-            recommendation = "good_mainly_in_y"
-        else:
-            recommendation = "poor_scan"
-
-        return {
-            "sigx2_range_per_screen": x_range.tolist(),
-            "sigy2_range_per_screen": y_range.tolist(),
-            "sigx2_rel_range_per_screen": x_rel.tolist(),
-            "sigy2_rel_range_per_screen": y_rel.tolist(),
-            "best_screen_x": screens[best_x_idx] if best_x_idx is not None else None,
-            "best_screen_y": screens[best_y_idx] if best_y_idx is not None else None,
-            "best_rel_var_x": None if not np.isfinite(best_x_rel) else best_x_rel,
-            "best_rel_var_y": None if not np.isfinite(best_y_rel) else best_y_rel,
-            "x_good": x_good,
-            "y_good": y_good,
-            "x_strong": x_strong,
-            "y_strong": y_strong,
-            "is_useful_scan": bool(x_good or y_good),
-            "is_good_for_joint_fit": bool(x_good and y_good),
-            "joint_fit_is_strong": bool(x_strong and y_strong),
-            "recommendation": recommendation,
-            "rel_threshold": threshold,
-            "strong_rel_threshold": strong_threshold,
-        }
 
     def _get_scan_dir(self,quad_name): # saves state files for each quadrupole
         base_dir=getattr(self,"dir_name",None)

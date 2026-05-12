@@ -386,7 +386,7 @@ class Optimization_EM:
             objectives={"f": "MINIMIZE"},
         )
 
-        def predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
+        def predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
             '''
             If the beam at the scanned quadrupole has certain Twiss parameters and given emittance,
             what quadrupole scan should be?
@@ -451,7 +451,7 @@ class Optimization_EM:
                 if self._pause_requested:
                     raise OptimizationPaused("Optimization paused.")
                 raise OptimizationStopped("Optimization stopped.")
-            pred2_x, pred2_y = predict_raw(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop, quad_k1_0 = quad_k1_0)
+            pred2_x, pred2_y = predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop, quad_k1_0 = quad_k1_0)
             rx = (pred2_x - sig_x2)[valid_x] if np.any(valid_x) else np.array([], dtype=float)
             ry = (pred2_y - sig_y2)[valid_y] if np.any(valid_y) else np.array([], dtype=float)
             # res = np.concatenate([np.asarray(rx, dtype = float).ravel(), np.asarray(ry, dtype = float).ravel()]) # the better the match, the smaller the number
@@ -575,7 +575,7 @@ class Optimization_EM:
         quad_k1_0_best = float(best_row["quad_k1_0"]) if self.fit_quadrupole_strength else None
 
         if self._stop_requested or self._pause_requested:
-            pred2_x_partial, pred2_y_partial = predict_raw(
+            pred2_x_partial, pred2_y_partial = predict_sigma2_from_fit_params(
                 emit_x_norm_best, beta_x0_best, alpha_x0_best,
                 emit_y_norm_best, beta_y0_best, alpha_y0_best,
                 allow_stop=False, quad_k1_0 = quad_k1_0_best,
@@ -594,7 +594,7 @@ class Optimization_EM:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             raise OptimizationStopped("Optimization stopped.", solution=solution)
 
-        pred2_x, pred2_y = predict_raw(
+        pred2_x, pred2_y = predict_sigma2_from_fit_params(
             emit_x_norm_best, beta_x0_best, alpha_x0_best,
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
             allow_stop=True, quad_k1_0 = quad_k1_0_best,
@@ -660,7 +660,7 @@ class Optimization_EM:
 
             p_c = np.asarray(z, dtype=float)
             try:
-                p2x, p2y = predict_raw(
+                p2x, p2y = predict_sigma2_from_fit_params(
                     p_c[0], p_c[1], p_c[2],
                     p_c[3], p_c[4], p_c[5],
                     quad_k1_0=(p_c[6] if self.fit_quadrupole_strength else None),
@@ -756,7 +756,7 @@ class Optimization_EM:
         stopped_during_fit = stopped_during_fit or ls_stopped[0]
 
         if stopped_during_fit or self._stop_requested or self._pause_requested:
-            pred2_x_p, pred2_y_p = predict_raw(
+            pred2_x_p, pred2_y_p = predict_sigma2_from_fit_params(
                 p_final[0], p_final[1], p_final[2],
                 p_final[3], p_final[4], p_final[5],
                 quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None),
@@ -772,7 +772,7 @@ class Optimization_EM:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             raise OptimizationStopped("Optimization stopped.", solution=solution)
 
-        pred2_x, pred2_y = predict_raw(
+        pred2_x, pred2_y = predict_sigma2_from_fit_params(
             p_final[0], p_final[1], p_final[2],
             p_final[3], p_final[4], p_final[5],
             quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None),

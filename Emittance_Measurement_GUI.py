@@ -479,7 +479,10 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             ax1.plot(K1_values[mask_x], sigx[mask_x, i], 'o-', label=screen)
             ax2.plot(K1_values[mask_y], sigy[mask_y, i], 'o-', label=screen)
 
-        title = f"Quadrupole scan: {quad_name}"
+        if session_to_plot.get("is_conventional_em", False):
+            title = f"Conventional multi-screen EM: {quad_name}"
+        else:
+            title = f"Quadrupole scan: {quad_name}"
         ax1.set_title(title)
         ax1.set_ylabel("sigx")
         ax2.set_ylabel("sigy")
@@ -699,7 +702,11 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             QMessageBox.information(self, "Scan error", "No quadrupole selected.")
             return
         quad_label = quadrupoles[0] if len(quadrupoles) == 1 else f"multi-quad scan ({len(quadrupoles)} quadrupoles)"
-        self.log(f"Running quadrupole scan for {quad_label}...")
+        steps_preview = int(self.steps_settings.value())
+        if steps_preview == 0:
+            self.log(f"Running conventional multi-screen EM for {quad_label}...")
+        else:
+            self.log(f"Running quadrupole scan for {quad_label}...")
         self.quad_on_plot.blockSignals(True)
         self.quad_on_plot.clear()
         self.quad_on_plot.addItems(quadrupoles)
@@ -746,7 +753,10 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
                 bpms=[],
                 progress_callback=self._scan_progress_callback
             )
-            self.log("Quadrupole scan finished.")
+            if steps == 0:
+                self.log("Conventional multi-screen EM finished.")
+            else:
+                self.log("Quadrupole scan finished.")
         except KeyboardInterrupt as e:
             self._set_progress(0)
             QMessageBox.information(self, "Scan", str(e))
@@ -949,13 +959,29 @@ class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
             result = self.session.get("optimization_result")
             reference_name = self.session.get("quad_name") or self.session.get("current_quadrupole")
 
+        if self.phase_spaces is None:
+            self.phase_spaces = PhaseSpaces(self)
+
+        screens = []
+        session_to_plot = None
+        if isinstance(self.session, dict):
+            session_to_plot = self._get_session_for_selected_quad(self.session)
+            if isinstance(session_to_plot, dict):
+                screens = list(session_to_plot.get("screens", []))
+
         if not isinstance(result, dict):
             QMessageBox.information(self, "Phase Space", "Run the emittance/Twiss optimization first." )
             return
 
-        if self.phase_spaces is None:
-            self.phase_spaces = PhaseSpaces(self)
-        self.phase_spaces.plot_from_result(result, reference_name=reference_name)
+        session_to_plot = self._get_session_for_selected_quad(self.session) if isinstance(self.session, dict) else None
+        has_transport = isinstance(session_to_plot, dict) and isinstance(session_to_plot.get("measured_transport"), dict)
+        has_model_transport = hasattr(self.interface, "get_phase_space_transport_to_screens")
+
+        if isinstance(session_to_plot, dict) and screens and (has_transport or has_model_transport):
+            self.phase_spaces.plot_projection_constraints(result, session_to_plot, interface=self.interface)
+        else:
+            self.phase_spaces.plot_from_result(result, reference_name=reference_name)
+
         self.phase_spaces.show()
         self.phase_spaces.raise_()
         self.phase_spaces.activateWindow()
