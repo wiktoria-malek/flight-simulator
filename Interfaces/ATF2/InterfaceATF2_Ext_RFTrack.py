@@ -910,6 +910,11 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
                 ps = np.asarray(b.get_phase_space("%y %yp"), dtype=float)
 
+                # [
+                #     [x_of_particle_0, xp_of_particle_0],
+                #     [x_of_particle_1, xp_of_particle_1],
+                # ]
+
                 result["y"]["R33"].append(float(ps[0, 0]))
                 result["y"]["R34"].append(float(ps[1, 0]))
                 result["y"]["R43"].append(float(ps[0, 1]))
