@@ -373,7 +373,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 yb_list.append(np.nan)
                 sigx_list.append(np.nan)
                 sigy_list.append(np.nan)
-                sig_xy_list.append(np.nan)
+                sigxy_list.append(np.nan)
                 tilt_list.append(np.nan)
                 sum_list.append(0)
                 images.append(np.zeros((1, 1)))
@@ -389,9 +389,15 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
             sigx = float(np.std(m[:, 0])) # RMS x beam size
             sigy = float(np.std(m[:, 1])) # RMS y beam size
+            sigxy = float(np.mean(x_centered * y_centered))
+            tilt = float(0.5 * np.arctan2(2.0 * sigxy, sigx ** 2 - sigy ** 2))  # ellipse angle
 
-
-
+            xb_list.append(x_mean) # mean x of particles
+            yb_list.append(y_mean)
+            sigx_list.append(sigx)
+            sigy_list.append(sigy)
+            sigxy_list.append(sigxy)
+            tilt_list.append(tilt)
             sum_list.append(sumw)
 
             nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(
@@ -399,8 +405,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
             nx = int(np.clip(nx, 10, 400))
             ny = int(np.clip(ny, 10, 400))
-            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx,
-                                                                           ny))  # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
+            image, hedges, vedges = np.histogram2d(m[:, 0], m[:, 1], bins=(nx, ny))  # divides x axis into nx bins, y axis into ny bins and calculates how many particles are in each rectangle
             images.append(image)  # image[i,j] = nparticles in bin i on x axis and nparticles in bin j on y axis
             hedges_all.append(hedges)  # bin edges in x (nx + 1)
             vedges_all.append(vedges)  # bin edges in y (ny + 1)
@@ -412,6 +417,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                    "y": np.array(yb_list, dtype=float),
                    "sigx": np.array(sigx_list, dtype=float),
                    "sigy": np.array(sigy_list, dtype=float),
+                   "sigxy": np.array(sigxy_list, dtype=float),
+                   "tilt": np.array(tilt_list, dtype=float),
                    "sum": np.array(sum_list, dtype=float),
                    "hedges": hedges_all,
                    "vedges": vedges_all,
