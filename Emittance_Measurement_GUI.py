@@ -118,7 +118,7 @@ class OptimizationWorker(QObject):
         finally:
             self.done.emit()
 
-class MainWindow(QMainWindow, SaveOrLoad,QuadrupoleScan_EM):
+class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
     def __init__(self, interface, dir_name):
         super().__init__()
         self.interface = interface

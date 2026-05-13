@@ -13,15 +13,13 @@ sigx on selected screens + sigy on selected screens
 import sys
 import time
 from pathlib import Path
-
+from Interfaces.interface_setup import INTERFACE_SETUP
 import numpy as np
 
 THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = THIS_FILE.parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-
-from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 
 OUTPUT_FILE = PROJECT_ROOT / "MachineLearning" / "EM_dataset.npz"
 
@@ -32,14 +30,27 @@ REFERENCE_SCREEN = SCREENS[0]
 N_SAMPLES = 2000
 RANDOM_SEED = 12345
 
-BOUNDS =  {
-                    "emit_x_norm": [0.5, 8.0],
-                    "beta_x0": [0.2, 5.0],
-                    "alpha_x0": [-4.0, 2.0],
-                    "emit_y_norm": [0.005, 0.12],
-                    "beta_y0": [2.0, 20.0],
-                    "alpha_y0": [-8.0, 2.0],
-                }
+class DatasetGenerator(QMainWindow, SaveOrLoad, ):
+
+
+def _get_interface_initial_settings():
+    interface_class_name = interface.__class__.__name__
+    interface_module_name = interface.__class__.__module__
+
+    for machine_interfaces in INTERFACE_SETUP.values():
+        for interface_defaults in machine_interfaces:
+            if (interface_defaults.get("class_name") == interface_class_name) and (
+                    interface_defaults.get("module") == interface_module_name):
+                return interface_defaults
+    return None
+
+def _get_interface_bounds():
+    interface_defaults=_get_interface_initial_settings()
+    if interface_defaults is None:
+        return {}
+    return dict(interface_defaults.get("bounds", {}))
+
+BOUNDS =_get_interface_bounds()
 
 
 K1_RELATIVE_CHANGE = (-0.30, 0.30)
