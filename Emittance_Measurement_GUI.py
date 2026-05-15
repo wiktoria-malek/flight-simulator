@@ -85,7 +85,6 @@ class OptimizationWorker(QObject):
         self.nm_steps = nm_steps
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
 
-
     def _emit_progress(self, phase, current, total):
         self.progress.emit(str(phase), int(current), int(total))
 

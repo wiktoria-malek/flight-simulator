@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>DatasetGenerator_EM_GUI</class>
+ <widget class="QMainWindow" name="DatasetGenerator_EM_GUI">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1180</width>
+    <height>774</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Emittance ML Dataset Generator</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="mainHBox">
+    <property name="spacing">
+     <number>12</number>
+    </property>
+    <property name="leftMargin">
+     <number>12</number>
+    </property>
+    <property name="topMargin">
+     <number>12</number>
+    </property>
+    <property name="rightMargin">
+     <number>12</number>
+    </property>
+    <property name="bottomMargin">
+     <number>12</number>
+    </property>
+    <item>
+     <widget class="QWidget" name="leftPanel" native="true">
+      <property name="minimumSize">
+       <size>
+        <width>420</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>520</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <layout class="QVBoxLayout" name="leftVBox">
+       <property name="spacing">
+        <number>10</number>
+       </property>
+       <item>
+        <widget class="QGroupBox" name="settingsGroup">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+         </property>
+         <property name="title">
+          <string>Dataset settings</string>
+         </property>
+         <layout class="QGridLayout" name="settingsGrid">
+          <property name="horizontalSpacing">
+           <number>10</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>8</number>
+          </property>
+          <item row="0" column="0">
+           <widget class="QLabel" name="samplesLabel">
+            <property name="text">
+             <string>Samples</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="samples_spin">
+            <property name="minimum">
+             <number>10</number>
+            </property>
+            <property name="maximum">
+             <number>1000000</number>
+            </property>
+            <property name="singleStep">
+             <number>100</number>
+            </property>
+            <property name="value">
+             <number>2000</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="k1MinLabel">
+            <property name="text">
+             <string>Delta_min</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QDoubleSpinBox" name="k1_relative_min_spin">
+            <property name="decimals">
+             <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>-10.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.050000000000000</double>
+            </property>
+            <property name="value">
+             <double>-0.300000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="k1MaxLabel">
+            <property name="text">
+             <string>Delta_max</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="k1_relative_max_spin">
+            <property name="decimals">
+             <number>4</number>
+            </property>
+            <property name="minimum">
+             <double>-10.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.050000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.300000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="outputLabel">
+            <property name="text">
+             <string>Output folder</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <layout class="QHBoxLayout" name="outputHBox">
+            <item>
+             <widget class="QLineEdit" name="output_dir_edit">
+              <property name="placeholderText">
+               <string>MachineLearning/...</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="browse_output_button">
+              <property name="maximumSize">
+               <size>
+                <width>42</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="devicesGroup">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+         </property>
+         <property name="title">
+          <string>Devices with position along the lattice</string>
+         </property>
+         <layout class="QVBoxLayout" name="devicesVBox">
+          <item>
+           <widget class="QSplitter" name="devicesSplitter">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <widget class="QWidget" name="quadrupolesWidget" native="true">
+             <layout class="QVBoxLayout" name="quadrupolesVBox">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="quadrupolesLabel">
+                <property name="text">
+                 <string>Quadrupoles</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QListWidget" name="quadrupoles_list">
+                <property name="selectionMode">
+                 <enum>QAbstractItemView::ExtendedSelection</enum>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="screensWidget" native="true">
+ <layout class="QVBoxLayout" name="screensVBox">
+  <property name="leftMargin">
+   <number>0</number>
+  </property>
+  <property name="topMargin">
+   <number>0</number>
+  </property>
+  <property name="rightMargin">
+   <number>0</number>
+  </property>
+  <property name="bottomMargin">
+   <number>0</number>
+  </property>
+  <item>
+   <widget class="QLabel" name="screensLabel">
+    <property name="text">
+     <string>Screens</string>
+    </property>
+   </widget>
+  </item>
+  <item>
+   <widget class="QListWidget" name="screens_list">
+    <property name="selectionMode">
+     <enum>QAbstractItemView::ExtendedSelection</enum>
+    </property>
+   </widget>
+  </item>
+ </layout>
+</widget>
+
+
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="actionsHBox">
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QPushButton" name="start_generation_button">
+           <property name="styleSheet">
+            <string notr="true">background-color: red; color: white;
+</string>
+           </property>
+           <property name="text">
+            <string>START DATASET GENERATION</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="stop_generation_button">
+           <property name="styleSheet">
+            <string notr="true">background-color: green; color: white; </string>
+           </property>
+           <property name="text">
+            <string>STOP</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QPushButton" name="resume_button">
+           <property name="text">
+            <string>Resume</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pause_button">
+           <property name="text">
+            <string>Pause</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QProgressBar" name="progressBar">
+         <property name="value">
+          <number>0</number>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="logGroup">
+      <property name="styleSheet">
+       <string notr="true">QGroupBox {
+    background-color: rgb(245, 245, 245);
+    border: 1px solid rgb(210, 210, 210);
+    border-radius: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 4px 0 4px;
+}</string>
+      </property>
+      <property name="title">
+       <string>Dataset creation log</string>
+      </property>
+      <layout class="QVBoxLayout" name="logVBox">
+       <item>
+        <widget class="QPlainTextEdit" name="log_console">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="placeholderText">
+          <string>Dataset generation output will appear here...</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

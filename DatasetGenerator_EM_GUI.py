@@ -18,7 +18,7 @@ except ImportError:
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 from Backend.SaveOrLoad import SaveOrLoad
-
+from MachineLearning.ML_dataset import generate_dataset, _get_interface_initial_settings
 
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -52,6 +52,50 @@ class SPositionDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
+class DatasetGeneratorWorker(QObject):
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
+    done = pyqtSignal()
+    progress = pyqtSignal( int, int)
+    log_message = pyqtSignal(str)
+
+    def __init__(self, interface, quad_name, screens, n_samples, relative_k_change, output_file):
+        super().__init__()
+        self.interface = interface
+        self.quad_name = quad_name
+        self.screens = screens
+        self.n_samples = n_samples
+        self.k1_relative_change = relative_k_change
+        self.output_file = output_file
+        self.stop_requested = False
+
+    def request_stop(self):
+        self.stop_requested = True
+
+    def _should_stop(self):
+        return bool(self.stop_requested)
+
+    def _emit_log(self, text):
+        self.log_message.emit(str(text))
+
+    def _emit_progress(self, current, total):
+        self.progress.emit(int(current), int(total))
+
+    def run(self):
+        try:
+            result = generate_dataset(quad_name=self.quad_name, screens=self.screens, interface = self.interface,
+                                      k1_relative_change=self.k1_relative_change,
+                                      n_samples = self.n_samples, output_file = self.output_file,
+                                      log_callback = self._emit_log, progress_callback = self._emit_progress,
+                                      stop_checker = self._should_stop)
+
+            self.finished.emit(result)
+
+        except Exception as e:
+            self.error.emit(str(e))
+        finally:
+            self.done.emit()
+
 class MainWindow(QMainWindow, SaveOrLoad):
     def __init__(self, interface, dir_name):
         super().__init__()
@@ -63,7 +107,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self._load_logo()
         self.start_generation_button.clicked.connect(self._run_generating)
         self.stop_generation_button.clicked.connect(self._stop_generating)
-        self.setWindowTitle("Emittance Measurement GUI")
+        self.setWindowTitle("Emittance ML Dataset Generator")
         self.progressBar.setValue(0)
         self.quadrupoles_list.setItemDelegate(SPositionDelegate(self.quadrupoles_list))
         self.screens_list.setItemDelegate(SPositionDelegate(self.screens_list))
@@ -82,15 +126,37 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.screens_list.itemSelectionChanged.connect(self._screen_selection_changed)
         self._last_selected_quadrupoles = []
         self._filter_quadrupoles_in_gui()
-        if hasattr(self, "pause_button"):
-            self.pause_button.clicked.connect(self._pause_task)
-
-        if hasattr(self, "resume_button"):
-            self.resume_button.clicked.connect(self._resume_task)
+        self.pause_button.clicked.connect(self._pause_task)
+        self.resume_button.clicked.connect(self._resume_task)
         self._pause_requested = False
         self._stop_requested = False
         self._ml_paused = False
         self._ml_stopped = None
+        self._generation_thread = None
+        self._generation_worker = None
+
+
+    def _pause_task(self):
+        pass
+
+    def _has_explicit_screen_selection(self):
+        for i in range(self.screens_list.count()):
+            item = self.screens_list.item(i)
+            if item is not None and item.isSelected():
+                return True
+        return False
+
+    def _select_all_screens_in_gui(self):
+        self.screens_list.blockSignals(True)
+        try:
+            for i in range(self.screens_list.count()):
+                item = self.screens_list.item(i)
+                if item is not None:
+                    item.setSelected(True)
+        finally:
+            self.screens_list.blockSignals(False)
+
+        self._filter_quadrupoles_in_gui()
 
     def _pause_ml(self):
         if self._is_running:
@@ -98,19 +164,12 @@ class MainWindow(QMainWindow, SaveOrLoad):
             return
 
     def _resume_task(self):
-        if self._is_scanning and (self._scan_pause_requested or self._scan_is_paused):
-            self.log("Resuming scan...")
-            self._scan_pause_requested = False
-            self._scan_is_paused = False
-            return
+        if self._pause_requested:
+            self.log("Resume is not yet implemented")
+            self._pause_requested = False
 
     def _stop_scan(self):
-        self.log("Stopping scan...")
-        if self._is_scanning:
-            self._scan_stop_requested = True
-            self._scan_pause_requested = False
-            self._scan_is_paused = False
-
+        self._stop_generating()
 
     def _get_element_order_values(self, names):
         names = list(names)
@@ -199,34 +258,65 @@ class MainWindow(QMainWindow, SaveOrLoad):
     def _get_selection(self):
         quadrupoles_all = []
         for i in range(self.quadrupoles_list.count()):
-            it = self.quadrupoles_list.item(i)
-            quadrupoles_all.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+            item = self.quadrupoles_list.item(i)
+            quadrupoles_all.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
 
         screens_all = []
         for i in range(self.screens_list.count()):
-            it = self.screens_list.item(i)
-            screens_all.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+            item = self.screens_list.item(i)
+            screens_all.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
 
         selected_quadrupoles = []
         for i in range(self.quadrupoles_list.count()):
-            it = self.quadrupoles_list.item(i)
-            if it.isSelected():
-                selected_quadrupoles.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+            item = self.quadrupoles_list.item(i)
+            if item.isSelected():
+                selected_quadrupoles.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
 
         selected_screens = []
         for i in range(self.screens_list.count()):
-            it = self.screens_list.item(i)
-            if it.isSelected():
-                selected_screens.append(it.data(Qt.ItemDataRole.UserRole) or it.text())
+            item = self.screens_list.item(i)
+            if item.isSelected():
+                selected_screens.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
 
-        quadrupoles = selected_quadrupoles or quadrupoles_all
-        screens = selected_screens or screens_all
+        screens = selected_screens if selected_screens else screens_all
+        quadrupoles = selected_quadrupoles if selected_quadrupoles else quadrupoles_all
 
         return quadrupoles, screens
 
+    def _get_machine_ml_folder_name(self):
+        interface_defaults = _get_interface_initial_settings(self.interface)
+
+        if interface_defaults is not None:
+            machine_name = interface_defaults.get("machine")
+            if machine_name:
+                return str(machine_name)
+
+        return type(self.interface).__name__
+
+    def _get_all_screens_in_lattice_order(self):
+        screens = []
+        for i in range(self.screens_list.count()):
+            item = self.screens_list.item(i)
+            screens.append(item.data(Qt.ItemDataRole.UserRole) or item.text())
+        return screens
+
+    def _get_default_output_dir(self, quad_name, screens):
+        if len(screens) == self.screens_list.count():
+            screens_folder = "all_screens"
+        else:
+            screens_folder = "screens_" + "-".join(str(screen) for screen in screens)
+
+        return os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "MachineLearning",
+            self._get_machine_ml_folder_name(),
+            str(quad_name),
+            screens_folder,
+        )
+
+
     def _screen_selection_changed(self):
         self._filter_quadrupoles_in_gui()
-
 
     def _filter_quadrupoles_in_gui(self):
         if not hasattr(self, "quadrupoles_list") or self.quadrupoles_list is None:
@@ -323,11 +413,95 @@ class MainWindow(QMainWindow, SaveOrLoad):
         return positions
 
     def _run_generating(self):
-        self.log("Dataset generation is not connected yet.")
+        if self._is_running:
+            self.log("Dataset generation already running")
+            return
+        if self.screens_list.count() == 0:
+            QMessageBox.warning(self, "Error", "No screens available.")
+            return
+
+        if not self._has_explicit_screen_selection():
+            self._select_all_screens_in_gui()
+
+        quadrupoles, screens = self._get_selection()
+
+        if not quadrupoles:
+            QMessageBox.warning(self, "Error", "No quadrupole selected.")
+            return
+
+        if not screens:
+            QMessageBox.warning(self, "Error", "No screens selected.")
+            return
+
+        quad_name = quadrupoles[0]
+        relative_k_change = (float(self.k1_relative_min_spin.value()), float(self.k1_relative_max_spin.value()))
+        if relative_k_change[0] >= relative_k_change[1]:
+            QMessageBox.warning(self, "Error", "K1 relative min must be smaller than K1 relative max.")
+            return
+        n_samples = int(self.samples_spin.value())
+        output_dir = self.output_dir_edit.text().strip()
+        if not output_dir:
+            output_dir = self._get_default_output_dir(quad_name, screens)
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, "EM_dataset.npz")
+        self.log(f"Dataset output directory: {output_dir}")
+        self._stop_requested = False
+        self._is_running = True
+        self._set_progress(0)
+        self.progressBar.setFormat("Dataset generation: 0/0")
+        self.log(f"Starting dataset generation for {quad_name}...")
+
+        thread = QThread(self)
+        worker = DatasetGeneratorWorker(
+            interface=self.interface,
+            quad_name=quad_name,
+            screens=screens,
+            n_samples=n_samples,
+            relative_k_change=relative_k_change,
+            output_file=output_file,
+        )
+        worker.moveToThread(thread)
+        worker.log_message.connect(self.log)
+        worker.progress.connect(self._on_generation_progress)
+        worker.finished.connect(self._on_generation_finished)
+        worker.error.connect(self._on_generation_error)
+        worker.done.connect(thread.quit)
+        worker.done.connect(worker.deleteLater)
+        thread.finished.connect(self._on_generation_thread_finished)
+        thread.finished.connect(thread.deleteLater)
+        thread.started.connect(worker.run)
+
+        self._generation_thread = thread
+        self._generation_worker = worker
+        thread.start()
+
+    def _on_generation_progress(self, current, total):
+        total = max(int(total), 1)
+        current = max(0, min(int(current), total))
+        self._set_progress(current / total * 100)
+        self.progressBar.setFormat(f"Dataset generation: {current}/{total}")
+
+    def _on_generation_finished(self, result):
+        self._set_progress(100)
+        self.progressBar.setFormat("Dataset generation finished")
+        self.log(f"Finished generating dataset: {result}")
+        QMessageBox.information(self, "Finished", "Dataset generation finished.")
+
+    def _on_generation_error(self, message):
+        self._set_progress(0)
+        self.log(f"Error in generating dataset. {message}")
+        QMessageBox.information(self, "Error", f"Error in generating dataset. {message}")
 
     def _stop_generating(self):
         self._stop_requested = True
         self.log("Stopping dataset generation requested.")
+        if self._generation_worker is not None:
+            self._generation_worker.request_stop()
+
+    def _on_generation_thread_finished(self):
+        self._is_running = False
+        self._generation_thread = None
+        self._generation_worker = None
 
     def log(self, text):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
