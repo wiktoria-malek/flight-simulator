@@ -50,6 +50,11 @@ LEARNING_RATE = 1e-3 # size of a step during learning
 WEIGHT_DECAY = 1e-5 # small penalty for too big weights of a neural network
 PATIENCE = 120 # if through 120 epochs result doesn't get better, triggers early stopping
 
+try:
+    torch.set_num_threads(1)
+except Exception:
+    pass
+
 class NeuralNetwork(nn.Module):
     def __init__(self, n_inputs, n_outputs):
         super().__init__()
@@ -121,7 +126,7 @@ class TrainModel:
             torch.cuda.manual_seed_all(self.random_seed) # randomly asigns which sample is for test, which for training
 
     def get_device(self):
-        return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        return torch.device("cpu")
 
     @staticmethod
     def make_loader(X, Y, batch_size, shuffle):
@@ -168,7 +173,7 @@ class TrainModel:
         Y_test = self.y_scaler.transform(Y_test_raw)
 
         device = self.get_device()
-        self.model = NeuralNetwork(X_train.shape[1], Y_train.shape[1]).to(device) # chooses gpu or cpu
+        self.model = NeuralNetwork(X_train.shape[1], Y_train.shape[1]).float().to(device) # chooses gpu or cpu
                                                                                     # X_train.shape[1] = 7
                                                                                     # Y_train.shape[1] = 2 * n_screens
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay) # creates an algorithm, that fixes network weights, AdamW is a standard optimizer for
@@ -242,13 +247,49 @@ class TrainModel:
         if X.ndim == 1:
             X = X.reshape(1, -1)
 
+        model_inputs = int(self.model.net[0].in_features)
+        model_outputs = int(self.model.net[-1].out_features)
+        actual_inputs = int(X.shape[1])
+        if actual_inputs != model_inputs:
+            raise RuntimeError(
+                f"ML input shape mismatch before PyTorch forward pass: X.shape={X.shape}, "
+                f"model expects {model_inputs} inputs and returns {model_outputs} outputs. "
+                f"Model file={self.model_file}."
+            )
+        if not np.all(np.isfinite(X)):
+            bad_rows = np.where(~np.all(np.isfinite(X), axis=1))[0]
+            raise RuntimeError(
+                f"ML input contains NaN or Inf before prediction. Bad rows={bad_rows[:10].tolist()}, "
+                f"X.shape={X.shape}, Model file={self.model_file}."
+            )
+
         device = self.get_device()
-        self.model.to(device)
+        self.model.float().to(device)
         self.model.eval() # prediction mode, not training
         X_scaled = self.x_scaler.transform(X) # scales the same way, as during learning
-        with torch.no_grad(): # don't calculate gradients (what direction and how much should we change weights, so the error is smaller), because it's not learning
-            X_tensor = torch.tensor(X_scaled, dtype=torch.float32, device=device)
-            Y_scaled = self.model(X_tensor).detach().cpu().numpy()
+        if not np.all(np.isfinite(X_scaled)):
+            bad_rows = np.where(~np.all(np.isfinite(X_scaled), axis=1))[0]
+            raise RuntimeError(
+                f"Scaled ML input contains NaN or Inf. Bad rows={bad_rows[:10].tolist()}, "
+                f"X_scaled.shape={X_scaled.shape}, Model file={self.model_file}."
+            )
+
+        try:
+            with torch.no_grad(): # don't calculate gradients (what direction and how much should we change weights, so the error is smaller), because it's not learning
+                X_tensor = torch.tensor(X_scaled, dtype=torch.float32, device=device)
+                Y_scaled = self.model(X_tensor).detach().cpu().numpy()
+        except Exception as e:
+            raise RuntimeError(
+                f"PyTorch forward pass failed inside ML surrogate. "
+                f"X.shape={X.shape}, X_scaled.shape={X_scaled.shape}, X_tensor.shape={tuple(X_tensor.shape)}, "
+                f"model_inputs={model_inputs}, model_outputs={model_outputs}, device={device}, "
+                f"Model file={self.model_file}. Original error: {type(e).__name__}: {e}"
+            ) from e
+
+        if not np.all(np.isfinite(Y_scaled)):
+            raise RuntimeError(
+                f"ML model returned NaN or Inf. Y_scaled.shape={Y_scaled.shape}, Model file={self.model_file}."
+            )
         return self.y_scaler.inverse_transform(Y_scaled) # unscales
 
     def save_model(self):
@@ -275,9 +316,10 @@ class TrainModel:
     def load_model(self):
         if not self.model_file.exists():
             raise FileNotFoundError(f"ML model file not found: {self.model_file}")
-        checkpoint = torch.load(self.model_file, map_location="cpu")
-        self.model = NeuralNetwork(int(checkpoint["n_inputs"]), int(checkpoint["n_outputs"])) # takes the same neural network architecture
+        checkpoint = torch.load(self.model_file, map_location="cpu", weights_only = False)
+        self.model = NeuralNetwork(int(checkpoint["n_inputs"]), int(checkpoint["n_outputs"])).float() # takes the same neural network architecture
         self.model.load_state_dict(checkpoint["state_dict"]) # loads nn weights
+        self.model.float()
         self.model.eval() # prediction mode
         self.x_scaler = StandardScaler()
         self.x_scaler.mean_ = np.asarray(checkpoint["x_mean"], dtype=float)
@@ -309,11 +351,61 @@ class MLInterface:
         self.trainer = TrainModel(screens=self.screens, quad_name=self.quad_name, machine_name=self.machine_name, model_file=self.model_file)
         self.trainer.load_model()
 
+
+        self._validate_model_for_current_scan()
+
+
+
+
+
+
     def __getattr__(self, name):
         return getattr(self.interface, name) # if there is a function that MLInterface doesn't have (almost all of them), it gets them form the
                                             # interface, but has predict_emittance_scan_response, so uses that
 
+    def _validate_model_for_current_scan(self):
+        expected_inputs = 7
+        expected_outputs = 2 * len(self.screens)
+        model_inputs = int(self.trainer.model.net[0].in_features)
+        model_outputs = int(self.trainer.model.net[-1].out_features)
+        trained_screens = [str(s) for s in getattr(self.trainer, "screens", [])]
+
+        print("ML model file:", self.model_file)
+        print("ML model inputs:", model_inputs, "expected:", expected_inputs)
+        print("ML model outputs:", model_outputs, "expected:", expected_outputs)
+        print("ML trainer screens:", trained_screens)
+        print("GUI selected screens:", self.screens)
+
+        if model_inputs != expected_inputs:
+            raise RuntimeError(
+                f"ML model has wrong number of inputs: got {model_inputs}, expected {expected_inputs}. "
+                f"Model file={self.model_file}."
+            )
+        if model_outputs != expected_outputs:
+            raise RuntimeError(
+                f"ML model has wrong number of outputs: got {model_outputs}, expected {expected_outputs}. "
+                f"Model file={self.model_file}."
+            )
+        if trained_screens and trained_screens != self.screens:
+            raise RuntimeError(
+                f"ML model was trained for screens {trained_screens}, but GUI selected {self.screens}. "
+                f"Model file={self.model_file}."
+            )
+        if str(getattr(self.trainer, "quad_name", self.quad_name)) != self.quad_name:
+            raise RuntimeError(
+                f"ML model was trained for quadrupole {self.trainer.quad_name}, but GUI selected {self.quad_name}. "
+                f"Model file={self.model_file}."
+            )
+
     def predict_array(self, X):
+        X = np.asarray(X, dtype=float)
+        model_inputs = int(self.trainer.model.net[0].in_features)
+        actual_inputs = int(X.size if X.ndim == 1 else X.shape[1])
+        if actual_inputs != model_inputs:
+            raise RuntimeError(
+                f"MLInterface input shape mismatch: got {actual_inputs} input columns, "
+                f"but model expects {model_inputs}. X.shape={X.shape}, Model file={self.model_file}."
+            )
         return self.trainer.predict_array(X)
 
     def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, reference_screen = None, stop_checker = None):
@@ -349,5 +441,9 @@ class MLInterface:
         return prediction_sigx, prediction_sigy
 
 if __name__ == "__main__":
-    trainer = TrainModel(machine_name="ATF2", quad_name="QD18X", screens=[])
+    trainer = TrainModel(
+        machine_name="ATF2",
+        quad_name="QD18X",
+        screens=["OTR0X", "OTR1X", "OTR2X", "OTR3X"],
+    )
     trainer.train()

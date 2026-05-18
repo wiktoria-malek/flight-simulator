@@ -30,7 +30,7 @@ from Backend.Optimization_EM import Optimization_EM
 from Backend.QuadrupoleScan_EM import QuadrupoleScan_EM
 from Backend.LogConsole import LogConsole
 from Backend.PhaseSpaceGraphs_EM import PhaseSpaces
-
+USE_ML = True
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
     def paint(self, painter: QPainter, option, index):
@@ -116,11 +116,25 @@ class OptimizationWorker(QObject):
             model_file = get_ml_model_file(machine_name, quad_name, screens)
             optimizer_interface = self.interface
 
-            if model_file.exists():
-                optimizer_interface = MLInterface(self.interface, quad_name=quad_name, screens=screens, machine_name=machine_name)
+            if model_file.exists() and USE_ML:
+                try:
+                    candidate_interface = MLInterface(self.interface, quad_name=quad_name, screens=screens, machine_name=machine_name)
+
+                    bounds = self._get_interface_bounds()
+                    k1_values = np.asarray(self.session.get("K1_values", []), dtype=float)
+                    if k1_values.size == 0:
+                        raise RuntimeError("Session has no K1_values, cannot test ML model.")
+                    optimizer_interface = candidate_interface
+                    self.info.emit(f"Using ML model: {model_file}")
+                except Exception as e:
+                    optimizer_interface = self.interface
+                    self.info.emit(
+                        f"ML model exists but failed before Xopt: {model_file}. "
+                        f"Reason: {type(e).__name__}: {e}. Using simulation instead."
+                    )
             else:
-                self.info.emit(
-                    f"No ML model found for {machine_name}/{quad_name} and screens {screens}. Using simulation instead.")
+                if USE_ML:
+                    self.info.emit(f"No ML model found for {machine_name}/{quad_name} and screens {screens}. Using simulation instead.")
 
             tool = Optimization_EM(interface=optimizer_interface, n_starts=self.n_starts, xopt_initial_points=self.xopt_initial_points,
                                    xopt_steps=self.xopt_steps, nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength,

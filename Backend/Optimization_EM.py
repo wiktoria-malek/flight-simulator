@@ -481,8 +481,18 @@ class Optimization_EM:
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.")
             quad_k1_0 = float(inputs["quad_k1_0"]) if self.fit_quadrupole_strength else None
-            f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
-                                float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = True, quad_k1_0 = quad_k1_0)
+            try:
+                f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
+                                    float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = True, quad_k1_0 = quad_k1_0)
+            except (OptimizationStopped, OptimizationPaused):
+                raise
+            except Exception as e:
+                if self.print_M:
+                    print(
+                        "Joint fit evaluation failed, assigning large cost: "
+                        f"{type(e).__name__}: {e}"
+                    )
+                return {"f": 1e30}
 
             if self.print_M:
                 print(
