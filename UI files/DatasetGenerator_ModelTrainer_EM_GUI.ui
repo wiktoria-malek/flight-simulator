@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1180</width>
-    <height>774</height>
+    <height>746</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -239,69 +239,39 @@ QGroupBox::title {
              </layout>
             </widget>
             <widget class="QWidget" name="screensWidget" native="true">
- <layout class="QVBoxLayout" name="screensVBox">
-  <property name="leftMargin">
-   <number>0</number>
-  </property>
-  <property name="topMargin">
-   <number>0</number>
-  </property>
-  <property name="rightMargin">
-   <number>0</number>
-  </property>
-  <property name="bottomMargin">
-   <number>0</number>
-  </property>
-  <item>
-   <widget class="QLabel" name="screensLabel">
-    <property name="text">
-     <string>Screens</string>
-    </property>
-   </widget>
-  </item>
-  <item>
-   <widget class="QListWidget" name="screens_list">
-    <property name="selectionMode">
-     <enum>QAbstractItemView::ExtendedSelection</enum>
-    </property>
-   </widget>
-  </item>
- </layout>
-</widget>
-
-
+             <layout class="QVBoxLayout" name="screensVBox">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="screensLabel">
+                <property name="text">
+                 <string>Screens</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QListWidget" name="screens_list">
+                <property name="selectionMode">
+                 <enum>QAbstractItemView::ExtendedSelection</enum>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
            </widget>
           </item>
          </layout>
         </widget>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="actionsHBox">
-         <property name="spacing">
-          <number>8</number>
-         </property>
-         <item>
-          <widget class="QPushButton" name="start_generation_button">
-           <property name="styleSheet">
-            <string notr="true">background-color: red; color: white;
-</string>
-           </property>
-           <property name="text">
-            <string>START DATASET GENERATION</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="stop_generation_button">
-           <property name="styleSheet">
-            <string notr="true">background-color: green; color: white; </string>
-           </property>
-           <property name="text">
-            <string>STOP</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout">
@@ -348,7 +318,7 @@ QGroupBox::title {
 }</string>
       </property>
       <property name="title">
-       <string>Dataset creation log</string>
+       <string>Log Console</string>
       </property>
       <layout class="QVBoxLayout" name="logVBox">
        <item>
@@ -360,6 +330,72 @@ QGroupBox::title {
           <string>Dataset generation output will appear here...</string>
          </property>
         </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="actionsHBox">
+         <property name="spacing">
+          <number>8</number>
+         </property>
+         <item>
+          <widget class="QPushButton" name="start_generation_button">
+           <property name="styleSheet">
+            <string notr="true">background-color: red; color: white;
+</string>
+           </property>
+           <property name="text">
+            <string>START DATASET GENERATION</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="stop_generation_button">
+           <property name="styleSheet">
+            <string notr="true">background-color: green; color: white; </string>
+           </property>
+           <property name="text">
+            <string>STOP</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QPlainTextEdit" name="model_training_log">
+         <property name="placeholderText">
+          <string>Model training output will appear here...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_ml" stretch="0,0">
+         <property name="spacing">
+          <number>-1</number>
+         </property>
+         <property name="sizeConstraint">
+          <enum>QLayout::SetDefaultConstraint</enum>
+         </property>
+         <item>
+          <widget class="QPushButton" name="start_training_button">
+           <property name="styleSheet">
+            <string notr="true">background-color: red; color: white;
+</string>
+           </property>
+           <property name="text">
+            <string>START TRAINING THE MODEL</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="stop_training_button">
+           <property name="styleSheet">
+            <string notr="true">background-color: green; color: white; </string>
+           </property>
+           <property name="text">
+            <string>STOP TRAINING THE MODEL</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>

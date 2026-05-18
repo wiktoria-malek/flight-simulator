@@ -82,8 +82,6 @@ def build_sample(rng, K1_nominal, bounds, relative_k_change):
 
     return parameters
 
-
-
 def generate_dataset(quad_name, screens, interface, k1_relative_change, n_samples, output_file, log_callback, progress_callback, stop_checker):
     rng = np.random.default_rng(RANDOM_SEED)
     log = log_callback if callable(log_callback) else print

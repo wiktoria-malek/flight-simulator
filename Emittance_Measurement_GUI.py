@@ -1,6 +1,7 @@
 import os, sys, time, copy
 import numpy as np
 import matplotlib
+from MachineLearning.ML_train import MLInterface, get_ml_model_file
 matplotlib.use("QtAgg")
 import matplotlib.colors as mcolors
 from datetime import datetime
@@ -74,6 +75,7 @@ class OptimizationWorker(QObject):
     optimizer_ready = pyqtSignal(object)
     done = pyqtSignal()
     progress = pyqtSignal(str, int, int)
+    info = pyqtSignal(str)
 
     def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False):
         super().__init__()
@@ -89,13 +91,14 @@ class OptimizationWorker(QObject):
         self.progress.emit(str(phase), int(current), int(total))
 
     def _get_interface_initial_settings(self):
-        interface_class_name=self.interface.__class__.__name__
-        interface_module_name=self.interface.__class__.__module__
+        interface = getattr(self.interface, "interface", self.interface)
+        interface_class_name = interface.__class__.__name__
+        interface_module_name = interface.__class__.__module__
 
-        for machine_interfaces in INTERFACE_SETUP.values():
+        for machine_name, machine_interfaces in INTERFACE_SETUP.items():
             for interface_defaults in machine_interfaces:
-                if (interface_defaults.get("class_name")==interface_class_name) and (interface_defaults.get("module")==interface_module_name):
-                    return interface_defaults
+                if (interface_defaults.get("class_name") == interface_class_name) and (interface_defaults.get("module") == interface_module_name):
+                    return dict(interface_defaults, machine_name=str(machine_name))
         return None
 
     def _get_interface_bounds(self):
@@ -106,7 +109,21 @@ class OptimizationWorker(QObject):
 
     def run(self):
         try:
-            tool = Optimization_EM(interface = self.interface, n_starts = self.n_starts, xopt_initial_points = self.xopt_initial_points, xopt_steps = self.xopt_steps, nm_steps = self.nm_steps, fit_quadrupole_strength = self.fit_quadrupole_strength,
+            quad_name = str(self.session.get("quad_name", ""))
+            screens = list(self.session.get("screens", []))
+            interface_defaults = self._get_interface_initial_settings() or {}
+            machine_name = str(interface_defaults.get("machine_name", ""))
+            model_file = get_ml_model_file(machine_name, quad_name, screens)
+            optimizer_interface = self.interface
+
+            if model_file.exists():
+                optimizer_interface = MLInterface(self.interface, quad_name=quad_name, screens=screens, machine_name=machine_name)
+            else:
+                self.info.emit(
+                    f"No ML model found for {machine_name}/{quad_name} and screens {screens}. Using simulation instead.")
+
+            tool = Optimization_EM(interface=optimizer_interface, n_starts=self.n_starts, xopt_initial_points=self.xopt_initial_points,
+                                   xopt_steps=self.xopt_steps, nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength,
                                    progress_callback=self._emit_progress)
             self.optimizer_ready.emit(tool)
             bounds = self._get_interface_bounds()
@@ -544,6 +561,9 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
 
     def _run_optimization(self):
         self.log("Fitting emittance and twiss parameters at scanned quadrupole started...")
+        xopt_initial_points = int(self.xopt_initial_points_spin.value())
+        xopt_steps = int(self.xopt_steps_spin.value())
+        nm_steps = int(self.nm_steps_spin.value())
         if self.session is None:
             QMessageBox.information(self, "Optimization", "No session.")
             return
@@ -554,9 +574,6 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         self._set_progress(0)
         self._optimization_t0 = time.perf_counter()
         thread = QThread(self)
-        xopt_initial_points = int(self.xopt_initial_points_spin.value())
-        xopt_steps = int(self.xopt_steps_spin.value())
-        nm_steps = int(self.nm_steps_spin.value())
 
         # FOR TESTS!!!
         # scale = 0.8
@@ -565,8 +582,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         # session_bad["K1_values"] = (np.asarray(self.session["K1_values"]) * scale).tolist()
         # FOR TESTS!!! in order to test again, pass sessios_bad to the worker, instead of self.session
 
-
         worker = OptimizationWorker(self.interface, self.session, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()))
+        worker.info.connect(self.log)
 
         worker.moveToThread(thread)
         worker.optimizer_ready.connect(self._store_current_optimizer)

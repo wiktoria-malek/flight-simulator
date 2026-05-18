@@ -3,8 +3,6 @@ MAE - mean absolute error
 RMSE - root mean squared error
 R2 - score of fit quality. Best is 1.0
 
-Input dataset is in MachineLearning/EM_dataset.npz
-
 The model learns:
 [emitx_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, K1]
 ->
@@ -13,104 +11,343 @@ sigy_OTR0X, sigy_OTR1X, sigy_OTR2X, sigy_OTR3X]
 
 '''
 
-import sys, joblib
+import sys
+import torch
 from pathlib import Path
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
-from sklearn.neural_network import MLPRegressor # multi-layer perceptron
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
 CURRENT_FILE = Path(__file__).resolve()
 PROJECT_ROOT = CURRENT_FILE.parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-DATASET_FILE = PROJECT_ROOT / "MachineLearning" / "EM_dataset.npz"
-MODEL_FILE = PROJECT_ROOT / "MachineLearning" / "EM_model.joblib"
+DATASET_FILENAME = "EM_dataset_3000_samples.npz"
+ML_FILE = PROJECT_ROOT / "MachineLearning"
+MODEL_FILENAME = "EM_model.pt"
+
+def screens_folder_name(screens):
+    screens = [str(screen).strip() for screen in (screens or []) if str(screen).strip()]
+    if not screens:
+        return "all_screens"
+    return "_".join(screens)
+
+def get_ml_model_file(machine_name, quad_name, screens):
+    return ML_FILE / str(machine_name) / str(quad_name) / screens_folder_name(screens) / MODEL_FILENAME
+
+def get_ml_dataset_file(machine_name, quad_name, screens):
+    return ML_FILE / str(machine_name) / str(quad_name) / screens_folder_name(screens) / DATASET_FILENAME
 
 RANDOM_SEED = 12345
-TEST_SIZE = 0.2
+TEST_SIZE = 0.2 # 20% goes into test, 80% to training. with 3000 samples, 600 go into test to see if a NN can predict them
+BATCH_SIZE = 128 # packets with 128 samples at the same time
+MAX_EPOCHS = 2000 # maximum numbers of iterations though the dataset
+LEARNING_RATE = 1e-3 # size of a step during learning
+WEIGHT_DECAY = 1e-5 # small penalty for too big weights of a neural network
+PATIENCE = 120 # if through 120 epochs result doesn't get better, triggers early stopping
 
-def main():
-    if not DATASET_FILE.exists():
-        raise FileNotFoundError(f"{DATASET_FILE} not found")
-    data = np.load(DATASET_FILE, allow_pickle=True)
-    X = np.asarray(data["X"], dtype=float)
-    Y = np.asarray(data["Y"], dtype=float)
+class NeuralNetwork(nn.Module):
+    def __init__(self, n_inputs, n_outputs):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_inputs, 128), # 128 hidden neurons
+            nn.ReLU(), # adds nonlinearities
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, n_outputs),
+        )
 
-    param_names = [str(x) for x in data["param_names"]] if "param_names" in data.files else []
-    sigma_names = [str(x) for x in data["sigma_names"]] if "sigma_names" in data.files else []
+    def forward(self, x):
+        return self.net(x) # gets x through each layer of NN
 
-    if X.ndim != 2 or Y.ndim != 2:
-        raise RuntimeError(f"Wrong shape for X or Y:  X= {X.shape} or Y= {Y.shape}")
-    if X.shape[0] != Y.shape[0]:
-        raise RuntimeError(f"X and Y must have the same number of samples")
 
-    print("Loading data...")
-    if param_names:
-        print(f"Parameter names: {param_names}")
-        print(f"sigma names: {sigma_names}")
+class TrainModel:
+    def __init__(self, screens, quad_name, machine_name, dataset_file=None, model_file=None,
+                random_seed=RANDOM_SEED, test_size=TEST_SIZE, batch_size=BATCH_SIZE, max_epochs=MAX_EPOCHS,
+                learning_rate=LEARNING_RATE, weight_decay=WEIGHT_DECAY, patience=PATIENCE, log_callback=None,
+                progress_callback=None, stop_checker=None):
 
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=TEST_SIZE, random_state=RANDOM_SEED)
-    model = Pipeline([
-        ("x_scaler", StandardScaler()),
-        ("mlp", MLPRegressor(
-            hidden_layer_sizes=(128, 128, 64),
-            activation="relu",
-            solver="adam",
-            alpha=1e-5,
-            learning_rate_init=1e-3,
-            max_iter=3000,
-            random_state=RANDOM_SEED,
-            early_stopping=True,
-            verbose=True,
-            validation_fraction=0.15,
-            n_iter_no_change=80,
-        ) ),
-    ])
+        self.screens = [str(screen) for screen in screens]
+        self.quad_name = str(quad_name)
+        self.machine_name = str(machine_name)
+        if dataset_file is None:
+            dataset_file = get_ml_dataset_file(self.machine_name, self.quad_name, self.screens)
 
-    print("Training model...")
-    model.fit(X_train, Y_train)
-    Y_pred = model.predict(X_test)
+        if model_file is None:
+            model_file = get_ml_model_file(self.machine_name, self.quad_name, self.screens)
 
-    MAE = mean_absolute_error(Y_test, Y_pred)
-    RMSE = np.sqrt(mean_squared_error(Y_test, Y_pred))
-    R2 = r2_score(Y_test, Y_pred)
+        self.dataset_file = Path(dataset_file)
+        self.model_file = Path(model_file)
+        self.random_seed = int(random_seed)
+        self.test_size = float(test_size)
+        self.batch_size = int(batch_size)
+        self.max_epochs = int(max_epochs)
+        self.learning_rate = float(learning_rate)
+        self.weight_decay = float(weight_decay)
+        self.patience = int(patience)
+        self.log_callback = log_callback
+        self.progress_callback = progress_callback
+        self.stop_checker = stop_checker
+        self.model = None
+        self.x_scaler = None
+        self.y_scaler = None
+        self.param_names = []
+        self.sigma_names = []
+        self.metrics = {}
 
-    print("Test quality:")
-    print(f"MAE: {MAE}")
-    print(f"RMSE: {RMSE}")
-    print(f"R2: {R2}")
+    def log(self, message):
+        if callable(self.log_callback):
+            self.log_callback(str(message))
+        else:
+            print(message)
 
-    print("Quality of each beam size:")
-    for i in range(Y.shape[1]):
-        name = sigma_names[i] if i < len(sigma_names) else f"sigma_{i}"
-        sigma_mae = mean_absolute_error(Y_test[:, i], Y_pred[:, i])
-        sigma_rmse = np.sqrt(mean_squared_error(Y_test[:, i], Y_pred[:, i]))
-        sigma_r2 = r2_score(Y_test[:, i], Y_pred[:, i])
+    def should_stop(self):
+        return callable(self.stop_checker) and bool(self.stop_checker())
 
-        print(f"{name}")
-        print(f"MAE: {sigma_mae}")
-        print(f"RMSE: {sigma_rmse}")
-        print(f"R2: {sigma_r2}")
+    def emit_progress(self, epoch, total_epochs):
+        if callable(self.progress_callback):
+            self.progress_callback(int(epoch), int(total_epochs))
 
-    result = {
-        "model": model,
-        "param_names": param_names,
-        "sigma_names": sigma_names,
-        "dataset_file": str(DATASET_FILE),
-        "metrics": {
-            "MAE": float(MAE),
-            "RMSE": float(RMSE),
-            "R2": float(R2),
+    def set_random_seed(self):
+        np.random.seed(self.random_seed)
+        torch.manual_seed(self.random_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(self.random_seed) # randomly asigns which sample is for test, which for training
+
+    def get_device(self):
+        return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    @staticmethod
+    def make_loader(X, Y, batch_size, shuffle):
+        X_tensor = torch.tensor(X, dtype=torch.float32)
+        Y_tensor = torch.tensor(Y, dtype=torch.float32)
+        dataset = TensorDataset(X_tensor, Y_tensor) # makes pairs input -> output
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle) # shuffle shuffles samples
+
+    def load_dataset(self):
+        if not self.dataset_file.exists():
+            raise FileNotFoundError(f"Dataset file not found: {self.dataset_file}")
+        data = np.load(self.dataset_file, allow_pickle=True)
+        X = np.asarray(data["X"], dtype=float)
+        Y = np.asarray(data["Y"], dtype=float)
+
+        if "param_names" in data:
+            self.param_names = [str(v) for v in data["param_names"]]
+        if "sigma_names" in data:
+            self.sigma_names = [str(v) for v in data["sigma_names"]]
+        if "screens" in data:
+            self.screens = [str(v) for v in data["screens"]]
+        if "quad_name" in data:
+            self.quad_name = str(data["quad_name"])
+
+        finite = np.all(np.isfinite(X), axis=1) & np.all(np.isfinite(Y), axis=1) # deletes samples with nan, -inf, +inf
+        X = X[finite]
+        Y = Y[finite]
+
+        if X.size ==0 or Y.size ==0:
+            raise RuntimeError("Dataset contains no valid data samples.")
+        return X, Y
+
+    def train(self):
+        self.set_random_seed()
+        X, Y = self.load_dataset()
+        X_train_raw, X_test_raw, Y_train_raw, Y_test_raw = train_test_split(
+            X, Y, test_size=self.test_size, random_state=self.random_seed, shuffle=True
+        )
+        self.x_scaler = StandardScaler() # scales data
+        self.y_scaler = StandardScaler()
+        X_train = self.x_scaler.fit_transform(X_train_raw)
+        X_test = self.x_scaler.transform(X_test_raw)
+        Y_train = self.y_scaler.fit_transform(Y_train_raw)
+        Y_test = self.y_scaler.transform(Y_test_raw)
+
+        device = self.get_device()
+        self.model = NeuralNetwork(X_train.shape[1], Y_train.shape[1]).to(device) # chooses gpu or cpu
+                                                                                    # X_train.shape[1] = 7
+                                                                                    # Y_train.shape[1] = 2 * n_screens
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay) # creates an algorithm, that fixes network weights, AdamW is a standard optimizer for
+                                                                                                                    # neural networks, W stands for weight decay, that is optimized well
+        loss_function = nn.MSELoss() # penalty for difference between prediction-true_sigma
+        train_loader = self.make_loader(X_train, Y_train, batch_size=self.batch_size, shuffle=True)
+        test_loader = self.make_loader(X_test, Y_test, batch_size=self.batch_size, shuffle=False)
+
+        best_state = None
+        best_test_loss = np.inf
+        bad_epochs = 0
+
+        for epoch in range(1, self.max_epochs+1):
+            if self.should_stop():
+                break
+            self.model.train()
+            train_losses = []
+
+            for xb, yb in train_loader: # one data batch
+                xb, yb = xb.to(device), yb.to(device)
+                optimizer.zero_grad(set_to_none=True)
+                prediction = self.model(xb) # predicts sigmas
+                loss = loss_function(prediction, yb) # calculates difference
+                loss.backward() # how to change weights to minimize error
+                optimizer.step() # updates network's weights
+                train_losses.append(float(loss.detach().cpu()))
+
+            self.model.eval() # checks model on test data, without learning
+            test_losses = []
+
+            with torch.no_grad(): # model checks samples that were not seen during learning and we check how well it reconstructs Y
+                for xb, yb in test_loader:
+                    xb, yb = xb.to(device), yb.to(device)
+                    prediction = self.model(xb)
+                    loss = loss_function(prediction, yb)
+                    test_losses.append(float(loss.detach().cpu()))
+
+            test_loss = float(np.mean(test_losses)) if test_losses else np.inf
+            if np.isfinite(test_loss) and test_loss < best_test_loss:
+                best_test_loss = test_loss
+                best_state = {k: v.detach().cpu().clone() for k,v in self.model.state_dict().items()}
+                bad_epochs = 0
+            else:
+                bad_epochs += 1 # saves best model, if test loss got better, it saves current weights
+            self.emit_progress(epoch, self.max_epochs)
+
+            if epoch == 1 or epoch % 25 ==0: # prints result from 1st epoch and then every 25th, so doesn't create a spam
+                train_loss = float(np.mean(train_losses)) if train_losses else np.nan
+                self.log(f"Epoch {epoch}/{self.max_epochs}, train loss: {train_loss}, test loss: {test_loss}")
+            if bad_epochs >= self.patience:
+                self.log("Early stopping")
+                break
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
+
+        Y_pred = self.predict_array(X_test_raw) # does prediction on unscaled test data
+        self.metrics = {
+            "mae": float(mean_absolute_error(Y_test_raw, Y_pred)),
+            "rmse": float(np.sqrt(mean_squared_error(Y_test_raw, Y_pred))),
+            "r2": float(r2_score(Y_test_raw, Y_pred, multioutput="variance_weighted")), # near 1 = perfect, it tells how well model is corresponding to data
         }
-    }
+        self.log(f"MAE: {self.metrics['mae']}, RMSE: {self.metrics['rmse']}, R2: {self.metrics['r2']}")
+        self.save_model()
+        return self.metrics
 
-    joblib.dump(result, MODEL_FILE)
-    print("Done.")
-    print(f"Saved model to {MODEL_FILE}")
+    def predict_array(self, X): # for already trained model
+        if self.model is None or self.x_scaler is None or self.y_scaler is None:
+            raise RuntimeError("Model and scaler not initialized.")
+        # model wants data in a format n_samples * n_params
+        X = np.asarray(X, dtype=float)
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+
+        device = self.get_device()
+        self.model.to(device)
+        self.model.eval() # prediction mode, not training
+        X_scaled = self.x_scaler.transform(X) # scales the same way, as during learning
+        with torch.no_grad(): # don't calculate gradients (what direction and how much should we change weights, so the error is smaller), because it's not learning
+            X_tensor = torch.tensor(X_scaled, dtype=torch.float32, device=device)
+            Y_scaled = self.model(X_tensor).detach().cpu().numpy()
+        return self.y_scaler.inverse_transform(Y_scaled) # unscales
+
+    def save_model(self):
+        if self.model is None or self.x_scaler is None or self.y_scaler is None:
+            raise RuntimeError("Nothing to save. Train model first.")
+        self.model_file.parent.mkdir(parents=True, exist_ok=True)
+        torch.save({
+            "state_dict": self.model.state_dict(), # trained network weights
+            "n_inputs": int(self.model.net[0].in_features),
+            "n_outputs": int(self.model.net[-1].out_features),
+            "x_mean": self.x_scaler.mean_,
+            "x_scale": self.x_scaler.scale_,
+            "y_mean": self.y_scaler.mean_,
+            "y_scale": self.y_scaler.scale_,
+            "param_names": self.param_names,
+            "sigma_names": self.sigma_names,
+            "screens": self.screens,
+            "quad_name": self.quad_name,
+            "machine_name": self.machine_name,
+            "metrics": self.metrics,
+        }, self.model_file)
+        self.log(f"Saved ML model: {self.model_file}")
+
+    def load_model(self):
+        if not self.model_file.exists():
+            raise FileNotFoundError(f"ML model file not found: {self.model_file}")
+        checkpoint = torch.load(self.model_file, map_location="cpu")
+        self.model = NeuralNetwork(int(checkpoint["n_inputs"]), int(checkpoint["n_outputs"])) # takes the same neural network architecture
+        self.model.load_state_dict(checkpoint["state_dict"]) # loads nn weights
+        self.model.eval() # prediction mode
+        self.x_scaler = StandardScaler()
+        self.x_scaler.mean_ = np.asarray(checkpoint["x_mean"], dtype=float)
+        self.x_scaler.scale_ = np.asarray(checkpoint["x_scale"], dtype=float)
+        self.x_scaler.var_ = self.x_scaler.scale_ ** 2
+        self.x_scaler.n_features_in_ = self.x_scaler.mean_.size
+
+        self.y_scaler = StandardScaler()
+        self.y_scaler.mean_ = np.asarray(checkpoint["y_mean"], dtype=float)
+        self.y_scaler.scale_ = np.asarray(checkpoint["y_scale"], dtype=float)
+        self.y_scaler.var_ = self.y_scaler.scale_ ** 2
+        self.y_scaler.n_features_in_ = self.y_scaler.mean_.size
+
+        self.param_names = [str(v) for v in checkpoint.get("param_names", [])]
+        self.sigma_names = [str(v) for v in checkpoint.get("sigma_names", [])]
+        self.screens = [str(v) for v in checkpoint.get("screens", self.screens)]
+        self.quad_name = str(checkpoint.get("quad_name", self.quad_name))
+        self.machine_name = str(checkpoint.get("machine_name", self.machine_name))
+        self.metrics = dict(checkpoint.get("metrics", {}))
+        return self # allows to do trainer = TrainModel(...).load_model(), it allows chaining
+
+class MLInterface:
+    def __init__(self, interface, quad_name, screens, machine_name):
+        self.interface = interface
+        self.quad_name = str(quad_name)
+        self.screens = [str(s) for s in screens]
+        self.machine_name = str(machine_name)
+        self.model_file = get_ml_model_file(self.machine_name, self.quad_name, self.screens)
+        self.trainer = TrainModel(screens=self.screens, quad_name=self.quad_name, machine_name=self.machine_name, model_file=self.model_file)
+        self.trainer.load_model()
+
+    def __getattr__(self, name):
+        return getattr(self.interface, name) # if there is a function that MLInterface doesn't have (almost all of them), it gets them form the
+                                            # interface, but has predict_emittance_scan_response, so uses that
+
+    def predict_array(self, X):
+        return self.trainer.predict_array(X)
+
+    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, reference_screen = None, stop_checker = None):
+
+        if callable(stop_checker) and stop_checker():
+            raise RuntimeError("__OPTIMIZATION_STOP__")
+
+        screens = [str(screen) for screen in screens]
+        if str(quad_name) != self.quad_name:
+            raise RuntimeError(f"ML model was loaded for a different quadrupole than optimizer requests.")
+        if screens != self.screens:
+            raise RuntimeError(f"ML model was loaded for different screens than optimizer requests.")
+
+        X = []
+
+        for K1 in K1_values:
+            X.append([emit_x, beta_x0, alpha_x0, emit_y, beta_y0, alpha_y0, K1])
+            # scan_points * 7
+
+        X = np.asarray(X, dtype=float)
+        Y = self.predict_array(X) # pytorch model
+        n_screens = len(screens)
+
+        if Y.shape[1] != 2*n_screens:
+            raise RuntimeError(f"ML model output has wrong size.")
+
+        prediction_sigx = Y[:, :n_screens]
+        prediction_sigy = Y[:, n_screens:]
+
+        prediction_sigx = np.maximum(prediction_sigx, 0.0) # cuts values that are negative to 0.0
+        prediction_sigy = np.maximum(prediction_sigy, 0.0) # element for element, checks if negative
+
+        return prediction_sigx, prediction_sigy
 
 if __name__ == "__main__":
-    main()
+    trainer = TrainModel(machine_name="ATF2", quad_name="QD18X", screens=[])
+    trainer.train()

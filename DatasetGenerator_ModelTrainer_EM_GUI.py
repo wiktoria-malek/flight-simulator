@@ -102,7 +102,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.interface = interface
         self.dir_name = dir_name
         self.session = None
-        ui_path = os.path.join(os.path.dirname(__file__),"UI files/DatasetGenerator_EM_GUI.ui")
+        ui_path = os.path.join(os.path.dirname(__file__), "UI files/DatasetGenerator_ModelTrainer_EM_GUI.ui")
         uic.loadUi(ui_path, self)
         self._load_logo()
         self.start_generation_button.clicked.connect(self._run_generating)
