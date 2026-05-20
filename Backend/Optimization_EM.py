@@ -610,7 +610,7 @@ class Optimization_EM:
             allow_stop=True, quad_k1_0 = quad_k1_0_best,
         )
 
-        local_max_nfev = int(getattr(self, "nm_steps", 500))
+        local_max_nfev = int(getattr(self, "nm_steps", 5000))
         run_local_ls = local_max_nfev > 0
 
         if not run_local_ls:
@@ -650,7 +650,7 @@ class Optimization_EM:
         x0 = np.array(x0_values, dtype=float)
         x0 = np.clip(x0, low_bounds, high_bounds)
 
-        local_max_nfev = int(getattr(self, "nm_steps", 500))
+        local_max_nfev = int(getattr(self, "nm_steps", 5000))
         ls_best_cost = [float(best_cost)]
         ls_best_params = [x0.copy()]
         ls_stopped = [False]
@@ -677,7 +677,7 @@ class Optimization_EM:
                     allow_stop=False,
                 )
             except Exception:
-                return np.full(n_x + n_y, 1e6, dtype=float)
+                return np.full(n_x + n_y, 1e3, dtype=float)
 
             rx = (p2x - sig_x2)[valid_x].ravel() if np.any(valid_x) else np.array([], dtype=float)
             ry = (p2y - sig_y2)[valid_y].ravel() if np.any(valid_y) else np.array([], dtype=float)
@@ -685,7 +685,7 @@ class Optimization_EM:
             ry = ry[np.isfinite(ry)]
 
             if rx.size == 0 and ry.size == 0:
-                return np.full(n_x + n_y, 1e6, dtype=float)
+                return np.full(n_x + n_y, 1e3, dtype=float)
 
             rx_scaled = np.sqrt(0.5 / n_x) * rx / np.sqrt(scale_x) if rx.size else np.array([], dtype=float)
             ry_scaled = np.sqrt(0.5 / n_y) * ry / np.sqrt(scale_y) if ry.size else np.array([], dtype=float)
@@ -718,10 +718,10 @@ class Optimization_EM:
                 loss="soft_l1",
                 f_scale=1.0,
                 max_nfev=local_max_nfev,
-                x_scale="jac",
-                ftol=1e-6,
-                xtol=1e-6,
-                gtol=1e-6,
+                x_scale=np.maximum(np.abs(x0), 1.0),
+                ftol=1e-8,
+                xtol=1e-8,
+                gtol=1e-8,
             )
             p_ls = np.asarray(res_ls.x, dtype=float)
             f_ls, _, _ = compute_cost(

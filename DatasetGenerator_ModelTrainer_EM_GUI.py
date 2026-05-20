@@ -19,6 +19,7 @@ except ImportError:
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 from Backend.SaveOrLoad import SaveOrLoad
 from MachineLearning.ML_dataset import generate_dataset, _get_interface_initial_settings
+from MachineLearning.ML_train import TrainModel
 
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -96,6 +97,53 @@ class DatasetGeneratorWorker(QObject):
         finally:
             self.done.emit()
 
+class ModelTrainerWorker(QObject):
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
+    done = pyqtSignal()
+    progress = pyqtSignal(int, int)
+    log_message = pyqtSignal(str)
+
+    def __init__(self, screens, quad_name, machine_name, dataset_file, model_file):
+        super().__init__()
+        self.screens = [str(screen) for screen in screens]
+        self.quad_name = str(quad_name)
+        self.machine_name = str(machine_name)
+        self.dataset_file = dataset_file
+        self.model_file = model_file
+        self.stop_requested = False
+
+    def request_stop(self):
+        self.stop_requested = True
+
+    def _should_stop(self):
+        return bool(self.stop_requested)
+
+    def _emit_log(self, text):
+        self.log_message.emit(str(text))
+
+    def _emit_progress(self, current, total):
+        self.progress.emit(int(current), int(total))
+
+    def run(self):
+        try:
+            trainer = TrainModel(
+                screens=self.screens,
+                quad_name=self.quad_name,
+                machine_name=self.machine_name,
+                dataset_file=self.dataset_file,
+                model_file=self.model_file,
+                log_callback=self._emit_log,
+                progress_callback=self._emit_progress,
+                stop_checker=self._should_stop,
+            )
+            metrics = trainer.train()
+            self.finished.emit(metrics)
+        except Exception as e:
+            self.error.emit(str(e))
+        finally:
+            self.done.emit()
+
 class MainWindow(QMainWindow, SaveOrLoad):
     def __init__(self, interface, dir_name):
         super().__init__()
@@ -107,6 +155,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self._load_logo()
         self.start_generation_button.clicked.connect(self._run_generating)
         self.stop_generation_button.clicked.connect(self._stop_generating)
+        self.start_training_button
         self.setWindowTitle("Emittance ML Dataset Generator")
         self.progressBar.setValue(0)
         self.quadrupoles_list.setItemDelegate(SPositionDelegate(self.quadrupoles_list))

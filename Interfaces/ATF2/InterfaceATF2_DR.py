@@ -4,6 +4,22 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 from epics import PV, ca, caget
 
+'''
+TO IMPLEMENT!!!
+
+def get_quadrupoles(self):
+    pass
+def set_quadrupoles(self):
+    pass
+def vary_quadrupoles(self, names, corr_vals):
+    pass
+def get_sextupoles(self):
+    pass
+def set_sextupoles(self):
+    pass
+
+'''
+
 class InterfaceATF2_DR(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_DR'

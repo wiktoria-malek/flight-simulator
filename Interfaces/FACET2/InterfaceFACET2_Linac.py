@@ -13,6 +13,18 @@ from F2_pytools.f2bsaBuffer import make_bpm_buffer, get_bpmdata2
 from F2_pytools.mags import set_magnets
 from traceback import print_exception
 
+'''
+TO IMPLEMENT!!!
+
+def get_screens(self):
+    pass
+def set_quadrupoles(self):
+    pass
+def vary_quadrupoles(self, names, corr_vals):
+    pass
+'''
+
+
 # missing/deffered elements in the model to ignore
 BPM_BLACKLIST = [
     'BPM19851','BPM19871'

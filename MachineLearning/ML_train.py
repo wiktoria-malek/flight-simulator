@@ -21,15 +21,6 @@ from sklearn.preprocessing import StandardScaler
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-CURRENT_FILE = Path(__file__).resolve()
-PROJECT_ROOT = CURRENT_FILE.parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-DATASET_FILENAME = "EM_dataset_3000_samples.npz"
-ML_FILE = PROJECT_ROOT / "MachineLearning"
-MODEL_FILENAME = "EM_model.pt"
-
 def screens_folder_name(screens):
     screens = [str(screen).strip() for screen in (screens or []) if str(screen).strip()]
     if not screens:
@@ -37,18 +28,18 @@ def screens_folder_name(screens):
     return "_".join(screens)
 
 def get_ml_model_file(machine_name, quad_name, screens):
-    return ML_FILE / str(machine_name) / str(quad_name) / screens_folder_name(screens) / MODEL_FILENAME
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parents[1]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    return project_root / "MachineLearning" / str(machine_name) / str(quad_name) / screens_folder_name(screens) / "EM_model_50k.pt"
 
 def get_ml_dataset_file(machine_name, quad_name, screens):
-    return ML_FILE / str(machine_name) / str(quad_name) / screens_folder_name(screens) / DATASET_FILENAME
-
-RANDOM_SEED = 12345
-TEST_SIZE = 0.2 # 20% goes into test, 80% to training. with 3000 samples, 600 go into test to see if a NN can predict them
-BATCH_SIZE = 128 # packets with 128 samples at the same time
-MAX_EPOCHS = 2000 # maximum numbers of iterations though the dataset
-LEARNING_RATE = 1e-3 # size of a step during learning
-WEIGHT_DECAY = 1e-5 # small penalty for too big weights of a neural network
-PATIENCE = 120 # if through 120 epochs result doesn't get better, triggers early stopping
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parents[1]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    return project_root / "MachineLearning" / str(machine_name) / str(quad_name) / screens_folder_name(screens) / "EM_dataset_50k.npz"
 
 try:
     torch.set_num_threads(1)
@@ -68,16 +59,12 @@ class NeuralNetwork(nn.Module):
             nn.Linear(64, n_outputs),
         )
 
+
     def forward(self, x):
         return self.net(x) # gets x through each layer of NN
 
-
 class TrainModel:
-    def __init__(self, screens, quad_name, machine_name, dataset_file=None, model_file=None,
-                random_seed=RANDOM_SEED, test_size=TEST_SIZE, batch_size=BATCH_SIZE, max_epochs=MAX_EPOCHS,
-                learning_rate=LEARNING_RATE, weight_decay=WEIGHT_DECAY, patience=PATIENCE, log_callback=None,
-                progress_callback=None, stop_checker=None):
-
+    def __init__(self, screens, quad_name, machine_name, dataset_file=None, model_file=None, log_callback=None, progress_callback=None, stop_checker=None):
         self.screens = [str(screen) for screen in screens]
         self.quad_name = str(quad_name)
         self.machine_name = str(machine_name)
@@ -89,13 +76,13 @@ class TrainModel:
 
         self.dataset_file = Path(dataset_file)
         self.model_file = Path(model_file)
-        self.random_seed = int(random_seed)
-        self.test_size = float(test_size)
-        self.batch_size = int(batch_size)
-        self.max_epochs = int(max_epochs)
-        self.learning_rate = float(learning_rate)
-        self.weight_decay = float(weight_decay)
-        self.patience = int(patience)
+        self.random_seed = 2137
+        self.test_size = 0.2 # 20% goes into test, 80% to training. with 3000 samples, 600 go into test to see if a NN can predict them
+        self.batch_size = 128 # packets with 128 samples at the same time
+        self.max_epochs = 2000 # maximum numbers of iterations though the dataset
+        self.learning_rate = 1e-3 # size of a step during learning
+        self.weight_decay = 1e-5 # small penalty for too big weights of a neural network
+        self.patience = 120 # if through 120 epochs result doesn't get better, triggers early stopping
         self.log_callback = log_callback
         self.progress_callback = progress_callback
         self.stop_checker = stop_checker
@@ -351,51 +338,9 @@ class MLInterface:
         self.trainer = TrainModel(screens=self.screens, quad_name=self.quad_name, machine_name=self.machine_name, model_file=self.model_file)
         self.trainer.load_model()
 
-
-        self._validate_model_for_current_scan()
-
-
-
-
-
-
     def __getattr__(self, name):
         return getattr(self.interface, name) # if there is a function that MLInterface doesn't have (almost all of them), it gets them form the
                                             # interface, but has predict_emittance_scan_response, so uses that
-
-    def _validate_model_for_current_scan(self):
-        expected_inputs = 7
-        expected_outputs = 2 * len(self.screens)
-        model_inputs = int(self.trainer.model.net[0].in_features)
-        model_outputs = int(self.trainer.model.net[-1].out_features)
-        trained_screens = [str(s) for s in getattr(self.trainer, "screens", [])]
-
-        print("ML model file:", self.model_file)
-        print("ML model inputs:", model_inputs, "expected:", expected_inputs)
-        print("ML model outputs:", model_outputs, "expected:", expected_outputs)
-        print("ML trainer screens:", trained_screens)
-        print("GUI selected screens:", self.screens)
-
-        if model_inputs != expected_inputs:
-            raise RuntimeError(
-                f"ML model has wrong number of inputs: got {model_inputs}, expected {expected_inputs}. "
-                f"Model file={self.model_file}."
-            )
-        if model_outputs != expected_outputs:
-            raise RuntimeError(
-                f"ML model has wrong number of outputs: got {model_outputs}, expected {expected_outputs}. "
-                f"Model file={self.model_file}."
-            )
-        if trained_screens and trained_screens != self.screens:
-            raise RuntimeError(
-                f"ML model was trained for screens {trained_screens}, but GUI selected {self.screens}. "
-                f"Model file={self.model_file}."
-            )
-        if str(getattr(self.trainer, "quad_name", self.quad_name)) != self.quad_name:
-            raise RuntimeError(
-                f"ML model was trained for quadrupole {self.trainer.quad_name}, but GUI selected {self.quad_name}. "
-                f"Model file={self.model_file}."
-            )
 
     def predict_array(self, X):
         X = np.asarray(X, dtype=float)
@@ -435,8 +380,8 @@ class MLInterface:
         prediction_sigx = Y[:, :n_screens]
         prediction_sigy = Y[:, n_screens:]
 
-        prediction_sigx = np.maximum(prediction_sigx, 0.0) # cuts values that are negative to 0.0
-        prediction_sigy = np.maximum(prediction_sigy, 0.0) # element for element, checks if negative
+        prediction_sigx = np.sqrt(np.maximum(prediction_sigx, 0.0)) # cuts values that are negative to 0.0
+        prediction_sigy = np.sqrt(np.maximum(prediction_sigy, 0.0)) # element for element, checks if negative
 
         return prediction_sigx, prediction_sigy
 

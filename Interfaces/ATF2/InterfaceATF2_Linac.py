@@ -6,6 +6,15 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 from epics import PV, ca
 
+'''
+TO IMPLEMENT!!!
+
+def get_quadrupoles(self):
+    pass
+def set_quadrupoles(self):
+    pass
+'''
+
 class InterfaceATF2_Linac(AbstractMachineInterface):
 
     def get_name(self):
