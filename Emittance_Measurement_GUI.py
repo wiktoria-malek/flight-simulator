@@ -77,7 +77,7 @@ class OptimizationWorker(QObject):
     progress = pyqtSignal(str, int, int)
     info = pyqtSignal(str)
 
-    def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False):
+    def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False, use_linear_response = False):
         super().__init__()
         self.interface = interface
         self.session = session
@@ -86,6 +86,7 @@ class OptimizationWorker(QObject):
         self.xopt_steps = xopt_steps
         self.nm_steps = nm_steps
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
+        self.use_linear_response = bool(use_linear_response)
 
     def _emit_progress(self, phase, current, total):
         self.progress.emit(str(phase), int(current), int(total))
@@ -116,7 +117,7 @@ class OptimizationWorker(QObject):
             model_file = get_ml_model_file(machine_name, quad_name, screens)
             optimizer_interface = self.interface
 
-            if model_file.exists() and USE_ML:
+            if model_file.exists() and USE_ML and not self.use_linear_response:
                 try:
                     candidate_interface = MLInterface(self.interface, quad_name=quad_name, screens=screens, machine_name=machine_name)
 
@@ -138,7 +139,7 @@ class OptimizationWorker(QObject):
 
             tool = Optimization_EM(interface=optimizer_interface, n_starts=self.n_starts, xopt_initial_points=self.xopt_initial_points,
                                    xopt_steps=self.xopt_steps, nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength,
-                                   progress_callback=self._emit_progress)
+                                   progress_callback=self._emit_progress, use_linear_response=self.use_linear_response)
             self.optimizer_ready.emit(tool)
             bounds = self._get_interface_bounds()
             output = tool.fit_from_session(self.session, bounds = bounds)
@@ -596,7 +597,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         # session_bad["K1_values"] = (np.asarray(self.session["K1_values"]) * scale).tolist()
         # FOR TESTS!!! in order to test again, pass sessios_bad to the worker, instead of self.session
 
-        worker = OptimizationWorker(self.interface, self.session, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()))
+        worker = OptimizationWorker(self.interface, self.session, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), use_linear_response = bool(self.R_linear_checkbox.isChecked()))
         worker.info.connect(self.log)
 
         worker.moveToThread(thread)

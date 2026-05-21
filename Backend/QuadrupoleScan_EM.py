@@ -159,7 +159,7 @@ class QuadrupoleScan_EM:
         #tilt_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigx_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
-        #sigxy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
+        sigxy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         #tilt_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         scan_steps = []
 
@@ -203,7 +203,7 @@ class QuadrupoleScan_EM:
                         self.interface.set_quadrupoles([quad_name], [float(K1)])
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
-                        # sxy_shots = np.full(nshots, np.nan, dtype=float)
+                        sxy_shots = np.full(nshots, np.nan, dtype=float)
                         # tilt_shots = np.full(nshots, np.nan, dtype=float)
                         state_files = []
                         for j in range(nshots):
@@ -229,16 +229,17 @@ class QuadrupoleScan_EM:
                             if idx is not None:
                                 sx_shots[j] = float(screens_data["sigx"][idx])
                                 sy_shots[j] = float(screens_data["sigy"][idx])
-                                #sxy_shots[j] = float(screens_data["sigxy"][idx])
+                                if "sigxy" in screens_data:
+                                    sxy_shots[j] = float(screens_data["sigxy"][idx])
                                 #tilt_shots[j] = float(screens_data["tilt"][idx])
                         if state_files:
                             sigx_mean[i, k] = np.nanmean(sx_shots)
                             sigy_mean[i, k] = np.nanmean(sy_shots)
-                            # sigxy_mean[i, k] = np.nanmean(sxy_shots)
+                            sigxy_mean[i, k] = np.nanmean(sxy_shots)
                             #tilt_mean[i, k] = np.nanmean(tilt_shots)
                             sigx_std[i, k] = np.nanstd(sx_shots)
                             sigy_std[i, k] = np.nanstd(sy_shots)
-                            # sigxy_std[i, k] = np.nanstd(sxy_shots)
+                            sigxy_std[i, k] = np.nanstd(sxy_shots)
                             #tilt_std[i, k] = np.nanstd(tilt_shots)
                         existing_step = next((step for step in scan_steps if int(step.get("step_index", -1)) == int(i)), None)
                         if existing_step is None:
@@ -264,11 +265,11 @@ class QuadrupoleScan_EM:
                             "K1_0": float(K1_0),
                             "sigx_mean": sigx_mean.tolist(),
                             "sigy_mean": sigy_mean.tolist(),
-                            #"sigxy_mean": sigxy_mean.tolist(),
+                            "sigxy_mean": sigxy_mean.tolist(),
                             #"tilt_mean": tilt_mean.tolist(),
                             "sigx_std": sigx_std.tolist(),
                             "sigy_std": sigy_std.tolist(),
-                            #"sigxy_std": sigxy_std.tolist(),
+                            "sigxy_std": sigxy_std.tolist(),
                             #"tilt_std": tilt_std.tolist(),
                             "deltas": deltas.tolist(),
                             "K1_values": K1_values.tolist(),
@@ -313,11 +314,11 @@ class QuadrupoleScan_EM:
             "K1_0": float(K1_0),
             "sigx_mean": sigx_mean.tolist(),
             "sigy_mean": sigy_mean.tolist(),
-            #"sigxy_mean": sigxy_mean.tolist(),
+            "sigxy_mean": sigxy_mean.tolist(),
             #"tilt_mean": tilt_mean.tolist(),
             "sigx_std": sigx_std.tolist(),
             "sigy_std": sigy_std.tolist(),
-            #"sigxy_std": sigxy_std.tolist(),
+            "sigxy_std": sigxy_std.tolist(),
             #"tilt_std": tilt_std.tolist(),
             "deltas": deltas.tolist(),
             "K1_values": K1_values.tolist(),

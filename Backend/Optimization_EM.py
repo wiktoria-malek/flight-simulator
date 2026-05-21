@@ -6,6 +6,7 @@ from xopt import Xopt
 from xopt.vocs import VOCS, select_best
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian import ExpectedImprovementGenerator
+from Backend.LinearResponse_EM import LinearResponse_EM
 
 class OptimizationStopped(Exception):
     def __init__(self, message = "Optimization stopped", solution = None):
@@ -18,7 +19,7 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization_EM:
-    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None):
+    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None, use_linear_response = False):
         self.progress_callback = progress_callback
         self.interface = interface
         self.n_starts = int(n_starts)
@@ -37,6 +38,7 @@ class Optimization_EM:
         self.xopt_local_refine = False
         self.xopt_local_refine_maxiter = 25
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
+        self.use_linear_response = bool(use_linear_response)
 
     def _emit_progress(self, phase, current, total):
         if self.progress_callback is None:
@@ -362,6 +364,16 @@ class Optimization_EM:
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
         beta_gamma = gamma_rel * beta_rel
+
+        linear_response = None
+
+        if self.use_linear_response:
+            if K1_values.size != 1:
+                raise RuntimeError("Linear response works only for fixed K1, so use steps = 0.")
+            if self.fit_quadrupole_strength:
+                raise RuntimeError("Linear response cannot be used with fitting quadrupole strength.")
+            linear_response = LinearResponse_EM()
+
         if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")
 
@@ -415,6 +427,9 @@ class Optimization_EM:
                 raise RuntimeError("Invalid joint fit paramaters. Emittance and beta should be positive.")
             emit_x_geom = emit_x_norm / beta_gamma
             emit_y_geom = emit_y_norm / beta_gamma
+
+            if self.use_linear_response:
+                return linear_response.predict_sigma2_from_twiss_set(screens = screens, emit_x_norm = emit_x_norm, beta_x0 = beta_x0, alpha_x0 = alpha_x0, emit_y_norm = emit_y_norm, beta_y0 = beta_y0, alpha_y0 = alpha_y0, beta_gamma = beta_gamma)
 
             if self.fit_quadrupole_strength:
                 if quad_k1_0 is None:
@@ -687,6 +702,57 @@ class Optimization_EM:
         x0 = np.clip(x0, low_bounds, high_bounds)
 
         local_max_nfev = int(getattr(self, "nm_steps", 5000))
+
+        # Build several local-optimization starts. A single LS start from the BO best point
+        # can get stuck if BO found a boundary/local minimum. ML predictions are cheap, so
+        # use top Xopt points plus additional interior points.
+        ls_starts = []
+
+        def _clip_to_interior(point, margin_fraction=0.03):
+            point = np.asarray(point, dtype=float)
+            margin = float(margin_fraction) * (high_bounds - low_bounds)
+            return np.clip(point, low_bounds + margin, high_bounds - margin)
+
+        ls_starts.append(_clip_to_interior(x0, margin_fraction=0.03))
+
+        data_for_starts = getattr(X, "data", None)
+        if data_for_starts is not None and len(data_for_starts) > 0:
+            good = data_for_starts.copy()
+            if "xopt_error" in good.columns:
+                try:
+                    good = good[~good["xopt_error"].astype(bool)]
+                except Exception:
+                    pass
+            cost_column = "cost_real" if "cost_real" in good.columns else "f"
+            if cost_column in good.columns:
+                try:
+                    good = good.sort_values(cost_column, ascending=True)
+                    for _, row in good.head(8).iterrows():
+                        candidate = np.array([float(row[p]) for p in params_order], dtype=float)
+                        ls_starts.append(_clip_to_interior(candidate, margin_fraction=0.03))
+                except Exception:
+                    pass
+
+        try:
+            sampler_ls = qmc.LatinHypercube(d=len(params_order), seed=int(self.rng.integers(0, 2**31 - 1)))
+            unit_ls = sampler_ls.random(n=128)
+            interior_low = low_bounds + 0.05 * (high_bounds - low_bounds)
+            interior_high = high_bounds - 0.05 * (high_bounds - low_bounds)
+            interior_samples = qmc.scale(unit_ls, interior_low, interior_high)
+            for candidate in interior_samples:
+                ls_starts.append(np.asarray(candidate, dtype=float))
+        except Exception:
+            pass
+
+        # Remove near-duplicate starts.
+        unique_starts = []
+        for candidate in ls_starts:
+            if not np.all(np.isfinite(candidate)):
+                continue
+            if not any(np.allclose(candidate, other, rtol=1e-5, atol=1e-8) for other in unique_starts):
+                unique_starts.append(candidate)
+        ls_starts = unique_starts
+
         ls_best_cost = [float(best_cost)]
         ls_best_params = [x0.copy()]
         ls_stopped = [False]
@@ -745,46 +811,60 @@ class Optimization_EM:
 
             return residuals
 
+        best_res_ls = None
         try:
-            res_ls = least_squares(
-                _ls_residuals,
-                x0,
-                bounds=(low_bounds, high_bounds),
-                method="trf",
-                loss="linear",
-                f_scale=1.0,
-                max_nfev=local_max_nfev,
-                x_scale=np.maximum(high_bounds - low_bounds, 1e-12),
-                ftol=1e-8,
-                xtol=1e-8,
-                gtol=1e-8,
-            )
-            p_ls = np.asarray(res_ls.x, dtype=float)
-            f_ls, _, _ = compute_cost(
-                p_ls[0], p_ls[1], p_ls[2],
-                p_ls[3], p_ls[4], p_ls[5],
-                quad_k1_0=(p_ls[6] if self.fit_quadrupole_strength else None),
-                allow_stop=False,
-            )
-            if np.isfinite(f_ls) and f_ls < ls_best_cost[0]:
-                ls_best_cost[0] = float(f_ls)
-                ls_best_params[0] = p_ls.copy()
-            if self.print_M:
-                print(
-                    f"  LS finished: cost={ls_best_cost[0]:.4g}, "
-                    f"success={res_ls.success}, "
-                    f"nfev={res_ls.nfev}/{local_max_nfev}, "
-                    f"message={res_ls.message}"
-                )
+            for start_idx, x0_try in enumerate(ls_starts):
+                if self.print_M:
+                    print(f"Starting LS multi-start {start_idx + 1}/{len(ls_starts)} from {x0_try}")
+                try:
+                    res_try = least_squares(
+                        _ls_residuals,
+                        x0_try,
+                        bounds=(low_bounds, high_bounds),
+                        method="trf",
+                        loss="linear",
+                        f_scale=1.0,
+                        max_nfev=local_max_nfev,
+                        x_scale=np.maximum(high_bounds - low_bounds, 1e-12),
+                        ftol=1e-8,
+                        xtol=1e-8,
+                        gtol=1e-8,
+                    )
+                    p_try = np.asarray(res_try.x, dtype=float)
+                    f_try, _, _ = compute_cost(
+                        p_try[0], p_try[1], p_try[2],
+                        p_try[3], p_try[4], p_try[5],
+                        quad_k1_0=(p_try[6] if self.fit_quadrupole_strength else None),
+                        allow_stop=False,
+                    )
+                    if np.isfinite(f_try) and f_try < ls_best_cost[0]:
+                        ls_best_cost[0] = float(f_try)
+                        ls_best_params[0] = p_try.copy()
+                        best_res_ls = res_try
+                    if self.print_M:
+                        print(
+                            f"  LS start {start_idx + 1}/{len(ls_starts)} finished: "
+                            f"cost={float(f_try):.4g}, success={res_try.success}, "
+                            f"nfev={res_try.nfev}/{local_max_nfev}, message={res_try.message}"
+                        )
+                except StopIteration:
+                    ls_stopped[0] = True
+                    if self.print_M:
+                        print("  LS interrupted.")
+                    break
+                except Exception as e:
+                    if self.print_M:
+                        print(f"  LS start {start_idx + 1}/{len(ls_starts)} failed ({e}).")
 
-        except StopIteration:
-            ls_stopped[0] = True
             if self.print_M:
-                print("  LS interrupted.")
+                if best_res_ls is not None:
+                    print(f"  Best LS multi-start cost={ls_best_cost[0]:.4g}")
+                else:
+                    print(f"  No LS start improved BO result; using BO cost={ls_best_cost[0]:.4g}")
 
         except Exception as e:
             if self.print_M:
-                print(f"  LS failed ({e}), using BO result.")
+                print(f"  LS multi-start failed ({e}), using BO result.")
 
         p_final = ls_best_params[0]
         best_cost_final = ls_best_cost[0]
