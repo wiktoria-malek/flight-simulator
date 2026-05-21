@@ -6,8 +6,8 @@ R2 - score of fit quality. Best is 1.0
 The model learns:
 [emitx_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, K1]
 ->
-[sigx_OTR0X, sigx_OTR1X, sigx_OTR2X, sigx_OTR3X,
-sigy_OTR0X, sigy_OTR1X, sigy_OTR2X, sigy_OTR3X]
+[sigx2_OTR0X, sigx2_OTR1X, sigx2_OTR2X, sigx2_OTR3X,
+sigy2_OTR0X, sigy2_OTR1X, sigy2_OTR2X, sigy2_OTR3X]
 
 '''
 
@@ -18,6 +18,7 @@ import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GroupShuffleSplit
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -32,14 +33,14 @@ def get_ml_model_file(machine_name, quad_name, screens):
     project_root = current_file.parents[1]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    return project_root / "MachineLearning" / str(machine_name) / str(quad_name) / screens_folder_name(screens) / "EM_model_50k.pt"
+    return project_root / "MachineLearning" / str(machine_name) / str(quad_name) / screens_folder_name(screens) / "EM_model_100k.pt"
 
 def get_ml_dataset_file(machine_name, quad_name, screens):
     current_file = Path(__file__).resolve()
     project_root = current_file.parents[1]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    return project_root / "MachineLearning" / str(machine_name) / str(quad_name) / screens_folder_name(screens) / "EM_dataset_50k.npz"
+    return project_root / "MachineLearning" / str(machine_name) / str(quad_name) / screens_folder_name(screens) / "EM_dataset_100k.npz"
 
 try:
     torch.set_num_threads(1)
@@ -50,15 +51,17 @@ class NeuralNetwork(nn.Module):
     def __init__(self, n_inputs, n_outputs):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_inputs, 128), # 128 hidden neurons
-            nn.ReLU(), # adds nonlinearities
-            nn.Linear(128, 128),
-            nn.ReLU(),
+            nn.Linear(n_inputs, 256),
+            nn.LayerNorm(256),
+            nn.SiLU(),
+            nn.Linear(256, 256),
+            nn.SiLU(),
+            nn.Linear(256, 128),
+            nn.SiLU(),
             nn.Linear(128, 64),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Linear(64, n_outputs),
         )
-
 
     def forward(self, x):
         return self.net(x) # gets x through each layer of NN
@@ -78,7 +81,7 @@ class TrainModel:
         self.model_file = Path(model_file)
         self.random_seed = 2137
         self.test_size = 0.2 # 20% goes into test, 80% to training. with 3000 samples, 600 go into test to see if a NN can predict them
-        self.batch_size = 128 # packets with 128 samples at the same time
+        self.batch_size = 256 # packets with 128 samples at the same time
         self.max_epochs = 2000 # maximum numbers of iterations though the dataset
         self.learning_rate = 1e-3 # size of a step during learning
         self.weight_decay = 1e-5 # small penalty for too big weights of a neural network
@@ -92,6 +95,7 @@ class TrainModel:
         self.param_names = []
         self.sigma_names = []
         self.metrics = {}
+        self.sample_groups=None
 
     def log(self, message):
         if callable(self.log_callback):
@@ -139,8 +143,11 @@ class TrainModel:
             self.quad_name = str(data["quad_name"])
 
         finite = np.all(np.isfinite(X), axis=1) & np.all(np.isfinite(Y), axis=1) # deletes samples with nan, -inf, +inf
+        n_k1_per_twiss_set = int(np.asarray(data["n_k1_per_twiss_set"]).item())
+        groups = np.arange(X.shape[0],dtype = int) // max(1, n_k1_per_twiss_set)
         X = X[finite]
         Y = Y[finite]
+        self.sample_groups = groups[finite]
 
         if X.size ==0 or Y.size ==0:
             raise RuntimeError("Dataset contains no valid data samples.")
@@ -149,9 +156,19 @@ class TrainModel:
     def train(self):
         self.set_random_seed()
         X, Y = self.load_dataset()
-        X_train_raw, X_test_raw, Y_train_raw, Y_test_raw = train_test_split(
-            X, Y, test_size=self.test_size, random_state=self.random_seed, shuffle=True
-        )
+        if self.sample_groups is not None and len(np.unique(self.sample_groups)) > 1:
+            splitter = GroupShuffleSplit(n_splits=1, test_size=self.test_size, random_state=self.random_seed)
+            train_idx, test_idx = next(splitter.split(X, Y, groups=self.sample_groups))
+            X_train_raw, X_test_raw = X[train_idx], X[test_idx]
+            Y_train_raw, Y_test_raw = Y[train_idx], Y[test_idx]
+            self.log(
+                f"Grouped train/test split: train rows={len(train_idx)}, test rows={len(test_idx)}, "
+                f"train Twiss groups={len(np.unique(self.sample_groups[train_idx]))}, "
+                f"test Twiss groups={len(np.unique(self.sample_groups[test_idx]))}"
+            )
+        else:
+            X_train_raw, X_test_raw, Y_train_raw, Y_test_raw = train_test_split(X, Y, test_size=self.test_size, random_state=self.random_seed, shuffle=True)
+
         self.x_scaler = StandardScaler() # scales data
         self.y_scaler = StandardScaler()
         X_train = self.x_scaler.fit_transform(X_train_raw)
@@ -217,12 +234,18 @@ class TrainModel:
             self.model.load_state_dict(best_state)
 
         Y_pred = self.predict_array(X_test_raw) # does prediction on unscaled test data
+        r2_per_output = r2_score(Y_test_raw, Y_pred, multioutput="raw_values")
         self.metrics = {
             "mae": float(mean_absolute_error(Y_test_raw, Y_pred)),
             "rmse": float(np.sqrt(mean_squared_error(Y_test_raw, Y_pred))),
             "r2": float(r2_score(Y_test_raw, Y_pred, multioutput="variance_weighted")), # near 1 = perfect, it tells how well model is corresponding to data
+            "r2_per_output": [float(value) for value in r2_per_output]
         }
+
         self.log(f"MAE: {self.metrics['mae']}, RMSE: {self.metrics['rmse']}, R2: {self.metrics['r2']}")
+        if self.sigma_names and len(self.sigma_names) == len(r2_per_output):
+            for name, value in zip(self.sigma_names, r2_per_output):
+                self.log(f"R2[{name}] = {float(value)}")
         self.save_model()
         return self.metrics
 

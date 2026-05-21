@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import median_abs_deviation
+from scipy.stats import median_abs_deviation, qmc
 from scipy.optimize import minimize, least_squares
 import pandas as pd
 from xopt import Xopt
@@ -386,6 +386,15 @@ class Optimization_EM:
             objectives={"f": "MINIMIZE"},
         )
 
+        params_order = ["emit_x_norm", "beta_x0", "alpha_x0",
+                       "emit_y_norm", "beta_y0", "alpha_y0"]
+
+        if self.fit_quadrupole_strength:
+            params_order.append("quad_k1_0")
+
+        low_bounds = np.array([bounds[p][0] for p in params_order], dtype=float)
+        high_bounds = np.array([bounds[p][1] for p in params_order], dtype=float)
+
         def predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
             '''
             If the beam at the scanned quadrupole has certain Twiss parameters and given emittance,
@@ -484,6 +493,8 @@ class Optimization_EM:
             try:
                 f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
                                     float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = True, quad_k1_0 = quad_k1_0)
+                f_real = float(f)
+                f_objective = float(np.log10(max(f_real, 1e-12)))
             except (OptimizationStopped, OptimizationPaused):
                 raise
             except Exception as e:
@@ -492,15 +503,16 @@ class Optimization_EM:
                         "Joint fit evaluation failed, assigning large cost: "
                         f"{type(e).__name__}: {e}"
                     )
-                return {"f": 1e30}
+                return {"f": 12.0, "cost_real": 1e12}
 
             if self.print_M:
                 print(
                     "Joint fit solution: "
                     f"emit_x_norm={float(inputs['emit_x_norm']):.6g}, beta_x0={float(inputs['beta_x0']):.6g}, alpha_x0={float(inputs['alpha_x0']):.6g}, "
-                    f"emit_y_norm={float(inputs['emit_y_norm']):.6g}, beta_y0={float(inputs['beta_y0']):.6g}, alpha_y0={float(inputs['alpha_y0']):.6g}, f={f:.6g}"
+                    f"emit_y_norm={float(inputs['emit_y_norm']):.6g}, beta_y0={float(inputs['beta_y0']):.6g}, alpha_y0={float(inputs['alpha_y0']):.6g}, "
+                    f"cost_real={f_real:.6g}, f_log10={f_objective:.6g}"
                 )
-            return {"f": f}
+            return {"f": f_objective, "cost_real": f_real}
 
         evaluator = Evaluator(function = evaluate) # how to calculate merit function
         generator = ExpectedImprovementGenerator(vocs = vocs) # how to choose the next point
@@ -527,17 +539,50 @@ class Optimization_EM:
                     pass
             if len(good) == 0 or "f" not in good.columns:
                 return
-            idx = good["f"].astype(float).idxmin() # change each value to float
+            cost_column = "cost_real" if "cost_real" in good.columns else "f"
+            idx = good[cost_column].astype(float).idxmin() # change each value to float
             row = good.loc[idx]
-            cost = float(row["f"])
+            cost = float(row[cost_column])
 
-            if np.isfinite(cost) and cost < best_cost: # updates best solution
+            if np.isfinite(cost) and cost < best_cost: # updates best solution using the real, not log-transformed, cost
                 best_cost = cost
                 best_row = row
 
         try:
-            X.random_evaluate(total_initial) # for bayesian optimization to suggest better solutions, it needs some data
+
+            # '''
+            # TEST!!!
+            # '''
+            #
+            # # Sanity check: known QD18X parameters
+            # if str(quad_name) == "QD18X":
+            #     truth_cost, _, _ = compute_cost(
+            #         5.2, 1.105221776, -0.7752115812,
+            #         0.03, 10.34240856, -3.739163822,
+            #         quad_k1_0=None,
+            #         allow_stop=False,
+            #     )
+            #     print(f"Truth cost for QD18X = {truth_cost}")
+            #
+            # '''
+            # TEST!!!
+            # '''
+
+
+            # X.random_evaluate(total_initial) # for bayesian optimization to suggest better solutions, it needs some data
+            #
+            # update_best_from_data()
+
+            lhs_seed = int(self.rng.integers(0, 2**31 - 1))
+            sampler = qmc.LatinHypercube(d=len(params_order), seed = lhs_seed)
+            unit_samples = sampler.random(n=total_initial)
+            lhs_samples = qmc.scale(unit_samples, low_bounds, high_bounds)
+            lhs_df = pd.DataFrame(lhs_samples, columns=params_order)
+            if self.print_M:
+                print(f"Joint Xopt init: {total_initial} Latin Hypercube samples in {len(params_order)}D")
+            X.evaluate_data(lhs_df)
             update_best_from_data()
+
             for i in range(self.xopt_steps):
                 if self.print_M:
                     print(f"Joint Xopt step {i + 1}/{self.xopt_steps}")
@@ -630,15 +675,6 @@ class Optimization_EM:
         if self.print_M:
             print(f"Starting local optimization from f={best_cost:.4g}...")
 
-        params_order = ["emit_x_norm", "beta_x0", "alpha_x0",
-                       "emit_y_norm", "beta_y0", "alpha_y0"]
-
-        if self.fit_quadrupole_strength:
-            params_order.append("quad_k1_0")
-
-        low_bounds = np.array([bounds[p][0] for p in params_order], dtype=float)
-        high_bounds = np.array([bounds[p][1] for p in params_order], dtype=float)
-
         x0_values = [
             emit_x_norm_best, beta_x0_best, alpha_x0_best,
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
@@ -715,10 +751,10 @@ class Optimization_EM:
                 x0,
                 bounds=(low_bounds, high_bounds),
                 method="trf",
-                loss="soft_l1",
+                loss="linear",
                 f_scale=1.0,
                 max_nfev=local_max_nfev,
-                x_scale=np.maximum(np.abs(x0), 1.0),
+                x_scale=np.maximum(high_bounds - low_bounds, 1e-12),
                 ftol=1e-8,
                 xtol=1e-8,
                 gtol=1e-8,

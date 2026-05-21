@@ -34,7 +34,7 @@ PARAMETER_NAMES = [
     "K1",
 ]
 
-N_K1_PER_TWISS = 11
+N_K1_PER_TWISS = 7
 
 def _get_interface_initial_settings(interface):
     interface_class_name = interface.__class__.__name__
@@ -120,6 +120,8 @@ def generate_dataset(quad_name, screens, interface, k1_relative_change, n_sample
     log(f"K1 relative change: {k1_relative_change}")
     log(f"Output file: {output_file}")
 
+    twiss_group_ids = []
+
     X = []
     Y = []
     failed = 0
@@ -160,6 +162,7 @@ def generate_dataset(quad_name, screens, interface, k1_relative_change, n_sample
 
                 X.append(parameters)
                 Y.append(sigma2)
+                twiss_group_ids.append(int(twiss_combination))
                 processed_rows += 1
 
         except Exception as e:
@@ -177,6 +180,7 @@ def generate_dataset(quad_name, screens, interface, k1_relative_change, n_sample
 
     X = np.asarray(X, dtype=float)
     Y = np.asarray(Y, dtype=float)
+    twiss_group_ids = np.asarray(twiss_group_ids, dtype=int)
 
     if X.size == 0 or Y.size == 0:
         raise RuntimeError("X and Y are empty")
