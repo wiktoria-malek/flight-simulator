@@ -121,3 +121,42 @@ class LinearResponse_EM:
         pred_y = Cy @ self.Ry[idx].T
 
         return pred_x.reshape(1, -1), pred_y.reshape(1, -1)
+
+    def solve_twiss_from_measured_sigma2(self, screens, sigma2_x, sigma2_y, beta_gamma):
+        idx = [self.screens.index(str(screen)) for screen in screens]
+
+        if len(idx) < 3:
+            raise RuntimeError("At least 3 screens are required for direct linear R-response fit.")
+
+        Rx = self.Rx[idx]
+        Ry = self.Ry[idx]
+
+        Mx = Rx[:, :3] # R11^2 2R111R12 R12^2
+        My = Ry[:, :3]
+
+        yx = np.asarray(sigma2_x, dtype=float).reshape(-1) - Rx[:, 3]
+        yy = np.asarray(sigma2_y, dtype=float).reshape(-1) - Ry[:, 3]
+
+        px = np.linalg.lstsq(Mx, yx, rcond=None)[0]
+        py = np.linalg.lstsq(My, yy, rcond=None)[0]
+
+        emit_x = np.sqrt(px[0] * px[2] - px[1] ** 2)
+        beta_x0 = px[0] / emit_x
+        alpha_x0 = -px[1] / emit_x
+
+        emit_y = np.sqrt(py[0] * py[2] - py[1] ** 2)
+        beta_y0 = py[0] / emit_y
+        alpha_y0 = -py[1] / emit_y
+
+        return {
+            "emit_x": emit_x,
+            "emit_y": emit_y,
+            "emit_x_norm": emit_x * beta_gamma,
+            "emit_y_norm": emit_y * beta_gamma,
+            "beta_x0": beta_x0,
+            "alpha_x0": alpha_x0,
+            "beta_y0": beta_y0,
+            "alpha_y0": alpha_y0,
+            "pred_x": (Mx @ px + Rx[:, 3]).reshape(1, -1),
+            "pred_y": (My @ py + Ry[:, 3]).reshape(1, -1),
+        }

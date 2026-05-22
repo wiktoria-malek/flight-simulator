@@ -134,7 +134,9 @@ class OptimizationWorker(QObject):
                         f"Reason: {type(e).__name__}: {e}. Using simulation instead."
                     )
             else:
-                if USE_ML:
+                if self.use_linear_response:
+                    self.info.emit("Using direct linear R-response model.")
+                elif USE_ML:
                     self.info.emit(f"No ML model found for {machine_name}/{quad_name} and screens {screens}. Using simulation instead.")
 
             tool = Optimization_EM(interface=optimizer_interface, n_starts=self.n_starts, xopt_initial_points=self.xopt_initial_points,

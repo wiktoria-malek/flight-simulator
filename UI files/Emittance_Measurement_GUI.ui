@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>788</height>
+    <height>844</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -534,6 +534,12 @@ QToolButton#fit_k1_scale_info_button:hover {
             </item>
             <item>
              <widget class="QToolButton" name="R_toolbox">
+              <property name="cursor">
+               <cursorShape>PointingHandCursor</cursorShape>
+              </property>
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fits R from B = C·Rᵀ, where B = σ² and C = [βε, -αε, γε, 1].&lt;/p&gt;&lt;p&gt;Then directly solves σ² = [R11², 2R11R12, R12²] · [βε, -αε, γε].&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#R_toolbox {
     border: 1px solid #888;
@@ -551,6 +557,9 @@ QToolButton#R_toolbox:hover {
               </property>
               <property name="text">
                <string>?</string>
+              </property>
+              <property name="toolButtonStyle">
+               <enum>Qt::ToolButtonTextOnly</enum>
               </property>
              </widget>
             </item>
