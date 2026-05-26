@@ -3,6 +3,7 @@ import numpy as np
 import time, math
 from Backend.LogConsole import LogConsole
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
+from typing import Dict, Optional
 
 from epics import PV, ca
 
@@ -76,9 +77,6 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         self.sequence = sequence_filtered
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
-
-        #screens??
-
         # Index of the selected BPMs in the Epics PV ATF2:monitors
         self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
@@ -112,10 +110,9 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         pv.put(self.phase_kl1)
         time.sleep(1)
 
-    def change_intensity(self):
-        new_laser_intensity = 0.15 # 0..1
-        laser_intensity = new_laser_intensity * 100 * 3 # Korysko dixit: 100 for percent, 5 convesion factor
-        print(f'Changing laser intensity to {laser_intensity}...')
+    def change_intensity(self, laserintensity=0.15):
+        print(f'Changing laser intensity to {laserintensity}...')
+        laser_intensity = float(laserintensity) * 100 * 3  # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
         return self
@@ -157,12 +154,10 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
                 charge.append(pv.get())
             else:
                 charge.append(1.0)
-
         icts = {
             "names": self.ict_names,
             "charge": np.array(charge),
         }
-
         if isinstance(names, str):
             names = [names]
         if names is not None:
@@ -171,7 +166,6 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
                 "names": np.array(icts["names"])[idx],
                 "charge": np.array(icts["charge"])[idx],
             }
-
         return icts
 
     def get_correctors(self, names=None):
@@ -277,6 +271,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
             corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
             print('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
+            return
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
@@ -288,10 +283,92 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
-            print('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
+            self.log('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
+            return
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             curr_val = self.make_safe_float(pv_des.get(), default=np.nan)
+            if not np.isfinite(curr_val):
+                self.log(f'Warning: could not read current value for {corrector}; skipping.')
+                continue
             target = curr_val + float(corr_val)
             pv_des.put(target)
             self._wait_for_corrector_readback(corrector, target)
+
+    '''
+    SATO-SAN'S METHODS:
+    '''
+    # ------------------------------------------------------------------
+    # Generic machine I/O helpers for optimizers
+    # ------------------------------------------------------------------
+    def pv_get(self, pv_name: str, default=np.nan):
+        try:
+            val = PV(pv_name).get()
+            if val is None:
+                return default
+            return float(val)
+        except Exception:
+            return default
+
+    def pv_put(self, pv_name: str, value: float):
+        PV(pv_name).put(float(value))
+
+    def pv_put_many(self, pv_to_value: Dict[str, float]):
+        for pv_name, value in pv_to_value.items():
+            self.pv_put(pv_name, float(value))
+
+    def read_current(self, pv_write: str, pv_read: Optional[str] = None, quantize_phase: bool = True) -> float:
+        def _quantize_phase(x: float) -> float:
+            step = 0.5  # degree
+            return round(x / step) * step
+
+        if pv_read:
+            val = self.pv_get(pv_read, default=np.nan)
+            if np.isfinite(val):
+                return _quantize_phase(val) if (quantize_phase and "phase" in pv_read.lower()) else float(val)
+
+        val = self.pv_get(pv_write, default=np.nan)
+        if np.isfinite(val):
+            return _quantize_phase(val) if (quantize_phase and "phase" in pv_write.lower()) else float(val)
+        return 0.0
+
+    def read_icts_for_optimizer(
+            self,
+            downstream_key: str,
+            dr_samples: int = 3,
+            dr_interval_s: float = 0.5,
+    ) -> Dict[str, float]:
+        ict_pvs = {
+            "L0": "BIM:LN0:nparticles",
+            "DR": "BIM:DR:nparticles",
+            "GUN": "BIM:GUN:nparticles",
+            "LNE": "BIM:LNE:nparticles",
+            "BTM": "BIM:BTM:nparticles",
+            "BTE": "BIM:BTE:nparticles",
+        }
+
+        out: Dict[str, float] = {}
+        for key, pv in ict_pvs.items():
+            if key == "DR":
+                continue
+            out[key] = self.pv_get(pv, default=np.nan)
+
+        dr_vals = []
+        for idx in range(max(1, int(dr_samples))):
+            dr_vals.append(self.pv_get(ict_pvs["DR"], default=np.nan))
+            if idx < max(1, int(dr_samples)) - 1:
+                time.sleep(float(dr_interval_s))
+        out["DR"] = float(np.nanmean(dr_vals)) if any(np.isfinite(dr_vals)) else float("nan")
+
+        l0 = out.get("L0", float("nan"))
+        downstream = out.get(str(downstream_key).upper(), float("nan"))
+        if np.isfinite(downstream) and downstream < 0.0:
+            out["Ttot"] = 0.0
+        elif np.isfinite(l0) and l0 != 0.0 and np.isfinite(downstream):
+            out["Ttot"] = float(downstream / l0)
+        else:
+            out["Ttot"] = float("nan")
+        return out
+
+
+

@@ -29,41 +29,52 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         self.log = print
         # Bpms and correctors in beamline order
         sequence = [
-            'MB1R', 'MB2R', 'ZV1R', 'ZH1R', 'MB3R', 'MB4R', 'ZV2R', 'ZH2R',
- 'MB5R', 'MB6R', 'ZV3R', 'ZH3R', 'MB7R', 'MB8R', 'ZV4R', 'ZH4R',
- 'MB9R', 'MB10R', 'ZV5R', 'ZH5R', 'MB11R', 'MB12R', 'ZV6R', 'ZH6R',
- 'MB13R', 'MB14R', 'ZV7R', 'ZH7R', 'MB15R', 'MB16R', 'ZV8R', 'ZH8R',
- 'MB17R', 'MB18R', 'ZV9R', 'ZH9R', 'MB19R', 'MBX1', 'MBX2', 'MB21R', 'MB22R', 'ZH10R', 'ZV10R',
- 'MB23R', 'ZH11R', 'MB24R','ZV11R', 'MB25R', 'ZH12R', 'MB26R','ZV12R',  
- 'MB27R', 'ZV13R', 'MB28R', 'ZH13R', 'MB29R', 'ZV14R', 'MB30R', 'ZH14R', 'ZV15R',
- 'MB31R', 'ZV16R', 'ZH15R', 'MB32R', 'MB33R', 'ZV17R', 'ZH16R',
- 'MB34R', 'ZV18R', 'MB35R', 'ZH17R', 'MB36R', 'MB37R', 'ZV19R', 'ZH18R',
- 'MB38R', 'MB39R', 'ZV20R', 'ZH19R', 'MB40R', 'MB41R', 'ZV21R', 'ZH20R',
- 'MB42R', 'MB43R', 'ZV22R', 'ZH21R', 'MB44R', 'MB45R', 'ZV23R', 'ZH22R',
- 'MB46R', 'MB47R', 'ZV24R', 'ZH23R', 'MB48R', 'MB49R', 'ZV25R', 'ZH24R',
- 'MB50R', 'MB51R', 'ZV26R', 'ZH25R', 'MB52R', 'MB53R', 'ZV27R', 'ZH26R',
- 'MB54R', 'MB55R', 'ZV28R', 'ZH27R', 'MB56R', 'MB57R', 'ZV29R', 'ZH28R',
- 'MB58R', 'MB59R', 'ZV30R', 'ZH29R', 'MB60R', 'MB61R', 'ZV31R', 'ZH30R',
- 'MB62R', 'MB63R', 'ZV32R', 'ZH31R', 'MB64R', 'MB65R', 'ZH32R', 'ZV33R',
- 'MB66R', 'ZV34R', 'MB67R', 'ZH33R', 'MB68R', 'MB69R', 'ZH34R', 'ZV35R',
- 'MB70R', 'ZV36R', 'MB71R', 'ZH35R', 'ZV37R', 'MB72R', 'ZH36R', 'MB73R', 'ZV38R',
- 'MB74R', 'ZH37R', 'ZV39R', 'MB76R', 'ZV40R', 'MB77R', 'ZH38R',
- 'MB78R', 'ZV41R', 'MB79R', 'ZV39R', 'ZH42R', 'MB80R', 'ZV43R', 'ZH40R',
- 'MB81R','MB82R', 'ZV44R', 'ZH41R', 'MB83R', 'ZV45R', 'MB84R', 'ZH42R', 'MB85R', 'MB86R',
- 'ZV46R', 'ZH43R', 'MB87R', 'MB88R', 'ZV47R', 'ZH44R', 'MB89R', 'MB90R',
- 'ZV48R', 'ZH45R', 'MB91R', 'MB92R', 'ZV49R', 'ZH46R', 'MB93R', 'MB94R',
- 'ZV50R', 'ZH47R', 'MB95R', 'MB96R', 'ZV51R', 'ZH48R', 'MB97R', 'MB98R'
+             'MB1R', 'MB2R', 'ZV1R', 'ZH1R', 'MB3R', 'MB4R', 'ZV2R', 'ZH2R',
+             'MB5R', 'MB6R', 'ZV3R', 'ZH3R', 'MB7R', 'MB8R', 'ZV4R', 'ZH4R',
+             'MB9R', 'MB10R', 'ZV5R', 'ZH5R', 'MB11R', 'MB12R', 'ZV6R', 'ZH6R',
+             'MB13R', 'MB14R', 'ZV7R', 'ZH7R', 'MB15R', 'MB16R', 'ZV8R', 'ZH8R',
+             'MB17R', 'MB18R', 'ZV9R', 'ZH9R', 'MB19R', 'MBX1', 'MBX2', 'MB21R', 'MB22R', 'ZH10R', 'ZV10R',
+             'MB23R', 'ZH11R', 'MB24R','ZV11R', 'MB25R', 'ZH12R', 'MB26R','ZV12R',
+             'MB27R', 'ZV13R', 'MB28R', 'ZH13R', 'MB29R', 'ZV14R', 'MB30R', 'ZH14R', 'ZV15R',
+             'MB31R', 'ZV16R', 'ZH15R', 'MB32R', 'MB33R', 'ZV17R', 'ZH16R',
+             'MB34R', 'ZV18R', 'MB35R', 'ZH17R', 'MB36R', 'MB37R', 'ZV19R', 'ZH18R',
+             'MB38R', 'MB39R', 'ZV20R', 'ZH19R', 'MB40R', 'MB41R', 'ZV21R', 'ZH20R',
+             'MB42R', 'MB43R', 'ZV22R', 'ZH21R', 'MB44R', 'MB45R', 'ZV23R', 'ZH22R',
+             'MB46R', 'MB47R', 'ZV24R', 'ZH23R', 'MB48R', 'MB49R', 'ZV25R', 'ZH24R',
+             'MB50R', 'MB51R', 'ZV26R', 'ZH25R', 'MB52R', 'MB53R', 'ZV27R', 'ZH26R',
+             'MB54R', 'MB55R', 'ZV28R', 'ZH27R', 'MB56R', 'MB57R', 'ZV29R', 'ZH28R',
+             'MB58R', 'MB59R', 'ZV30R', 'ZH29R', 'MB60R', 'MB61R', 'ZV31R', 'ZH30R',
+             'MB62R', 'MB63R', 'ZV32R', 'ZH31R', 'MB64R', 'MB65R', 'ZH32R', 'ZV33R',
+             'MB66R', 'ZV34R', 'MB67R', 'ZH33R', 'MB68R', 'MB69R', 'ZH34R', 'ZV35R',
+             'MB70R', 'ZV36R', 'MB71R', 'ZH35R', 'ZV37R', 'MB72R', 'ZH36R', 'MB73R', 'ZV38R',
+             'MB74R', 'ZH37R', 'ZV39R', 'MB76R', 'ZV40R', 'MB77R', 'ZH38R',
+             'MB78R', 'ZV41R', 'MB79R', 'ZV39R', 'ZH42R', 'MB80R', 'ZV43R', 'ZH40R',
+             'MB81R','MB82R', 'ZV44R', 'ZH41R', 'MB83R', 'ZV45R', 'MB84R', 'ZH42R', 'MB85R', 'MB86R',
+             'ZV46R', 'ZH43R', 'MB87R', 'MB88R', 'ZV47R', 'ZH44R', 'MB89R', 'MB90R',
+             'ZV48R', 'ZH45R', 'MB91R', 'MB92R', 'ZV49R', 'ZH46R', 'MB93R', 'MB94R',
+             'ZV50R', 'ZH47R', 'MB95R', 'MB96R', 'ZV51R', 'ZH48R', 'MB97R', 'MB98R'
         ]
 
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         monitors = [
-            'MB1R', 'MB2R', 'MB3R', 'MB4R','MB5R', 'MB6R', 'MB7R', 'MB8R',
-'MB9R', 'MB10R', 'MB11R', 'MB12R','MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R', 'MBX1', 'MBX2', 'MB21R', 'MB22R',
-'MB23R', 'MB24R','MB25R', 'MB26R',  'MB27R', 'MB28R', 'MB29R', 'MB30R', 'MB31R', 'MB32R', 'MB33R',
-'MB34R', 'MB35R', 'MB36R', 'MB37R','MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 
-'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R','MB54R', 'MB55R', 'MB56R', 'MB57R', 'MB58R', 'MB59R', 'MB60R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB70R', 'MB71R', 'MB72R', 'MB73R', 'MB74R', 'MB76R', 'MB77R', 'MB78R', 'MB79R', 'MB80R', 'MB81R','MB82R', 'MB83R', 'MB84R', 'MB85R', 'MB86R', 'MB87R', 'MB88R', 'MB89R', 'MB90R','MB91R', 'MB92R', 'MB93R', 'MB94R','MB95R', 'MB96R', 'MB97R', 'MB98R'
+            'MB1R', 'MB2R', 'MB3R', 'MB4R', 'MB5R', 'MB6R', 'MB7R', 'MB8R',
+            'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R', 'MBX1',
+            'MBX2', 'MB21R', 'MB22R',
+            'MB23R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB30R', 'MB31R', 'MB32R', 'MB33R',
+            'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R',
+            'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB57R',
+            'MB58R', 'MB59R', 'MB60R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R',
+            'MB70R', 'MB71R', 'MB72R', 'MB73R', 'MB74R', 'MB76R', 'MB77R', 'MB78R', 'MB79R', 'MB80R', 'MB81R', 'MB82R',
+            'MB83R', 'MB84R', 'MB85R', 'MB86R', 'MB87R', 'MB88R', 'MB89R', 'MB90R', 'MB91R', 'MB92R', 'MB93R', 'MB94R',
+            'MB95R', 'MB96R', 'MB97R', 'MB98R'
         ]
+        monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R',
+                    'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R',
+                    'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R',
+                    'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R',
+                    'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R',
+                    'MB71R']
 
         self.sextupoles = [
             "SF1R.1", "SD1R.1", "SBH1R.1", "SBH1R.2", "SQF1R.1", "SQF1R.2",
@@ -147,6 +158,14 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         #self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
         self.twiss_path = os.path.join(os.path.dirname(__file__), "DR_ATF2", "ATF_DR_twiss_file.tws")
 
+        self.xsr_pvs = {
+            "proj_v_sigma_ave": "XSR:PROJ_V_SIGMA_AVE",
+            "proj_v_mean_ave": "XSR:PROJ_V_MEAN_AVE",
+            "proj_h_sigma_ave": "XSR:PROJ_H_SIGMA_AVE",
+            "proj_h_mean_ave": "XSR:PROJ_H_MEAN_AVE",
+        }
+        self.arc_dispersion_pv = "MONITOR:DR:ARCDISPERSION"
+        self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
 
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
@@ -300,16 +319,14 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         charge = []
         for ict in self.ict_names:
             pv = PV(f'{ict}')
-            if 0:
+            if 0: # Reading the icts is time consuming and unnecessary for SysID and BBA
                 charge.append(pv.get())
             else:
                 charge.append(1.0)
-
         icts = {
             "names": self.ict_names,
             "charge": np.array(charge),
         }
-
         if isinstance(names, str):
             names = [names]
         if names is not None:
@@ -318,7 +335,6 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                 "names": np.array(icts["names"])[idx],
                 "charge": np.array(icts["charge"])[idx],
             }
-
         return icts
 
     def get_correctors(self, names=None):
@@ -412,6 +428,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
             corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
             self.log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
+            return
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
@@ -424,9 +441,100 @@ class InterfaceATF2_DR(AbstractMachineInterface):
             corr_vals = [corr_vals]
         if len(names) != len(corr_vals):
             self.log('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
+            return
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             curr_val = self.make_safe_float(pv_des.get(), default=np.nan)
+            if not np.isfinite(curr_val):
+                self.log(f'Warning: could not read current value for {corrector}; skipping.')
+                continue
             target = curr_val + float(corr_val)
             pv_des.put(target)
             self._wait_for_corrector_readback(corrector, target)
+
+    '''
+    SATO-SAN'S METHODS:
+    '''
+
+    def pv_get(self, pv_name, default=np.nan):
+        try:
+            val = PV(pv_name).get()
+            if val is None:
+                return default
+            return float(val)
+        except Exception:
+            return default
+
+    def pv_put(self, pv_name, value):
+        PV(pv_name).put(float(value))
+
+    def pv_put_many(self, pv_to_value):
+        for pv_name, value in pv_to_value.items():
+            self.pv_put(pv_name, value)
+
+    def read_current(self, pv_write: str, pv_read: str = None, quantize_phase: bool = True) -> float:
+        pv_name = pv_read or pv_write
+        return self.pv_get(pv_name)
+
+    def get_skew_series_names(self):
+        return ["SD1R", "SF1R"]
+
+    def get_skew_names(self, series: str):
+        series_name = str(series).strip().upper()
+        if series_name not in self.get_skew_series_names():
+            raise ValueError(f"Unknown skew series: {series}")
+        return [f"{series_name}.{idx}" for idx in range(1, 35)]
+
+    def _skew_pv_names(self, name: str):
+        series, idx = str(name).strip().upper().split(".")
+        base = f"{series}_{int(idx)}"
+        return {
+            "set": f"{base}:internalCurrentWrite",
+            "read": f"{base}:current",
+        }
+
+    def get_skews(self, series: str):
+        names, currents = [], []
+        for name in self.get_skew_names(series):
+            pvs = self._skew_pv_names(name)
+            names.append(name)
+            currents.append(self.pv_get(pvs["read"]))
+        arr = np.asarray(currents, dtype=float)
+        return {
+            "series": str(series).strip().upper(),
+            "names": names,
+            "current": arr,
+            "abs_current": np.abs(arr),
+        }
+
+    def get_top_skews_by_abs_current(self, series: str, count: int = 5):
+        skews = self.get_skews(series)
+        vals = np.asarray(skews["current"], dtype=float)
+        valid = np.isfinite(vals)
+        idx = np.where(valid)[0]
+        idx = idx[np.argsort(-np.abs(vals[idx]))]
+        top = idx[:max(int(count), 0)]
+        return {
+            "series": skews["series"],
+            "names": [skews["names"][i] for i in top],
+            "current": vals[top],
+            "abs_current": np.abs(vals[top]),
+        }
+
+    def set_skew_current(self, name: str, value: float):
+        pvs = self._skew_pv_names(name)
+        self.pv_put(pvs["set"], value)
+
+    def set_skew_currents(self, name_to_value):
+        for name, value in name_to_value.items():
+            self.set_skew_current(name, value)
+
+    def get_skew_current(self, name: str):
+        pvs = self._skew_pv_names(name)
+        return self.pv_get(pvs["read"])
+
+    def get_xsr(self):
+        return {name: self.pv_get(pv) for name, pv in self.xsr_pvs.items()}
+
+    def get_arc_dispersion(self):
+        return self.pv_get(self.arc_dispersion_pv)

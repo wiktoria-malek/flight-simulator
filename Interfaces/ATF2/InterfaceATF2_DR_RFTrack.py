@@ -247,7 +247,6 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
             "names": self.bpms,
             "charge": np.array([bpm.get_total_charge() for bpm in self.lattice.get_bpms()])
         }
-
         if isinstance(names, str):
             names = [names]
         if names is not None:

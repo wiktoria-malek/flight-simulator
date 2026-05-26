@@ -13,25 +13,25 @@ class AbstractMachineInterface(ABC):
         pass
 
     @abstractmethod
-    def get_correctors(self):
+    def get_correctors(self, names=None):
         pass
 
     @abstractmethod
-    def get_bpms(self):
+    def get_bpms(self, names=None):
         pass
 
     @abstractmethod
-    def get_icts(self):
+    def get_icts(self, names=None):
         pass
 
-    def get_quadrupoles(self):
+    def get_quadrupoles(self, names=None):
         return {
             "names": [],
             "bdes": np.array([]),
             "bact": np.array([]),
         }
 
-    def get_sextupoles(self):
+    def get_sextupoles(self, names=None):
         return {
             "names": [],
             "bdes": np.array([]),
@@ -41,7 +41,7 @@ class AbstractMachineInterface(ABC):
     def set_sextupoles(self, names, values):
         raise NotImplementedError(f"{self.get_name()} does not implement set_sextupoles")
 
-    def get_screens(self):
+    def get_screens(self, names=None):
         return {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])}
 
     def get_target_dispersion(self, names=None):
@@ -50,14 +50,6 @@ class AbstractMachineInterface(ABC):
         if isinstance(names, str):
             names = [names]
         return np.zeros(len(names)), np.zeros(len(names))
-
-    @abstractmethod
-    def get_hcorrectors_names(self):
-        pass
-
-    @abstractmethod
-    def get_vcorrectors_names(self):
-        pass
 
     @abstractmethod
     def set_correctors(self, names, values):
