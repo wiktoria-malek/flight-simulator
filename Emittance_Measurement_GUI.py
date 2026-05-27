@@ -1,7 +1,6 @@
 import os, sys, time, copy
 import numpy as np
 import matplotlib
-from MachineLearning.ML_train import MLInterface, get_ml_model_file
 matplotlib.use("QtAgg")
 import matplotlib.colors as mcolors
 from datetime import datetime
@@ -26,11 +25,11 @@ from Interfaces.interface_setup import INTERFACE_SETUP
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
-from Backend.Optimization_EM import Optimization_EM
 from Backend.QuadrupoleScan_EM import QuadrupoleScan_EM
 from Backend.LogConsole import LogConsole
 from Backend.PhaseSpaceGraphs_EM import PhaseSpaces
-USE_ML = True
+from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
+
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
     def paint(self, painter: QPainter, option, index):
@@ -77,7 +76,7 @@ class OptimizationWorker(QObject):
     progress = pyqtSignal(str, int, int)
     info = pyqtSignal(str)
 
-    def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False, use_linear_response = False):
+    def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False, computing_method = "Linear R-response model"):
         super().__init__()
         self.interface = interface
         self.session = session
@@ -86,7 +85,7 @@ class OptimizationWorker(QObject):
         self.xopt_steps = xopt_steps
         self.nm_steps = nm_steps
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
-        self.use_linear_response = bool(use_linear_response)
+        self.computing_method = computing_method
 
     def _emit_progress(self, phase, current, total):
         self.progress.emit(str(phase), int(current), int(total))
@@ -110,44 +109,21 @@ class OptimizationWorker(QObject):
 
     def run(self):
         try:
-            quad_name = str(self.session.get("quad_name", ""))
-            screens = list(self.session.get("screens", []))
             interface_defaults = self._get_interface_initial_settings() or {}
             machine_name = str(interface_defaults.get("machine_name", ""))
-            model_file = get_ml_model_file(machine_name, quad_name, screens)
-            optimizer_interface = self.interface
-
-            if model_file.exists() and USE_ML and not self.use_linear_response:
-                try:
-                    candidate_interface = MLInterface(self.interface, quad_name=quad_name, screens=screens, machine_name=machine_name)
-
-                    bounds = self._get_interface_bounds()
-                    k1_values = np.asarray(self.session.get("K1_values", []), dtype=float)
-                    if k1_values.size == 0:
-                        raise RuntimeError("Session has no K1_values, cannot test ML model.")
-                    optimizer_interface = candidate_interface
-                    self.info.emit(f"Using ML model: {model_file}")
-                except Exception as e:
-                    optimizer_interface = self.interface
-                    self.info.emit(
-                        f"ML model exists but failed before Xopt: {model_file}. "
-                        f"Reason: {type(e).__name__}: {e}. Using simulation instead."
-                    )
-            else:
-                if self.use_linear_response:
-                    self.info.emit("Using direct linear R-response model.")
-                elif USE_ML:
-                    self.info.emit(f"No ML model found for {machine_name}/{quad_name} and screens {screens}. Using simulation instead.")
-
-            tool = Optimization_EM(interface=optimizer_interface, n_starts=self.n_starts, xopt_initial_points=self.xopt_initial_points,
-                                   xopt_steps=self.xopt_steps, nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength,
-                                   progress_callback=self._emit_progress, use_linear_response=self.use_linear_response)
-            self.optimizer_ready.emit(tool)
             bounds = self._get_interface_bounds()
-            output = tool.fit_from_session(self.session, bounds = bounds)
+
+            tool = EmittanceComputingEngineSelector.create(method=self.computing_method, interface=self.interface,
+                session=self.session, machine_name=machine_name, info_callback=self.info.emit, n_starts=self.n_starts,
+                xopt_initial_points=self.xopt_initial_points, xopt_steps=self.xopt_steps, nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength, progress_callback=self._emit_progress)
+
+            self.optimizer_ready.emit(tool)
+            output = tool.fit_from_session(self.session, bounds=bounds)
             self.finished.emit(output)
+
         except Exception as e:
             self.error.emit(str(e))
+
         finally:
             self.done.emit()
 
@@ -220,6 +196,11 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         if not isinstance(session_partial, dict):
             return
 
+        current_step_display = int(current_step)
+        total_steps_display = int(total_steps)
+        if total_steps_display > 0:
+            current_step_display = max(1, min(current_step_display, total_steps_display))
+
         if session_partial.get("mode") == "multi_quad_scan":
             current_quad = str(session_partial.get("current_quadrupole", "-")).strip() or "-"
             quad_idx = int(session_partial.get("current_quadrupole_index", 0)) + 1
@@ -228,7 +209,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
             skipped = list(session_partial.get("skipped_quadrupoles", []))
             skipped_names = [str(item.get("quad_name", "")).strip() for item in skipped if isinstance(item, dict)]
 
-            status = ("multi", current_quad, quad_idx, int(current_step), int(total_steps), tuple(completed), tuple(skipped_names))
+            status = ("multi", current_quad, quad_idx, current_step_display, total_steps_display, tuple(completed), tuple(skipped_names))
             if status == self._last_scan_status:
                 return
             self._last_scan_status = status
@@ -237,17 +218,17 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
 
             self.log(
                 f"Scanning quadrupole {quad_idx}/{total_quads}: {current_quad} | "
-                f"step {int(current_step) + 1}/{int(total_steps)} | "
+                f"step {current_step_display}/{total_steps_display} | "
                 f"finished: {finished_msg} | skipped, because of K1_0 = 0: {skipped_msg}"
             )
 
         else:
             quad_name = str(session_partial.get("quad_name", "-")).strip() or "-"
-            status = ("single", quad_name, int(current_step), int(total_steps))
+            status = ("single", quad_name, current_step_display, total_steps_display)
             if status == self._last_scan_status:
                 return
             self._last_scan_status = status
-            self.log(f"Scanning quadrupole {quad_name} | step {int(current_step) + 1}/{int(total_steps)}")
+            self.log(f"Scanning quadrupole {quad_name} | step {current_step_display}/{total_steps_display}")
 
     def _on_show_all_screens_toggled(self, checked):
         self.screen_on_plot.setEnabled(not bool(checked))
@@ -599,7 +580,9 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         # session_bad["K1_values"] = (np.asarray(self.session["K1_values"]) * scale).tolist()
         # FOR TESTS!!! in order to test again, pass sessios_bad to the worker, instead of self.session
 
-        worker = OptimizationWorker(self.interface, self.session, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), use_linear_response = bool(self.R_linear_checkbox.isChecked()))
+        computing_method = self.computing_method_combo.currentText().strip()
+
+        worker = OptimizationWorker(self.interface, self.session, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), computing_method=computing_method)
         worker.info.connect(self.log)
 
         worker.moveToThread(thread)

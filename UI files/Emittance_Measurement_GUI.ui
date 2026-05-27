@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>844</height>
+    <height>956</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -132,6 +132,41 @@ QGroupBox#screensGroup::title {
              </widget>
             </item>
            </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="computingMethodGroup">
+         <property name="title">
+          <string>Computing engine</string>
+         </property>
+         <layout class="QGridLayout" name="gridComputingMethod">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_computing_method">
+            <property name="text">
+             <string>Computing method</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="computing_method_combo">
+            <item>
+             <property name="text">
+              <string>Linear R-response model</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Machine learning model</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>RFTrack tracking</string>
+             </property>
+            </item>
+           </widget>
           </item>
          </layout>
         </widget>
@@ -518,48 +553,6 @@ QToolButton#fit_k1_scale_info_button:hover {
               </property>
               <property name="autoRaise">
                <bool>false</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item row="1" column="1">
-           <layout class="QHBoxLayout" name="horizontalLayout_2">
-            <item>
-             <widget class="QCheckBox" name="R_linear_checkbox">
-              <property name="text">
-               <string>Use linear R-response model</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QToolButton" name="R_toolbox">
-              <property name="cursor">
-               <cursorShape>PointingHandCursor</cursorShape>
-              </property>
-              <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fits R from B = C·Rᵀ, where B = σ² and C = [βε, -αε, γε, 1].&lt;/p&gt;&lt;p&gt;Then directly solves σ² = [R11², 2R11R12, R12²] · [βε, -αε, γε].&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">QToolButton#R_toolbox {
-    border: 1px solid #888;
-    border-radius: 11px;
-    min-width: 22px;
-    max-width: 22px;
-    min-height: 22px;
-    max-height: 22px;
-    padding: 0px;
-    font-weight: bold;
-}
-QToolButton#R_toolbox:hover {
-    background-color: #e6e6e6;
-}</string>
-              </property>
-              <property name="text">
-               <string>?</string>
-              </property>
-              <property name="toolButtonStyle">
-               <enum>Qt::ToolButtonTextOnly</enum>
               </property>
              </widget>
             </item>

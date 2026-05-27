@@ -4,8 +4,8 @@ import time, os, re
 from Backend.LogConsole import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
-from . import ipbsm_calc
-from .knobs import KnobSystem
+# from . import ipbsm_calc
+# from .knobs import KnobSystem
 class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
 # For OTR0X:
@@ -64,7 +64,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         # Knobs (linear / nonlinear)
         # ----------------------------
 
-        self.knobs = KnobSystem(self.lattice, p_ref=-self.Pref)
+        #self.knobs = KnobSystem(self.lattice, p_ref=-self.Pref)
 
         self.kl_per_A = {
             "ZH100RX": 0.0007311,

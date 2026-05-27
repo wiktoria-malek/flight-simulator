@@ -27,7 +27,8 @@ class MainWindow(QMainWindow):
         self.emittance_interface_button.clicked.connect(self.handle_emittance_click)
         self.knobs_interface_button.clicked.connect(self.handle_knobs_click)
         self.sysid_interface_button.clicked.connect(self.handle_sysid_click)
-
+        # self.dispersion_interface_button.clicked.connect(self.handle_dispersion_click)
+        # self.linac_interface_button.clicked.connect(self.handle_linac_click)
         self._procs=[]
         self.setWindowTitle("Choose the application")
 
@@ -44,9 +45,7 @@ class MainWindow(QMainWindow):
         argv = [path] + (args or [])
         proc.start(sys.executable, argv)
 
-        proc.readyReadStandardOutput.connect(
-            lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"), end="")
-        )
+        proc.readyReadStandardOutput.connect(lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"), end=""))
         self._procs.append(proc)
 
     def _latest_response_file(self) -> str | None:
@@ -69,12 +68,19 @@ class MainWindow(QMainWindow):
         self.handling("BBA_GUI.py")
 
     def handle_emittance_click(self):
-        pass
+        self.handling("Emittance_Measurement_GUI.py")
+
     def handle_knobs_click(self):
-        pass
+        self.handling("IPBSM_Opt_GUI.py")
 
     def handle_compute_response_matrix_click(self):
         self.handling("ComputeResponseMatrix_GUI.py")
+
+    # def handle_linac_click(self):
+    #     self.handling("Knobs/Linac_Opt.py")
+    #
+    # def handle_dispersion_click(self):
+    #     self.handling("Tantative_combined_GUI.py", args=["--only-tab", "Dispersion"])
 
 if __name__ == "__main__":
     app = QApplication([])

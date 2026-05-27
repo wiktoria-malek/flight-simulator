@@ -6,7 +6,6 @@ from xopt import Xopt
 from xopt.vocs import VOCS, select_best
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian import ExpectedImprovementGenerator
-from Backend.LinearResponse_EM import LinearResponse_EM
 
 class OptimizationStopped(Exception):
     def __init__(self, message = "Optimization stopped", solution = None):
@@ -19,7 +18,7 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization_EM:
-    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None, use_linear_response = False):
+    def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None):
         self.progress_callback = progress_callback
         self.interface = interface
         self.n_starts = int(n_starts)
@@ -38,7 +37,6 @@ class Optimization_EM:
         self.xopt_local_refine = False
         self.xopt_local_refine_maxiter = 25
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
-        self.use_linear_response = bool(use_linear_response)
 
     def _emit_progress(self, phase, current, total):
         if self.progress_callback is None:
@@ -97,76 +95,6 @@ class Optimization_EM:
 
         sigma2_template_x = np.asarray(sigx ** 2 if sigx.size else np.empty((0, len(screens))), dtype=float)
         sigma2_template_y = np.asarray(sigy ** 2 if sigy.size else np.empty((0, len(screens))), dtype=float)
-
-        if self.use_linear_response:
-            if K1_values.size != 1:
-                raise RuntimeError("Direct linear R-response fit works only for fixed K1, so use steps = 0.")
-            if self.fit_quadrupole_strength:
-                raise RuntimeError("Direct linear R-response fit cannot be used together with fitted quadrupole strength.")
-            if len(screens) < 3:
-                raise RuntimeError("Direct linear R-response fit requires at least 3 screens.")
-
-            gamma_rel, beta_rel = self.interface.get_beam_factors()
-            beta_gamma = gamma_rel * beta_rel
-            if not np.isfinite(beta_gamma) or beta_gamma <= 0:
-                raise RuntimeError("Invalid beam factors")
-            linear = LinearResponse_EM()
-            direct = linear.solve_twiss_from_measured_sigma2(screens=screens, sigma2_x=sigma2_template_x[0], sigma2_y=sigma2_template_y[0], beta_gamma=beta_gamma)
-
-            pred_x = direct["pred_x"]
-            pred_y = direct["pred_y"]
-            res_x = pred_x - sigma2_template_x
-            res_y = pred_y - sigma2_template_y
-            data_res_x = res_x.reshape(-1)
-            data_res_y = res_y.reshape(-1)
-            rms_x = float(np.sqrt(np.nanmean(data_res_x ** 2)))
-            rms_y = float(np.sqrt(np.nanmean(data_res_y ** 2)))
-            mad_x = float(median_abs_deviation(data_res_x, scale = "normal"))
-            mad_y = float(median_abs_deviation(data_res_y, scale = "normal"))
-            per_screen_x = {screen: float(abs(res_x[0, i])) for i, screen in enumerate(screens)}
-            per_screen_y = {screen: float(abs(res_y[0, i])) for i, screen in enumerate(screens)}
-
-            result = {
-                "screen0": screens[0],
-                "quad_name": quad_name,
-                "emit_x_norm": direct["emit_x_norm"],
-                "emit_y_norm": direct["emit_y_norm"],
-                "beta_x0": direct["beta_x0"],
-                "alpha_x0": direct["alpha_x0"],
-                "beta_y0": direct["beta_y0"],
-                "alpha_y0": direct["alpha_y0"],
-                "fit_x_cost": 0.0,
-                "fit_y_cost": 0.0,
-                "fit_x_residual_rms": 0.0,
-                "fit_y_residual_rms": 0.0,
-                "fit_x_residual_mad": 0.0,
-                "fit_y_residual_mad": 0.0,
-                "fit_x_residual_rms_per_screen": {},
-                "fit_y_residual_rms_per_screen": {},
-                "worst_screen_x": None,
-                "worst_screen_y": None,
-                "fit_x_found": True,
-                "fit_y_found": True,
-                "paused": False,
-                "stopped": False,
-                "fit_quadrupole_strength": False,
-                "quad_k1_0": quad_k1_0_readback,
-                "quad_k1_0_is_fitted": False,
-                "fit_method": "direct_linear_response",
-            }
-
-            output = {
-                "result": result,
-                "pred_x": pred_x,
-                "pred_y": pred_y,
-            }
-            self.best_out_so_far = output
-            self._last_completed_output = output
-            self._pause_requested = False
-            if self.print_M:
-                print("Direct linear R-response fit done:", result)
-
-            return output
 
         def _plane_no_solution(plane_name, sigma2_template):
             return {
