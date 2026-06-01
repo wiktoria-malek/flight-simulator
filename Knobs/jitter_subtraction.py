@@ -160,24 +160,19 @@ def apply_jitter_subtraction(bpms, model):
     s = np.asarray(bpms.get("S", []), dtype=float).copy()
 
     ref_idx = [idx[name] for name in ref_bpms]
-    tgt_idx = [idx[name] for name in tgt_bpms if name in idx]
-    tgt_use = [name for name in tgt_bpms if name in idx]
-
+    tgt_model_idx = [i for i, name in enumerate(tgt_bpms) if name in idx]
+    tgt_idx = [idx[tgt_bpms[i]] for i in tgt_model_idx]
     if x.ndim != 2 or y.ndim != 2 or not tgt_idx:
         return bpms
 
     x_ref = np.nan_to_num(x[:, ref_idx] - model["x_ref_mean"], nan=0.0)
     y_ref = np.nan_to_num(y[:, ref_idx] - model["y_ref_mean"], nan=0.0)
-    x_pred = x_ref @ model["x_weights"][:, :len(tgt_use)]
-    y_pred = y_ref @ model["y_weights"][:, :len(tgt_use)]
-
+    x_pred = x_ref @ model["x_weights"][:, tgt_model_idx]
+    y_pred = y_ref @ model["y_weights"][:, tgt_model_idx]
     x[:, tgt_idx] = x[:, tgt_idx] - x_pred
     y[:, tgt_idx] = y[:, tgt_idx] - y_pred
 
-    return {
-        "names": list(bpms.get("names", [])),
-        "x": x,
-        "y": y,
-        "tmit": t,
-        "S": s,
-    }
+    corrected = dict(bpms)
+    corrected["x"] = x
+    corrected["y"] = y
+    return corrected

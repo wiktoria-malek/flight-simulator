@@ -633,8 +633,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
 
         elapsed = time.perf_counter() - self._optimization_t0
 
-        joint_found = bool(
-            np.isfinite(result.get("emit_x_norm", np.nan)) and np.isfinite(result.get("emit_y_norm", np.nan)))
+        joint_found = bool(np.isfinite(result.get("emit_x_norm", np.nan)) and np.isfinite(result.get("emit_y_norm", np.nan)))
         paused = bool(result.get("paused", False))
 
         if paused:
@@ -758,17 +757,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         self._clear_fit_panel()
         self._set_progress(0)
         try:
-            self.session = self.run_scan(
-                quad_name=quadrupoles,
-                delta_min=delta_min,
-                delta_max=delta_max,
-                steps=steps,
-                nshots=nshots,
-                screens=screens,
-                reference_screen=screens[0],
-                bpms=[],
-                progress_callback=self._scan_progress_callback
-            )
+            self.session = self.run_scan(quad_name=quadrupoles, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, screens=screens, reference_screen=screens[0], bpms=[], progress_callback=self._scan_progress_callback)
             if steps == 0:
                 self.log("Conventional multi-screen EM finished.")
             else:

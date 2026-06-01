@@ -384,6 +384,31 @@ QGroupBox#bpmsGroup::title {
          <number>4</number>
         </property>
         <item>
+                  <layout class="QHBoxLayout" name="actuator_type_layout">
+          <item>
+           <widget class="QLabel" name="label_actuator_type">
+            <property name="text">
+             <string>Actuator type</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="actuator_type_combo">
+            <item>
+             <property name="text">
+              <string>Correctors</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Quadrupole movers</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
          <layout class="QHBoxLayout" name="triangular_layout">
           <item>
            <spacer name="tri_spacer_left">

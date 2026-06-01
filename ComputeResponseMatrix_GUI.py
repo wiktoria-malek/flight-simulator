@@ -24,7 +24,7 @@ except ImportError:
     pyqt_version = 5
 
 import numpy as np
-import glob,sys,os,argparse,matplotlib
+import glob,sys,os,argparse,matplotlib, re
 from Backend.SaveOrLoad import SaveOrLoad
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -58,6 +58,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.save_as_button.clicked.connect(self.__save_as_button_clicked)
         self.diff_checkbox.toggled.connect(self._compute_difference_clicked)
         self._compute_difference_clicked(self.diff_checkbox.isChecked())
+        self.actuator_type_combo.currentTextChanged.connect(lambda _text: self._refresh_device_lists_for_current_mode())
         self.plot_singular_values_button.clicked.connect(self._plot_singular_values)
         self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
         self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
@@ -106,7 +107,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self.bpms_list.item(i).setSelected(True)
             bpms=self.bpms
 
-        Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms=self._compute_response_matrix_from_directory(directory=directory, correctors=correctors, bpms=bpms, triangular=bool(self.triangular_checkbox.isChecked()))
+        Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms=self._compute_response_matrix_from_directory(directory=directory, correctors=correctors, bpms=bpms, triangular=bool(self.triangular_checkbox.isChecked()), actuator_mode = self._current_actuator_mode())
 
         R = Response()
         R.bpms = bpms
@@ -132,6 +133,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         expanded_path=(path or "").strip()
         expanded_path=os.path.expandvars(os.path.expanduser(expanded_path))
         return os.path.abspath(os.path.normpath(expanded_path))
+
+    def _current_actuator_mode(self):
+        text = self.actuator_type_combo.currentText().strip().lower()
+        if "quadrupole" in text: return "quadrupole_movers"
+        return "correctors"
+
+    def _refresh_device_lists_for_current_mode(self):
+        folder = self._expand_path(self.data_directory_1.text())
+        if folder:
+            self._load_lists_from_directory(folder)
 
     def _compute_difference_clicked(self,checked):
         checked=bool(checked)
@@ -170,14 +181,42 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             return
         S=State(filename=datafiles[0])
         self.sequence=S.get_sequence()
-        self.correctors=list(S.get_correctors()["names"])
         self.bpms=list(S.get_bpms()["names"])
+
+        if self._current_actuator_mode()=="quadrupole_movers":
+            self.correctors = self._quadrupole_movers_from_datafiles(datafiles)
+            self.correctorsGroup.setTitle("Quadrupole movers")
+        else:
+            self.correctors = list(S.get_correctors()["names"])
+            self.correctorsGroup.setTitle("Correctors")
 
         self.correctors_list.clear()
         self.correctors_list.addItems([str(c) for c in self.correctors])
 
         self.bpms_list.clear()
         self.bpms_list.addItems([str(b) for b in self.bpms])
+
+    def _quadrupole_movers_from_datafiles(self, datafiles):
+        pattern = re.compile(r"DATA_(.+)_(p|m)(\d+)\.pkl$")
+        names = []
+        seen = set()
+        sequence_index = {name: i for i, name in enumerate(getattr(self, "sequence", []))}
+
+        for datafile in datafiles:
+            match = pattern.search(os.path.basename(datafile))
+            if not match:
+                continue
+            tag = match.group(1)
+            if not (tag.endswith("_x") or tag.endswith("_y")):
+                continue
+            base_name = tag[:-2]
+            if base_name not in seen:
+                seen.add(base_name)
+                names.append(base_name)
+
+        names.sort(key=lambda item: sequence_index.get(item, 10**9))
+        return names
+
 
     def _substract_matrices(self,R1,R2):
         if R1.Rxx.shape != R2.Rxx.shape or R1.Ryy.shape != R2.Ryy.shape:
@@ -300,6 +339,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         filename, _ = QFileDialog.getSaveFileName(None, "Save Response Matrix", dir_name, "Pickle Files (*.pkl)")
         if filename:
             self.R.save(filename)
+
     def _load_logo(self):
         if not hasattr(self, "logo_label"):
             return

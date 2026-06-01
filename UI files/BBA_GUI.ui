@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1295</width>
-    <height>819</height>
+    <height>831</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -1042,42 +1042,23 @@ QToolButton#pinv_tooltip:hover {
                    <item>
                     <layout class="QHBoxLayout" name="horizontalLayout_beta">
                      <item>
-                      <layout class="QHBoxLayout" name="horizontalLayout_beta_label_group">
-                       <property name="spacing">
-                        <number>4</number>
+                      <widget class="QLabel" name="label_beta">
+                       <property name="minimumSize">
+                        <size>
+                         <width>130</width>
+                         <height>0</height>
+                        </size>
                        </property>
-                       <property name="leftMargin">
-                        <number>0</number>
+                       <property name="maximumSize">
+                        <size>
+                         <width>130</width>
+                         <height>16777215</height>
+                        </size>
                        </property>
-                       <property name="topMargin">
-                        <number>0</number>
+                       <property name="text">
+                        <string>Beta parameter</string>
                        </property>
-                       <property name="rightMargin">
-                        <number>0</number>
-                       </property>
-                       <property name="bottomMargin">
-                        <number>0</number>
-                       </property>
-                       <item>
-                        <widget class="QLabel" name="label_beta">
-                         <property name="minimumSize">
-                          <size>
-                           <width>130</width>
-                           <height>0</height>
-                          </size>
-                         </property>
-                         <property name="maximumSize">
-                          <size>
-                           <width>130</width>
-                           <height>16777215</height>
-                          </size>
-                         </property>
-                         <property name="text">
-                          <string>Beta parameter</string>
-                         </property>
-                        </widget>
-                       </item>
-                      </layout>
+                      </widget>
                      </item>
                      <item>
                       <widget class="QLineEdit" name="lineEdit_beta">
@@ -1089,7 +1070,7 @@ QToolButton#pinv_tooltip:hover {
                        </property>
                        <property name="maximumSize">
                         <size>
-                         <width>400</width>
+                         <width>500</width>
                          <height>16777215</height>
                         </size>
                        </property>
@@ -1139,6 +1120,19 @@ QToolButton#beta_tooltip:hover {
                       </widget>
                      </item>
                     </layout>
+                   </item>
+                   <item>
+                    <widget class="QCheckBox" name="subtract_jitter_checkbox">
+                     <property name="toolTip">
+                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use upstream BPMs to estimate shot-to-shot incoming beam jitter and subtract it from downstream BPM readings. Useful for real-machine response measurements; disabled by default.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                     </property>
+                     <property name="text">
+                      <string>Subtract incoming jitter</string>
+                     </property>
+                     <property name="checked">
+                      <bool>false</bool>
+                     </property>
+                    </widget>
                    </item>
                   </layout>
                  </widget>

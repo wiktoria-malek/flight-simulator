@@ -2,6 +2,7 @@ import os, pickle, re, matplotlib, glob
 import numpy as np
 matplotlib.use("QtAgg")
 from Backend.State import State
+from Knobs.jitter_subtraction import apply_jitter_subtraction
 
 '''
 Mutual response matrix calculation algorithm.
@@ -9,37 +10,41 @@ Mutual response matrix calculation algorithm.
 
 class ResponseMatrix_DFS_WFS():
 
-    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False):
+    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode = "correctors"):
         info=self._find_useful_files(directory)
         if not info["ok"]:
             raise RuntimeError(f"Could not find any valid DATA pairs in {directory}")
 
-        return self._compute_response_matrix(pairs=info["pairs"],correctors=correctors, bpms=bpms, triangular=triangular)
-
+        return self._compute_response_matrix(pairs=info["pairs"],correctors=correctors, bpms=bpms, triangular=triangular, actuator_mode = actuator_mode)
 
     def _find_useful_files(self, directory):
         datafiles=sorted(glob.glob(os.path.join(directory, 'DATA*.pkl')))
         pairs=[]
-
+        pair_re = re.compile(r"DATA_(.+)_(p|m)(\d+)\.pkl$")
         for fp in datafiles:
             basename=os.path.basename(fp)
-            if "_p" not in basename:
+            match = pair_re.search(basename)
+            if not match or match.group(2) != "p":
                 continue
-            fm=fp.replace("_p","_m")
+            tag = match.group(1)
+            shot_index = match.group(3)
+            fm = os.path.join(os.path.dirname(fp), f"DATA_{tag}_m{shot_index}.pkl")
             if os.path.exists(fm):
-                pairs.append((fp, fm))
+                pairs.append((fp, fm, tag))
 
         return {"ok":bool(pairs), "dir":directory, "pairs":pairs}
 
-    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False):
+    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False, actuator_mode = "correctors"):
         if not hasattr(self, 'sequence'):
             file = pairs[0][0]
             S = State(filename=file)
             self.sequence = S.get_sequence()
 
-        hcorrs = [string for string in correctors if self._is_h_corrector(string)]
-        vcorrs = [string for string in correctors if self._is_v_corrector(string)]
-
+        if actuator_mode == "quadrupole_movers":
+            return self._compute_qm_response_matrix(pairs=pairs, qcorrs=correctors, bpms=bpms, triangular=triangular)
+        else:
+            hcorrs = [string for string in correctors if self._is_h_corrector(string)]
+            vcorrs = [string for string in correctors if self._is_v_corrector(string)]
 
         # Pick all correctors preceding the last bpm
         hcorrs = [corr for corr in hcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1])]
@@ -58,9 +63,19 @@ class ResponseMatrix_DFS_WFS():
         Cy = np.empty((0, len(vcorrs)))
         B_mask = np.full((1, len(bpms)), True, dtype=bool)
 
-        for fp, fm in pairs:
+        for pair in pairs:
+            if len(pair) == 3:
+                fp, fm, tag = pair
+            else:
+                fp, fm = pair
+                tag = ""
             Sp = State(filename=fp)
             Sm = State(filename=fm)
+
+            jitter_model = getattr(self, "jitter_model", None)
+            if jitter_model is not None:
+                Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
+                Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
 
             Op = Sp.get_orbit(bpms)
             Om = Sm.get_orbit(bpms)
@@ -75,10 +90,44 @@ class ResponseMatrix_DFS_WFS():
                 continue
 
             B_mask &= np.isfinite(Op['x']) & np.isfinite(Om['x']) & np.isfinite(Op['y']) & np.isfinite(Om['y'])
-            Cx_p = Sp.get_correctors(hcorrs)['bact']
-            Cy_p = Sp.get_correctors(vcorrs)['bact']
-            Cx_m = Sm.get_correctors(hcorrs)['bact']
-            Cy_m = Sm.get_correctors(vcorrs)['bact']
+
+            if actuator_mode == "quadrupole_movers":
+                if str(tag).endswith("_x"):
+                    qname = str(tag)[:-2]
+                    Cx_p = np.zeros(len(hcorrs), dtype=float)
+                    Cx_m = np.zeros(len(hcorrs), dtype=float)
+                    Cy_p = np.zeros(len(vcorrs), dtype=float)
+                    Cy_m = np.zeros(len(vcorrs), dtype=float)
+                    if qname in hcorrs:
+                        qidx = hcorrs.index(qname)
+                        qxp = Sp.get_quadrupoles([qname])
+                        qxm = Sm.get_quadrupoles([qname])
+                        Cx_p[qidx] = np.asarray(qxp.get('xact', qxp.get('xdes', [0.0])), dtype=float)[0]
+                        Cx_m[qidx] = np.asarray(qxm.get('xact', qxm.get('xdes', [0.0])), dtype=float)[0]
+                    else:
+                        continue
+                elif str(tag).endswith("_y"):
+                    qname = str(tag)[:-2]
+                    Cx_p = np.zeros(len(hcorrs), dtype=float)
+                    Cx_m = np.zeros(len(hcorrs), dtype=float)
+                    Cy_p = np.zeros(len(vcorrs), dtype=float)
+                    Cy_m = np.zeros(len(vcorrs), dtype=float)
+                    if qname in vcorrs:
+                        qidx = vcorrs.index(qname)
+                        qyp = Sp.get_quadrupoles([qname])
+                        qym = Sm.get_quadrupoles([qname])
+                        Cy_p[qidx] = np.asarray(qyp.get('yact', qyp.get('ydes', [0.0])), dtype=float)[0]
+                        Cy_m[qidx] = np.asarray(qym.get('yact', qym.get('ydes', [0.0])), dtype=float)[0]
+                    else:
+                        continue
+                else:
+                    continue
+            else:
+                Cx_p = Sp.get_correctors(hcorrs)['bact']
+                Cy_p = Sp.get_correctors(vcorrs)['bact']
+                Cx_m = Sm.get_correctors(hcorrs)['bact']
+                Cy_m = Sm.get_correctors(vcorrs)['bact']
+
 
             Bx = np.vstack((Bx, Op['x']))
             Bx = np.vstack((Bx, Om['x']))
@@ -140,10 +189,21 @@ class ResponseMatrix_DFS_WFS():
                 Rxx[bpm_indexes, hcorrs.index(corr)] = 0
                 Ryx[bpm_indexes, hcorrs.index(corr)] = 0
 
+                if actuator_mode == "quadrupole_movers":
+                    forbidden = f"M{corr}"
+                    bpm_indexes = [bpms.index(bpm) for bpm in bpms if forbidden in bpm]
+                    Rxx[bpm_indexes, hcorrs.index(corr)] = 0
+                    Ryx[bpm_indexes, hcorrs.index(corr)] = 0
+
             for corr in vcorrs:
                 bpm_indexes = [bpms.index(bpm) for bpm in bpms if self.sequence.index(bpm) < self.sequence.index(corr)]
                 Rxy[bpm_indexes, vcorrs.index(corr)] = 0
                 Ryy[bpm_indexes, vcorrs.index(corr)] = 0
+                if actuator_mode == "quadrupole_movers":
+                    forbidden = f"M{corr}"
+                    bpm_indexes = [bpms.index(bpm) for bpm in bpms if forbidden in bpm]
+                    Rxy[bpm_indexes, vcorrs.index(corr)] = 0
+                    Ryy[bpm_indexes, vcorrs.index(corr)] = 0
 
         return Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms
 
@@ -287,3 +347,155 @@ class ResponseMatrix_DFS_WFS():
         Ayx = np.vstack(Ayx)
 
         return Axx, Ayy, Axy, Ayx, B0x, B0y, hcorrs, vcorrs, bpms
+
+    def _creating_qm_response_matrices(self, selected_corrs, selected_bpms, triangular=True):
+        info_traj = self._data_dirs.get("traj")
+        if not (info_traj and info_traj.get("ok") and info_traj.get("pairs")):
+            return None
+
+        Rxx, Ryy, Rxy, Ryx, _B0x, _B0y, hcorrs, vcorrs, bpms_common = self._compute_response_matrix(
+            pairs=info_traj["pairs"],
+            correctors=selected_corrs,
+            bpms=selected_bpms,
+            triangular=triangular,
+            actuator_mode="quadrupole_movers",
+        )
+
+        common_qcorrs = [str(q) for q in selected_corrs if str(q) in hcorrs and str(q) in vcorrs]
+        if not common_qcorrs:
+            raise RuntimeError("No quadrupole movers with both x and y measured response data")
+
+        h_index = {str(name): i for i, name in enumerate(hcorrs)}
+        v_index = {str(name): i for i, name in enumerate(vcorrs)}
+
+        h_cols = [h_index[q] for q in common_qcorrs]
+        v_cols = [v_index[q] for q in common_qcorrs]
+
+        R_xx = np.asarray(Rxx[:, h_cols], dtype=float)
+        R_xy = np.asarray(Rxy[:, v_cols], dtype=float)
+        R_yx = np.asarray(Ryx[:, h_cols], dtype=float)
+        R_yy = np.asarray(Ryy[:, v_cols], dtype=float)
+
+        T_xx = np.zeros_like(R_xx)
+        T_yy = np.zeros_like(R_yy)
+
+        for j, q in enumerate(common_qcorrs):
+            attached = f"M{q}"
+            for i, bpm in enumerate(bpms_common):
+                if attached in str(bpm):
+                    T_xx[i, j] = -1.0
+                    T_yy[i, j] = -1.0
+
+        return {
+            "qcorrs": common_qcorrs,
+            "bpms": list(bpms_common),
+            "R_xx": R_xx,
+            "R_xy": R_xy,
+            "R_yx": R_yx,
+            "R_yy": R_yy,
+            "T_xx": T_xx,
+            "T_yy": T_yy,
+        }
+
+    def _compute_qm_response_matrix(self, pairs, qcorrs, bpms, triangular = False):
+        if not pairs:
+            raise RuntimeError("No DATA pairs available for quadrupole mover response matrix")
+
+        if not hasattr(self, "sequence"):
+            self.sequence = State(filename=pairs[0][0]).get_sequence()
+
+        qcorrs = [str(q) for q in qcorrs]
+        bpms = [str(bpm) for bpm in bpms]
+
+        available_x = {str(tag)[:-2] for _fp, _fm, tag in pairs if str(tag).endswith("_x")}
+        available_y = {str(tag)[:-2] for _fp, _fm, tag in pairs if str(tag).endswith("_y")}
+
+        qcorrs_x = [q for q in qcorrs if q in available_x]
+        qcorrs_y = [q for q in qcorrs if q in available_y]
+
+        nb = len(bpms)
+        Rxx_samples = {q: [] for q in qcorrs_x}
+        Ryx_samples = {q: [] for q in qcorrs_x}
+        Rxy_samples = {q: [] for q in qcorrs_y}
+        Ryy_samples = {q: [] for q in qcorrs_y}
+
+        Bx_rows, By_rows = [], []
+
+        def qval(state, qname, axis):
+            qdata = state.get_quadrupoles([qname])
+            keys = ("xact", "xdes") if axis == "x" else ("yact", "ydes")
+            for key in keys:
+                if key in qdata:
+                    arr = np.asarray(qdata[key], dtype=float).ravel()
+                    if arr.size:
+                        return float(arr[0])
+            raise RuntimeError(f"No {axis} mover value for {qname}")
+        for pair in pairs:
+            fp, fm = pair[0], pair[1]
+            tag = str(pair[2]) if len(pair) > 2 else ""
+
+            if not (tag.endswith("_x") or tag.endswith("_y")):
+                continue
+
+            axis = tag[-1]
+            qname = tag[:-2]
+            Sp = State(filename=fp)
+            Sm = State(filename=fm)
+            jitter_model = getattr(self, "jitter_model", None)
+            if jitter_model is not None:
+                Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
+                Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
+            Op = Sp.get_orbit(bpms)
+            Om = Sm.get_orbit(bpms)
+            den = qval(Sp, qname, axis) - qval(Sm, qname, axis)
+            if not np.isfinite(den) or den == 0:
+                continue
+            dx = (np.asarray(Op["x"], dtype=float) - np.asarray(Om["x"], dtype=float)) / den
+            dy = (np.asarray(Op["y"], dtype=float) - np.asarray(Om["y"], dtype=float)) / den
+            if axis == "x" and qname in Rxx_samples:
+                Rxx_samples[qname].append(dx)
+                Ryx_samples[qname].append(dy)
+            if axis == "y" and qname in Ryy_samples:
+                Rxy_samples[qname].append(dx)
+                Ryy_samples[qname].append(dy)
+
+            Bx_rows += [np.asarray(Op["x"], dtype=float), np.asarray(Om["x"], dtype=float)]
+            By_rows += [np.asarray(Op["y"], dtype=float), np.asarray(Om["y"], dtype=float)]
+
+        def mean_or_nan(samples):
+            if not samples:
+                return np.full(nb, np.nan)
+            return np.nanmean(np.vstack(samples), axis=0)
+
+        Rxx = np.column_stack([mean_or_nan(Rxx_samples[q]) for q in qcorrs_x])
+        Ryx = np.column_stack([mean_or_nan(Ryx_samples[q]) for q in qcorrs_x])
+
+        Rxy = np.column_stack([mean_or_nan(Rxy_samples[q]) for q in qcorrs_y])
+        Ryy = np.column_stack([mean_or_nan(Ryy_samples[q]) for q in qcorrs_y])
+
+        Bx = np.nanmean(np.vstack(Bx_rows), axis=0).reshape(-1, 1)
+        By = np.nanmean(np.vstack(By_rows), axis=0).reshape(-1, 1)
+
+        if triangular:
+            sequence_index = {str(name): i for i, name in enumerate(self.sequence)}
+
+            def sequence_pos(name):
+                return sequence_index.get(str(name), np.inf)
+
+            for j, q in enumerate(qcorrs_x):
+                qpos = sequence_pos(q)
+                for i, bpm in enumerate(bpms):
+                    if sequence_pos(bpm) < qpos or str(bpm) == f"M{q}" or f"M{q}" in str(bpm):
+                        Rxx[i, j] = 0.0
+                        Ryx[i, j] = 0.0
+
+            for j, q in enumerate(qcorrs_y):
+                qpos = sequence_pos(q)
+                for i, bpm in enumerate(bpms):
+                    if sequence_pos(bpm) < qpos or str(bpm) == f"M{q}" or f"M{q}" in str(bpm):
+                        Rxy[i, j] = 0.0
+                        Ryy[i, j] = 0.0
+
+
+
+        return Rxx, Ryy, Rxy, Ryx, Bx, By, qcorrs_x, qcorrs_y, bpms

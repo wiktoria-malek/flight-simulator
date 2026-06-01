@@ -1,16 +1,16 @@
-import sys, os, re, matplotlib
+import sys, os, re, matplotlib, pickle
 from datetime import datetime
 import numpy as np
 try:
     from PyQt6 import uic
     from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget)
+    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
     from PyQt6.QtGui import QPainter, QPixmap
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget)
+    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
     from PyQt5.QtGui import QPainter, QPixmap
     pyqt_version = 5
 matplotlib.use("QtAgg")
@@ -22,9 +22,27 @@ from Backend.RMS_Plots_BBA import RMS_Plots
 from Backend.SaveOrLoad import SaveOrLoad
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import matplotlib.pyplot as plt
+from enum import Enum
+from dataclasses import dataclass
 from Backend.BPM_weights import BPM_weights
 from traceback import print_exception
 from Interfaces.interface_setup import INTERFACE_SETUP
+from Backend.State import State
+from Knobs.jitter_subtraction import (apply_jitter_subtraction, explain_reference_selection, fit_jitter_model)
+
+class ActuatorMode(Enum):
+    Kicker = "Correctors" #Kicker"
+    QM = "Quadrupole movers" #"QM"
+
+@dataclass
+class QmResponseMatrices:
+    qcorrs: list
+    r_xx: np.ndarray
+    r_xy: np.ndarray
+    r_yx: np.ndarray
+    r_yy: np.ndarray
+    t_xx: np.ndarray
+    t_yy: np.ndarray
 
 class PlotPopup(QMainWindow):
     def __init__(self, title, parent=None):
@@ -129,6 +147,17 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.start_button.clicked.connect(self._on_start_click)
         self.stop_button.clicked.connect(self._stop_correction)
         self.corrs = self.initial_state.get_correctors()["names"]
+        self.jitter_model = None
+        self.subtract_jitter_checkbox.setChecked(False)
+        self.actuator_mode = ActuatorMode.Kicker
+
+        if hasattr(self.interface, "get_quadrupoles_names"):
+            try:
+                self.qm_corrs = self.interface.get_quadrupoles_names()
+            except Exception:
+                self.qm_corrs = []
+        else:
+            self.qm_corrs = []
         self.setWindowTitle("BBA GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
@@ -171,6 +200,89 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
 
+        self._setup_qm_controls()
+        self._refresh_corrector_list()
+        self._update_qm_widgets_visibility()
+
+    def _setup_qm_controls(self):
+        row_mode = QHBoxLayout()
+        row_mode.addWidget(QLabel("Actuator mode"))
+        self.actuator_mode_combo = QComboBox(self)
+        self.actuator_mode_combo.addItems([ActuatorMode.Kicker.value, ActuatorMode.QM.value])
+        row_mode.addWidget(self.actuator_mode_combo)
+        self.verticalLayout_3.insertLayout(0, row_mode)
+        row_specific = QHBoxLayout()
+        self.specific_bpm_label = QLabel("Specific BPM (QM)")
+        self.specific_bpm_combo = QComboBox(self)
+        row_specific.addWidget(self.specific_bpm_label)
+        row_specific.addWidget(self.specific_bpm_combo)
+        self.verticalLayout_3.insertLayout(4, row_specific)
+        self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
+        self.bpms_list.itemSelectionChanged.connect(self._refresh_specific_bpm_candidates)
+        self._refresh_specific_bpm_candidates()
+
+    def _on_actuator_mode_changed(self, text):
+        self.actuator_mode = ActuatorMode(text)
+        self._refresh_corrector_list()
+        self._update_qm_widgets_visibility()
+
+    def _update_qm_widgets_visibility(self):
+        is_qm = self.actuator_mode == ActuatorMode.QM
+        self.specific_bpm_label.setVisible(is_qm)
+        self.specific_bpm_combo.setVisible(is_qm)
+
+        if is_qm:
+            self.label.setText("Trajectory hold weight")
+            self.label_2.setText("BPM->0 weight")
+            self.label_3.setText("Specific BPM->0 weight")
+            self.current_groupbox_right.setTitle("Max range [um]")
+            self.horizontal_current_label.setText("X:")
+            self.vertical_current_label.setText("Y:")
+
+            self.max_horizontal_current_spinbox.setMaximum(1e6)
+            self.max_vertical_current_spinbox.setMaximum(1e6)
+
+            self.max_horizontal_current_spinbox.setDecimals(0)
+            self.max_vertical_current_spinbox.setDecimals(0)
+
+            self.max_horizontal_current_spinbox.setValue(1000.0)
+            self.max_vertical_current_spinbox.setValue(1000.0)
+        else:
+            self.label.setText("Orbit weight")
+            self.label_2.setText("Dispersion weight")
+            self.label_3.setText("Wakefield weight")
+            self.current_groupbox_right.setTitle(f"Max strength ({self.corrs_unit})")
+            self.horizontal_current_label.setText("H:")
+            self.vertical_current_label.setText("V:")
+
+    def _refresh_corrector_list(self):
+        self.correctors_list.clear()
+        items = self.qm_corrs if self.actuator_mode == ActuatorMode.QM else self.corrs
+        self.correctors_list.insertItems(0, [str(item) for item in items])
+
+    def _refresh_specific_bpm_candidates(self):
+        if not hasattr(self, "specific_bpm_combo"):
+            return
+        current = self.specific_bpm_combo.currentText()
+        bpms = []
+        for i in range(self.bpms_list.count()):
+            it = self.bpms_list.item(i)
+            if it.isSelected():
+                bpms.append(it.data(Qt.ItemDataRole.UserRole))
+
+        if not bpms:
+            bpms = list(self.initial_state.get_bpms()["names"])
+
+        self.specific_bpm_combo.blockSignals(True)
+        self.specific_bpm_combo.clear()
+        self.specific_bpm_combo.addItems([str(b) for b in bpms])
+
+        idx = self.specific_bpm_combo.findText(current)
+        if idx >= 0:
+            self.specific_bpm_combo.setCurrentIndex(idx)
+
+        self.specific_bpm_combo.blockSignals(False)
+
     def _load_logo(self):
         self.logo_label.setText("")
         self.logo_label.setScaledContents(False)
@@ -202,6 +314,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.disp_canvas.mpl_connect("button_press_event", lambda event: self._handle_plot_click(event, "disp"))
         if getattr(self, "wake_canvas", None) is not None:
             self.wake_canvas.mpl_connect("button_press_event", lambda event: self._handle_plot_click(event, "wake"))
+
     def _handle_plot_click(self, event, plot_type):
         if event is None: return
         if getattr(event, "dblclick", False) and getattr(event, "button", None) == 1:
@@ -439,7 +552,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.bpms_list.addItem(item)
 
     def _get_selection(self):
-        corrs_all = self.initial_state.get_correctors()["names"]
+        corrs_all = self.qm_corrs if self.actuator_mode == ActuatorMode.QM else self.initial_state.get_correctors()["names"]
         bpms_all = self.initial_state.get_bpms()["names"]
 
         selected_corrs = []
@@ -562,7 +675,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
     def _start_correction(self):
         try:
+            if self.actuator_mode == ActuatorMode.QM:
+                self._start_qm_correction()
+                return
             corrs, bpms = self._get_selection()
+            self._build_jitter_model_for_correction(actuators = corrs, bpms = bpms)
 
             '''
             Restore only selected correctors
@@ -648,6 +765,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 print("Measuring orbit")
                 self.log("Measuring orbit")
                 state0=self.interface.get_state()
+                state0 = self._apply_jitter_subtraction_to_state(state0)
                 if it==0:
                     self.measurement_start_state=state0
                     screens0=state0.get_screens()
@@ -677,11 +795,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self._hist_abs_rms_y.append(orbit_rms_y)
                 self._hist_abs_rms_xy.append(orbit_rms_xy)
 
-
-                # UNCOMMENT AFTER SANITY CHECKS
-                # if it == 0: # instead of golden orbit, correct from current orbit
-                #     B0x = O0x
-                #     B0y = O0y
+                '''
+                UNCOMMENT AFTER SANITY CHECKS
+                if it == 0: # instead of golden orbit, correct from current orbit
+                    B0x = O0x
+                    B0y = O0y
+                '''
 
                 if self.reset_ref_orb==True:
                     B0x = O0x.copy()
@@ -705,6 +824,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self.log("Measuring dispersion")
                     dP_P = self.interface.change_energy()
                     state1=self.interface.get_state()
+                    state1 = self._apply_jitter_subtraction_to_state(state1)
                     self.interface.reset_energy()
                     O1 = state1.get_orbit(bpms)
                     O1x=np.asarray(O1['x'],dtype=float).reshape(-1,1)
@@ -726,6 +846,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self.log("Measuring wakefield")
                     self.interface.change_intensity()
                     state2=self.interface.get_state()
+                    state2 = self._apply_jitter_subtraction_to_state(state2)
                     self.interface.reset_intensity()
                     O2 = state2.get_orbit(bpms)
                     O2x = np.asarray(O2['x'], dtype=float).reshape(-1, 1)
@@ -1041,6 +1162,120 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             #self.log_console.show()
         self.log_console.log(line)
 
+    def _start_qm_correction(self):
+        if not hasattr(self.interface, "apply_qmag_xyroll"):
+            raise RuntimeError("Interface does not support quadrupole mover correction")
+
+        w1, w2, w3, rcond, iters, gain, beta = self._read_params()
+
+        qcorrs, bpms = self._get_selection()
+        self._build_jitter_model_for_correction(actuators=qcorrs, bpms=bpms)
+
+        if len(qcorrs) == 0:
+            raise RuntimeError("No quadrupoles selected")
+
+        if len(bpms) == 0:
+            raise RuntimeError("No BPMs selected")
+
+        spec_bpm = self.specific_bpm_combo.currentText().strip()
+        response = self._creating_qm_response_matrices(selected_corrs=qcorrs, selected_bpms=bpms, triangular=True)
+
+        if response is not None:
+            qcorrs = list(response["qcorrs"])
+            bpms = list(response["bpms"])
+            self.log("Using measured QM response matrix from loaded trajectory data")
+        else:
+            self.log("No loaded QM response matrix data")
+            return
+        Rxx = np.asarray(response["R_xx"], dtype=float) + np.asarray(response["T_xx"], dtype=float)
+        Rxy = np.asarray(response["R_xy"], dtype=float)
+        Ryx = np.asarray(response["R_yx"], dtype=float)
+        Ryy = np.asarray(response["R_yy"], dtype=float) + np.asarray(response["T_yy"], dtype=float)
+
+        max_x = self.max_horizontal_current_spinbox.value()
+        max_y = self.max_vertical_current_spinbox.value()
+
+        B0x = None
+        B0y = None
+
+        for it in range(iters):
+            if self._cancel:
+                break
+
+            state = self.interface.get_state()
+            state = self._apply_jitter_subtraction_to_state(state)
+            orbit = state.get_orbit(bpms)
+
+            O0x = np.asarray(orbit["x"], dtype=float).reshape(-1, 1)
+            O0y = np.asarray(orbit["y"], dtype=float).reshape(-1, 1)
+
+            if B0x is None:
+                B0x = O0x.copy()
+                B0y = O0y.copy()
+
+            blocks_A = []
+            blocks_B = []
+
+            if w1 > 0:
+                top = np.hstack((w1 * Rxx, w1 * Rxy))
+                bottom = np.hstack((w1 * Ryx, w1 * Ryy))
+
+                blocks_A.extend((top, bottom))
+                blocks_B.extend((w1 * (O0x - B0x), w1 * (O0y - B0y)))
+
+            if w2 > 0:
+                top = np.hstack((w2 * Rxx, w2 * Rxy))
+                bottom = np.hstack((w2 * Ryx, w2 * Ryy))
+
+                blocks_A.extend((top, bottom))
+                blocks_B.extend((w2 * O0x, w2 * O0y))
+
+            if w3 > 0 and spec_bpm in bpms:
+                idx = bpms.index(spec_bpm)
+
+                row_top = np.hstack((Rxx[idx:idx+1, :], Rxy[idx:idx+1, :]))
+                row_bottom = np.hstack((Ryx[idx:idx+1, :], Ryy[idx:idx+1, :]))
+
+                blocks_A.extend((w3 * row_top, w3 * row_bottom))
+                blocks_B.extend((w3 * O0x[idx:idx+1, :], w3 * O0y[idx:idx+1, :]))
+
+            A = np.vstack(blocks_A)
+            B = np.vstack(blocks_B)
+
+            A[np.isnan(A)] = 0.0
+            B[np.isnan(B)] = 0.0
+
+            delta = -gain * (np.linalg.pinv(A, rcond=rcond) @ B).reshape(-1)
+
+            nq = len(qcorrs)
+            dx = np.clip(delta[:nq], -max_x, max_x)
+            dy = np.clip(delta[nq:nq + nq], -max_y, max_y)
+
+            qstate = self.interface.get_quadrupoles(qcorrs)
+
+            x_now = np.asarray(qstate["xdes"], dtype=float)
+            y_now = np.asarray(qstate["ydes"], dtype=float)
+            r_now = np.asarray(qstate["rolldes"], dtype=float)
+
+            self.interface.apply_qmag_xyroll(
+                qcorrs,
+                x_now + dx,
+                y_now + dy,
+                r_now,
+                wait=True,
+            )
+
+            self._hist_orbit_x.append(float(np.linalg.norm(np.nan_to_num(O0x - B0x))))
+            self._hist_orbit_y.append(float(np.linalg.norm(np.nan_to_num(O0y - B0y))))
+            self._hist_orbit.append(self._hist_orbit_x[-1] + self._hist_orbit_y[-1])
+
+            self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x, values_y=self._hist_orbit_y, vals=self._hist_orbit, title="QM trajectory hold")
+
+            QApplication.processEvents()
+
+        QMessageBox.information(self, "QM correction", "QM correction finished")
+
+
     def _clear_graphs(self):
         # it doesnt do fresh start, it only clears the graphs
         self._cancel = True
@@ -1055,6 +1290,47 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None)
         self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None)
         self._refresh_all_plot_popups()
+
+    def _build_jitter_model_for_correction(self, actuators, bpms):
+        if not self.subtract_jitter_checkbox.isChecked():
+            self.jitter_model = None
+            return None
+
+        sequence = self.interface.get_sequence()
+        refs, reason = explain_reference_selection(bpms, actuators, sequence, min_refs=2)
+
+        if reason:
+            self.log(f"Jitter subtraction disabled: {reason}")
+            self.jitter_model = None
+            return None
+
+        info = self._data_dirs.get("traj")
+        if not (info and info.get("ok")):
+            self.log("Jitter subtraction disabled: no trajectory response data")
+            self.jitter_model = None
+            return None
+        bpm_snapshots = []
+        for pair in info["pairs"]:
+            fp, fm = pair[0], pair[1]
+            for filename in (fp, fm):
+                state = State(filename=filename)
+                bpm_snapshots.append(state.get_bpms())
+
+        model, fit_reason = fit_jitter_model(bpms_list=bpm_snapshots, reference_bpms=refs, target_bpms=bpms)
+        if model is None:
+            self.log(f"Jitter subtraction disabled: {fit_reason}")
+            self.jitter_model = None
+            return None
+        self.jitter_model = model
+        self.log("Jitter subtraction enabled with refs: " + ", ".join(refs))
+        return model
+
+    def _apply_jitter_subtraction_to_state(self, state):
+        if self.jitter_model is None:
+            return state
+
+        state.bpms = apply_jitter_subtraction(state.get_bpms(), self.jitter_model)
+        return state
 
     def handling(self, app_name,cwd=None, args=None):
         try:

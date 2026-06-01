@@ -14,7 +14,7 @@ class State:
         self.hcorrectors_names = hcorrectors_names if hcorrectors_names is not None else []
         self.vcorrectors_names = vcorrectors_names if vcorrectors_names is not None else []
         self.screens = screens if screens is not None else {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])}
-        self.quadrupoles = quadrupoles if quadrupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([])}
+        self.quadrupoles = quadrupoles if quadrupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([]), "xdes": np.array([]), "ydes": np.array([]), "rolldes": np.array([])}
         self.sextupoles = sextupoles if sextupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([])}
         self.timestamp = timestamp if timestamp is not None else datetime.now()
 
@@ -48,7 +48,7 @@ class State:
             }
         else:
             bpms = self.bpms
-        return bpms         
+        return bpms
 
     def get_icts(self, names=None):
         if isinstance(names, str):
@@ -60,19 +60,23 @@ class State:
                 "names": np.array(self.icts['names'])[ict_indexes],
                 "charge": np.array(self.icts['charge'])[ict_indexes]
             }
-        return icts         
+        return icts
 
     def get_quadrupoles(self, names=None):
         if isinstance(names, str):
             names = [names]
-        quadrupoles=self.quadrupoles
+        quadrupoles = self.quadrupoles
         if names is not None:
-            quadrupole_indexes=np.array([index for index, string in enumerate(quadrupoles['names']) if string in names])
-            quadrupoles = {
-                "names": np.array(self.quadrupoles['names'])[quadrupole_indexes],
-                "bdes": np.array(self.quadrupoles['bdes'])[quadrupole_indexes],
-                "bact": np.array(self.quadrupoles['bact'])[quadrupole_indexes],
-            }
+            quadrupole_indexes = np.array([index for index, string in enumerate(quadrupoles.get('names', [])) if string in names])
+            subset = {"names": np.array(quadrupoles.get('names', []))[quadrupole_indexes]}
+            for key, value in quadrupoles.items():
+                if key == "names":
+                    continue
+                try:
+                    subset[key] = np.array(value)[quadrupole_indexes]
+                except Exception:
+                    subset[key] = np.array([])
+            quadrupoles = subset
         return quadrupoles
 
     def get_sextupoles(self, names=None):
@@ -140,7 +144,7 @@ class State:
                                     {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x": np.array([]),
                                      "y": np.array([]), "sigx": np.array([]), "sigy": np.array([]), "sum": np.array([]),
                                      "hedges": [], "vedges": [], "images": [], "S": np.array([])})
-            self.quadrupoles = data.get('quadrupoles', {"names": [], "bdes": np.array([]), "bact": np.array([])})
+            self.quadrupoles = data.get('quadrupoles', {"names": [], "bdes": np.array([]), "bact": np.array([]), "xdes": np.array([]), "ydes": np.array([]), "rolldes": np.array([])})
             self.sextupoles = data.get('sextupoles', {"names": [], "bdes": np.array([]), "bact": np.array([])})
             self.hcorrectors_names = data['hcorrectors_names']
             self.vcorrectors_names = data['vcorrectors_names']
@@ -168,11 +172,7 @@ class State:
             'charge': self.icts['charge'] #intensity
         }
 
-        quadrupoles = {
-            'names': self.quadrupoles['names'],
-            "bact": self.quadrupoles['bact'],
-            "bdes": self.quadrupoles['bdes'],
-        }
+        quadrupoles = dict(self.quadrupoles)
 
         sextupoles = {
             'names': self.sextupoles['names'],

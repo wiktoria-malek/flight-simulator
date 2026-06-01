@@ -803,26 +803,9 @@ class Optimization_EM:
                 if self.print_M:
                     print(f"Starting LS multi-start {start_idx + 1}/{len(ls_starts)} from {x0_try}")
                 try:
-                    res_try = least_squares(
-                        _ls_residuals,
-                        x0_try,
-                        bounds=(low_bounds, high_bounds),
-                        method="trf",
-                        loss="linear",
-                        f_scale=1.0,
-                        max_nfev=local_max_nfev,
-                        x_scale=np.maximum(high_bounds - low_bounds, 1e-12),
-                        ftol=1e-8,
-                        xtol=1e-8,
-                        gtol=1e-8,
-                    )
+                    res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=local_max_nfev, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8)
                     p_try = np.asarray(res_try.x, dtype=float)
-                    f_try, _, _ = compute_cost(
-                        p_try[0], p_try[1], p_try[2],
-                        p_try[3], p_try[4], p_try[5],
-                        quad_k1_0=(p_try[6] if self.fit_quadrupole_strength else None),
-                        allow_stop=False,
-                    )
+                    f_try, _, _ = compute_cost(p_try[0], p_try[1], p_try[2], p_try[3], p_try[4], p_try[5], quad_k1_0=(p_try[6] if self.fit_quadrupole_strength else None), allow_stop=False)
                     if np.isfinite(f_try) and f_try < ls_best_cost[0]:
                         ls_best_cost[0] = float(f_try)
                         ls_best_params[0] = p_try.copy()
@@ -868,35 +851,15 @@ class Optimization_EM:
         stopped_during_fit = stopped_during_fit or ls_stopped[0]
 
         if stopped_during_fit or self._stop_requested or self._pause_requested:
-            pred2_x_p, pred2_y_p = predict_sigma2_from_fit_params(
-                p_final[0], p_final[1], p_final[2],
-                p_final[3], p_final[4], p_final[5],
-                quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None),
-                allow_stop=False,
-            )
-            solution = self._build_joint_partial_output(
-                screens=screens, sigma2_x=sig_x2,
-                sigma2_y=sig_y2,
-                pred2_x=pred2_x_p, pred2_y=pred2_y_p,
-                best_row=best_row, best_cost=best_cost_final,
-            )
+            pred2_x_p, pred2_y_p = predict_sigma2_from_fit_params(p_final[0], p_final[1], p_final[2], p_final[3], p_final[4], p_final[5], quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None), allow_stop=False)
+            solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x_p, pred2_y=pred2_y_p, best_row=best_row, best_cost=best_cost_final)
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             raise OptimizationStopped("Optimization stopped.", solution=solution)
 
-        pred2_x, pred2_y = predict_sigma2_from_fit_params(
-            p_final[0], p_final[1], p_final[2],
-            p_final[3], p_final[4], p_final[5],
-            quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None),
-            allow_stop=True,
-        )
+        pred2_x, pred2_y = predict_sigma2_from_fit_params(p_final[0], p_final[1], p_final[2], p_final[3], p_final[4], p_final[5], quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None), allow_stop=True)
 
-        solution = self._build_joint_partial_output(
-            screens=screens, sigma2_x=sig_x2,
-            sigma2_y=sig_y2,
-            pred2_x=pred2_x, pred2_y=pred2_y,
-            best_row=best_row, best_cost=best_cost_final,
-        )
+        solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x, pred2_y=pred2_y, best_row=best_row, best_cost=best_cost_final)
         solution["message"] = "Joint x+y Bayesian optimization + least-squares."
         solution["stopped"] = bool(stopped_during_fit)
         return solution

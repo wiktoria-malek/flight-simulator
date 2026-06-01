@@ -28,6 +28,11 @@ class Mode(Enum):
     Wakefield = "Changed intensity"
     All = "All modes at once"
 
+
+class ActuatorMode(Enum):
+    Kicker = "Correctors" #Kicker"
+    QM = "Quadrupole movers" #"QM"
+
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
         fig = Figure(tight_layout=True)
@@ -35,12 +40,32 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
 
+
+def finite_abs_max(values):
+    arr = np.asarray(values, dtype=float).ravel()
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return 0.0
+    return float(np.max(np.abs(arr)))
+
+
+def update_amplitude(current_amp, observed, target, max_range):
+    if not np.isfinite(observed) or observed <= 0.0:
+        new_amp = current_amp * 1.5
+    else:
+        scale = target / observed if target > 0 else 1.0
+        scale = max(0.8, min(scale, 2.0))
+        new_amp = current_amp * scale
+    if max_range > 0:
+        new_amp = min(new_amp, max_range)
+    return max(float(new_amp), 1e-6)
+
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, object,str)
     progress=pyqtSignal(int)
     finished = pyqtSignal()
 
-    def __init__(self, interface, state, correctors, bpms, hkicks,vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,output_dir):
+    def __init__(self, interface, state, correctors, bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, output_dir, actuator_mode=ActuatorMode.Kicker):
         super().__init__()
         self.output_dir=output_dir
         self.interface = interface
@@ -55,6 +80,7 @@ class Worker(QObject):
         self.max_curr_h = max_curr_h
         self.max_curr_v = max_curr_v
         self.Niter = Niter
+        self.actuator_mode = actuator_mode
         self.running = False
         self.paused = False
         self.progress_value=0
@@ -68,6 +94,133 @@ class Worker(QObject):
         vkicks = self.vkicks
         hkicks = self.hkicks
         pending_steps=0
+        if self.actuator_mode == ActuatorMode.QM:
+            for iter in range(self.Niter):
+                for magnet in self.correctors:
+                    for axis in ("x", "y"):
+                        filename_p = os.path.join(self.output_dir, f"DATA_{magnet}_{axis}_p{iter:04d}.pkl")
+                        filename_m = os.path.join(self.output_dir, f"DATA_{magnet}_{axis}_m{iter:04d}.pkl")
+                        if not (os.path.isfile(filename_p) and os.path.isfile(filename_m)):
+                            pending_steps += 1
+            total_steps = max(pending_steps, 1)
+
+            for iter in range(self.Niter):
+                if not self.running:
+                    break
+                if self.paused:
+                    self._await_user()
+
+                for imag, magnet in enumerate(self.correctors):
+                    if not self.running:
+                        break
+                    if self.paused:
+                        self._await_user()
+
+                    try:
+                        q0 = I.get_quadrupoles(magnet)
+                    except TypeError:
+                        q0 = I.get_quadrupoles([magnet])
+                    except Exception as exc:
+                        print(f"Skipping {magnet}: failed to read quadrupole state ({exc})")
+                        continue
+
+                    if len(q0.get("names", [])) == 0:
+                        print(f"Skipping {magnet}: quadrupole not found in interface readback.")
+                        continue
+
+                    if not all(key in q0 for key in ("xdes", "ydes", "rolldes")):
+                        print(f"Skipping {magnet}: QM mode needs xdes, ydes and rolldes in get_quadrupoles().")
+                        continue
+
+                    x0 = float(np.asarray(q0["xdes"])[0])
+                    y0 = float(np.asarray(q0["ydes"])[0])
+                    r0 = float(np.asarray(q0["rolldes"])[0])
+
+                    for axis in ("x", "y"):
+                        if not self.running:
+                            break
+                        if self.paused:
+                            self._await_user()
+
+                        amp = float(hkicks[imag]) if axis == "x" else float(vkicks[imag])
+                        target = float(self.max_osc_h) if axis == "x" else float(self.max_osc_v)
+                        max_range = float(self.max_curr_h) if axis == "x" else float(self.max_curr_v)
+                        if max_range > 0:
+                            amp = min(amp, max_range)
+
+                        filename_p = os.path.join(self.output_dir, f"DATA_{magnet}_{axis}_p{iter:04d}.pkl")
+                        filename_m = os.path.join(self.output_dir, f"DATA_{magnet}_{axis}_m{iter:04d}.pkl")
+                        measured_this_magnet = False
+
+                        try:
+                            if not os.path.isfile(filename_p):
+                                print(f"QM {magnet} axis={axis} '+' excitation...")
+                                if axis == "x":
+                                    I.apply_qmag_xyroll(magnet, x0 + amp, y0, r0)
+                                else:
+                                    I.apply_qmag_xyroll(magnet, x0, y0 + amp, r0)
+                                state_p = I.get_state()
+                                state_p.save(filename=filename_p)
+                                measured_this_magnet = True
+                            else:
+                                state_p = I.get_state().__class__(filename=filename_p)
+                            Op = state_p.get_orbit(self.bpms)
+
+                            if not os.path.isfile(filename_m):
+                                print(f"QM {magnet} axis={axis} '-' excitation...")
+                                if axis == "x":
+                                    I.apply_qmag_xyroll(magnet, x0 - amp, y0, r0)
+                                else:
+                                    I.apply_qmag_xyroll(magnet, x0, y0 - amp, r0)
+                                state_m = I.get_state()
+                                state_m.save(filename=filename_m)
+                                measured_this_magnet = True
+                            else:
+                                state_m = I.get_state().__class__(filename=filename_m)
+                            Om = state_m.get_orbit(self.bpms)
+                        finally:
+                            try:
+                                I.apply_qmag_xyroll(magnet, x0, y0, r0)
+                            except Exception as exc:
+                                print(f"WARNING: failed to restore {magnet} mover state ({exc})")
+
+                        Diff_x = (Op['x'] - Om['x']) / 2.0
+                        Diff_y = (Op['y'] - Om['y']) / 2.0
+                        nsamples = max(1, Op['stdx'].size)
+                        Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
+                        Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
+
+                        print(
+                            f"QM result {magnet}:{axis} "
+                            f"max|dx|={finite_abs_max(Diff_x):.4g}, "
+                            f"max|dy|={finite_abs_max(Diff_y):.4g}"
+                        )
+
+                        if measured_this_magnet:
+                            self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, self.bpms, f"{magnet}:{axis}")
+                            self.progress_value += 1
+                            percent = int(self.progress_value / total_steps * 100)
+                            self.progress.emit(percent)
+
+                        observed = max(finite_abs_max(Diff_x), finite_abs_max(Diff_y))
+                        new_amp = update_amplitude(amp, observed, target, max_range)
+                        if axis == "x":
+                            hkicks[imag] = new_amp
+                        else:
+                            vkicks[imag] = new_amp
+
+                        with open(os.path.join(self.output_dir, 'kicks.txt'), 'w') as f:
+                            for i, c in enumerate(self.correctors):
+                                f.write(f'{c} {hkicks[i]} {vkicks[i]}\n')
+
+                        if measured_this_magnet:
+                            t0 = time.monotonic()
+                            while self.running and (time.monotonic() - t0) < 0.2:
+                                time.sleep(0.05)
+
+            self.running = False
+            self.finished.emit()
+            return
 
         for iter in range(self.Niter):
             for corrector in self.correctors:
@@ -113,7 +266,7 @@ class Worker(QObject):
                 if not corr_fully_measured:
                     print(f"Corrector {corrector} '+' excitation...")
                 if not os.path.isfile(filename_p):
-                    print('corr[bds] =', corr['bdes'], ' also kick = ', kick) 
+                    print('corr[bds] =', corr['bdes'], ' also kick = ', kick)
                     curr_p = corr['bdes'] + kick
                     if corrector in self.hcorrs:
                         curr_p = clamp(curr_p, self.max_curr_h)
@@ -222,7 +375,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         project_name=self.interface.get_name()
         mode=self.mode
         time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        folder_path=os.path.join(base,f"{project_name}_{time_str}_{mode.name}")
+        actuator_tag = self.actuator_mode.name if hasattr(self, "actuator_mode") else "Kicker"
+        folder_path = os.path.join(base, f"{project_name}_{time_str}_{actuator_tag}_{mode.name}")
         self.working_directory_input.setText(folder_path)
 
     def __init__(self, interface, dir_name):
@@ -235,6 +389,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.stop_requested = False
         self.cwd = os.getcwd()
         self.interface = interface
+        self.actuator_mode = ActuatorMode.Kicker
         bpms_list = interface.get_bpms()['names']
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
@@ -283,6 +438,9 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
+        self.actuator_mode_combo.clear()
+        self.actuator_mode_combo.addItems([mode.value for mode in ActuatorMode])
+        self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
         self.bpms_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.bpms_list.insertItems(0, bpms_list)
         self.working_directory_input.setText(dir_name+'_Orbit')
@@ -308,6 +466,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.initial_hkick_settings.setText(str(self.sysid_kick))
         self.initial_vkick_settings.setText(str(self.sysid_kick))
         self._set_directory_edit_enabled(True)
+        self._refresh_actuator_labels()
 
     def _load_logo(self):
         self.logo_label.setText("")
@@ -337,6 +496,69 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.working_directory_input.setEnabled(enabled)
         self.working_directory_dialog.setEnabled(enabled)
 
+
+    def _get_quadrupole_names_for_qm_mode(self):
+        names = list(self.interface.get_quadrupoles()["names"])
+        if names:
+            return [str(name) for name in names]
+        try:
+            return [str(name) for name in self.interface.get_sequence() if str(name).upper().startswith("Q")]
+        except Exception:
+            return []
+
+    def _available_actuators(self):
+        if self.actuator_mode == ActuatorMode.QM:
+            return self._sort_elements(self._get_quadrupole_names_for_qm_mode(), which='sequence')
+        return self._sort_elements(list(self.interface.get_correctors()['names']), which='corrs')
+
+    def _refresh_actuator_list(self):
+        selected = {item.text() for item in self.correctors_list.selectedItems()}
+        self.correctors_list.clear()
+        self.correctors_list.insertItems(0, self._available_actuators())
+        for name in selected:
+            for item in self.correctors_list.findItems(name, Qt.MatchFlag.MatchExactly):
+                item.setSelected(True)
+
+    def _refresh_actuator_labels(self):
+        if self.actuator_mode == ActuatorMode.QM:
+            self.correctorsGroup.setTitle("Quadrupoles")
+            self.initial_hkick_label.setText("Initial X [um]")
+            self.initial_vkick_label.setText("Initial Y [um]")
+            self.current_label.setText("Max mover range [um]")
+            self.horizontal_current_label.setText("X:")
+            self.vertical_current_label.setText("Y:")
+            self.max_horizontal_current_spinbox.setMaximum(1e6)
+            self.max_vertical_current_spinbox.setMaximum(1e6)
+            self.max_horizontal_current_spinbox.setSingleStep(10.0)
+            self.max_vertical_current_spinbox.setSingleStep(10.0)
+            self.max_horizontal_current_spinbox.setValue(1000.0)
+            self.max_vertical_current_spinbox.setValue(1000.0)
+            self.initial_hkick_settings.setText("100")
+            self.initial_vkick_settings.setText("100")
+            self.excursion_label.setText(f"Target orbit excursion ({self.bpm_unit})")
+            self.choose_mode.setCurrentText(Mode.Orbit.value)
+            self.choose_mode.setEnabled(False)
+        else:
+            self.correctorsGroup.setTitle("Correctors")
+            self.initial_hkick_label.setText("Initial hkick")
+            self.initial_vkick_label.setText("Initial vkick")
+            self.current_label.setText(f"Max strength ({self.corrs_unit})")
+            self.horizontal_current_label.setText("H:")
+            self.vertical_current_label.setText("V:")
+            self.max_horizontal_current_spinbox.setMaximum(99.99)
+            self.max_vertical_current_spinbox.setMaximum(99.99)
+            self.max_horizontal_current_spinbox.setSingleStep(0.01)
+            self.max_vertical_current_spinbox.setSingleStep(0.01)
+            self.initial_hkick_settings.setText(str(self.sysid_kick))
+            self.initial_vkick_settings.setText(str(self.sysid_kick))
+            self.excursion_label.setText(f"Target orbit excursion ({self.bpm_unit})")
+            self.choose_mode.setEnabled(True)
+
+    def _on_actuator_mode_changed(self, text):
+        self.actuator_mode = ActuatorMode(text)
+        self._refresh_actuator_list()
+        self._refresh_actuator_labels()
+        self._update_folder_path()
 
     def _current_measuring_mode(self):
         if self.mode == Mode.All:
@@ -444,13 +666,26 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
     def _sort_elements(self, unsorted_names, which='corrs'):
         """
-        sorts a list of correctors or BPMs in machine (s) order
-        meant to handle the selection-order-sorted results of QTableWidget.SelectedItems()
+        Sorts a list of correctors, BPMs, or generic sequence elements in machine order.
         """
+        unsorted_names = [str(name) for name in unsorted_names]
+        if which == 'corrs' and hasattr(self.interface, 'corrs'):
+            reference_namelist = self.interface.corrs
+        elif which == 'bpms' and hasattr(self.interface, 'bpms'):
+            reference_namelist = self.interface.bpms
+        else:
+            try:
+                reference_namelist = self.interface.get_sequence()
+            except Exception:
+                reference_namelist = unsorted_names
+
         sorted_names = []
-        reference_namelist = self.interface.corrs if (which == 'corrs') else self.interface.bpms
         for name in reference_namelist:
-            if name in unsorted_names: sorted_names.append(str(name))
+            if str(name) in unsorted_names:
+                sorted_names.append(str(name))
+        for name in unsorted_names:
+            if name not in sorted_names:
+                sorted_names.append(name)
         return sorted_names
 
     def _read_filenames(self,basedir,filename):
@@ -486,12 +721,33 @@ class MainWindow(QMainWindow, SaveOrLoad):
         if self.thread and self.thread.isRunning():
             return  # already running
 
-        selected_correctors = self._sort_elements([item.text() for item in self.correctors_list.selectedItems()], which='corrs')
+        if self.actuator_mode == ActuatorMode.QM:
+            if self.mode != Mode.Orbit:
+                QMessageBox.critical(self, "QM mode", "QM SysID is available only for Orbit Correction mode.")
+                self._set_directory_edit_enabled(True)
+                return
+            if not hasattr(self.interface, "apply_qmag_xyroll") or not hasattr(self.interface, "get_quadrupoles"):
+                QMessageBox.critical(
+                    self,
+                    "QM mode not available",
+                    "This interface does not expose apply_qmag_xyroll(...) and get_quadrupoles(...). Use Kicker mode instead."
+                )
+                self._set_directory_edit_enabled(True)
+                return
+            if len(self._available_actuators()) == 0:
+                QMessageBox.critical(self, "QM mode not available", "No quadrupoles are available for this interface.")
+                self._set_directory_edit_enabled(True)
+                return
+
+        selected_correctors = self._sort_elements(
+            [item.text() for item in self.correctors_list.selectedItems()],
+            which='sequence' if self.actuator_mode == ActuatorMode.QM else 'corrs'
+        )
 
         if not selected_correctors:
             for i in range(self.correctors_list.count()):
                 self.correctors_list.item(i).setSelected(True)
-            selected_correctors = self.interface.get_correctors()['names']
+            selected_correctors = self._available_actuators()
 
         selected_bpms = self._sort_elements([item.text() for item in self.bpms_list.selectedItems()], which='bpms')
         self.selected_bpms = selected_bpms
@@ -506,7 +762,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
             saved_correctors=self._read_filenames(resume_directory,'correctors.txt')
             saved_bpms=self._read_filenames(resume_directory,'bpms.txt')
             if saved_correctors:
-                selected_correctors=self._sort_elements(saved_correctors,'corrs')
+                selected_correctors = self._sort_elements(saved_correctors, 'sequence' if self.actuator_mode == ActuatorMode.QM else 'corrs')
             if saved_bpms:
                 selected_bpms=self._sort_elements(saved_bpms,'bpms')
             self.selected_bpms=selected_bpms
@@ -522,15 +778,16 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 d=resume_directory
             else:
                 time_str=datetime.now().strftime("%Y%m%d_%H%M%S")
-                d = os.path.join(base, f"{project_name}_{time_str}_{mode.name}")
+                d = os.path.join(base, f"{project_name}_{time_str}_{self.actuator_mode.name}_{mode.name}")
             os.makedirs(d, exist_ok=True)
             self.mode_dirs[mode] = d
 
             self._save_names_if_missing(d,'correctors.txt',selected_correctors)
             self._save_names_if_missing(d,'bpms.txt',selected_bpms)
-
+            self._save_names_if_missing(d, 'actuator_mode.txt', [self.actuator_mode.name])
 
         machine_state=self.interface.get_state()
+        machine_state.put("sysid_actuator_mode", self.actuator_mode.name)
         for mode,d in self.mode_dirs.items():
             machine_status=os.path.join(d,'machine_status.pkl')
             if not os.path.isfile(machine_status):
@@ -554,7 +811,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
         self.thread = QThread()
         out_dir=self.mode_dirs[self.current_mode]
-        self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks,vkicks ,max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
+        self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, out_dir, self.actuator_mode)
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
@@ -576,7 +833,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
             #self.S.load('machine_status')
             current_dir=self.mode_dirs[self.current_mode]
             machine_state=self.interface.get_state().__class__(filename=os.path.join(current_dir,"machine_status.pkl"))
-            self.interface.restore_correctors_state(machine_state)
+            if self.actuator_mode != ActuatorMode.QM:
+                self.interface.restore_correctors_state(machine_state)
             self.progressBar.setValue(100)
             self.thread = None
             self.worker = None
@@ -599,7 +857,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 print(f"Niter: {Niter}")
                 self.thread = QThread()
                 out_dir = self.mode_dirs[self.current_mode]
-                self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks,max_osc_h,max_osc_v, max_curr_h, max_curr_v, Niter,out_dir)
+                self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, out_dir, self.actuator_mode)
                 self.worker.moveToThread(self.thread)
                 self.thread.started.connect(self.worker.run)
                 self.worker.finished.connect(self.thread.quit)
@@ -655,7 +913,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot_widget.axes.set_xticks(scale)
         self.plot_widget.axes.set_xticklabels(bpm_names[:n],rotation=90,fontsize=8)
         self.plot_widget.axes.set_ylabel(f'Orbit [{self.bpm_unit}]')
-        self.plot_widget.axes.set_title(f"Corrector '{corrector}'")
+        self.plot_widget.axes.set_title(f"Actuator '{corrector}'")
         self.plot_widget.axes.grid(color='#EEEEEE')
         self.plot_widget.draw()
         self.plot_widget.repaint()
@@ -671,20 +929,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         if not self._is_a_valid_directory_to_resume(folder):
             return
 
-        self._loading_func(
-            elements_list=self.correctors_list,
-            filename="correctors.txt",
-            loading_name="Load Correctors",
-            use_dialog=False,
-            base_dir=folder,
-        )
-        self._loading_func(
-            elements_list=self.bpms_list,
-            filename="bpms.txt",
-            loading_name="Load BPMs",
-            use_dialog=False,
-            base_dir=folder,
-        )
+        self._loading_func(elements_list=self.correctors_list, filename="correctors.txt", loading_name="Load Correctors", use_dialog=False, base_dir=folder)
+        self._loading_func(elements_list=self.bpms_list, filename="bpms.txt", loading_name="Load BPMs", use_dialog=False, base_dir=folder)
         QMessageBox.information(self,"Directory loaded","Loaded directory data to be resumed.")
 
 ## MAIN

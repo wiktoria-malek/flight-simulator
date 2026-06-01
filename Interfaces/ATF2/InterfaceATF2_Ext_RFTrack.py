@@ -529,51 +529,30 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         # AS A TEST!
             self.__track_bunch()
 
-
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
-        if np.isscalar(corr_vals):
-            corr_vals = [corr_vals] * len(names)
-        elif not isinstance(corr_vals, (list, tuple, np.ndarray)):
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = [corr_vals]
-        if len(names) != len(corr_vals):
-            self.log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
-            return
         for corr, val in zip(names, corr_vals):
-            if corr not in self.kl_per_A:
-                self.log(f'Warning: missing kl_per_A for {corr}; skipping.')
-                continue
-            strength = float(val) * self.kl_per_A[corr] * 1000  # A -> T*mm
             if corr[:2] == "ZH" or corr[:2] == "ZX":
-                self.lattice[corr].set_strength(strength, 0.0)
+                self.lattice[corr].set_strength(val / 10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
-                self.lattice[corr].set_strength(0.0, strength)
-
+                self.lattice[corr].set_strength(0.0, val / 10)  # T*mm
         self.__track_bunch()
-
 
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
-        if np.isscalar(corr_vals):
-            corr_vals = [corr_vals] * len(names)
-        elif not isinstance(corr_vals, (list, tuple, np.ndarray)):
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = [corr_vals]
-        if len(names) != len(corr_vals):
-            self.log('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
-            return
         for corr, val in zip(names, corr_vals):
-            if corr not in self.kl_per_A:
-                self.log(f'Warning: missing kl_per_A for {corr}; skipping.')
-                continue
-            delta_strength = float(val) * self.kl_per_A[corr] * 1000  # A -> T*mm
             if corr[:2] == "ZH" or corr[:2] == "ZX":
-                self.lattice[corr].vary_strength(delta_strength, 0.0)
+                self.lattice[corr].vary_strength(val / 10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
-                self.lattice[corr].vary_strength(0.0, delta_strength)
+                self.lattice[corr].vary_strength(0.0, val / 10)  # T*mm
         self.__track_bunch()
-        #self._needs_tracking = True
+
 
     def vary_quadrupoles(self, names, delta_values):
         if not isinstance(names, list):
@@ -1221,6 +1200,48 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "S": s,
         }
         
-        
-        
+    def set_correctors(self, names, corr_vals):
+        if isinstance(names, str):
+            names = [names]
+        if np.isscalar(corr_vals):
+            corr_vals = [corr_vals] * len(names)
+        elif not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
+        if len(names) != len(corr_vals):
+            self.log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
+            return
+        for corr, val in zip(names, corr_vals):
+            if corr not in self.kl_per_A:
+                self.log(f'Warning: missing kl_per_A for {corr}; skipping.')
+                continue
+            strength = float(val) * self.kl_per_A[corr] * 1000  # A -> T*mm
+            if corr[:2] == "ZH" or corr[:2] == "ZX":
+                self.lattice[corr].set_strength(strength, 0.0)
+            elif corr[:2] == "ZV":
+                self.lattice[corr].set_strength(0.0, strength)
+
+        self.__track_bunch()
+    
+    
+        def vary_correctors(self, names, corr_vals):
+        if isinstance(names, str):
+            names = [names]
+        if np.isscalar(corr_vals):
+            corr_vals = [corr_vals] * len(names)
+        elif not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
+        if len(names) != len(corr_vals):
+            self.log('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
+            return
+        for corr, val in zip(names, corr_vals):
+            if corr not in self.kl_per_A:
+                self.log(f'Warning: missing kl_per_A for {corr}; skipping.')
+                continue
+            delta_strength = float(val) * self.kl_per_A[corr] * 1000  # A -> T*mm
+            if corr[:2] == "ZH" or corr[:2] == "ZX":
+                self.lattice[corr].vary_strength(delta_strength, 0.0)
+            elif corr[:2] == "ZV":
+                self.lattice[corr].vary_strength(0.0, delta_strength)
+        self.__track_bunch()
+        #self._needs_tracking = True 
     '''
