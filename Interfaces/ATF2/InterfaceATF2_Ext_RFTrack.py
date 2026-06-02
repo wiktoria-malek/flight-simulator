@@ -32,6 +32,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
+        self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
         self.lattice = rft.Lattice(self.twiss_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
@@ -209,11 +210,19 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
-        dx = self.jitter * I0.sigma_x
-        dy = self.jitter * I0.sigma_y
+        # dx = self.jitter * I0.sigma_x
+        # dy = self.jitter * I0.sigma_y
+        # dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
+        # pitch = self.jitter * I0.sigma_py
+        # yaw = self.jitter * I0.sigma_px
+
+        #Uncomment for jitter subtraction tests
+        dx = self.rng.normal(0.0, self.jitter * I0.sigma_x)
+        dy = self.rng.normal(0.0, self.jitter * I0.sigma_y)
+        pitch = self.rng.normal(0.0, self.jitter * I0.sigma_py)
+        yaw = self.rng.normal(0.0, self.jitter * I0.sigma_px)
         dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
-        pitch = self.jitter * I0.sigma_py
-        yaw = self.jitter * I0.sigma_px
+
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         B1=self.lattice.track(B0_offset)
         I = B0_offset.get_info()
@@ -297,7 +306,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return target_disp_x, target_disp_y
 
     def get_icts(self, names=None):
-        self.log("Reading ict's...")
+        #self.log("Reading ict's...")
         icts = {
             "names": self.bpms,
             "charge": np.array([bpm.get_total_charge() for bpm in self.lattice.get_bpms()])
@@ -314,7 +323,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return icts
 
     def get_correctors(self, names=None):
-        self.log("Reading correctors' strengths...")
+        #self.log("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i, corrector in enumerate(self.corrs):
             if corrector[:2] == "ZH" or corrector[:2] == "ZX":
@@ -337,18 +346,30 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return correctors
 
     def get_bpms(self, names=None):
-        self.log('Reading bpms...')
+        #self.log('Reading bpms...')
         x = np.zeros((self.nsamples, len(self.bpms)))
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
 
+        # for i in range(self.nsamples):
+        #     for j, bpm in enumerate(self.bpms):
+        #         b = self.lattice[bpm]
+        #         reading = b.get_reading()
+        #         x[i, j] = reading[0]
+        #         y[i, j] = reading[1]
+        #         tmit[i, j] = b.get_total_charge()
+
+
+        # Uncomment for jitter subtraction tests
         for i in range(self.nsamples):
+            self.__track_bunch()
             for j, bpm in enumerate(self.bpms):
                 b = self.lattice[bpm]
                 reading = b.get_reading()
                 x[i, j] = reading[0]
                 y[i, j] = reading[1]
                 tmit[i, j] = b.get_total_charge()
+
 
         bpms = {"names": self.bpms, "x": x, "y": y, "tmit": tmit}
 
@@ -829,7 +850,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         }
 
     def get_sextupoles(self, names = None):
-        self.log("Reading sextupoles' strengths...")
+        #self.log("Reading sextupoles' strengths...")
         bdes = np.zeros(len(self.sextupoles), dtype=float)
 
         for i, sextupole_name in enumerate(self.sextupoles):
@@ -888,8 +909,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 strengths[2] = complex(float(value), 0.0)
                 element.set_strengths(strengths)
         self.__track_bunch()
-
-
 
     def get_phase_space_transport_to_screens(self, reference_screen=None, screens=None):
         if screens is None:

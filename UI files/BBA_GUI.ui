@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1295</width>
-    <height>831</height>
+    <height>819</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -1122,17 +1122,64 @@ QToolButton#beta_tooltip:hover {
                     </layout>
                    </item>
                    <item>
-                    <widget class="QCheckBox" name="subtract_jitter_checkbox">
-                     <property name="toolTip">
-                      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use upstream BPMs to estimate shot-to-shot incoming beam jitter and subtract it from downstream BPM readings. Useful for real-machine response measurements; disabled by default.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                     </property>
-                     <property name="text">
-                      <string>Subtract incoming jitter</string>
-                     </property>
-                     <property name="checked">
-                      <bool>false</bool>
-                     </property>
-                    </widget>
+                    <layout class="QHBoxLayout" name="jitter_subtraction_layout">
+                     <item>
+                      <widget class="QCheckBox" name="subtract_jitter_checkbox">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use upstream BPMs to estimate shot-to-shot incoming beam jitter and subtract it from downstream BPM readings. Recommended mainly for quadrupole mover correction, where the machine configuration remains fixed. For kicker correction with DFS/WFS, use with care because energy or intensity changes can be interpreted as jitter.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="text">
+                        <string>Subtract incoming jitter</string>
+                       </property>
+                       <property name="checked">
+                        <bool>false</bool>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QToolButton" name="jitter_subtraction_tooltip">
+                       <property name="minimumSize">
+                        <size>
+                         <width>22</width>
+                         <height>22</height>
+                        </size>
+                       </property>
+                       <property name="maximumSize">
+                        <size>
+                         <width>22</width>
+                         <height>22</height>
+                        </size>
+                       </property>
+                       <property name="focusPolicy">
+                        <enum>Qt::NoFocus</enum>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Subtracts correlated incoming beam jitter using upstream BPMs as references.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Recommended:&lt;/span&gt; quadrupole mover correction, where the optics/energy stay fixed.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;For correctors mode &lt;/span&gt;(kicker correction with DFS/WFS): In off-energy or reduced-charge measurements, real physical orbit changes may be mistaken for jitter and over-subtracted.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#jitter_subtraction_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#jitter_subtraction_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
+                       </property>
+                       <property name="autoRaise">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
                    </item>
                   </layout>
                  </widget>

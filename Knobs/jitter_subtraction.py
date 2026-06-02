@@ -172,6 +172,7 @@ def apply_jitter_subtraction(bpms, model):
     x[:, tgt_idx] = x[:, tgt_idx] - x_pred
     y[:, tgt_idx] = y[:, tgt_idx] - y_pred
 
+
     corrected = dict(bpms)
     corrected["x"] = x
     corrected["y"] = y

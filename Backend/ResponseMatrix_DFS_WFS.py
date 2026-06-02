@@ -72,10 +72,10 @@ class ResponseMatrix_DFS_WFS():
             Sp = State(filename=fp)
             Sm = State(filename=fm)
 
-            jitter_model = getattr(self, "jitter_model", None)
-            if jitter_model is not None:
-                Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
-                Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
+            # jitter_model = getattr(self, "jitter_model", None)
+            # if jitter_model is not None:
+            #     Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
+            #     Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
 
             Op = Sp.get_orbit(bpms)
             Om = Sm.get_orbit(bpms)
@@ -253,12 +253,19 @@ class ResponseMatrix_DFS_WFS():
             hcorrs0, vcorrs0, hcorrs1, vcorrs1, hcorrs2, vcorrs2,
             bpms0, bpms1, bpms2,
         )
-    def _creating_response_matrices(self):
+    def _creating_response_matrices(self, selected_corrs = None, selected_bpms = None):
+
+        if selected_corrs is None or selected_bpms is None:
+            corrs, bpms = self._get_selection()
+        else:
+            corrs = list(selected_corrs)
+            bpms = list(selected_bpms)
+
 
         w1, w2, w3, rcond, iters, gain,beta = self._read_params()
         wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
-        corrs, bpms = self._get_selection()
+        #corrs, bpms = self._get_selection()
 
         (
             R0xx, R0yy, R0xy, R0yx, B0x, B0y,
@@ -441,10 +448,10 @@ class ResponseMatrix_DFS_WFS():
             qname = tag[:-2]
             Sp = State(filename=fp)
             Sm = State(filename=fm)
-            jitter_model = getattr(self, "jitter_model", None)
-            if jitter_model is not None:
-                Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
-                Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
+            # jitter_model = getattr(self, "jitter_model", None)
+            # if jitter_model is not None:
+            #     Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
+            #     Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
             Op = Sp.get_orbit(bpms)
             Om = Sm.get_orbit(bpms)
             den = qval(Sp, qname, axis) - qval(Sm, qname, axis)

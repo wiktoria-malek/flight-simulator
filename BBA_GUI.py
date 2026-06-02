@@ -680,7 +680,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 return
             corrs, bpms = self._get_selection()
             self._build_jitter_model_for_correction(actuators = corrs, bpms = bpms)
-
+            if self.jitter_model is not None:
+                refs = set(self.jitter_model["reference_bpms"])
+                bpms = [bpm for bpm in bpms if bpm not in refs]
+                self.log("Removed jitter reference BPMs from QM correction targets")
             '''
             Restore only selected correctors
             '''
@@ -700,13 +703,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
             w1, w2, w3, rcond, iters, gain,beta = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
-            corrs, bpms = self._get_selection()
+            #corrs, bpms = self._get_selection()
 
             Cx = [s for s in corrs if self._is_h_corrector(s)]
 
             Cy = [s for s in corrs if self._is_v_corrector(s)]
 
-            Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs, bpms_common = self._creating_response_matrices()
+            Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs, bpms_common = self._creating_response_matrices(selected_corrs = corrs, selected_bpms = bpms)
             print("hcorrs order =", hcorrs)
             print("vcorrs order =", vcorrs)
             print("Cx from GUI =", Cx)
@@ -811,6 +814,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 # COMMENT AFTER SANITY CHECKS
                 if it == 0:
                     if self.nominal_state is not None:
+                        # nominal_state = self._apply_jitter_subtraction_to_state(self.nominal_state)
+                        # nominal_orbit = nominal_state.get_orbit(bpms)
                         nominal_orbit = self.nominal_state.get_orbit(bpms)
                         B0x = np.asarray(nominal_orbit["x"], dtype=float).reshape(-1, 1)
                         B0y = np.asarray(nominal_orbit["y"], dtype=float).reshape(-1, 1)
@@ -1170,6 +1175,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
         qcorrs, bpms = self._get_selection()
         self._build_jitter_model_for_correction(actuators=qcorrs, bpms=bpms)
+        if self.jitter_model is not None:
+            refs = set(self.jitter_model["reference_bpms"])
+            bpms = [bpm for bpm in bpms if bpm not in refs]
+            self.log("Removed jitter reference BPMs from correction targets")
 
         if len(qcorrs) == 0:
             raise RuntimeError("No quadrupoles selected")
@@ -1304,25 +1313,32 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.jitter_model = None
             return None
 
-        info = self._data_dirs.get("traj")
-        if not (info and info.get("ok")):
-            self.log("Jitter subtraction disabled: no trajectory response data")
-            self.jitter_model = None
-            return None
-        bpm_snapshots = []
-        for pair in info["pairs"]:
-            fp, fm = pair[0], pair[1]
-            for filename in (fp, fm):
-                state = State(filename=filename)
-                bpm_snapshots.append(state.get_bpms())
+        old_nsamples = getattr(self.interface, "nsamples", None)
+        fit_nsamples = 300
 
-        model, fit_reason = fit_jitter_model(bpms_list=bpm_snapshots, reference_bpms=refs, target_bpms=bpms)
+        try:
+            if old_nsamples is not None:
+                self.interface.nsamples = fit_nsamples
+            bpms_snapshot = self.interface.get_bpms()
+        finally:
+            if old_nsamples is not None:
+                self.interface.nsamples = old_nsamples
+
+        targets = [str(bpm) for bpm in bpms if str(bpm) not in set(refs)]
+
+        model, fit_reason = fit_jitter_model(bpms_list=[bpms_snapshot], reference_bpms=refs, target_bpms=targets)
+
         if model is None:
             self.log(f"Jitter subtraction disabled: {fit_reason}")
             self.jitter_model = None
             return None
+
         self.jitter_model = model
-        self.log("Jitter subtraction enabled with refs: " + ", ".join(refs))
+        self.log(
+            "Jitter subtraction enabled with refs: "
+            + ", ".join(refs)
+            + f"; fitted from {fit_nsamples} fixed-config BPM samples"
+        )
         return model
 
     def _apply_jitter_subtraction_to_state(self, state):
