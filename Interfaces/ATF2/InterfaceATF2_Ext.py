@@ -174,14 +174,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # # Index of the selected BPMs in the Epics PV ATF2:monitors
         # self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
 
-           '''
+        '''
+        
            Sato-san's way:
            BPM order must follow MONITOR_INDEX_TO_NAME, independent from sequence.
            
         self.bpm_indexes = np.array(sorted(self.MONITOR_INDEX_TO_NAME.keys()), dtype=int)
         self.bpms = [self.MONITOR_INDEX_TO_NAME[i] for i in self.bpm_indexes]
         
-           '''
+        '''
         name_to_monitor_index = {name: index for index, name in self.MONITOR_INDEX_TO_NAME.items()}
         self.bpms = [element for element in self.sequence if not element.lower().startswith('z') and element in name_to_monitor_index]
         self.bpm_indexes = np.array([name_to_monitor_index[name] for name in self.bpms], dtype=int)

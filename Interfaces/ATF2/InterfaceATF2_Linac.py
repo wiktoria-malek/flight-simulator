@@ -16,6 +16,46 @@ def set_quadrupoles(self):
     pass
 '''
 
+LINAC_SEQUENCE = [
+    'MB5L', 'MB6L', 'MB7L', 'ZH1L', 'ZV1L', 'MB8L', 'MB9L', 'MB10L',
+    'ZV2L', 'ZH2L', 'MB11L', 'ML1L', 'ML2L', 'ZV3L', 'ZH3L', 'ML3L',
+    'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L', 'ML4L', 'ZH6L', 'ZV6L', 'ML5L',
+    'ZH7L', 'ZV7L', 'ML6L', 'ZH8L', 'ZV8L', 'ML7L', 'ZH9L', 'ML8L',
+    'ZV9L', 'ML9L', 'ZH10L', 'ML10L', 'ZV10L', 'ML11L', 'ZH11L',
+    'ML12L', 'ZV11L', 'ML13L', 'ZH12L', 'ML14L', 'ZV12L', 'ML15L'
+]
+
+LINAC_MONITORS = [
+    "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L", "ML1L",
+    "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L", "ML8L", "ML9L",
+    "ML10L", "ML11L", "ML12L", "ML13L", "ML14L", "ML15L", "ML1P", "ML2P",
+    "ML3P", "ML4P", "GUN", "LN0", "LNE", "BTM", "BTE", "C44N16A08",
+    "C44N16A09", "C44N16A10", "C44N16A11", "C44N16A12", "C44N16A13",
+    "C44N16A14", "C44N16A15", "C45N09A00", "C45N09A01", "C45N09A02",
+    "C45N09A03", "C45N09A04", "C45N09A05", "C45N09A06", "C45N09A07",
+    "C45N09A08", "C45N09A09", "C45N09A10", "C45N09A11", "C45N09A12",
+    "C45N09A13", "C45N09A14", "C45N09A15", "ML1T", "ML2T", "ML3T",
+    "ML4T", "ML5T", "ML6T", "ML7T", "ML8T", "ML9T", "MB10T", "MB11T",
+    "MB1T", "ML101T", "ML102T", "ML103T", "ML104T", "ML105T", "ML106T",
+    "C43N16A08", "C43N16A09", "C43N16A10", "C43N16A11", "C43N16A12",
+    "C43N16A13", "C43N16A14", "C43N16A15"
+]
+
+def _build_beamline(sequence, monitors):
+    sequence = [str(element) for element in sequence]
+    monitors = [str(monitor) for monitor in monitors]
+    monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
+    bpm_ok = all(bpm in monitors for bpm in monitors_from_sequence)
+    if not bpm_ok:
+        bpms_unknown = [bpm for bpm in monitors_from_sequence if bpm not in monitors]
+        print(f'Unknown bpms {bpms_unknown} removed from list')
+    sequence_filtered = [element for element in sequence if (element in monitors) or element.lower().startswith('z')]
+    bpms = [string for string in sequence_filtered if not string.lower().startswith('z')]
+    corrs = [string for string in sequence_filtered if string.lower().startswith('z')]
+    bpm_indexes = [index for index, string in enumerate(monitors) if string in bpms]
+    return sequence_filtered, bpms, corrs, bpm_indexes
+
+
 class InterfaceATF2_Linac(AbstractMachineInterface):
 
     def get_name(self):
@@ -25,45 +65,45 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         self.log = print
         self.nsamples = nsamples
         # Bpms and correctors in beamline order
-        sequence = [ 
-            'MB5L', 'MB6L', 'MB7L', 'ZH1L', 'ZV1L', 'MB8L', 'MB9L', 'MB10L', 
-            'ZV2L', 'ZH2L', 'MB11L', 'ML1L', 'ML2L', 'ZV3L', 'ZH3L', 'ML3L',
-            'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L', 'ML4L', 'ZH6L', 'ZV6L', 'ML5L',
-            'ZH7L', 'ZV7L', 'ML6L', 'ZH8L', 'ZV8L', 'ML7L', 'ZH9L', 'ML8L',
-            'ZV9L', 'ML9L', 'ZH10L', 'ML10L', 'ZV10L', 'ML11L', 'ZH11L',
-            'ML12L', 'ZV11L', 'ML13L', 'ZH12L', 'ML14L', 'ZV12L', 'ML15L'
-        ]
-        '''
-        sequence = [
-            'MB5L', 'MB6L', 'MB7L', 'ZH1L', 'ZV1L', 'MB8L', 'MB9L', 'MB10L',
-            'ZV2L', 'ZH2L', 'MB11L', 'ML1L', 'ML2L', 'ZV3L', 'ZH3L', 'ML3L',
-            'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L', 'ML4L', 'ZH6L', 'ZV6L', 'ML5L',
-            'ZH7L', 'ZV7L', 'ML6L', 'ZH8L', 'ZV8L', 'ML7L', 'ZH9L', 'ML8L',
-            'ZV9L', 'ML9L', 'ZH10L', 'ML10L', 'ZV10L', 'ML11L', 'ZH11L', 'ML12L',
-            'ZV11L', 'ML13L', 'ZH12L', 'ML14L', 'ZV12L', 'ML15L', 'ZX10T', 'ZX11T',
-            'ML1T', 'ZV13L', 'ZX12T', 'ML2T', 'ZY20T', 'ZY21T', 'ML101T', 'ML102T',
-            'ZY22T', 'ZY23T', 'ML103T', 'ZX30T', 'ML3T', 'ZX31T', 'ZV30T', 'ZH30T',
-            'ML104T', 'ZX32T', 'ML4T', 'ML105T', 'ZV40T', 'ZH40T', 'ML5T', 'ML6T',
-            'ZX50T', 'ML106T', 'ZX50T', 'ML7T', 'ZX51T', 'ZV50T', 'ML8T', 'ZH50T',
-            'ZV51T', 'ML9T', 'MB10T', 'MB11T'
-        ]'''
+        # sequence = [
+        #     'MB5L', 'MB6L', 'MB7L', 'ZH1L', 'ZV1L', 'MB8L', 'MB9L', 'MB10L',
+        #     'ZV2L', 'ZH2L', 'MB11L', 'ML1L', 'ML2L', 'ZV3L', 'ZH3L', 'ML3L',
+        #     'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L', 'ML4L', 'ZH6L', 'ZV6L', 'ML5L',
+        #     'ZH7L', 'ZV7L', 'ML6L', 'ZH8L', 'ZV8L', 'ML7L', 'ZH9L', 'ML8L',
+        #     'ZV9L', 'ML9L', 'ZH10L', 'ML10L', 'ZV10L', 'ML11L', 'ZH11L',
+        #     'ML12L', 'ZV11L', 'ML13L', 'ZH12L', 'ML14L', 'ZV12L', 'ML15L'
+        # ]
+        # '''
+        # sequence = [
+        #     'MB5L', 'MB6L', 'MB7L', 'ZH1L', 'ZV1L', 'MB8L', 'MB9L', 'MB10L',
+        #     'ZV2L', 'ZH2L', 'MB11L', 'ML1L', 'ML2L', 'ZV3L', 'ZH3L', 'ML3L',
+        #     'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L', 'ML4L', 'ZH6L', 'ZV6L', 'ML5L',
+        #     'ZH7L', 'ZV7L', 'ML6L', 'ZH8L', 'ZV8L', 'ML7L', 'ZH9L', 'ML8L',
+        #     'ZV9L', 'ML9L', 'ZH10L', 'ML10L', 'ZV10L', 'ML11L', 'ZH11L', 'ML12L',
+        #     'ZV11L', 'ML13L', 'ZH12L', 'ML14L', 'ZV12L', 'ML15L', 'ZX10T', 'ZX11T',
+        #     'ML1T', 'ZV13L', 'ZX12T', 'ML2T', 'ZY20T', 'ZY21T', 'ML101T', 'ML102T',
+        #     'ZY22T', 'ZY23T', 'ML103T', 'ZX30T', 'ML3T', 'ZX31T', 'ZV30T', 'ZH30T',
+        #     'ML104T', 'ZX32T', 'ML4T', 'ML105T', 'ZV40T', 'ZH40T', 'ML5T', 'ML6T',
+        #     'ZX50T', 'ML106T', 'ZX50T', 'ML7T', 'ZX51T', 'ZV50T', 'ML8T', 'ZH50T',
+        #     'ZV51T', 'ML9T', 'MB10T', 'MB11T'
+        # ]'''
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
-        monitors = [
-            "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L", "ML1L",
-            "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L", "ML8L", "ML9L",
-            "ML10L", "ML11L", "ML12L", "ML13L", "ML14L", "ML15L", "ML1P", "ML2P",
-            "ML3P", "ML4P", "GUN", "LN0", "LNE", "BTM", "BTE", "C44N16A08",
-            "C44N16A09", "C44N16A10", "C44N16A11", "C44N16A12", "C44N16A13",
-            "C44N16A14", "C44N16A15", "C45N09A00", "C45N09A01", "C45N09A02",
-            "C45N09A03", "C45N09A04", "C45N09A05", "C45N09A06", "C45N09A07",
-            "C45N09A08", "C45N09A09", "C45N09A10", "C45N09A11", "C45N09A12",
-            "C45N09A13", "C45N09A14", "C45N09A15", "ML1T", "ML2T", "ML3T",
-            "ML4T", "ML5T", "ML6T", "ML7T", "ML8T", "ML9T", "MB10T", "MB11T",
-            "MB1T", "ML101T", "ML102T", "ML103T", "ML104T", "ML105T", "ML106T",
-            "C43N16A08", "C43N16A09", "C43N16A10", "C43N16A11", "C43N16A12",
-            "C43N16A13", "C43N16A14", "C43N16A15"
-        ]
+        # monitors = [
+        #     "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L", "ML1L",
+        #     "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L", "ML8L", "ML9L",
+        #     "ML10L", "ML11L", "ML12L", "ML13L", "ML14L", "ML15L", "ML1P", "ML2P",
+        #     "ML3P", "ML4P", "GUN", "LN0", "LNE", "BTM", "BTE", "C44N16A08",
+        #     "C44N16A09", "C44N16A10", "C44N16A11", "C44N16A12", "C44N16A13",
+        #     "C44N16A14", "C44N16A15", "C45N09A00", "C45N09A01", "C45N09A02",
+        #     "C45N09A03", "C45N09A04", "C45N09A05", "C45N09A06", "C45N09A07",
+        #     "C45N09A08", "C45N09A09", "C45N09A10", "C45N09A11", "C45N09A12",
+        #     "C45N09A13", "C45N09A14", "C45N09A15", "ML1T", "ML2T", "ML3T",
+        #     "ML4T", "ML5T", "ML6T", "ML7T", "ML8T", "ML9T", "MB10T", "MB11T",
+        #     "MB1T", "ML101T", "ML102T", "ML103T", "ML104T", "ML105T", "ML106T",
+        #     "C43N16A08", "C43N16A09", "C43N16A10", "C43N16A11", "C43N16A12",
+        #     "C43N16A13", "C43N16A14", "C43N16A15"
+        # ]
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
         # Check if the bpms in the config files are known to Epics
@@ -74,11 +114,14 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         # Only retain BPMs in config file which are known by Epics
         sequence_filtered = [element for element in sequence if (element in monitors) or element.lower().startswith('z')]
         # Subset of BPMs and correctors from the config file
-        self.sequence = sequence_filtered
-        self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
-        self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
+        #self.sequence = sequence_filtered
+        #self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
+        #self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         # Index of the selected BPMs in the Epics PV ATF2:monitors
-        self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
+        #self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
+        self.monitors = list(LINAC_MONITORS)
+        self.sequence, self.bpms, self.corrs, self.bpm_indexes = _build_beamline(sequence=LINAC_SEQUENCE, monitors=self.monitors)
+
         # Bunch current monitors
         self.ict_names = [
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
@@ -112,7 +155,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
 
     def change_intensity(self, laserintensity=0.15):
         print(f'Changing laser intensity to {laserintensity}...')
-        laser_intensity = float(laserintensity) * 100 * 3  # Korysko dixit: 100 for percent, 5 convesion factor
+        laser_intensity = float(laserintensity) * 100 * 5  # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
         return self

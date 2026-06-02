@@ -114,7 +114,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         T.disp_px = 0.1112759177
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        Nparticles = 1000 # number of macroparticles
+        Nparticles = 10000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, self.Pref, T, Nparticles)
         
     def __setup_beam1(self):
@@ -131,7 +131,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         T.disp_px = 0.1112759177
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        Nparticles = 1000 # number of macroparticles
+        Nparticles = 10000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, -1, Pref, T, Nparticles)
 
     def __setup_beam2(self):
@@ -149,7 +149,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         T.disp_px = 0.1112759177
         T.sigma_t = 8 # mm/c
         T.sigma_pt = 0.8 # permille
-        Nparticles = 1000 # number of macroparticles
+        Nparticles = 10000 # number of macroparticles
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, -1, self.Pref, T, Nparticles)
 
     def __track_bunch(self):

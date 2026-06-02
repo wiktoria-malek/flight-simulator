@@ -126,7 +126,7 @@ class SaveOrLoad():
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
 
-    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By):
+    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By, is_jitter_subtraction_checked):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir = f"~/flight-simulator-data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
@@ -149,6 +149,7 @@ class SaveOrLoad():
             "max_horizontal_current" : max_horizontal_current,
             "max_vertical_current" : max_vertical_current,
             "is_triangular" : is_triangular,
+            "is_jitter_subtraction_checked": is_jitter_subtraction_checked,
             "bpm_weights" : bpm_weights,
             "data_dirs": {k: (self._expand_data_path(v["dir"]) if v else None)
                           for k, v in self._data_dirs.items()},
@@ -267,6 +268,7 @@ class SaveOrLoad():
         if "max_horizontal_current" in settings: self.max_horizontal_current_spinbox.setValue(settings["max_horizontal_current"])
         if "max_vertical_current" in settings: self.max_vertical_current_spinbox.setValue(settings["max_vertical_current"])
         if "is_triangular" in settings: self.triangular_checkbox.setChecked(settings["is_triangular"])
+        if "is_jitter_subtraction_checked" in settings: self.subtract_jitter_checkbox.setChecked(settings["is_jitter_subtraction_checked"])
         if "bpm_weights" in settings:
             for bpm_name, weights in settings["bpm_weights"].items():
                 try:

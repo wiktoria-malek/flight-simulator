@@ -108,6 +108,27 @@ INTERFACE_SETUP = {
             }
         },
         {
+            "display_name": "ATF2 Linac Beam Transport",
+            "module": "Interfaces.ATF2.InterfaceATF2_LinacBT",
+            "class_name": "InterfaceATF2_LinacBT",
+            "settings": {"nsamples": 3},
+            "actions": [],
+            "units":
+                {
+                    "corrector_strength": "T*mm",
+                    "bpm_position": "mm",
+                    "sysid_corrector_kick": 0.01
+                },
+            "bounds": {
+                "emit_x_norm": [1e-4, 0.05],
+                "beta_x0": [0.05, 5.0],
+                "alpha_x0": [-6.0, 2.0],
+                "emit_y_norm": [1e-4, 0.05],
+                "beta_y0": [0.2, 8.0],
+                "alpha_y0": [-15.0, 2.0],
+            }
+        },
+        {
             "display_name": "ATF2 Linac RFTrack",
             "module": "Interfaces.ATF2.InterfaceATF2_Linac_RFTrack",
             "class_name": "InterfaceATF2_Linac_RFTrack",

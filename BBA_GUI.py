@@ -151,13 +151,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.subtract_jitter_checkbox.setChecked(False)
         self.actuator_mode = ActuatorMode.Kicker
 
-        if hasattr(self.interface, "get_quadrupoles_names"):
+        if hasattr(self.interface, "get_quadrupoles"):
             try:
-                self.qm_corrs = self.interface.get_quadrupoles_names()
+                self.qm_corrs = self.interface.get_quadrupoles()["names"]
             except Exception:
                 self.qm_corrs = []
         else:
             self.qm_corrs = []
+
         self.setWindowTitle("BBA GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
@@ -203,6 +204,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._setup_qm_controls()
         self._refresh_corrector_list()
         self._update_qm_widgets_visibility()
+        self._refresh_specific_bpm_candidates()
 
     def _setup_qm_controls(self):
         row_mode = QHBoxLayout()
@@ -211,28 +213,58 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.actuator_mode_combo.addItems([ActuatorMode.Kicker.value, ActuatorMode.QM.value])
         row_mode.addWidget(self.actuator_mode_combo)
         self.verticalLayout_3.insertLayout(0, row_mode)
-        row_specific = QHBoxLayout()
+        self.correctors_list.itemSelectionChanged.connect(self._refresh_specific_bpm_candidates)
+        self.specific_bpm_row = QWidget(self)
+        row_specific = QHBoxLayout(self.specific_bpm_row)
+        row_specific.setContentsMargins(0, 0, 0, 0)
         self.specific_bpm_label = QLabel("Specific BPM (QM)")
         self.specific_bpm_combo = QComboBox(self)
         row_specific.addWidget(self.specific_bpm_label)
         row_specific.addWidget(self.specific_bpm_combo)
-        self.verticalLayout_3.insertLayout(4, row_specific)
+        self.verticalLayout_3.insertWidget(4, self.specific_bpm_row)
+        self.specific_bpm_row.setFixedHeight(self.specific_bpm_row.sizeHint().height())
+
         self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
         self.bpms_list.itemSelectionChanged.connect(self._refresh_specific_bpm_candidates)
         self._refresh_specific_bpm_candidates()
+
+    def _qm_control_bpms(self, qcorrs, bpms):
+        seq = self.interface.get_sequence()
+        order = {str(name): idx for idx, name in enumerate(seq)}
+        qpos = []
+        for name in qcorrs:
+            key = str(name)
+            if key in order:
+                qpos.append(order[key])
+            elif f"M{key}" in order:
+                qpos.append(order[f"M{key}"])
+        if not qpos:
+            return list(bpms)
+        threshold = max(qpos)
+        out = []
+        for name in bpms:
+            key = str(name)
+            pos = order.get(key, order.get(f"M{key}", 10**9))
+            if pos >= threshold:
+                out.append(key)
+        return out
 
     def _on_actuator_mode_changed(self, text):
         self.actuator_mode = ActuatorMode(text)
         self._refresh_corrector_list()
         self._update_qm_widgets_visibility()
+        self._refresh_specific_bpm_candidates()
+        self._refresh_metric_plots_for_mode()
 
     def _update_qm_widgets_visibility(self):
         is_qm = self.actuator_mode == ActuatorMode.QM
+        self.specific_bpm_row.setVisible(True)
         self.specific_bpm_label.setVisible(is_qm)
         self.specific_bpm_combo.setVisible(is_qm)
 
         if is_qm:
             self.label.setText("Trajectory hold weight")
+
             self.label_2.setText("BPM->0 weight")
             self.label_3.setText("Specific BPM->0 weight")
             self.current_groupbox_right.setTitle("Max range [um]")
@@ -254,11 +286,30 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.current_groupbox_right.setTitle(f"Max strength ({self.corrs_unit})")
             self.horizontal_current_label.setText("H:")
             self.vertical_current_label.setText("V:")
+            self.max_horizontal_current_spinbox.setMaximum(99.99)
+            self.max_vertical_current_spinbox.setMaximum(99.99)
+            self.max_horizontal_current_spinbox.setDecimals(2)
+            self.max_vertical_current_spinbox.setDecimals(2)
+            self.max_horizontal_current_spinbox.setSingleStep(0.01)
+            self.max_vertical_current_spinbox.setSingleStep(0.01)
+            self.max_horizontal_current_spinbox.setValue(0.0)
+            self.max_vertical_current_spinbox.setValue(0.0)
 
     def _refresh_corrector_list(self):
         self.correctors_list.clear()
-        items = self.qm_corrs if self.actuator_mode == ActuatorMode.QM else self.corrs
+        if self.actuator_mode == ActuatorMode.QM:
+            items = self.qm_corrs
+            self.groupBox_5.setTitle("Quadrupoles")
+        else:
+            items = self.corrs
+            self.groupBox_5.setTitle("Correctors")
         self.correctors_list.insertItems(0, [str(item) for item in items])
+
+        for gb in (self.groupBox_5, self.groupBox_8):
+            t = gb.title()
+            gb.setTitle("")
+            gb.setTitle(t)
+        self.horizontalLayout_corrbpms_tables.activate()
 
     def _refresh_specific_bpm_candidates(self):
         if not hasattr(self, "specific_bpm_combo"):
@@ -275,6 +326,18 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
         self.specific_bpm_combo.blockSignals(True)
         self.specific_bpm_combo.clear()
+        if self.actuator_mode == ActuatorMode.QM:
+            qcorrs = []
+            for i in range(self.correctors_list.count()):
+                it = self.correctors_list.item(i)
+                if it.isSelected():
+                    qcorrs.append(it.text())
+
+            if not qcorrs:
+                qcorrs = list(self.qm_corrs)
+
+            bpms = self._qm_control_bpms(qcorrs, bpms)
+
         self.specific_bpm_combo.addItems([str(b) for b in bpms])
 
         idx = self.specific_bpm_combo.findText(current)
@@ -1099,7 +1162,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._hist_abs_rms_xy.append(final_rms_xy)
 
             self.log("Correction finished.")
-            self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h,max_curr_v, bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy,Axy,Ayx, Bx, By)
+            self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h,max_curr_v, bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy,Axy,Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()))
 
         except Exception as e:
             self.setWindowTitle("BBA GUI")
@@ -1174,6 +1237,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         w1, w2, w3, rcond, iters, gain, beta = self._read_params()
 
         qcorrs, bpms = self._get_selection()
+        bpms = self._qm_control_bpms(qcorrs, bpms)
         self._build_jitter_model_for_correction(actuators=qcorrs, bpms=bpms)
         if self.jitter_model is not None:
             refs = set(self.jitter_model["reference_bpms"])
@@ -1299,6 +1363,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._plot_series(self.disp_ax, self.disp_canvas, values_x=[],values_y=[],vals=[], title=None)
         self._plot_series(self.wake_ax, self.wake_canvas, values_x=[],values_y=[], vals=[],title=None)
         self._refresh_all_plot_popups()
+
+    def _refresh_metric_plots_for_mode(self):
+        if self.actuator_mode == ActuatorMode.QM:
+            self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title="QM trajectory hold")
+            self._plot_series(self.disp_ax, self.disp_canvas, [], [], [], title="BPM absolute mean")
+            self._plot_series(self.wake_ax, self.wake_canvas, [], [], [], title="Unused in QM mode")
+        else:
+            self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title=None)
+            self._plot_series(self.disp_ax, self.disp_canvas, [], [], [], title=None)
+            self._plot_series(self.wake_ax, self.wake_canvas, [], [], [], title=None)
 
     def _build_jitter_model_for_correction(self, actuators, bpms):
         if not self.subtract_jitter_checkbox.isChecked():

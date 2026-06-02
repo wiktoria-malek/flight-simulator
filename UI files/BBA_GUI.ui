@@ -367,10 +367,22 @@ QGroupBox#groupBox_9::title {
            <layout class="QHBoxLayout" name="horizontalLayout_corrbpms_tables">
             <item>
              <widget class="QGroupBox" name="groupBox_5">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>500</height>
+               </size>
+              </property>
               <property name="maximumSize">
                <size>
                 <width>16777215</width>
-                <height>750</height>
+                <height>16777215</height>
                </size>
               </property>
               <property name="styleSheet">
@@ -378,7 +390,7 @@ QGroupBox#groupBox_9::title {
     background-color: rgb(245, 245, 245);
     border: 1px solid rgb(210, 210, 210);
     border-radius: 6px;
-    margin-top: 8px;
+    margin-top: 18px;
     padding-top: 6px;
 }
 QGroupBox#groupBox_5::title {
@@ -398,7 +410,7 @@ QGroupBox#groupBox_5::title {
                    <property name="maximumSize">
                     <size>
                      <width>16777215</width>
-                     <height>700</height>
+                     <height>16777215</height>
                     </size>
                    </property>
                    <property name="selectionMode">
@@ -420,10 +432,22 @@ QGroupBox#groupBox_5::title {
             </item>
             <item>
              <widget class="QGroupBox" name="groupBox_8">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>500</height>
+               </size>
+              </property>
               <property name="maximumSize">
                <size>
                 <width>16777215</width>
-                <height>750</height>
+                <height>16777215</height>
                </size>
               </property>
               <property name="styleSheet">
@@ -431,7 +455,7 @@ QGroupBox#groupBox_5::title {
     background-color: rgb(245, 245, 245);
     border: 1px solid rgb(210, 210, 210);
     border-radius: 6px;
-    margin-top: 8px;
+    margin-top: 18px;
     padding-top: 6px;
 }
 QGroupBox#groupBox_8::title {
@@ -451,7 +475,7 @@ QGroupBox#groupBox_8::title {
                    <property name="maximumSize">
                     <size>
                      <width>16777215</width>
-                     <height>700</height>
+                     <height>16777215</height>
                     </size>
                    </property>
                    <property name="selectionMode">
