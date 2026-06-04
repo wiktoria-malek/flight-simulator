@@ -240,7 +240,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 qpos.append(order[f"M{key}"])
         if not qpos:
             return list(bpms)
-        threshold = max(qpos)
+        threshold = min(qpos)
         out = []
         for name in bpms:
             key = str(name)
@@ -1263,9 +1263,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
         w1, w2, w3, rcond, iters, gain, beta = self._read_params()
 
-        qcorrs, bpms = self._get_selection()
-        bpms = self._qm_control_bpms(qcorrs, bpms)
-        self._build_jitter_model_for_correction(actuators=qcorrs, bpms=bpms)
+        qcorrs, bpms_selected = self._get_selection()
+        self._build_jitter_model_for_correction(actuators=qcorrs, bpms=bpms_selected)
+        bpms = self._qm_control_bpms(qcorrs, bpms_selected)
         if self.jitter_model is not None:
             refs = set(self.jitter_model["reference_bpms"])
             bpms = [bpm for bpm in bpms if bpm not in refs]
@@ -1405,22 +1405,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             nq = len(qcorrs)
             dx = delta[:nq]
             dy = delta[nq:nq + nq]
-
-            try:
-                pred_x = O0x + Rxx @ dx.reshape(-1, 1) + Rxy @ dy.reshape(-1, 1)
-                pred_y = O0y + Ryx @ dx.reshape(-1, 1) + Ryy @ dy.reshape(-1, 1)
-                pred_x_opposite = O0x - Rxx @ dx.reshape(-1, 1) - Rxy @ dy.reshape(-1, 1)
-                pred_y_opposite = O0y - Ryx @ dx.reshape(-1, 1) - Ryy @ dy.reshape(-1, 1)
-                current_rms = float(np.sqrt(np.nanmean(O0x.ravel() ** 2 + O0y.ravel() ** 2)))
-                predicted_rms = float(np.sqrt(np.nanmean(pred_x.ravel() ** 2 + pred_y.ravel() ** 2)))
-                predicted_opposite_rms = float(np.sqrt(np.nanmean(pred_x_opposite.ravel() ** 2 + pred_y_opposite.ravel() ** 2)))
-                self.log(
-                    f"QM iteration {it}: current RMS={current_rms:.6g} mm, "
-                    f"predicted RMS={predicted_rms:.6g} mm, "
-                    f"opposite-sign predicted RMS={predicted_opposite_rms:.6g} mm"
-                )
-            except Exception as exc:
-                self.log(f"QM prediction diagnostic failed: {exc}")
 
             qstate = self.interface.get_quadrupoles(qcorrs)
 

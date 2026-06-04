@@ -29,7 +29,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
+    def __init__(self, population=2e10, jitter=1.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
         self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
