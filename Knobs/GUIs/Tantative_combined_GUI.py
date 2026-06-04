@@ -24,6 +24,7 @@ class EmittingStream:
     def flush(self):
         pass
 
+
 class UnifiedGUI(QMainWindow):
 
     def __init__(self, interface, dir_name, only_tab=None):
@@ -58,12 +59,11 @@ class UnifiedGUI(QMainWindow):
         layout.addWidget(self.splitter)
         self.setCentralWidget(central)
 
-
         # ---------- SysGUI (裏で1回だけ生成) ----------
         self.beamtuniggui = BeamTuniggWindow(interface, dir_name)
         self.beamtuniggui.hide()
         print("SysGUI tabs:", [self.beamtuniggui.tabs.tabText(i) for i in range(self.beamtuniggui.tabs.count())])
-        for i in range(self.beamtuniggui.tabs.count()-1, -1, -1):
+        for i in range(self.beamtuniggui.tabs.count() - 1, -1, -1):
             if self.beamtuniggui.tabs.tabText(i) == "Response":
                 self.beamtuniggui.tabs.removeTab(i)
 
@@ -103,19 +103,17 @@ class UnifiedGUI(QMainWindow):
         for i in range(src_tabs.count()):
             if src_tabs.tabText(i) == name:
                 widget = src_tabs.widget(i)
-                src_tabs.removeTab(i)       # SysGUI 側から取り外す
+                src_tabs.removeTab(i)  # SysGUI 側から取り外す
                 self.tabs.addTab(widget, name)  # UnifiedGUI 側に移す
                 return
         raise RuntimeError(f"[UnifiedGUI] SysGUI に '{name}' タブが見つかりません。")
-    
-    
-
 
 
 # --------- 単体起動用 ---------
 if __name__ == "__main__":
     # 既存の選択ダイアログがある前提
-    from SelectInterface import InterfaceSelectionDialog
+    from Backend.SelectInterface import InterfaceSelectionDialog
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--only-tab", type=str, default=None)
     args, qt_args = parser.parse_known_args()
@@ -133,6 +131,6 @@ if __name__ == "__main__":
     os.makedirs(dir_name, exist_ok=True)
 
     w = UnifiedGUI(interface, dir_name, only_tab=args.only_tab)
-    
+
     w.show()
     sys.exit(app.exec())

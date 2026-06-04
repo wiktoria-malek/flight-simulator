@@ -2,6 +2,24 @@ from datetime import datetime
 import numpy as np
 import pickle
 
+OUTLIER_FACTOR = 10.0
+
+def reject_large_outliers(values, factor=OUTLIER_FACTOR):
+    arr = np.asarray(values, dtype=float).copy()
+    if arr.ndim != 2 or arr.size == 0:
+        return arr
+
+    med_abs = np.nanmedian(np.abs(arr), axis=0)
+    threshold = factor * med_abs
+
+    for j, thr in enumerate(threshold):
+        if not np.isfinite(thr) or thr <= 0:
+            continue
+        mask = np.isfinite(arr[:, j]) & (np.abs(arr[:, j]) > thr)
+        arr[mask, j] = np.nan
+
+    return arr
+
 class State:
     def __init__(self, sextupoles = None, correctors=None,bpms=None, icts=None,sequence=None,hcorrectors_names=None,vcorrectors_names=None,screens=None,quadrupoles=None,timestamp=None,filename=None):
         if filename is not None:
@@ -94,16 +112,36 @@ class State:
 
     def get_orbit(self, names=None):
         bpms = self.get_bpms(names)
-        x = np.mean(bpms['x'],axis=0) # mm
-        y = np.mean(bpms['y'],axis=0) # mm
-        stdx = np.std(bpms['x'],axis=0) # mm #standard deviation
-        stdy = np.std(bpms['y'],axis=0) # mm
-        tmit = np.mean(bpms['tmit'],axis=0)
-        nshots=int(np.shape(bpms['x'])[0])
-        faulty = (x == 0.0) & (y == 0.0)
+        # x = np.mean(bpms['x'],axis=0) # mm
+        # y = np.mean(bpms['y'],axis=0) # mm
+        # stdx = np.std(bpms['x'],axis=0) # mm #standard deviation
+        # stdy = np.std(bpms['y'],axis=0) # mm
+        # tmit = np.mean(bpms['tmit'],axis=0)
+        # nshots=int(np.shape(bpms['x'])[0])
+        # faulty = (x == 0.0) & (y == 0.0)
+        x_all = reject_large_outliers(bpms['x'])
+        y_all = reject_large_outliers(bpms['y'])
+        tmit_all = np.asarray(bpms['tmit'], dtype=float)
+        x = np.nanmean(x_all, axis=0)  # mm
+        y = np.nanmean(y_all, axis=0)  # mm
+        stdx = np.nanstd(x_all, axis=0)  # mm
+        stdy = np.nanstd(y_all, axis=0)  # mm
+        tmit = np.nanmean(tmit_all, axis=0)
+        nshots = int(np.shape(x_all)[0])
+        faulty = np.isnan(x) | np.isnan(y) | ((x == 0.0) & (y == 0.0))
         x[faulty] = np.nan
         y[faulty] = np.nan
-        orbit = { "names": bpms["names"], "x": x, "y": y, "stdx": stdx, "stdy": stdy, "tmit": tmit, "faulty": faulty, "nbpms": len(bpms["names"]),"nshots": nshots }
+        orbit = {
+            "names": bpms["names"],
+            "x": x,
+            "y": y,
+            "stdx": stdx,
+            "stdy": stdy,
+            "tmit": tmit,
+            "faulty": faulty,
+            "nbpms": len(bpms["names"]),
+            "nshots": nshots,
+        }
         return orbit
 
     def get_screens(self,names=None):

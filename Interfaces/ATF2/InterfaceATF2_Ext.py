@@ -837,12 +837,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             pv_des.put(curr_val + current)
         time.sleep(1)
 
-    def apply_qmag_xyroll(self, names, x_um, y_um, roll_m,
-                          wait=True,
-                          max_attempts=5,
-                          attempt_timeout=30.0,
-                          settle_dt=0.5,
-                          tol_um=15.0):
+    def apply_qmag_xyroll(self, names, x_um, y_um, roll_m, wait=True, max_attempts=5, attempt_timeout=30.0, settle_dt=0.5, tol_um=15.0):
         if type(names) == str:
             names = [names]
 
@@ -1041,8 +1036,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             return "174"
         raise ValueError(f"Unsupported scan mode label: {scan_mode_label}")
 
-
-
     def _normalize_linear_knob_name(self, knob_name: str) -> str:
         aliases = {
             "A_X": "Ax",
@@ -1228,19 +1221,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "zscan_base_values": {str(knob): float(val) for knob, val in zscan_base_values.items()},
         }
 
-    def restore_knob_origin(
-            self,
-            origin_state,
-            *,
-            pos_tol=15.0,
-            pos_timeout=30.0,
-            current_tol=0.05,
-            current_timeout=15.0,
-            poll=0.05,
-            settle_dt=0.5,
-            use_trim=True,
-            scan_mode_label=None,
-    ):
+    def restore_knob_origin(self, origin_state, *, pos_tol=15.0, pos_timeout=30.0, current_tol=0.05, current_timeout=15.0, poll=0.05, settle_dt=0.5, use_trim=True, scan_mode_label=None):
         if not isinstance(origin_state, dict):
             raise ValueError("origin_state must be a dict")
 
@@ -1520,17 +1501,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 settle_dt=settle_dt,
             )
 
-    def _move_zscan_knob_absolute(
-            self,
-            knob_name: str,
-            target_value: float,
-            *,
-            scan_mode_label="30",
-            timeout=30.0,
-            poll=0.05,
-            settle_dt=0.05,
-            busy_seen_grace=0.2,
-    ):
+    def _move_zscan_knob_absolute(self, knob_name: str, target_value: float, *, scan_mode_label="30", timeout=30.0, poll=0.05, settle_dt=0.05, busy_seen_grace=0.2):
         key = str(knob_name)
         if key != self.zscan_knob_name:
             raise KeyError(f"Unknown Z scan knob: {knob_name}")
@@ -1588,14 +1559,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "ict_average": float(save_ict_average),
         }
 
-    def get_ipbsm_full(
-            self,
-            timeout=300,
-            file_wait=330.0,
-            poll=0.1,
-            start_return_timeout=5.0,
-            start_to_finish_wait=1.0,
-    ):
+    def get_ipbsm_full(self, timeout=300, file_wait=330.0, poll=0.1, start_return_timeout=5.0, start_to_finish_wait=1.0):
         with self._ipbsm_lock:
             try:
                 prev_mtime = os.path.getmtime(self.datafile)
@@ -1687,7 +1651,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
     def _pv_put(self, pv_name, value):
         PV(pv_name).put(value)
-
 
     def _build_qmag_pv_names(self, mag_name, slacsys_mov_notation=None):
         # slacsys_mov_notation is kept as an explicit hook for future system-specific naming.

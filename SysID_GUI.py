@@ -40,7 +40,6 @@ class MatplotlibWidget(FigureCanvas):
         self.setParent(parent)
         self.axes = fig.add_subplot(111)
 
-
 def finite_abs_max(values):
     arr = np.asarray(values, dtype=float).ravel()
     arr = arr[np.isfinite(arr)]
@@ -246,11 +245,18 @@ class Worker(QObject):
                 if self.paused:      self._await_user()
 
                 if corrector in self.hcorrs:
-                    max_curr=self.max_curr_h
-                    kick=hkicks[icorr]
+                    kick=float(hkicks[icorr])
+                    target = float(self.max_osc_h)
+                    max_curr = float(self.max_curr_h)
+                    response_plane = "x"
                 elif corrector in self.vcorrs:
-                    max_curr=self.max_curr_v
-                    kick=vkicks[icorr]
+                    kick=float(vkicks[icorr])
+                    target = float(self.max_osc_v)
+                    max_curr = float(self.max_curr_v)
+                    response_plane = "y"
+                else:
+                    print(f"Corrector {corrector} not in h/v correctors")
+                    continue
 
                 if not self.running: break
                 if self.paused:      self._await_user()
@@ -268,13 +274,9 @@ class Worker(QObject):
                 if not os.path.isfile(filename_p):
                     print('corr[bds] =', corr['bdes'], ' also kick = ', kick)
                     curr_p = corr['bdes'] + kick
-                    if corrector in self.hcorrs:
-                        curr_p = clamp(curr_p, self.max_curr_h)
-                    else:
-                        curr_p = clamp(curr_p, self.max_curr_v)
+                    curr_p = clamp(curr_p, max_curr)
                     I.set_correctors(corrector, curr_p)
                     corr_changed = True
-
                     if not self.running: break
                     if self.paused:      self._await_user()
                     measured_this_corr=True
@@ -287,10 +289,7 @@ class Worker(QObject):
                     print(f"Corrector {corrector} '-' excitation...")
                 if not os.path.isfile(filename_m):
                     curr_m = corr['bdes'] - kick
-                    if corrector in self.hcorrs:
-                        curr_m = clamp(curr_m, self.max_curr_h)
-                    else:
-                        curr_m = clamp(curr_m, self.max_curr_v)
+                    curr_m = clamp(curr_m, max_curr)
                     I.set_correctors(corrector, curr_m)
                     corr_changed = True
 
@@ -312,7 +311,7 @@ class Worker(QObject):
 
                 Diff_x = (Op['x'] - Om['x']) / 2.0
                 Diff_y = (Op['y'] - Om['y']) / 2.0
-                nsamples = Op['stdx'].size
+                nsamples = max(1, int(np.asarray(Op['stdx']).size))
                 Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
                 if measured_this_corr:
@@ -321,16 +320,24 @@ class Worker(QObject):
                     percent = int(self.progress_value / total_steps * 100)
                     self.progress.emit(percent)
 
-                if corrector in self.hcorrs:
-                    Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
-                    if np.max(np.abs(Diff_x_clean)) != 0.0:
-                        hkicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
-                    hkicks[icorr] = 0.8 * hkicks[icorr] + 0.2 * kick
+                observed = finite_abs_max(Diff_x if response_plane == "x" else Diff_y)
+                new_kick = update_amplitude(kick, observed, target, max_curr)
+                new_kick = 0.8 * new_kick + 0.2 * kick
+                if response_plane == "x":
+                    hkicks[icorr] = new_kick
                 else:
-                    Diff_y_clean = Diff_y[~np.isnan(Diff_y)]
-                    if np.max(np.abs(Diff_y_clean)) != 0.0:
-                        vkicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
-                    vkicks[icorr] = 0.8 * vkicks[icorr] + 0.2 * kick
+                    vkicks[icorr] = new_kick
+                # if corrector in self.hcorrs:
+                #     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
+                #     if np.max(np.abs(Diff_x_clean)) != 0.0:
+                #         hkicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
+                #     hkicks[icorr] = 0.8 * hkicks[icorr] + 0.2 * kick
+
+                # else:
+                #     Diff_y_clean = Diff_y[~np.isnan(Diff_y)]
+                #     if np.max(np.abs(Diff_y_clean)) != 0.0:
+                #         vkicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
+                #     vkicks[icorr] = 0.8 * vkicks[icorr] + 0.2 * kick
 
                 with open(os.path.join(self.output_dir,'kicks.txt'), 'w') as f:
                     for i, c in enumerate(self.correctors):
@@ -498,13 +505,10 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
 
     def _get_quadrupole_names_for_qm_mode(self):
-        names = list(self.interface.get_quadrupoles()["names"])
+        names = list(self.interface.get_quadrupole_movers_names())
         if names:
             return [str(name) for name in names]
-        try:
-            return [str(name) for name in self.interface.get_sequence() if str(name).upper().startswith("Q")]
-        except Exception:
-            return []
+        return names
 
     def _available_actuators(self):
         if self.actuator_mode == ActuatorMode.QM:
@@ -606,7 +610,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.__set_status_in_title(f"[Running {mode.name} mode]")
         self.progressBar.setValue(0)
         machine_state=self.interface.get_state().__class__(filename=os.path.join(dir_name,'machine_status.pkl'))
-        self.interface.restore_correctors_state(machine_state)
+        if self.actuator_mode != ActuatorMode.QM:
+            self.interface.restore_correctors_state(machine_state)
 
         if mode==Mode.Dispersion:
             self.interface.change_energy()
@@ -784,10 +789,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
             self._save_names_if_missing(d,'correctors.txt',selected_correctors)
             self._save_names_if_missing(d,'bpms.txt',selected_bpms)
-            self._save_names_if_missing(d, 'actuator_mode.txt', [self.actuator_mode.name])
 
         machine_state=self.interface.get_state()
-        machine_state.put("sysid_actuator_mode", self.actuator_mode.name)
         for mode,d in self.mode_dirs.items():
             machine_status=os.path.join(d,'machine_status.pkl')
             if not os.path.isfile(machine_status):
@@ -797,16 +800,26 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self._start_next_mode()
 
         # kicks = 0.1 * np.ones(len(selected_correctors), dtype=float)
-        initial_hkick=float(self.initial_hkick_settings.text())
-        initial_vkick=float(self.initial_vkick_settings.text())
-        hkicks=initial_hkick*np.ones(len(selected_correctors), dtype=float)
-        vkicks=initial_vkick*np.ones(len(selected_correctors), dtype=float)
+        try:
+            initial_hkick = float(self.initial_hkick_settings.text())
+            initial_vkick = float(self.initial_vkick_settings.text())
+        except ValueError:
+            QMessageBox.critical(self, "Invalid initial excitation", "Initial hkick/X and vkick/Y must be numbers.")
+            self._set_directory_edit_enabled(True)
+            return
+        hkicks = initial_hkick * np.ones(len(selected_correctors), dtype=float)
+        vkicks = initial_vkick * np.ones(len(selected_correctors), dtype=float)
 
         max_osc_h = self.horizontal_excursion_spinbox.value()
         max_osc_v = self.vertical_excursion_spinbox.value()
         max_curr_h = self.max_horizontal_current_spinbox.value()
         max_curr_v = self.max_vertical_current_spinbox.value()
-        Niter = int(self.niter_number.text())
+        try:
+            Niter = int(self.niter_number.text())
+        except ValueError:
+            QMessageBox.critical(self, "Invalid number of iterations", "Niter must be an integer.")
+            self._set_directory_edit_enabled(True)
+            return
         print(f"Niter: {Niter}")
 
         self.thread = QThread()
@@ -845,15 +858,27 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 return
             if self.counter< len(self.modes_to_do):
                 self._start_next_mode()
-                initial_hkick = float(self.initial_hkick_settings.text())
-                initial_vkick=float(self.initial_vkick_settings.text())
+                try:
+                    initial_hkick = float(self.initial_hkick_settings.text())
+                    initial_vkick = float(self.initial_vkick_settings.text())
+                except ValueError:
+                    QMessageBox.critical(self, "Invalid initial excitation", "Initial hkick/X and vkick/Y must be numbers.")
+                    self._set_directory_edit_enabled(True)
+                    self.__set_status_in_title("[Idle]")
+                    return
                 hkicks = initial_hkick * np.ones(len(selected_correctors), dtype=float)
                 vkicks = initial_vkick * np.ones(len(selected_correctors), dtype=float)
                 max_osc_h = self.horizontal_excursion_spinbox.value()
                 max_osc_v = self.vertical_excursion_spinbox.value()
                 max_curr_h = self.max_horizontal_current_spinbox.value()
                 max_curr_v = self.max_vertical_current_spinbox.value()
-                Niter = int(self.niter_number.text())
+                try:
+                    Niter = int(self.niter_number.text())
+                except ValueError:
+                    QMessageBox.critical(self, "Invalid number of iterations", "Niter must be an integer.")
+                    self._set_directory_edit_enabled(True)
+                    self.__set_status_in_title("[Idle]")
+                    return
                 print(f"Niter: {Niter}")
                 self.thread = QThread()
                 out_dir = self.mode_dirs[self.current_mode]
@@ -913,7 +938,10 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot_widget.axes.set_xticks(scale)
         self.plot_widget.axes.set_xticklabels(bpm_names[:n],rotation=90,fontsize=8)
         self.plot_widget.axes.set_ylabel(f'Orbit [{self.bpm_unit}]')
-        self.plot_widget.axes.set_title(f"Actuator '{corrector}'")
+        if self.actuator_mode == ActuatorMode.QM:
+            self.plot_widget.axes.set_title(f"Quadrupole '{corrector}'")
+        else:
+            self.plot_widget.axes.set_title(f"Corrector '{corrector}'")
         self.plot_widget.axes.grid(color='#EEEEEE')
         self.plot_widget.draw()
         self.plot_widget.repaint()

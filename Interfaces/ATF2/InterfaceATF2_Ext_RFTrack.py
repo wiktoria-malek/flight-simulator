@@ -60,6 +60,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.__setup_beam0()
         self.__track_bunch()
         self._saved_sextupoles_state = None
+        self.qmag_xdes = {name: 0.0 for name in self.quadrupoles}
+        self.qmag_ydes = {name: 0.0 for name in self.quadrupoles}
+        self.qmag_rolldes = {name: 0.0 for name in self.quadrupoles}
+        #self.qm_list = [s for s in self.interface.get_sequence() if str(s).upper().startswith("Q")]
 
         # ----------------------------
         # Knobs (linear / nonlinear)
@@ -68,41 +72,13 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         #self.knobs = KnobSystem(self.lattice, p_ref=-self.Pref)
 
         self.kl_per_A = {
-            "ZH100RX": 0.0007311,
-            "ZH101RX": 0.0002322,
-            "ZV100RX": 0.0002764,
-            "ZV1X": 0.0003276,
-            "ZX1X": 0.0,
-            "ZV2X": 0.0003276,
-            "ZH1X": 0.0003018,
-            "ZV3X": 0.0003276,
-            "ZH2X": 0.0003018,
-            "ZV4X": 0.0003276,
-            "ZX2X": 0.0,
-            "ZV5X": 0.0003276,
-            "ZH3X": 0.0003018,
-            "ZV6X": 0.0003276,
-            "ZH4X": 0.0003018,
-            "ZV7X": 0.0003276,
-            "ZH5X": 0.0003018,
-            "ZV8X": 0.0003276,
-            "ZH6X": 0.0003018,
-            "ZH7X": 0.0003018,
-            "ZV9X": 0.0003276,
-            "ZH8X": 0.0003018,
-            "ZV10X": 0.0003276,
-            "ZH9X": 0.0003018,
-            "ZV11X": 0.0003276,
-            "ZH10X": 0.0003018,
-            "ZH1FF": 0.0003018,
-            "ZV1FF": 0.0003276,
-            "IPKICK": 0.0,
-            "QS1X": -0.0051397,
-            "QS2X": -0.0051397,
-            "QF6X": -0.0216857,
-            "QF1FF": -0.0061125,
-            "QD0FF": 0.0070313,
-
+            "ZH100RX": 0.0007311, "ZH101RX": 0.0002322, "ZV100RX": 0.0002764, "ZV1X": 0.0003276, "ZX1X": 0.0,
+            "ZV2X": 0.0003276,    "ZH1X": 0.0003018,    "ZV3X": 0.0003276,    "ZH2X": 0.0003018, "ZV4X": 0.0003276,
+            "ZX2X": 0.0,          "ZV5X": 0.0003276,    "ZH3X": 0.0003018,    "ZV6X": 0.0003276, "ZH4X": 0.0003018,
+            "ZV7X": 0.0003276,    "ZH5X": 0.0003018,    "ZV8X": 0.0003276,    "ZH6X": 0.0003018, "ZH7X": 0.0003018,
+            "ZV9X": 0.0003276,    "ZH8X": 0.0003018,    "ZV10X": 0.0003276,   "ZH9X": 0.0003018, "ZV11X": 0.0003276,
+            "ZH10X": 0.0003018,   "ZH1FF": 0.0003018,   "ZV1FF": 0.0003276,   "IPKICK": 0.0,     "QS1X": -0.0051397,
+            "QS2X": -0.0051397,   "QF6X": -0.0216857,   "QF1FF": -0.0061125,  "QD0FF": 0.0070313,
         }
 
         self.Qmagnames = ['QS1X', 'QF1X', 'QD2X', 'QF3X', 'QF4X', 'QD5X', 'QF6X', 'QS2X', 'QF7X', 'QD8X', 'QF9X',
@@ -521,7 +497,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
             bdes[i] = k1_values[0] if k1_values else 0.0
 
-        quadrupoles = {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
+        quadrupoles = {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy(),
+                       "xdes": np.array([self.qmag_xdes.get(name, 0.0) for name in self.quadrupoles], dtype=float),
+                       "ydes": np.array([self.qmag_ydes.get(name, 0.0) for name in self.quadrupoles], dtype=float),
+                       "rolldes": np.array([self.qmag_rolldes.get(name, 0.0) for name in self.quadrupoles], dtype=float)}
 
         if isinstance(names, str):
             names = [names]
@@ -531,9 +510,70 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 "names": np.array(quadrupoles["names"])[idx],
                 "bdes": np.array(quadrupoles["bdes"])[idx],
                 "bact": np.array(quadrupoles["bact"])[idx],
+                "xdes": np.array(quadrupoles["xdes"])[idx],
+                "ydes": np.array(quadrupoles["ydes"])[idx],
+                "rolldes": np.array(quadrupoles["rolldes"])[idx],
             }
 
         return quadrupoles
+
+    def apply_qmag_xyroll(self, names, x_um, y_um, roll_m, wait=True, max_attempts=5, attempt_timeout=30.0, settle_dt=0.5, tol_um=15.0):
+        if isinstance(names, str):
+            names = [names]
+
+        nmag = len(names)
+
+        def _expand(values):
+            if np.isscalar(values):
+                return np.full(nmag, float(values), dtype=float)
+            arr = np.asarray(values, dtype=float).reshape(-1)
+            if arr.size != nmag:
+                raise ValueError(f"Length mismatch in apply_qmag_xyroll: expected {nmag}, got {arr.size}")
+            return arr
+
+        xs = _expand(x_um)
+        ys = _expand(y_um)
+        rolls = _expand(roll_m)
+
+        for name, x_target, y_target, roll_target in zip(names, xs, ys, rolls):
+            if name not in self.quadrupoles:
+                raise ValueError(f"Quadrupole {name} not found in RFTrack interface.")
+
+            elements = self.lattice[name]
+            if not isinstance(elements, list):
+                elements = [elements]
+
+            x_mm = float(x_target) * 1e-3
+            y_mm = float(y_target) * 1e-3
+            roll_rad = float(roll_target)
+            roll_mrad = roll_rad * 1e3
+
+            for element in elements:
+                if hasattr(element, "set_offsets"):
+                    try:
+                        element.set_offsets(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0, "center")
+                    except TypeError:
+                        element.set_offsets(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0)
+                elif hasattr(element, "set_alignment"):
+                    try:
+                        element.set_alignment(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0, "center")
+                    except TypeError:
+                        element.set_alignment(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0)
+                else:
+                    raise NotImplementedError(
+                        f"RF-Track element {name} does not expose set_offsets(...) or set_alignment(...)."
+                    )
+
+            self.qmag_xdes[name] = float(x_target)
+            self.qmag_ydes[name] = float(y_target)
+            self.qmag_rolldes[name] = float(roll_target)
+
+            print(
+                f"Simulated mover {name}: "
+                f"x={float(x_target):.3f} um, y={float(y_target):.3f} um, roll={float(roll_target):.6g} rad"
+            )
+
+        self.__track_bunch()
 
     def set_quadrupoles(self, names, values_range, track = True):
         if isinstance(names, str):
@@ -1044,6 +1084,11 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "sigma_y_m": SigIPBSM,
         }
 
+    def get_quadrupole_movers_names(self):
+        if hasattr(self, "Qmagnames") and self.Qmagnames:
+            return [str(name) for name in self.Qmagnames]
+        return [str(name) for name in self.quadrupoles]
+
     def apply_sum_knob(self, I):
         """
         SUM knob: QS1X +k, QS2X +k
@@ -1103,6 +1148,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             elem.set_K1L(self.Pref, k1l + dk1l / len(elems))
         # self.__track_bunch()
         self._needs_tracking = True
+
 
     def apply_qmag_offsets(self, name, dx, dy, dr, add=True):
         elems = self.lattice[name] + self.lattice[name + "MULT"]

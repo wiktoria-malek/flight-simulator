@@ -48,19 +48,6 @@ class MainWindow(QMainWindow):
         proc.readyReadStandardOutput.connect(lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"), end=""))
         self._procs.append(proc)
 
-    def _latest_response_file(self) -> str | None:
-        root = f"~/flight-simulator-data/"
-        root = os.path.expanduser(os.path.expandvars(root))
-        if not root.exists():
-            return None
-        files = []
-        for d in root.iterdir():
-            if d.is_dir() and any(d.glob("DATA*.pkl")):
-                files.append((d.stat().st_mtime, d))
-        if not files:
-            return None
-        return str(max(files, key=lambda t: t[0])[1])
-
     def handle_sysid_click(self):
         self.handling("SysID_GUI.py")
 

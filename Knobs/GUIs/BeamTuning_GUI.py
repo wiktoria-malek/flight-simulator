@@ -16,10 +16,12 @@ from PyQt6.QtGui import QPixmap, QIcon, QPainter, QTextCursor
 from PyQt6.QtCore import Qt, QThread, QTimer, QObject, pyqtSignal
 
 import matplotlib
+
 matplotlib.use("QtAgg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
 
 def orbit_from_bpms(bpms, names=None):
     names_all = list(bpms.get("names", []))
@@ -56,6 +58,7 @@ def orbit_from_bpms(bpms, names=None):
         "faulty": faulty,
         "nbpms": len(names_use),
     }
+
 
 def save_machine_state(interface, filename):
     s = State()
@@ -99,13 +102,13 @@ class OrbitPlotWidget(FigureCanvas):
         self.ax_y.set_xlabel("S [m]")
 
     def update_orbit(
-        self,
-        s_m,
-        x_mm,
-        y_mm,
-        faulty=None,
-        corr_S=None,
-        corr_name=None,
+            self,
+            s_m,
+            x_mm,
+            y_mm,
+            faulty=None,
+            corr_S=None,
+            corr_name=None,
     ):
         # --- 型と shape を強制 ---
         s_m = np.asarray(s_m, dtype=float).reshape(-1)
@@ -163,24 +166,23 @@ class OrbitPlotWidget(FigureCanvas):
         self.draw()
         self.flush_events()
 
-
         def _autoscale_with_min(ax, data, min_half_range):
-                arr = np.asarray(data, dtype=float)
-                arr = arr[np.isfinite(arr)]
-                if arr.size == 0:
-                    ax.set_ylim(-min_half_range, min_half_range)
-                    return
-                dmin = float(arr.min())
-                dmax = float(arr.max())
-                center = 0.5 * (dmin + dmax)
-                span = dmax - dmin
-                half = 0.5 * span * 1.2
-                if half <= 0.0:
-                    half = min_half_range
-                half = max(half, min_half_range)
-                ax.set_ylim(center - half, center + half)
+            arr = np.asarray(data, dtype=float)
+            arr = arr[np.isfinite(arr)]
+            if arr.size == 0:
+                ax.set_ylim(-min_half_range, min_half_range)
+                return
+            dmin = float(arr.min())
+            dmax = float(arr.max())
+            center = 0.5 * (dmin + dmax)
+            span = dmax - dmin
+            half = 0.5 * span * 1.2
+            if half <= 0.0:
+                half = min_half_range
+            half = max(half, min_half_range)
+            ax.set_ylim(center - half, center + half)
 
-        _autoscale_with_min(self.ax_x, x_mm, 2.0)  
+        _autoscale_with_min(self.ax_x, x_mm, 2.0)
         _autoscale_with_min(self.ax_y, y_mm, 2.0)
 
         self.draw()
@@ -199,12 +201,12 @@ class DispersionPlotWidget(FigureCanvas):
         self.ax_v.set_xlabel("S [m]")
 
     def update_dispersion(
-        self,
-        s_m: np.ndarray,
-        eta_x: np.ndarray,
-        eta_y: np.ndarray,
-        eta_x0: np.ndarray | None,
-        eta_y0: np.ndarray | None,
+            self,
+            s_m: np.ndarray,
+            eta_x: np.ndarray,
+            eta_y: np.ndarray,
+            eta_x0: np.ndarray | None,
+            eta_y0: np.ndarray | None,
     ):
         self.ax_h.clear()
         self.ax_v.clear()
@@ -238,7 +240,6 @@ class DispersionPlotWidget(FigureCanvas):
             half = max(half, min_half_range)
             ax.set_ylim(center - half, center + half)
 
-        
         _autoscale_with_min(self.ax_h, eta_x, 1500.0)
         _autoscale_with_min(self.ax_v, eta_y, 200.0)
 
@@ -250,7 +251,7 @@ class DispersionPlotWidget(FigureCanvas):
 
 
 # ---------------------------------------------------------
-# Worker (SysID 
+# Worker (SysID
 # ---------------------------------------------------------
 class Worker(QObject):
     plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, str)
@@ -258,17 +259,17 @@ class Worker(QObject):
     suggestion_ready = pyqtSignal(object)
 
     def __init__(
-        self,
-        interface,
-        correctors,
-        bpms,
-        kicks,
-        max_osc_h,
-        max_osc_v,
-        max_curr_h,
-        max_curr_v,
-        Niter,
-        running_flag,
+            self,
+            interface,
+            correctors,
+            bpms,
+            kicks,
+            max_osc_h,
+            max_osc_v,
+            max_curr_h,
+            max_curr_v,
+            Niter,
+            running_flag,
     ):
         super().__init__()
         self.interface = interface
@@ -284,7 +285,6 @@ class Worker(QObject):
 
         self.Rx = None
         self.Ry = None
-
 
     def run(self):
         I = self.interface
@@ -350,12 +350,12 @@ class Worker(QObject):
 
                 nsamples = Op["stdx"].size
                 Err_x = (
-                    np.sqrt(np.square(Op["stdx"]) + np.square(Om["stdx"]))
-                    / np.sqrt(nsamples)
+                        np.sqrt(np.square(Op["stdx"]) + np.square(Om["stdx"]))
+                        / np.sqrt(nsamples)
                 )
                 Err_y = (
-                    np.sqrt(np.square(Op["stdy"]) + np.square(Om["stdy"]))
-                    / np.sqrt(nsamples)
+                        np.sqrt(np.square(Op["stdy"]) + np.square(Om["stdy"]))
+                        / np.sqrt(nsamples)
                 )
 
                 if corrector in hcorrs:
@@ -372,7 +372,6 @@ class Worker(QObject):
 
                 self.plot_data.emit(Op, Diff_x, Err_x, Diff_y, Err_y, corrector)
 
-
         try:
             if self.Rx is not None and self.Ry is not None:
                 I = self.interface
@@ -386,7 +385,6 @@ class Worker(QObject):
 
                 x_now = x_now.reshape(-1)
                 y_now = y_now.reshape(-1)
-
 
                 np.save("R_x.npy", self.Rx)
                 np.save("R_y.npy", self.Ry)
@@ -404,10 +402,10 @@ class Worker(QObject):
                 h_idx = [i for i, name in enumerate(self.correctors) if name in h_names_all]
                 if len(h_idx) > 0:
                     R_sub = self.Rx[:, h_idx]
-                    if R_sub.ndim == 0:              
+                    if R_sub.ndim == 0:
                         R_sub = np.array([[float(R_sub)]])
-                    elif R_sub.ndim == 1:          
-                        R_sub = R_sub[:, np.newaxis] 
+                    elif R_sub.ndim == 1:
+                        R_sub = R_sub[:, np.newaxis]
                     dk_h, *_ = np.linalg.lstsq(R_sub, -x_now, rcond=1e-3)
                     dk_h = np.asarray(dk_h, dtype=float)
                     dk_h = np.clip(dk_h, -5.0, 5.0)
@@ -426,9 +424,9 @@ class Worker(QObject):
                 v_idx = [i for i, name in enumerate(self.correctors) if name in v_names_all]
                 if len(v_idx) > 0:
                     R_sub = self.Ry[:, v_idx]
-                    if R_sub.ndim == 0:               
+                    if R_sub.ndim == 0:
                         R_sub = np.array([[float(R_sub)]])
-                    elif R_sub.ndim == 1:             
+                    elif R_sub.ndim == 1:
                         R_sub = R_sub[:, np.newaxis]
                     dk_v, *_ = np.linalg.lstsq(R_sub, -y_now, rcond=1e-3)
                     dk_v = np.asarray(dk_v, dtype=float)
@@ -444,6 +442,7 @@ class Worker(QObject):
             print(f"Failed to compute/save orbit-correction suggestion: {e}")
 
         self.finished.emit()
+
 
 class EmittingStream(QObject):
     textWritten = pyqtSignal(str)
@@ -516,7 +515,6 @@ class MainWindow(QMainWindow):
             max_curr_h = 1.0
             max_curr_v = 1.0
 
-
         self._misalign_baseline_eta_x = None
         self._misalign_baseline_eta_y = None
 
@@ -542,7 +540,7 @@ class MainWindow(QMainWindow):
         # --------------------------------------
         self.tabs = QTabWidget()
         main_layout.addWidget(self.tabs, 1)
-        
+
         # === Response tab DISABLED ===
         ENABLE_RESPONSE_TAB = False
 
@@ -789,7 +787,6 @@ class MainWindow(QMainWindow):
         browse_btn.clicked.connect(self.__browse_suggest_workdir)
         suggest_row.addWidget(browse_btn)
 
-
         # ==== Dispersion Tab ====
         disp_tab = QWidget()
         disp_layout = QVBoxLayout(disp_tab)
@@ -816,17 +813,14 @@ class MainWindow(QMainWindow):
         self._target_disp_eta_y = None
         try:
             tx, ty = self.interface.get_target_dispersion(self.interface.bpms)
-            self._target_disp_eta_x = np.asarray(tx, dtype=float)*1e3  # to mm
-            self._target_disp_eta_y = np.asarray(ty, dtype=float)*1e3  # to mm
+            self._target_disp_eta_x = np.asarray(tx, dtype=float) * 1e3  # to mm
+            self._target_disp_eta_y = np.asarray(ty, dtype=float) * 1e3  # to mm
             print("Target dispersion loaded.")
 
         except Exception as e:
             print(f"Failed to load target dispersion: {e}")
             self._target_disp_eta_x = None
             self._target_disp_eta_y = None
-        
-        
-
 
         # QF6X knob (STEP +/-)
         qf_layout = QHBoxLayout()
@@ -852,7 +846,7 @@ class MainWindow(QMainWindow):
         self.qf6x_curr_label = QLabel("QF6X k1: N/A")
         qf_layout.addWidget(self.qf6x_curr_label)
 
-        # SUM knob (QS1X +k, QS2X +k) STEP +/- 
+        # SUM knob (QS1X +k, QS2X +k) STEP +/-
         sum_layout = QHBoxLayout()
         dc_layout.addLayout(sum_layout)
         sum_layout.addWidget(
@@ -879,7 +873,6 @@ class MainWindow(QMainWindow):
         self.sum_total_label = QLabel("SUM total: +0.0")
         sum_layout.addWidget(self.sum_total_label)
 
-        
         # ==== IPBSM Tab ====
         ipbsm_tab = QWidget()
         ipbsm_layout = QVBoxLayout(ipbsm_tab)
@@ -1027,7 +1020,7 @@ class MainWindow(QMainWindow):
             minus_btn.setStyleSheet("background-color: blue; color: white;")
             minus_btn.clicked.connect(
                 lambda _checked=False, knob=name, box=step_box:
-                    self.__change_linear_knob(knob, -box.value())
+                self.__change_linear_knob(knob, -box.value())
             )
             row.addWidget(minus_btn)
 
@@ -1035,7 +1028,7 @@ class MainWindow(QMainWindow):
             plus_btn.setStyleSheet("background-color: red; color: white;")
             plus_btn.clicked.connect(
                 lambda _checked=False, knob=name, box=step_box:
-                    self.__change_linear_knob(knob, +box.value())
+                self.__change_linear_knob(knob, +box.value())
             )
             row.addWidget(plus_btn)
 
@@ -1073,7 +1066,7 @@ class MainWindow(QMainWindow):
             minus_btn.setStyleSheet("background-color: blue; color: white;")
             minus_btn.clicked.connect(
                 lambda _checked=False, knob=name, box=step_box:
-                    self.__change_nonlinear_knob(knob, -box.value())
+                self.__change_nonlinear_knob(knob, -box.value())
             )
             row.addWidget(minus_btn)
 
@@ -1081,20 +1074,19 @@ class MainWindow(QMainWindow):
             plus_btn.setStyleSheet("background-color: red; color: white;")
             plus_btn.clicked.connect(
                 lambda _checked=False, knob=name, box=step_box:
-                    self.__change_nonlinear_knob(knob, +box.value())
+                self.__change_nonlinear_knob(knob, +box.value())
             )
             row.addWidget(plus_btn)
 
         try:
             self.__update_qf1qd0_state()
-            #self.__refresh_ipbsm_state()
+            # self.__refresh_ipbsm_state()
         except Exception as e:
             print(f"Failed to update IPBSM/QF1FF/QD0FF state on startup: {e}")
 
-# ==== Misalignment Tab ====
+        # ==== Misalignment Tab ====
         is_rftrack = "RFTrack" in self.interface.__class__.__name__
         if is_rftrack:
-
             mis_tab = QWidget()
             mis_layout = QVBoxLayout(mis_tab)
             self.tabs.addTab(mis_tab, "Misalignment")
@@ -1186,7 +1178,7 @@ class MainWindow(QMainWindow):
     def __save_correctors_button_clicked(self):
         base_dir = self.working_directory_input.text()
         os.makedirs(base_dir, exist_ok=True)
-        
+
         selected_correctors = self.correctors_list.selectedItems()
         default_path = os.path.join(base_dir, "correctors.txt")
         filename, _ = QFileDialog.getSaveFileName(
@@ -1239,7 +1231,7 @@ class MainWindow(QMainWindow):
         filename, _ = QFileDialog.getOpenFileName(
             None, "Open File", default_path, "Text Files (*.txt)"
         )
-        
+
         if filename:
             with open(filename, "r") as f:
                 selected_bpms = [line.strip() for line in f]
@@ -1259,7 +1251,6 @@ class MainWindow(QMainWindow):
         d = QFileDialog.getExistingDirectory(self, "Select working directory for suggestion")
         if d:
             self.suggest_workdir_input.setText(d)
-
 
     # ---------------------------------------------------------
     # SysID: start/stop
@@ -1357,7 +1348,6 @@ class MainWindow(QMainWindow):
         self.plot.update()
         self.plot.repaint()
 
-
     def __store_suggestion(self, suggestion: dict):
         self._last_suggestion = suggestion
 
@@ -1365,15 +1355,15 @@ class MainWindow(QMainWindow):
         if suggestion.get("correctors_h") is not None:
             print("H-plane:")
             for name, dk in zip(
-                suggestion.get("correctors_h", []),
-                suggestion.get("delta_k_h", []),
+                    suggestion.get("correctors_h", []),
+                    suggestion.get("delta_k_h", []),
             ):
                 print(f"  {name:8s} : ΔI = {dk:+.4g} (A)")
         if suggestion.get("correctors_v") is not None:
             print("V-plane:")
             for name, dk in zip(
-                suggestion.get("correctors_v", []),
-                suggestion.get("delta_k_v", []),
+                    suggestion.get("correctors_v", []),
+                    suggestion.get("delta_k_v", []),
             ):
                 print(f"  {name:8s} : ΔI = {dk:+.4g} (A)")
         print("======================================================")
@@ -1382,7 +1372,6 @@ class MainWindow(QMainWindow):
         if self.worker_thread and self.worker_thread.isRunning():
             self.__set_status_in_title("[Stopping SysID...]")
             self.running.clear()
-
 
     def __update_manual_corr_strength_label(self):
         if not hasattr(self, "manual_corr_strength_label"):
@@ -1420,7 +1409,6 @@ class MainWindow(QMainWindow):
 
         return os.path.join(self.cwd, text)
 
-
     # ---------------------------------------------------------
     # Orbit monitor / manual OC
     # ---------------------------------------------------------
@@ -1454,8 +1442,6 @@ class MainWindow(QMainWindow):
             corr_name=corr_name,
         )
 
-
-
     def __where_button_clicked(self):
         if self._last_orbit_s is None:
             print("No cached orbit. Please measure orbit first.")
@@ -1477,7 +1463,6 @@ class MainWindow(QMainWindow):
             corr_name=corr_name,
         )
 
-
     def __get_suggest_working_directory(self) -> str:
 
         if hasattr(self, "suggest_workdir_input"):
@@ -1487,27 +1472,27 @@ class MainWindow(QMainWindow):
                     return text
                 return os.path.join(self.cwd, text)
         return self.__get_working_directory()
-    
+
     def __load_suggestion_from_disk(self) -> bool:
 
         dir_name = self.__get_suggest_working_directory()
         files = {
             "h_corr": os.path.join(dir_name, "suggestion_h_correctors.npy"),
-            "h_dk":   os.path.join(dir_name, "suggestion_h_delta_k.npy"),
+            "h_dk": os.path.join(dir_name, "suggestion_h_delta_k.npy"),
             "v_corr": os.path.join(dir_name, "suggestion_v_correctors.npy"),
-            "v_dk":   os.path.join(dir_name, "suggestion_v_delta_k.npy"),
+            "v_dk": os.path.join(dir_name, "suggestion_v_delta_k.npy"),
         }
 
         try:
             corr_h = np.load(files["h_corr"], allow_pickle=True)
-            dk_h   = np.load(files["h_dk"])
+            dk_h = np.load(files["h_dk"])
         except Exception as e:
             print(f"Failed to load H suggestion from {dir_name}: {e}")
             corr_h, dk_h = None, None
 
         try:
             corr_v = np.load(files["v_corr"], allow_pickle=True)
-            dk_v   = np.load(files["v_dk"])
+            dk_v = np.load(files["v_dk"])
         except Exception as e:
             print(f"Failed to load V suggestion from {dir_name}: {e}")
             corr_v, dk_v = None, None
@@ -1527,7 +1512,6 @@ class MainWindow(QMainWindow):
         self._last_suggestion = suggestion
         print(f"Suggestion loaded from {dir_name}")
         return True
-
 
     def __apply_suggested_correction(self):
         if not self.__load_suggestion_from_disk():
@@ -1567,7 +1551,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Error in vary_correctors: {e}")
             return
-
 
         try:
             corr_data = self.interface.get_correctors()
@@ -1666,8 +1649,6 @@ class MainWindow(QMainWindow):
             eta_y0,
         )
 
-
-
     def __update_qf6x_strength_label(self):
         if not hasattr(self, "qf6x_curr_label"):
             return
@@ -1701,10 +1682,10 @@ class MainWindow(QMainWindow):
 
     def __apply_qf6x_step(self, sign: float):
         step = self.qf6x_step_spinbox.value() * sign
-        #print(f"GUI: apply_qf6x(dk1={step})")
+        # print(f"GUI: apply_qf6x(dk1={step})")
         print(f"GUI: apply_qmag_current(QF6X, dA={step})")
         try:
-            #self.interface.apply_qf6x(step)
+            # self.interface.apply_qf6x(step)
             self.interface.apply_qmag_current("QF6X", step)
         except Exception as e:
             print(f"apply_qmag_current is not available: {e}")
@@ -1901,14 +1882,15 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"set_nonlinear_knob not available: {e}")
 
-
     # ---------------------------------------------------------
     # MAIN
     # ---------------------------------------------------------
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    from SelectInterface import InterfaceSelectionDialog
+    from Backend.SelectInterface import InterfaceSelectionDialog
 
     dialog = InterfaceSelectionDialog("ATF2")
     if dialog.exec():
