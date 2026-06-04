@@ -543,26 +543,13 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, list):
                 elements = [elements]
 
-            x_mm = float(x_target) * 1e-3
-            y_mm = float(y_target) * 1e-3
+            x_offset = float(x_target) * 1e-6
+            y_offset = float(y_target) * 1e-6
             roll_rad = float(roll_target)
             roll_mrad = roll_rad * 1e3
 
             for element in elements:
-                if hasattr(element, "set_offsets"):
-                    try:
-                        element.set_offsets(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0, "center")
-                    except TypeError:
-                        element.set_offsets(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0)
-                elif hasattr(element, "set_alignment"):
-                    try:
-                        element.set_alignment(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0, "center")
-                    except TypeError:
-                        element.set_alignment(x_mm, y_mm, 0.0, roll_mrad, 0.0, 0.0)
-                else:
-                    raise NotImplementedError(
-                        f"RF-Track element {name} does not expose set_offsets(...) or set_alignment(...)."
-                    )
+                element.set_offsets(x_offset, y_offset, 0.0, roll_mrad, 0.0, 0.0, "center")
 
             self.qmag_xdes[name] = float(x_target)
             self.qmag_ydes[name] = float(y_target)

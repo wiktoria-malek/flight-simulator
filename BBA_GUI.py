@@ -1246,7 +1246,21 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if not hasattr(self.interface, "apply_qmag_xyroll"):
             raise RuntimeError("Interface does not support quadrupole mover correction")
 
-        self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
+        self._cancel = False
+        self._hist_orbit_x.clear()
+        self._hist_orbit_y.clear()
+        self._hist_orbit.clear()
+        self._hist_disp_x.clear()
+        self._hist_disp_y.clear()
+        self._hist_disp.clear()
+        self._hist_wake_x.clear()
+        self._hist_wake_y.clear()
+        self._hist_wake.clear()
+        self._hist_abs_rms_x.clear()
+        self._hist_abs_rms_y.clear()
+        self._hist_abs_rms_xy.clear()
+        self._refresh_metric_plots_for_mode()
+
         w1, w2, w3, rcond, iters, gain, beta = self._read_params()
 
         qcorrs, bpms = self._get_selection()
@@ -1273,10 +1287,32 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         else:
             self.log("No loaded QM response matrix data")
             return
-        Rxx = np.asarray(response["R_xx"], dtype=float) + np.asarray(response["T_xx"], dtype=float)
-        Rxy = np.asarray(response["R_xy"], dtype=float)
-        Ryx = np.asarray(response["R_yx"], dtype=float)
-        Ryy = np.asarray(response["R_yy"], dtype=float) + np.asarray(response["T_yy"], dtype=float)
+        Rxx_raw = np.asarray(response["R_xx"], dtype=float) # + np.asarray(response["T_xx"], dtype=float)
+        Rxy_raw = np.asarray(response["R_xy"], dtype=float)
+        Ryx_raw = np.asarray(response["R_yx"], dtype=float)
+        Ryy_raw = np.asarray(response["R_yy"], dtype=float) # + np.asarray(response["T_yy"], dtype=float)
+
+        def _log_matrix_stats(name, mat):
+            arr = np.asarray(mat, dtype=float)
+            finite = arr[np.isfinite(arr)]
+            if finite.size == 0:
+                self.log(f"QM response {name}: all values are non-finite")
+                return
+            self.log(
+                f"QM response {name}: shape={arr.shape}, "
+                f"max|R|={float(np.max(np.abs(finite))):.6g} mm/um, "
+                f"median|R|={float(np.median(np.abs(finite))):.6g} mm/um"
+            )
+
+        _log_matrix_stats("Rxx", Rxx_raw)
+        _log_matrix_stats("Rxy", Rxy_raw)
+        _log_matrix_stats("Ryx", Ryx_raw)
+        _log_matrix_stats("Ryy", Ryy_raw)
+
+        Rxx = np.nan_to_num(Rxx_raw, nan=0.0, posinf=0.0, neginf=0.0)
+        Rxy = np.nan_to_num(Rxy_raw, nan=0.0, posinf=0.0, neginf=0.0)
+        Ryx = np.nan_to_num(Ryx_raw, nan=0.0, posinf=0.0, neginf=0.0)
+        Ryy = np.nan_to_num(Ryy_raw, nan=0.0, posinf=0.0, neginf=0.0)
 
         max_x = self.max_horizontal_current_spinbox.value()
         max_y = self.max_vertical_current_spinbox.value()
@@ -1344,14 +1380,47 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             A = np.vstack(blocks_A)
             B = np.vstack(blocks_B)
 
-            A[np.isnan(A)] = 0.0
-            B[np.isnan(B)] = 0.0
+            A = np.nan_to_num(A, nan=0.0, posinf=0.0, neginf=0.0)
+            B = np.nan_to_num(B, nan=0.0, posinf=0.0, neginf=0.0)
+
+            if it == 0:
+                try:
+                    singular_values = np.linalg.svd(A, compute_uv=False)
+                    if singular_values.size:
+                        cutoff = float(rcond) * float(np.max(singular_values))
+                        kept = int(np.sum(singular_values > cutoff))
+                        self.log(
+                            f"QM A SVD: shape={A.shape}, smax={float(np.max(singular_values)):.6g}, "
+                            f"smin={float(np.min(singular_values)):.6g}, cutoff={cutoff:.6g}, kept={kept}/{singular_values.size}"
+                        )
+                except Exception as exc:
+                    self.log(f"QM A SVD diagnostic failed: {exc}")
 
             delta = -gain * (np.linalg.pinv(A, rcond=rcond) @ B).reshape(-1)
+            self.log(
+                f"QM iteration {it}: ||B||={float(np.linalg.norm(B)):.6g}, "
+                f"max|delta|={float(np.max(np.abs(delta))) if delta.size else 0.0:.6g} um"
+            )
 
             nq = len(qcorrs)
-            dx = np.clip(delta[:nq], -max_x, max_x)
-            dy = np.clip(delta[nq:nq + nq], -max_y, max_y)
+            dx = delta[:nq]
+            dy = delta[nq:nq + nq]
+
+            try:
+                pred_x = O0x + Rxx @ dx.reshape(-1, 1) + Rxy @ dy.reshape(-1, 1)
+                pred_y = O0y + Ryx @ dx.reshape(-1, 1) + Ryy @ dy.reshape(-1, 1)
+                pred_x_opposite = O0x - Rxx @ dx.reshape(-1, 1) - Rxy @ dy.reshape(-1, 1)
+                pred_y_opposite = O0y - Ryx @ dx.reshape(-1, 1) - Ryy @ dy.reshape(-1, 1)
+                current_rms = float(np.sqrt(np.nanmean(O0x.ravel() ** 2 + O0y.ravel() ** 2)))
+                predicted_rms = float(np.sqrt(np.nanmean(pred_x.ravel() ** 2 + pred_y.ravel() ** 2)))
+                predicted_opposite_rms = float(np.sqrt(np.nanmean(pred_x_opposite.ravel() ** 2 + pred_y_opposite.ravel() ** 2)))
+                self.log(
+                    f"QM iteration {it}: current RMS={current_rms:.6g} mm, "
+                    f"predicted RMS={predicted_rms:.6g} mm, "
+                    f"opposite-sign predicted RMS={predicted_opposite_rms:.6g} mm"
+                )
+            except Exception as exc:
+                self.log(f"QM prediction diagnostic failed: {exc}")
 
             qstate = self.interface.get_quadrupoles(qcorrs)
 
@@ -1359,13 +1428,21 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             y_now = np.asarray(qstate["ydes"], dtype=float)
             r_now = np.asarray(qstate["rolldes"], dtype=float)
 
-            self.interface.apply_qmag_xyroll(qcorrs, x_now + dx, y_now + dy, r_now, wait=True)
+            x_target = np.clip(x_now + dx, -max_x, max_x)
+            y_target = np.clip(y_now + dy, -max_y, max_y)
+
+            self.log(
+                f"QM iteration {it}: max|target_x|={float(np.max(np.abs(x_target))) if x_target.size else 0.0:.6g} um, "
+                f"max|target_y|={float(np.max(np.abs(y_target))) if y_target.size else 0.0:.6g} um"
+            )
+
+            self.interface.apply_qmag_xyroll(qcorrs, x_target, y_target, r_now, wait=True)
 
             self._hist_orbit_x.append(float(np.linalg.norm(np.nan_to_num(O0x - B0x))))
             self._hist_orbit_y.append(float(np.linalg.norm(np.nan_to_num(O0y - B0y))))
             self._hist_orbit.append(self._hist_orbit_x[-1] + self._hist_orbit_y[-1])
 
-            self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x, values_y=self._hist_orbit_y, vals=self._hist_orbit, title="QM trajectory hold")
+            self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x, values_y=self._hist_orbit_y, vals=self._hist_orbit, title="QM - distance from initial trajectory")
 
             if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
                 self.rms_orbits_data = {}
@@ -1378,6 +1455,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 "current_y": np.asarray(y_vals, dtype=float),
                 "final_x": self.rms_orbits_data.get("final_x"),
                 "final_y": self.rms_orbits_data.get("final_y"),
+                "x1_vals": None,
+                "y1_vals": None,
+                "x2_vals": None,
+                "y2_vals": None,
                 "nominal_x": None,
                 "nominal_y": None,
             }
@@ -1388,6 +1469,26 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self.rms_orbits_data["nominal_y"] = np.asarray(nominal_bpms["y"], dtype=float)
 
             QApplication.processEvents()
+
+        final_state = self.interface.get_state()
+        final_state = self._apply_jitter_subtraction_to_state(final_state)
+        final_bpms = final_state.get_bpms(bpms)
+        final_x_vals = np.asarray(final_bpms["x"], dtype=float)
+        final_y_vals = np.asarray(final_bpms["y"], dtype=float)
+
+        if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
+            self.rms_orbits_data = {"selected_bpms": list(bpms)}
+        self.rms_orbits_data["final_x"] = final_x_vals
+        self.rms_orbits_data["final_y"] = final_y_vals
+
+        mean_final_x = np.nanmean(final_x_vals, axis=0) if final_x_vals.ndim == 2 else final_x_vals
+        mean_final_y = np.nanmean(final_y_vals, axis=0) if final_y_vals.ndim == 2 else final_y_vals
+        final_rms_x = float(np.sqrt(np.nanmean(mean_final_x ** 2)))
+        final_rms_y = float(np.sqrt(np.nanmean(mean_final_y ** 2)))
+        final_rms_xy = float(np.sqrt(np.nanmean(mean_final_x ** 2 + mean_final_y ** 2)))
+        self._hist_abs_rms_x.append(final_rms_x)
+        self._hist_abs_rms_y.append(final_rms_y)
+        self._hist_abs_rms_xy.append(final_rms_xy)
 
         QMessageBox.information(self, "QM correction", "QM correction finished")
 
@@ -1415,8 +1516,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.plot_widget_4.setEnabled(False)
             self.plot_widget_5.setEnabled(False)
             self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title="QM trajectory hold")
-            self._plot_series(self.disp_ax, self.disp_canvas, [], [], [], title="DFS not used in QM Mode")
-            self._plot_series(self.wake_ax, self.wake_canvas, [], [], [], title="WFS not used in QM Mode")
+            self._plot_disabled_panel(self.disp_ax, self.disp_canvas, title="DFS not used in QM mode")
+            self._plot_disabled_panel(self.wake_ax, self.wake_canvas, title="WFS not used in QM mode")
         else:
             self.plot_widget_4.setEnabled(True)
             self.plot_widget_5.setEnabled(True)
