@@ -151,6 +151,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.data_directory_2.setEnabled(checked)
 
     def _plot_singular_values(self):
+        if self.R is None:
+            QMessageBox.warning(self, "Error", "Load directory data and compute response matrix first.")
+            return
+
         def get_SV(R):
             R = R.copy()
             R[np.isnan(R)] = 0

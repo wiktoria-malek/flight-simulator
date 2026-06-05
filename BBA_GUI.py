@@ -4,14 +4,14 @@ import numpy as np
 try:
     from PyQt6 import uic
     from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt6.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
-    from PyQt6.QtGui import QPainter, QPixmap
+    from PyQt6.QtWidgets import (QGroupBox, QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
+    from PyQt6.QtGui import QPainter, QPixmap, QPalette
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt5.QtWidgets import (QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
-    from PyQt5.QtGui import QPainter, QPixmap
+    from PyQt5.QtWidgets import (QGroupBox, QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
+    from PyQt5.QtGui import QPainter, QPixmap, QPalette
     pyqt_version = 5
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -136,7 +136,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.pushButton_9.clicked.connect(self._pick_and_load_disp_data)
         self.pushButton_10.clicked.connect(self._pick_and_load_wake_data)
         self.clear_graphs_button.clicked.connect(self._clear_graphs)
-        self.pushButton_11.clicked.connect(self.load_session_settings)
         self.restore_initial_settings.clicked.connect(self._restore_initial_settings)
         self.modes= [ 'Orbit', 'Dispersion', 'Wakefield']
         self._running = False
@@ -150,7 +149,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.jitter_model = None
         self.subtract_jitter_checkbox.setChecked(False)
         self.actuator_mode = ActuatorMode.Kicker
-
+        self.pushButton_11.clicked.connect(self.load_session_settings)
         if hasattr(self.interface, "get_quadrupoles"):
             try:
                 self.qm_corrs = self.interface.get_quadrupole_movers_names()
@@ -158,7 +157,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self.qm_corrs = []
         else:
             self.qm_corrs = []
-
         self.setWindowTitle("BBA GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
@@ -205,6 +203,18 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._refresh_corrector_list()
         self._update_qm_widgets_visibility()
         self._refresh_specific_bpm_candidates()
+        self._refresh_metric_plots_for_mode()
+        is_qm = self.actuator_mode == ActuatorMode.QM
+        if is_qm:
+            self.radio_buttons[0].setChecked(True)
+            self.groupBox_6.setTitle("DFS not used in QM mode")
+            self.groupBox_7.setTitle("WFS not used in QM mode")
+
+        self.radio_buttons[1].setEnabled(not is_qm)
+        self.radio_buttons[2].setEnabled(not is_qm)
+
+        for widget in (self.dfs_response_3, self.pushButton_9, self.mode_dispersion, self.wfs_response_3, self.pushButton_10, self.mode_wakefield):
+            widget.setEnabled(not is_qm)
 
     def _setup_qm_controls(self):
         row_mode = QHBoxLayout()
@@ -255,6 +265,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._update_qm_widgets_visibility()
         self._refresh_specific_bpm_candidates()
         self._refresh_metric_plots_for_mode()
+        is_qm = self.actuator_mode == ActuatorMode.QM
+        if is_qm:
+            self.radio_buttons[0].setChecked(True)
+        self.radio_buttons[1].setEnabled(not is_qm)
+        self.radio_buttons[2].setEnabled(not is_qm)
+
+        for widget in (self.dfs_response_3, self.pushButton_9, self.mode_dispersion,
+                       self.wfs_response_3, self.pushButton_10, self.mode_wakefield):
+            widget.setEnabled(not is_qm)
 
     def _update_qm_widgets_visibility(self):
         is_qm = self.actuator_mode == ActuatorMode.QM
@@ -263,26 +282,34 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.specific_bpm_combo.setVisible(is_qm)
 
         if is_qm:
+            self.groupBox_6.setTitle("DFS not used in QM mode")
+            self.groupBox_7.setTitle("WFS not used in QM mode")
             self.label.setText("Trajectory hold weight")
-
+            self.lineEdit.setText("0.0")
+            self.lineEdit_2.setText("1.0")
+            self.lineEdit_3.setText("0.0")
+            self.lineEdit_4.setText("0.000001")
             self.label_2.setText("BPM->0 weight")
             self.label_3.setText("Specific BPM->0 weight")
             self.current_groupbox_right.setTitle("Max range [um]")
             self.horizontal_current_label.setText("X:")
             self.vertical_current_label.setText("Y:")
-
             self.max_horizontal_current_spinbox.setMaximum(1e6)
             self.max_vertical_current_spinbox.setMaximum(1e6)
-
             self.max_horizontal_current_spinbox.setDecimals(0)
             self.max_vertical_current_spinbox.setDecimals(0)
-
             self.max_horizontal_current_spinbox.setValue(1000.0)
             self.max_vertical_current_spinbox.setValue(1000.0)
         else:
+            self.groupBox_6.setTitle("Dispersion-Free Steering")
+            self.groupBox_7.setTitle("Wakefield-Free Steering")
             self.label.setText("Orbit weight")
             self.label_2.setText("Dispersion weight")
             self.label_3.setText("Wakefield weight")
+            self.lineEdit.setText("1.0")
+            self.lineEdit_2.setText("10.0")
+            self.lineEdit_3.setText("10.0")
+            self.lineEdit_4.setText("0.001")
             self.current_groupbox_right.setTitle(f"Max strength ({self.corrs_unit})")
             self.horizontal_current_label.setText("H:")
             self.vertical_current_label.setText("V:")
@@ -1473,6 +1500,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._hist_abs_rms_x.append(final_rms_x)
         self._hist_abs_rms_y.append(final_rms_y)
         self._hist_abs_rms_xy.append(final_rms_xy)
+        self.save_session_settings_qm_correction(w1=w1, w2=w2, w3=w3, specific_bpm=spec_bpm, rcond=rcond, iters=iters, gain=gain, beta=beta, max_horizontal_range=max_x, max_vertical_range=max_y, is_triangular=bool(self.triangular_checkbox.isChecked()), bpm_weights=self.bpm_weights, response=response, is_jitter_subtraction_checked=bool(self.subtract_jitter_checkbox.isChecked()))
 
         QMessageBox.information(self, "QM correction", "QM correction finished")
 
@@ -1499,7 +1527,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if self.actuator_mode == ActuatorMode.QM:
             self.plot_widget_4.setEnabled(False)
             self.plot_widget_5.setEnabled(False)
-            self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title="QM trajectory hold")
+            self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title="QM - distance from initial trajectory")
             self._plot_disabled_panel(self.disp_ax, self.disp_canvas, title="DFS not used in QM mode")
             self._plot_disabled_panel(self.wake_ax, self.wake_canvas, title="WFS not used in QM mode")
         else:
@@ -1596,6 +1624,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 break
         if selected_mode is None:
             selected_mode = self.modes[0]
+
 
         if selected_mode==self.modes[0]:
             mode = "orbit"

@@ -21,7 +21,11 @@ class SaveOrLoad():
 
         if state is not None:
             if hasattr(self,"correctors_list") and elements_list is self.correctors_list:
-                ref_list=[str(x) for x in state.get_correctors()["names"]]
+                actuator_mode = getattr(getattr(self,"actuator_mode",None),"name", "Kicker")
+                if actuator_mode == "QM" and hasattr(self, "qm_corrs"):
+                    ref_list = [str(x) for x in self.qm_corrs]
+                else:
+                    ref_list = [str(x) for x in state.get_correctors()["names"]]
             elif hasattr(self, "bpms_list") and elements_list is self.bpms_list:
                     ref_list=[str(x) for x in state.get_bpms()["names"]]
             elif hasattr(self,"quadrupoles_list") and elements_list is self.quadrupoles_list:
@@ -68,12 +72,16 @@ class SaveOrLoad():
             with open(fn, "r") as f:
                 selected = [ln.strip() for ln in f]
         if not selected:
-            state=getattr(self,"initial_state",None)
+            state = getattr(self, "initial_state", None)
             if state is not None:
                 if hasattr(self, "bpms_list") and elements_list is self.bpms_list:
                     selected = state.get_bpms()["names"]
                 elif hasattr(self, "correctors_list") and elements_list is self.correctors_list:
-                    selected = state.get_correctors()["names"]
+                    actuator_mode = getattr(getattr(self, "actuator_mode", None), "name", "Kicker")
+                    if actuator_mode == "QM" and hasattr(self, "qm_corrs"):
+                        selected = self.qm_corrs
+                    else:
+                        selected = state.get_correctors()["names"]
                 elif hasattr(self, "quadrupoles_list") and elements_list is self.quadrupoles_list:
                     selected = state.get_quadrupoles()["names"]
                 elif hasattr(self, "screens_list") and elements_list is self.screens_list:
@@ -139,6 +147,7 @@ class SaveOrLoad():
                           base_dir=save_session_dir)
 
         correction_settings = {
+            "actuator_mode": "Kicker",
             "w1": w1,
             "w2": w2,
             "w3": w3,
@@ -227,14 +236,6 @@ class SaveOrLoad():
             return
         if hasattr(self, "session_database_3"):
             self.session_database_3.setText(folder)
-
-        # load correctors
-        self._loading_func(elements_list=self.correctors_list, filename="correctors.txt",
-                           loading_name="Load Correctors", use_dialog=False, base_dir=folder)
-        # load bpms
-        self._loading_func(elements_list=self.bpms_list, filename="bpms.txt", loading_name="Load BPMs",
-                           use_dialog=False, base_dir=folder)
-
         correction_settings_path = os.path.join(folder, "correction_settings.json")
         if not os.path.isfile(correction_settings_path):
             QMessageBox.warning(self, "Load session", "Selected folder doesn't contain proper correction settings.")
@@ -242,9 +243,37 @@ class SaveOrLoad():
         try:
             with open(correction_settings_path, "r") as f:
                 settings = json.load(f)
+                actuator_mode = settings.get("actuator_mode", "Kicker")
         except Exception as e:
             QMessageBox.warning(self,"Load session",f"Couldn't read correction_settings.json: {e}")
             return
+
+        # Set actuator mode in combo if present
+        if hasattr(self, "actuator_mode_combo"):
+            mode_text = "Quadrupole movers" if actuator_mode == "QM" else "Correctors"
+            idx = self.actuator_mode_combo.findText(mode_text)
+            if idx >= 0:
+                self.actuator_mode_combo.setCurrentIndex(idx)
+
+        if hasattr(self, "_refresh_corrector_list"):
+            self._refresh_corrector_list()
+        if hasattr(self, "_update_qm_widgets_visibility"):
+            self._update_qm_widgets_visibility()
+        if hasattr(self, "_refresh_metric_plots_for_mode"):
+            self._refresh_metric_plots_for_mode()
+        if hasattr(self, "_refresh_specific_bpm_candidates"):
+            self._refresh_specific_bpm_candidates()
+
+        if actuator_mode == "QM" and os.path.isfile(os.path.join(folder, "quadrupole_movers.txt")):
+            actuator_filename = "quadrupole_movers.txt"
+        else:
+            actuator_filename = "correctors.txt"
+
+        self._loading_func(elements_list=self.correctors_list, filename=actuator_filename,
+                           loading_name="Load Actuators", use_dialog=False, base_dir=folder)
+        self._loading_func(elements_list=self.bpms_list, filename="bpms.txt", loading_name="Load BPMs",
+                           use_dialog=False, base_dir=folder)
+
         paths = settings.get("data_dirs") or {}
         for key, path in paths.items():
             if not path:
@@ -265,8 +294,6 @@ class SaveOrLoad():
         if "iters" in settings:  self.lineEdit_5.setText(str(settings["iters"]))
         if "gain" in settings: self.lineEdit_6.setText(str(settings["gain"]))
         if "beta" in settings: self.lineEdit_beta.setText(str(settings["beta"]))
-        if "max_horizontal_current" in settings: self.max_horizontal_current_spinbox.setValue(settings["max_horizontal_current"])
-        if "max_vertical_current" in settings: self.max_vertical_current_spinbox.setValue(settings["max_vertical_current"])
         if "is_triangular" in settings: self.triangular_checkbox.setChecked(settings["is_triangular"])
         if "is_jitter_subtraction_checked" in settings: self.subtract_jitter_checkbox.setChecked(settings["is_jitter_subtraction_checked"])
         if "bpm_weights" in settings:
@@ -280,10 +307,30 @@ class SaveOrLoad():
                 item = self.bpms_list.item(i)
                 self._update_bpm_weights(item)
 
-        if hasattr(self, "trajectory_response_3"): self.trajectory_response_3.setText(settings["data_dirs"]["traj"] or "")
-        if hasattr(self, "dfs_response_3"): self.dfs_response_3.setText(settings["data_dirs"]["dfs"] or "")
-        if hasattr(self, "wfs_response_3"): self.wfs_response_3.setText(settings["data_dirs"]["wfs"] or "")
+        data_dirs = settings.get("data_dirs") or {}
+        if hasattr(self, "trajectory_response_3"):
+            self.trajectory_response_3.setText(data_dirs.get("traj") or "")
 
+        if actuator_mode == "Kicker":
+            if "max_horizontal_current" in settings:
+                self.max_horizontal_current_spinbox.setValue(settings["max_horizontal_current"])
+            if "max_vertical_current" in settings:
+                self.max_vertical_current_spinbox.setValue(settings["max_vertical_current"])
+            if hasattr(self, "dfs_response_3"):
+                self.dfs_response_3.setText(data_dirs.get("dfs") or "")
+            if hasattr(self, "wfs_response_3"):
+                self.wfs_response_3.setText(data_dirs.get("wfs") or "")
+        else:
+            if hasattr(self, "_refresh_specific_bpm_candidates"):
+                self._refresh_specific_bpm_candidates()
+            if "specific_bpm" in settings and hasattr(self, "specific_bpm_combo"):
+                idx = self.specific_bpm_combo.findText(str(settings["specific_bpm"]))
+                if idx >= 0:
+                    self.specific_bpm_combo.setCurrentIndex(idx)
+            if "max_horizontal_range" in settings:
+                self.max_horizontal_current_spinbox.setValue(settings["max_horizontal_range"])
+            if "max_vertical_range" in settings:
+                self.max_vertical_current_spinbox.setValue(settings["max_vertical_range"])
 
     def save_emittance_measurement_session(self,session):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
@@ -325,5 +372,60 @@ class SaveOrLoad():
         return session
 
         self.session_database.setText(save_session_dir)
+
+        return save_session_dir
+
+    def save_session_settings_qm_correction(self, w1, w2, w3, specific_bpm, rcond, iters, gain, beta, max_horizontal_range, max_vertical_range, is_triangular, bpm_weights, response, is_jitter_subtraction_checked):
+        time_str = datetime.now().strftime("%y%m%d%H%M%S")
+        default_dir = os.path.expanduser(os.path.expandvars("~/flight-simulator-data/"))
+        save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}_{time_str}_QM_session_settings")
+        os.makedirs(save_session_dir, exist_ok=True)
+        self._saving_func(elements_list=self.correctors_list, filename="quadrupole_movers.txt", saving_name="Save Quadrupole Movers", use_dialog=False, base_dir=save_session_dir)
+        self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs", use_dialog=False, base_dir=save_session_dir)
+        correction_settings = {
+            "actuator_mode": "QM",
+            "w1": w1,
+            "w2": w2,
+            "w3": w3,
+            "specific_bpm": specific_bpm,
+            "rcond": rcond,
+            "iters": iters,
+            "gain": gain,
+            "beta": beta,
+            "max_horizontal_range": max_horizontal_range,
+            "max_vertical_range": max_vertical_range,
+            "is_triangular": is_triangular,
+            "is_jitter_subtraction_checked": is_jitter_subtraction_checked,
+            "bpm_weights": bpm_weights,
+            "data_dirs": {
+                k: (self._expand_data_path(v["dir"]) if v else None)
+                for k, v in self._data_dirs.items()
+            },
+        }
+
+        with open(os.path.join(save_session_dir, "correction_settings.json"), "w") as f:
+            json.dump(correction_settings, f, indent=2)
+
+        def __save_graph_data(path, series):
+            with open(path, "w") as f:
+                f.write("Iteration\tvalue\n")
+                for i, v in enumerate(series, start=1):
+                    f.write(f"{i}\t{v}\n")
+
+        __save_graph_data(os.path.join(save_session_dir, "trajectory_x_after_correction.txt"), self._hist_orbit_x)
+        __save_graph_data(os.path.join(save_session_dir, "trajectory_y_after_correction.txt"), self._hist_orbit_y)
+        __save_graph_data(os.path.join(save_session_dir, "trajectory_combined_after_correction.txt"), self._hist_orbit)
+        __save_graph_data(os.path.join(save_session_dir, "orbit_rms_x_after_correction.txt"), self._hist_abs_rms_x)
+        __save_graph_data(os.path.join(save_session_dir, "orbit_rms_y_after_correction.txt"), self._hist_abs_rms_y)
+        __save_graph_data(os.path.join(save_session_dir, "orbit_rms_xy_after_correction.txt"), self._hist_abs_rms_xy)
+
+        qm_matrices = {}
+        if response is not None:
+            for key in ("qcorrs", "bpms", "R_xx", "R_xy", "R_yx", "R_yy", "T_xx", "T_yy"):
+                if key in response:
+                    qm_matrices[key] = response[key]
+
+        with open(os.path.join(save_session_dir, "qm_correction_matrices.pkl"), "wb") as f:
+            pickle.dump(qm_matrices, f)
 
         return save_session_dir

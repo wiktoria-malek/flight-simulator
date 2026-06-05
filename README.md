@@ -1,5 +1,5 @@
 # Installation
-Requires: Python >= 3.11 and Poetry.
+Requires: Python >= 3.11 and Poetry >= 2.0
 
 ### Install Poetry (if not yet installed)
 ```bash
