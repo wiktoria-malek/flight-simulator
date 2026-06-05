@@ -69,7 +69,7 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_Ext_RFTrack",
             "class_name": "InterfaceATF2_Ext_RFTrack",
             "settings": {"jitter":1.0, "bpm_resolution":0.00, "nsamples":1},
-            "actions": ["align_everything", "misalign_bpms"],
+            "actions": ["align_everything", "misalign_quadrupoles"],
             "units":
                 {
                     "corrector_strength": "T*mm",

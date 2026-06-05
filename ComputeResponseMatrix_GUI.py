@@ -39,7 +39,7 @@ class MatplotlibWidget(FigureCanvas):
         self.axes = fig.add_subplot(111)
 
 class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
-    def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False):
+    def __init__(self,data_dir_1=None,data_dir_2=None,comp_difference=False,auto_click_compute=False, actuator_mode = None):
         super().__init__()
         uic.loadUi("UI files/ComputeResponseMatrix_GUI.ui", self)
         self._load_logo()
@@ -58,12 +58,17 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.save_as_button.clicked.connect(self.__save_as_button_clicked)
         self.diff_checkbox.toggled.connect(self._compute_difference_clicked)
         self._compute_difference_clicked(self.diff_checkbox.isChecked())
+        self.actuator_mode=actuator_mode
+        if self.actuator_mode=="QM":
+            self.actuator_type_combo.setCurrentText("Quadrupole movers")
+        else:
+            self.actuator_mode="Kicker"
+            self.actuator_type_combo.setCurrentText("Correctors")
+
         self.actuator_type_combo.currentTextChanged.connect(lambda _text: self._refresh_device_lists_for_current_mode())
         self.plot_singular_values_button.clicked.connect(self._plot_singular_values)
         self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
         self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
-        self.hcorrector_prefixes=("zh", "zx")
-        self.vcorrector_prefixes=("zv")
 
         layout = self.plot_widget.layout()
         if layout is None:
@@ -120,14 +125,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         R.Bx = Bx
         R.By = By
         return R
-
-    def _is_h_corrector(self, s):
-        name=str(s).lower()
-        return name.startswith(self.hcorrector_prefixes)
-
-    def _is_v_corrector(self, s):
-        name=str(s).lower()
-        return name.startswith(self.vcorrector_prefixes)
 
     def _expand_path(self,path):
         expanded_path=(path or "").strip()
@@ -377,16 +374,15 @@ if __name__ == '__main__':
     parser.add_argument("--dir2",default=None,help="Second data directory")
     parser.add_argument("--diff",action="store_true",help="Difference between responses")
     parser.add_argument("--compute",action="store_true",help="Auto-click Compute button")
+    parser.add_argument("--actuator_mode",default="Kicker",help="Set Actuator mode")
+
     args=parser.parse_args()
 
     dir1=args.dir1
     dir2=args.dir2
 
     app = QApplication(sys.argv)
-    window = MainWindow(data_dir_1=args.dir1,
-        data_dir_2=args.dir2,
-        comp_difference=args.diff,
-        auto_click_compute=args.compute,)
+    window = MainWindow(data_dir_1=args.dir1, data_dir_2=args.dir2, comp_difference=args.diff, auto_click_compute=args.compute, actuator_mode=args.actuator_mode)
     window.show()
     sys.exit(app.exec())
 

@@ -480,6 +480,9 @@ class ResponseMatrix_DFS_WFS():
         Rxy = np.column_stack([mean_or_nan(Rxy_samples[q]) for q in qcorrs_y])
         Ryy = np.column_stack([mean_or_nan(Ryy_samples[q]) for q in qcorrs_y])
 
+        if not Bx_rows or not By_rows:
+            raise RuntimeError("No valid quadrupole mover DATA pairs found")
+
         Bx = np.nanmean(np.vstack(Bx_rows), axis=0).reshape(-1, 1)
         By = np.nanmean(np.vstack(By_rows), axis=0).reshape(-1, 1)
 
@@ -502,7 +505,5 @@ class ResponseMatrix_DFS_WFS():
                     if sequence_pos(bpm) < qpos or str(bpm) == f"M{q}" or f"M{q}" in str(bpm):
                         Rxy[i, j] = 0.0
                         Ryy[i, j] = 0.0
-
-
 
         return Rxx, Ryy, Rxy, Ryx, Bx, By, qcorrs_x, qcorrs_y, bpms

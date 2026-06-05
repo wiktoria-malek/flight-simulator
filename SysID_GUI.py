@@ -99,7 +99,7 @@ class Worker(QObject):
                     for axis in ("x", "y"):
                         filename_p = os.path.join(self.output_dir, f"DATA_{magnet}_{axis}_p{iter:04d}.pkl")
                         filename_m = os.path.join(self.output_dir, f"DATA_{magnet}_{axis}_m{iter:04d}.pkl")
-                        if not (os.path.isfile(filename_p) and os.path.isfile(filename_m)):
+                        if iter > 0 or not (os.path.isfile(filename_p) and os.path.isfile(filename_m)):
                             pending_steps += 1
             total_steps = max(pending_steps, 1)
 
@@ -152,7 +152,9 @@ class Worker(QObject):
                         measured_this_magnet = False
 
                         try:
-                            if not os.path.isfile(filename_p):
+                            apply_new_measurement = iter > 0
+
+                            if apply_new_measurement or not os.path.isfile(filename_p):
                                 print(f"QM {magnet} axis={axis} '+' excitation...")
                                 if axis == "x":
                                     I.apply_qmag_xyroll(magnet, x0 + amp, y0, r0)
@@ -165,7 +167,7 @@ class Worker(QObject):
                                 state_p = I.get_state().__class__(filename=filename_p)
                             Op = state_p.get_orbit(self.bpms)
 
-                            if not os.path.isfile(filename_m):
+                            if apply_new_measurement or not os.path.isfile(filename_m):
                                 print(f"QM {magnet} axis={axis} '-' excitation...")
                                 if axis == "x":
                                     I.apply_qmag_xyroll(magnet, x0 - amp, y0, r0)
@@ -203,6 +205,7 @@ class Worker(QObject):
 
                         observed = max(finite_abs_max(Diff_x), finite_abs_max(Diff_y))
                         new_amp = update_amplitude(amp, observed, target, max_range)
+                        new_amp = 0.8 * new_amp + 0.2 * amp
                         if axis == "x":
                             hkicks[imag] = new_amp
                         else:
@@ -217,6 +220,7 @@ class Worker(QObject):
                             while self.running and (time.monotonic() - t0) < 0.2:
                                 time.sleep(0.05)
 
+            print(f"QM progress: done={self.progress_value}, expected={total_steps}")
             self.running = False
             self.finished.emit()
             return
@@ -505,6 +509,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
 
     def _get_quadrupole_names_for_qm_mode(self):
+        print(len(self.interface.get_quadrupole_movers_names()))
+        print(self.interface.get_quadrupole_movers_names())
         names = list(self.interface.get_quadrupole_movers_names())
         if names:
             return [str(name) for name in names]
@@ -685,12 +691,21 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 reference_namelist = unsorted_names
 
         sorted_names = []
+        seen = set()
+        unsorted_set = set(unsorted_names)
+
         for name in reference_namelist:
-            if str(name) in unsorted_names:
-                sorted_names.append(str(name))
-        for name in unsorted_names:
-            if name not in sorted_names:
+            name = str(name)
+            if name in unsorted_set and name not in seen:
                 sorted_names.append(name)
+                seen.add(name)
+
+        for name in unsorted_names:
+            name = str(name)
+            if name not in seen:
+                sorted_names.append(name)
+                seen.add(name)
+
         return sorted_names
 
     def _read_filenames(self,basedir,filename):

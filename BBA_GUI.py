@@ -1588,24 +1588,22 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         state.bpms = apply_jitter_subtraction(state.get_bpms(), self.jitter_model)
         return state
 
-    def handling(self, app_name,cwd=None, args=None):
+    def handling(self, app_name,cwd=None, args=None, is_qm_mode=False):
         try:
             path = os.path.join(os.path.dirname(__file__), app_name)
             workdir=os.path.expanduser(os.path.expandvars(cwd))
-
             proc = QProcess(self)
             proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
             proc.setWorkingDirectory(workdir)
-
             env = QProcessEnvironment.systemEnvironment()
             proc.setProcessEnvironment(env)
-
             argv = [path] + list(args or [])
+            if is_qm_mode:
+                argv += ["--actuator_mode", "QM"]
+            else:
+                argv += ["--actuator_mode", "Kicker"]
             proc.start(sys.executable, argv)
-
-            proc.readyReadStandardOutput.connect(
-                lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore"))
-            )
+            proc.readyReadStandardOutput.connect(lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore")))
             self._procs.append(proc)
             print(workdir)
 
@@ -1618,13 +1616,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         dispersion_dir=self.dfs_response_3.text()
         wakefield_dir=self.wfs_response_3.text()
         selected_mode=None
+        is_qm = self.actuator_mode == ActuatorMode.QM
         for rb in self.radio_buttons:
             if rb.isChecked():
                 selected_mode = rb.text()
                 break
         if selected_mode is None:
             selected_mode = self.modes[0]
-
 
         if selected_mode==self.modes[0]:
             mode = "orbit"
@@ -1644,7 +1642,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 return
             args = ["--dir1",wakefield_dir,"--dir2",orbit_dir,"--diff","--compute"]
 
-        self.handling('ComputeResponseMatrix_GUI.py', cwd=self.cwd,args=args) # args = arguments passed to the second program
+        self.handling('ComputeResponseMatrix_GUI.py', cwd=self.cwd,args=args, is_qm_mode = is_qm) # args = arguments passed to the second program
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
