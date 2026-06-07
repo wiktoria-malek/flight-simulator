@@ -47,7 +47,6 @@ def finite_abs_max(values):
         return 0.0
     return float(np.max(np.abs(arr)))
 
-
 def update_amplitude(current_amp, observed, target, max_range):
     if not np.isfinite(observed) or observed <= 0.0:
         new_amp = current_amp * 1.5
@@ -392,7 +391,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
     def __init__(self, interface, dir_name):
         super().__init__()
-
         # SysID
         self.worker = None
         self.thread = None
@@ -937,6 +935,15 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self.__set_status_in_title(f"[Running {mode.name} mode]")
             self.worker.unpause()
 
+    def _device_position_on_bpm_axis(self, device_name, bpm_names):
+        sequence = self.interface.get_sequence()
+        device_position = sequence.index(device_name)
+        bpm_position = [sequence.index(bpm) for bpm in bpm_names if bpm in sequence]
+        for i, position in enumerate(bpm_position):
+            if device_position < position:
+                return i - 0.5
+        return len(bpm_position) - 0.5
+
     def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, bpm_names,corrector):
         Diff_x=np.asarray(Diff_x).ravel()
         Diff_y=np.asarray(Diff_y).ravel()
@@ -949,6 +956,9 @@ class MainWindow(QMainWindow, SaveOrLoad):
         scale=np.arange(n) # np.arange(start,stop,step) -> 0,n,1
         self.plot_widget.axes.errorbar(scale, Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
         self.plot_widget.axes.errorbar(scale, Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
+        device_x = self._device_position_on_bpm_axis(corrector.split(":")[0], bpm_names)
+        self.plot_widget.axes.axvline(device_x, linestyle='--', linewidth=2, color = "purple")
+        self.plot_widget.axes.text(device_x, self.plot_widget.axes.get_ylim()[1], corrector, rotation=90, va="top", ha="right")
         self.plot_widget.axes.legend(loc='upper left')
         self.plot_widget.axes.set_xticks(scale)
         self.plot_widget.axes.set_xticklabels(bpm_names[:n],rotation=90,fontsize=8)

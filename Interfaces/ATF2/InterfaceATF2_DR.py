@@ -13,11 +13,6 @@ def set_quadrupoles(self):
     pass
 def vary_quadrupoles(self, names, corr_vals):
     pass
-def get_sextupoles(self):
-    pass
-def set_sextupoles(self):
-    pass
-
 '''
 
 class InterfaceATF2_DR(AbstractMachineInterface):
@@ -402,6 +397,32 @@ class InterfaceATF2_DR(AbstractMachineInterface):
             }
 
         return bpms
+
+    def get_sextupoles(self, names=None):
+        if names is None:
+            names = self.sextupoles
+        if isinstance(names, str):
+            names = [names]
+        bdes, bact = [], []
+
+        for name in names:
+            bdes.append(self._pv_get(f"{name}:currentWrite"))
+            bact.append(self._pv_get(f"{name}:currentRead"))
+        return {
+            "names": names,
+            "bdes": np.array(bdes, dtype=float),
+            "bact": np.array(bact, dtype=float),
+        }
+
+    def set_sextupoles(self, names, values):
+        if isinstance(names, str):
+            names = [names]
+        values = np.asarray(values, dtype=float).reshape(-1)
+        if len(names) != len(values):
+            raise ValueError("len(names) != len(values) in set_sextupoles")
+        for name, value in zip(names, values):
+            self._pv_put(f"{name}:currentWrite", float(value))
+            self._wait_for_corrector_readback(name, value)
 
     def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
         readback_pv = PV(f'{corrector}:currentRead')

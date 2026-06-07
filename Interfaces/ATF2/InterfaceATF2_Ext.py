@@ -76,73 +76,16 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         # keep monitor indexes from MONITOR_INDEX_TO_NAME as the source of truth.
         self.MONITOR_INDEX_TO_NAME = {
-            0: "MB1X",
-            1: "MB2X",
-            2: "MQF1X",
-            3: "MQD2X",
-            4: "MQF3X",
-            5: "MQF4X",
-            6: "MQD5X",
-            7: "MQF6X",
-            8: "MQF7X",
-            9: "MQD8X",
-            10: "MQF9X",
-            11: "MQD10X",
-            12: "MQF11X",
-            13: "MQD12X",
-            14: "MQF13X",
-            15: "MQD14X",
-            16: "MQF15X",
-            17: "MQD16X",
-            18: "MQF17X",
-            19: "MQD18X",
-            20: "MQF19X",
-            21: "MQD20X",
-            22: "MQF21X",
-            23: "IPBPM1",
-            24: "IPBPM2",
-            25: "nBPM1",
-            26: "nBPM2",
-            27: "nBPM3",
-            28: "MQM16FF",
-            29: "MQM15FF",
-            30: "MQM14FF",
-            31: "MFB2FF",
-            32: "MQM13FF",
-            33: "MQM12FF",
-            34: "MFB1FF",
-            35: "MQM11FF",
-            36: "MQD10BFF",
-            37: "MQD10AFF",
-            38: "MQF9BFF",
-            39: "MSF6FF",
-            40: "MQF9AFF",
-            41: "MQD8FF",
-            42: "MQF7FF",
-            43: "MQD6FF",
-            44: "MQF5BFF",
-            45: "MSF5FF",
-            46: "MQF5AFF",
-            47: "MQD4BFF",
-            48: "MSD4FF",
-            49: "MQD4AFF",
-            50: "MQF3FF",
-            51: "MQD2BFF",
-            52: "MQD2AFF",
-            53: "MSF1FF",
-            54: "MQF1FF",
-            55: "MSD0FF",
-            56: "MQD0FF",
-            57: "M1&2IP",
-            58: "MPIP",
-            59: "MDUMP",
-            60: "ICT1X",
-            61: "ICTDUMP",
-            62: "MW1X",
-            63: "MW1IP",
-            64: "MPREIP",
-            65: "MIPA",
-            66: "MIPB"}
+            0: "MB1X", 1: "MB2X", 2: "MQF1X", 3: "MQD2X", 4: "MQF3X", 5: "MQF4X", 6: "MQD5X", 7: "MQF6X", 8: "MQF7X",
+            9: "MQD8X", 10: "MQF9X", 11: "MQD10X", 12: "MQF11X", 13: "MQD12X", 14: "MQF13X", 15: "MQD14X", 16: "MQF15X", 17: "MQD16X",
+            18: "MQF17X", 19: "MQD18X", 20: "MQF19X", 21: "MQD20X", 22: "MQF21X", 23: "IPBPM1", 24: "IPBPM2", 25: "nBPM1",
+            26: "nBPM2", 27: "nBPM3", 28: "MQM16FF", 29: "MQM15FF", 30: "MQM14FF", 31: "MFB2FF", 32: "MQM13FF", 33: "MQM12FF",
+            34: "MFB1FF", 35: "MQM11FF", 36: "MQD10BFF", 37: "MQD10AFF", 38: "MQF9BFF", 39: "MSF6FF", 40: "MQF9AFF", 41: "MQD8FF",
+            42: "MQF7FF", 43: "MQD6FF", 44: "MQF5BFF", 45: "MSF5FF", 46: "MQF5AFF", 47: "MQD4BFF", 48: "MSD4FF", 49: "MQD4AFF",
+            50: "MQF3FF", 51: "MQD2BFF", 52: "MQD2AFF", 53: "MSF1FF", 54: "MQF1FF", 55: "MSD0FF", 56: "MQD0FF", 57: "M1&2IP", 58: "MPIP",
+            59: "MDUMP", 60: "ICT1X", 61: "ICTDUMP", 62: "MW1X", 63: "MW1IP", 64: "MPREIP", 65: "MIPA", 66: "MIPB"}
+
+        self.sextupoles = ["SF6FF", "SK4FF", "SK3FF", "SF5FF", "SF5FF", "SD4FF", "SK2FF", "SK1FF", "SF1FF", "SD0FF"]
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
@@ -342,10 +285,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
     def get_movable_magnets_names(self):
         return self.movable_magnets
-
-    # Backward-compatibility alias for the typo used in discussion.
-    def get_quadropoles(self, names=None, include_pv_names=False):
-        return self.get_quadrupoles(names=names, include_pv_names=include_pv_names)
 
     def get_quadrupoles(self, names=None, include_pv_names=False):
         if names is None:
@@ -731,6 +670,32 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             }
 
         return bpms
+
+    def get_sextupoles(self, names=None):
+        if names is None:
+            names = self.sextupoles
+        if isinstance(names, str):
+            names = [names]
+        bdes, bact = [], []
+
+        for name in names:
+            bdes.append(self._pv_get(f"{name}:currentWrite"))
+            bact.append(self._pv_get(f"{name}:currentRead"))
+        return {
+            "names": names,
+            "bdes": np.array(bdes, dtype=float),
+            "bact": np.array(bact, dtype=float),
+        }
+
+    def set_sextupoles(self, names, values):
+        if isinstance(names, str):
+            names = [names]
+        values = np.asarray(values, dtype=float).reshape(-1)
+        if len(names) != len(values):
+            raise ValueError("len(names) != len(values) in set_sextupoles")
+        for name, value in zip(names, values):
+            self._pv_put(f"{name}:currentWrite", float(value))
+            self._wait_for_corrector_readback(name, value)
 
     def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
         readback_pv = PV(f'{corrector}:currentRead')
