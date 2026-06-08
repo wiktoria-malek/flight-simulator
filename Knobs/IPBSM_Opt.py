@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import json
+import sys
 import time
 import math
 import csv
@@ -13,6 +14,13 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 
 import time
 import numpy as np
+
+_KNOBS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _KNOBS_DIR.parent
+for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 from Interfaces.ATF2.InterfaceATF2_Ext import InterfaceATF2_Ext
 from Interfaces.ATF2.InterfaceATF2_Ext import CurrentDropToZeroError
 
@@ -310,15 +318,26 @@ class EPICSIPBSMController:
     def get_ipbsm_full(self) -> Dict[str, Any]:
         return self.interface.get_ipbsm_full()
 
-from ipbsm_opt_math import (
-    GPParams,
-    GaussianFitResult,
-    SimpleGP,
-    acq_ei,
-    acq_ucb,
-    bootstrap_fit,
-    fit_gaussian_from_samples,
-)
+try:
+    from .ipbsm_opt_math import (
+        GPParams,
+        GaussianFitResult,
+        SimpleGP,
+        acq_ei,
+        acq_ucb,
+        bootstrap_fit,
+        fit_gaussian_from_samples,
+    )
+except ImportError:
+    from ipbsm_opt_math import (
+        GPParams,
+        GaussianFitResult,
+        SimpleGP,
+        acq_ei,
+        acq_ucb,
+        bootstrap_fit,
+        fit_gaussian_from_samples,
+    )
 
 # ----------------------------
 # Optimizer
@@ -2384,4 +2403,7 @@ class Optimizer:
 
         return out
 
-from ipbsm_opt_plotting import build_gf_axiswise_fit, plot_bo_gp_heatmap, plot_results
+try:
+    from .ipbsm_opt_plotting import build_gf_axiswise_fit, plot_bo_gp_heatmap, plot_results
+except ImportError:
+    from ipbsm_opt_plotting import build_gf_axiswise_fit, plot_bo_gp_heatmap, plot_results

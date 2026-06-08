@@ -27,6 +27,12 @@ from typing import Any, Callable, Dict, List, Tuple, Optional
 
 import numpy as np
 
+_KNOBS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _KNOBS_DIR.parent
+for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 from PyQt6.QtCore import QThread, QTimer, pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
