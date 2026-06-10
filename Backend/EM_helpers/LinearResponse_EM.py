@@ -7,7 +7,7 @@ linear_response_engine.py - using this mathematics on session from GUI
 '''
 class LinearResponse_EM:
     def __init__(self, coefficients_path=None, dataset_path=None):
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
         if coefficients_path is None:
             coefficients_path = os.path.join(

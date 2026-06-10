@@ -92,6 +92,15 @@ class Worker(QObject):
         vkicks = self.vkicks
         hkicks = self.hkicks
         pending_steps=0
+
+        # #delete later
+        # if hasattr(self.interface, "get_sextupoles") and hasattr(self.interface, "set_sextupoles"):
+        #     sextupoles = self.interface.get_sextupoles()
+        #     sextupole_names = list(sextupoles.get("names", []))
+        #     if sextupole_names:
+        #         self.interface.set_sextupoles(sextupole_names, np.zeros(len(sextupole_names), dtype=float))
+        #         print("SysID: sextupoles switched OFF before response matrix measurement.")
+
         if self.actuator_mode == ActuatorMode.QM:
             for iter in range(self.Niter):
                 for magnet in self.correctors:

@@ -85,7 +85,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             50: "MQF3FF", 51: "MQD2BFF", 52: "MQD2AFF", 53: "MSF1FF", 54: "MQF1FF", 55: "MSD0FF", 56: "MQD0FF", 57: "M1&2IP", 58: "MPIP",
             59: "MDUMP", 60: "ICT1X", 61: "ICTDUMP", 62: "MW1X", 63: "MW1IP", 64: "MPREIP", 65: "MIPA", 66: "MIPB"}
 
-        self.sextupoles = ["SF6FF", "SK4FF", "SK3FF", "SF5FF", "SF5FF", "SD4FF", "SK2FF", "SK1FF", "SF1FF", "SD0FF"]
+        self.sextupoles = ["SF6FF", "SK4FF", "SK3FF", "SF5FF", "SD4FF", "SK2FF", "SK1FF", "SF1FF", "SD0FF"]
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
@@ -575,10 +575,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(icts["names"]) if s in names])
+            idx = [i for i, s in enumerate(icts["names"]) if s in names]
             icts = {
-                "names": np.array(icts["names"])[idx],
-                "charge": np.array(icts["charge"])[idx],
+                "names": [icts["names"][i] for i in idx],
+                "charge": np.asarray(icts["charge"])[idx],
             }
 
         return icts
@@ -652,7 +652,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 time.sleep(self.bpm_sample_interval_s)
 
         bpms = {
-            "names": np.asarray(bpm_names),
+            "names": list(bpm_names),
             "x": np.vstack(x_list) / 1e3,
             "y": np.vstack(y_list) / 1e3,
             "tmit": np.vstack(tmit_list),
@@ -660,9 +660,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         }
 
         if names is not None:
-            idx = np.array([i for i, s in enumerate(bpms["names"]) if s in names])
+            idx = [i for i, s in enumerate(bpms["names"]) if s in names]
             bpms = {
-                "names": bpms["names"][idx],
+                "names": [bpms["names"][i] for i in idx],
                 "x": bpms["x"][:, idx],
                 "y": bpms["y"][:, idx],
                 "tmit": bpms["tmit"][:, idx],

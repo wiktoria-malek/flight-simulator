@@ -143,10 +143,10 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(icts["names"]) if s in names])
+            idx = [i for i, s in enumerate(icts["names"]) if s in names]
             icts = {
-                "names": np.array(icts["names"])[idx],
-                "charge": np.array(icts["charge"])[idx],
+                "names": [icts["names"][i] for i in idx],
+                "charge": np.asarray(icts["charge"])[idx],
             }
         return icts
 
@@ -178,11 +178,11 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(quadrupoles["names"]) if s in names])
+            idx = [i for i, s in enumerate(quadrupoles["names"]) if s in names]
             quadrupoles = {
-                "names": np.array(quadrupoles["names"])[idx],
-                "bdes": np.array(quadrupoles["bdes"])[idx],
-                "bact": np.array(quadrupoles["bact"])[idx],
+                "names": [quadrupoles["names"][i] for i in idx],
+                "bdes": np.asarray(quadrupoles["bdes"])[idx],
+                "bact": np.asarray(quadrupoles["bact"])[idx],
             }
 
         return quadrupoles
@@ -217,11 +217,11 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            idx = [i for i, s in enumerate(correctors["names"]) if s in names]
             correctors = {
-                "names": np.array(correctors["names"])[idx],
-                "bdes": np.array(correctors["bdes"])[idx],
-                "bact": np.array(correctors["bact"])[idx],
+                "names": [correctors["names"][i] for i in idx],
+                "bdes": np.asarray(correctors["bdes"])[idx],
+                "bact": np.asarray(correctors["bact"])[idx],
             }
 
         return correctors
@@ -242,12 +242,12 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(bpms["names"]) if s in names])
+            idx = [i for i, s in enumerate(bpms["names"]) if s in names]
             bpms = {
-                "names": np.array(bpms["names"])[idx],
-                "x": np.array(bpms["x"])[:, idx],
-                "y": np.array(bpms["y"])[:, idx],
-                "tmit": np.array(bpms["tmit"])[:, idx],
+                "names": [bpms["names"][i] for i in idx],
+                "x": np.asarray(bpms["x"])[:, idx],
+                "y": np.asarray(bpms["y"])[:, idx],
+                "tmit": np.asarray(bpms["tmit"])[:, idx],
             }
 
         return bpms

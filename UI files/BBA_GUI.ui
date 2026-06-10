@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1295</width>
-    <height>819</height>
+    <width>1453</width>
+    <height>916</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -33,14 +33,23 @@
           <string>Response Matrices</string>
          </attribute>
          <layout class="QVBoxLayout" name="verticalLayout_7">
+          <property name="spacing">
+           <number>1</number>
+          </property>
           <item>
            <widget class="QGroupBox" name="session_group_3">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="styleSheet">
              <string notr="true">QGroupBox#session_group_3 {
     background-color: rgb(245, 245, 245);
     border: 1px solid rgb(210, 210, 210);
     border-radius: 6px;
-    margin-top: 8px;
+    margin-top: 4px;
     padding-top: 6px;
 }
 QGroupBox#session_group_3::title {
@@ -104,12 +113,18 @@ QGroupBox#session_group_3::title {
           </item>
           <item>
            <widget class="QGroupBox" name="trajectory_group_3">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="styleSheet">
              <string notr="true">QGroupBox#trajectory_group_3 {
     background-color: rgb(245, 245, 245);
     border: 1px solid rgb(210, 210, 210);
     border-radius: 6px;
-    margin-top: 8px;
+    margin-top: 4px;
     padding-top: 6px;
 }
 QGroupBox#trajectory_group_3::title {
@@ -173,12 +188,18 @@ QGroupBox#trajectory_group_3::title {
           </item>
           <item>
            <widget class="QGroupBox" name="groupBox_6">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="styleSheet">
              <string notr="true">QGroupBox#groupBox_6 {
     background-color: rgb(245, 245, 245);
     border: 1px solid rgb(210, 210, 210);
     border-radius: 6px;
-    margin-top: 8px;
+    margin-top: 4px;
     padding-top: 6px;
 }
 QGroupBox#groupBox_6::title {
@@ -246,12 +267,18 @@ QGroupBox#groupBox_6::title {
           </item>
           <item>
            <widget class="QGroupBox" name="groupBox_7">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="styleSheet">
              <string notr="true">QGroupBox#groupBox_7 {
     background-color: rgb(245, 245, 245);
     border: 1px solid rgb(210, 210, 210);
     border-radius: 6px;
-    margin-top: 8px;
+    margin-top: 4px;
     padding-top: 6px;
 }
 QGroupBox#groupBox_7::title {
@@ -315,6 +342,12 @@ QGroupBox#groupBox_7::title {
           </item>
           <item>
            <widget class="QGroupBox" name="groupBox_9">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="styleSheet">
              <string notr="true">QGroupBox#groupBox_9 {
     background-color: rgb(245, 245, 245);
@@ -333,12 +366,91 @@ QGroupBox#groupBox_9::title {
              <string>Computation</string>
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_2">
-             <item alignment="Qt::AlignHCenter">
-              <widget class="QCheckBox" name="triangular_checkbox">
-               <property name="text">
-                <string>Force triangular matrix</string>
-               </property>
-              </widget>
+             <item>
+              <layout class="QHBoxLayout" name="triangular_checkbox_layout">
+               <item>
+                <spacer name="triangular_left_spacer">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeType">
+                  <enum>QSizePolicy::Expanding</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="triangular_checkbox">
+                 <property name="text">
+                  <string>Force triangular matrix</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QToolButton" name="triangular_tooltip">
+                 <property name="minimumSize">
+                  <size>
+                   <width>22</width>
+                   <height>22</height>
+                  </size>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>22</width>
+                   <height>22</height>
+                  </size>
+                 </property>
+                 <property name="focusPolicy">
+                  <enum>Qt::NoFocus</enum>
+                 </property>
+                 <property name="toolTip">
+                  <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;Forces the response matrix to be triangular by setting the response of BPMs upstream of each actuator to zero.&lt;/p&gt;&lt;p&gt;Useful for transport lines or linacs. In a damping ring, the orbit is closed and each corrector can affect every BPM, so this option is usually not needed.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">QToolButton#triangular_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#triangular_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                 </property>
+                 <property name="text">
+                  <string>?</string>
+                 </property>
+                 <property name="autoRaise">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="triangular_right_spacer">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeType">
+                  <enum>QSizePolicy::Expanding</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+              </layout>
              </item>
             </layout>
            </widget>
@@ -348,10 +460,13 @@ QGroupBox#groupBox_9::title {
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::Maximum</enum>
+            </property>
             <property name="sizeHint" stdset="0">
              <size>
               <width>20</width>
-              <height>40</height>
+              <height>300</height>
              </size>
             </property>
            </spacer>
@@ -1205,6 +1320,16 @@ QToolButton#jitter_subtraction_tooltip:hover {
                      </item>
                     </layout>
                    </item>
+                   <item>
+                    <layout class="QVBoxLayout" name="verticalLayout_6"/>
+                   </item>
+                   <item>
+                    <widget class="QCheckBox" name="disable_sextupoles_button">
+                     <property name="text">
+                      <string>Disable sextupoles and do orbit correction after BBA</string>
+                     </property>
+                    </widget>
+                   </item>
                   </layout>
                  </widget>
                 </item>
@@ -1260,6 +1385,13 @@ QGroupBox#correction_controls_group::title {
                     <widget class="QPushButton" name="show_orbit_RMS_button">
                      <property name="text">
                       <string>Show Orbit RMS</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="sextupole_restoration_button">
+                     <property name="text">
+                      <string>Sextupole restoration summary</string>
                      </property>
                     </widget>
                    </item>

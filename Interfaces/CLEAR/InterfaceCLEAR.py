@@ -568,7 +568,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             inout_list.append(status)
 
         return {
-            "names": np.asarray(selected_names),
+            "names": list(selected_names),
             "hpixel": np.asarray(hpixel_list, dtype=float),
             "vpixel": np.asarray(vpixel_list, dtype=float),
             "x": np.asarray(xb_list, dtype=float),
@@ -650,7 +650,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 charge.append(self._valid_japc_value([name], default=np.nan))
 
         return {
-            "names": np.asarray(names),
+            "names": list(names),
             "charge": np.asarray(charge, dtype=float),
         }
 
@@ -664,7 +664,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             bact.append(self._valid_japc_value([self.corrector_get_params[corrector]], default=np.nan))
 
         return {
-            "names": np.asarray(selected_names),
+            "names": list(selected_names),
             "bdes": np.asarray(bdes, dtype=float),
             "bact": np.asarray(bact, dtype=float),
         }
@@ -687,7 +687,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             time.sleep(1)
 
         return {
-            "names": np.asarray(selected_names),
+            "names": list(selected_names),
             "x": np.asarray(x, dtype=float),
             "y": np.asarray(y, dtype=float),
             "tmit": np.asarray(tmit, dtype=float),
@@ -754,9 +754,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
             bact.append(self._valid_japc_value([self.quad_get_params[quadrupole]], default=np.nan))
 
         return {
-            "names": np.array(names),
-            "bdes": np.array(bdes, dtype=float),
-            "bact": np.array(bact, dtype=float),
+            "names": list(names),
+            "bdes": np.asarray(bdes, dtype=float),
+            "bact": np.asarray(bact, dtype=float),
         }
 
     def set_quadrupoles(self, names, values):

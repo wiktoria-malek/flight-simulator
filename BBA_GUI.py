@@ -1,4 +1,4 @@
-import sys, os, re, matplotlib, pickle
+import sys, os, re, matplotlib
 from datetime import datetime
 import numpy as np
 try:
@@ -17,17 +17,18 @@ matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.LogConsole import LogConsole
-from Backend.TestOrbits_BBA import TestOrbits
-from Backend.RMS_Plots_BBA import RMS_Plots
+from Backend.BBA_helpers.TestOrbits_BBA import TestOrbits
+from Backend.BBA_helpers.RMS_Plots_BBA import RMS_Plots
 from Backend.SaveOrLoad import SaveOrLoad
+from Backend.BBA_helpers.Sextupole_Restoration_Logic import Sextupole_Restoration_Logic
+from Backend.BBA_helpers.QM_mode_helpers import QM_mode_helpers
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import matplotlib.pyplot as plt
 from enum import Enum
 from dataclasses import dataclass
-from Backend.BPM_weights import BPM_weights
+from Backend.BBA_helpers.BPM_weights import BPM_weights
 from traceback import print_exception
 from Interfaces.interface_setup import INTERFACE_SETUP
-from Backend.State import State
 from Knobs.jitter_subtraction import (apply_jitter_subtraction, explain_reference_selection, fit_jitter_model)
 
 class ActuatorMode(Enum):
@@ -87,7 +88,7 @@ class BpmWeightsDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
-class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
+class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Restoration_Logic, QM_mode_helpers):
     def __init__(self, interface, dir_name,nominal_state=None, start_state=None):
         super().__init__()
         self.cwd = os.getcwd()
@@ -120,6 +121,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.show_response_matrix=None
         self.test_orbits=None
         self.rms_plots=None
+        self.sextupole_restoration_popup = None
+        self.sextupole_restoration_history = []
         self.traj_popup, self.disp_popup, self.wake_popup = None, None,None
         self._setup_canvases()
         self._plot_double_clicks()
@@ -150,6 +153,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.subtract_jitter_checkbox.setChecked(False)
         self.actuator_mode = ActuatorMode.Kicker
         self.pushButton_11.clicked.connect(self.load_session_settings)
+        self.sextupole_restoration_button.clicked.connect(self._show_sextupole_restoration_popup)
         if hasattr(self.interface, "get_quadrupoles"):
             try:
                 self.qm_corrs = self.interface.get_quadrupole_movers_names()
@@ -216,49 +220,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         for widget in (self.dfs_response_3, self.pushButton_9, self.mode_dispersion, self.wfs_response_3, self.pushButton_10, self.mode_wakefield):
             widget.setEnabled(not is_qm)
 
-    def _setup_qm_controls(self):
-        row_mode = QHBoxLayout()
-        row_mode.addWidget(QLabel("Actuator mode"))
-        self.actuator_mode_combo = QComboBox(self)
-        self.actuator_mode_combo.addItems([ActuatorMode.Kicker.value, ActuatorMode.QM.value])
-        row_mode.addWidget(self.actuator_mode_combo)
-        self.verticalLayout_3.insertLayout(0, row_mode)
-        self.correctors_list.itemSelectionChanged.connect(self._refresh_specific_bpm_candidates)
-        self.specific_bpm_row = QWidget(self)
-        row_specific = QHBoxLayout(self.specific_bpm_row)
-        row_specific.setContentsMargins(0, 0, 0, 0)
-        self.specific_bpm_label = QLabel("Specific BPM (QM)")
-        self.specific_bpm_combo = QComboBox(self)
-        row_specific.addWidget(self.specific_bpm_label)
-        row_specific.addWidget(self.specific_bpm_combo)
-        self.verticalLayout_3.insertWidget(4, self.specific_bpm_row)
-        self.specific_bpm_row.setFixedHeight(self.specific_bpm_row.sizeHint().height())
-
-        self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
-        self.bpms_list.itemSelectionChanged.connect(self._refresh_specific_bpm_candidates)
-        self._refresh_specific_bpm_candidates()
-
-    def _qm_control_bpms(self, qcorrs, bpms):
-        seq = self.interface.get_sequence()
-        order = {str(name): idx for idx, name in enumerate(seq)}
-        qpos = []
-        for name in qcorrs:
-            key = str(name)
-            if key in order:
-                qpos.append(order[key])
-            elif f"M{key}" in order:
-                qpos.append(order[f"M{key}"])
-        if not qpos:
-            return list(bpms)
-        threshold = min(qpos)
-        out = []
-        for name in bpms:
-            key = str(name)
-            pos = order.get(key, order.get(f"M{key}", 10**9))
-            if pos >= threshold:
-                out.append(key)
-        return out
-
     def _on_actuator_mode_changed(self, text):
         self.actuator_mode = ActuatorMode(text)
         self._refresh_corrector_list()
@@ -274,53 +235,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         for widget in (self.dfs_response_3, self.pushButton_9, self.mode_dispersion,
                        self.wfs_response_3, self.pushButton_10, self.mode_wakefield):
             widget.setEnabled(not is_qm)
-
-    def _update_qm_widgets_visibility(self):
-        is_qm = self.actuator_mode == ActuatorMode.QM
-        self.specific_bpm_row.setVisible(True)
-        self.specific_bpm_label.setVisible(is_qm)
-        self.specific_bpm_combo.setVisible(is_qm)
-
-        if is_qm:
-            self.groupBox_6.setTitle("DFS not used in QM mode")
-            self.groupBox_7.setTitle("WFS not used in QM mode")
-            self.label.setText("Trajectory hold weight")
-            self.lineEdit.setText("0.0")
-            self.lineEdit_2.setText("1.0")
-            self.lineEdit_3.setText("0.0")
-            self.lineEdit_4.setText("0.000001")
-            self.label_2.setText("BPM->0 weight")
-            self.label_3.setText("Specific BPM->0 weight")
-            self.current_groupbox_right.setTitle("Max range [um]")
-            self.horizontal_current_label.setText("X:")
-            self.vertical_current_label.setText("Y:")
-            self.max_horizontal_current_spinbox.setMaximum(1e6)
-            self.max_vertical_current_spinbox.setMaximum(1e6)
-            self.max_horizontal_current_spinbox.setDecimals(0)
-            self.max_vertical_current_spinbox.setDecimals(0)
-            self.max_horizontal_current_spinbox.setValue(1000.0)
-            self.max_vertical_current_spinbox.setValue(1000.0)
-        else:
-            self.groupBox_6.setTitle("Dispersion-Free Steering")
-            self.groupBox_7.setTitle("Wakefield-Free Steering")
-            self.label.setText("Orbit weight")
-            self.label_2.setText("Dispersion weight")
-            self.label_3.setText("Wakefield weight")
-            self.lineEdit.setText("1.0")
-            self.lineEdit_2.setText("10.0")
-            self.lineEdit_3.setText("10.0")
-            self.lineEdit_4.setText("0.001")
-            self.current_groupbox_right.setTitle(f"Max strength ({self.corrs_unit})")
-            self.horizontal_current_label.setText("H:")
-            self.vertical_current_label.setText("V:")
-            self.max_horizontal_current_spinbox.setMaximum(99.99)
-            self.max_vertical_current_spinbox.setMaximum(99.99)
-            self.max_horizontal_current_spinbox.setDecimals(2)
-            self.max_vertical_current_spinbox.setDecimals(2)
-            self.max_horizontal_current_spinbox.setSingleStep(0.01)
-            self.max_vertical_current_spinbox.setSingleStep(0.01)
-            self.max_horizontal_current_spinbox.setValue(0.0)
-            self.max_vertical_current_spinbox.setValue(0.0)
 
     def _refresh_corrector_list(self):
         self.correctors_list.clear()
@@ -338,61 +252,22 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             gb.setTitle(t)
         self.horizontalLayout_corrbpms_tables.activate()
 
-    def _refresh_specific_bpm_candidates(self):
-        if not hasattr(self, "specific_bpm_combo"):
-            return
-        current = self.specific_bpm_combo.currentText()
-        bpms = []
-        for i in range(self.bpms_list.count()):
-            it = self.bpms_list.item(i)
-            if it.isSelected():
-                bpms.append(it.data(Qt.ItemDataRole.UserRole))
-
-        if not bpms:
-            bpms = list(self.initial_state.get_bpms()["names"])
-
-        self.specific_bpm_combo.blockSignals(True)
-        self.specific_bpm_combo.clear()
-        if self.actuator_mode == ActuatorMode.QM:
-            qcorrs = []
-            for i in range(self.correctors_list.count()):
-                it = self.correctors_list.item(i)
-                if it.isSelected():
-                    qcorrs.append(it.text())
-
-            if not qcorrs:
-                qcorrs = list(self.qm_corrs)
-
-            bpms = self._qm_control_bpms(qcorrs, bpms)
-
-        self.specific_bpm_combo.addItems([str(b) for b in bpms])
-
-        idx = self.specific_bpm_combo.findText(current)
-        if idx >= 0:
-            self.specific_bpm_combo.setCurrentIndex(idx)
-
-        self.specific_bpm_combo.blockSignals(False)
 
     def _load_logo(self):
         self.logo_label.setText("")
         self.logo_label.setScaledContents(False)
-
         transform_mode = (
             Qt.TransformationMode.SmoothTransformation
             if pyqt_version == 6
             else Qt.SmoothTransformation
         )
-
         base_dir = os.path.dirname(os.path.abspath(__file__))
         logo_path = os.path.join(base_dir, "UI files", "Assets", "CERN_logo.png")
-
         if not os.path.isfile(logo_path):
             return
-
         pixmap = QPixmap(logo_path)
         if pixmap.isNull():
             return
-
         scaled = pixmap.scaledToHeight(80, transform_mode)
         self.logo_label.setPixmap(scaled)
         self.logo_label.setToolTip(logo_path)
@@ -430,7 +305,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         popup = getattr(self, f"{plot_kind}_popup", None)
         if popup is None:
             return
-
         if plot_kind == "traj":
             values_x = self._hist_orbit_x
             values_y = self._hist_orbit_y
@@ -508,13 +382,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
     def _restore_initial_settings(self):
         self.log("Restoring initial settings...")
-        self._cancel=True
-        self._running=False
+        self._cancel = True
+        self._running = False
         self.interface.reset_energy()
         self.interface.reset_intensity()
         self.interface.restore_correctors_state(self.restore_state)
         self.interface.restore_sextupoles_state(self.restore_state)
-        self.reset_ref_orb=True
+        self.reset_ref_orb = True
         self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
         self._clear_graphs()
         self.log("Machine initial settings restored.")
@@ -546,16 +420,28 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             saved_state = self.interface.get_state()
             sextupoles = saved_state.get_sextupoles()
             sextupoles_to_disable = len(sextupoles["names"]) > 0
+            completed = False
             try:
                 if sextupoles_to_disable:
-                    self.interface.set_sextupoles(sextupoles["names"],np.zeros(len(sextupoles["names"]),dtype=float))
-                    self.log("Sextupoles disabled")
-                self._start_correction()
+                    #self._start_correction()
+                    
+                    self.interface.set_sextupoles(sextupoles["names"], np.zeros(len(sextupoles["names"]), dtype=float))
+                    self.log("Sextupoles disabled before BBA")
+                    self._start_correction(silent=True)
+                    golden_state = self.interface.get_state()
+                    golden_state = self._apply_jitter_subtraction_to_state(golden_state)
+                    self.log("BBA finished with sextupoles off. Stored this orbit as the post-BBA reference.")
+                    self.sextupole_restoration_history = self._restore_sextupoles_one_by_one_with_orbit_correction(saved_state, golden_state, orbit_iters=30)
+                    self._show_sextupole_restoration_popup()
+                    QMessageBox.information(self, "Correction", "BBA and sextupole restoration finished.")
+                else:
+                    self._start_correction()
+                completed = True
             finally:
                 self._running = False
-                if sextupoles_to_disable:
+                if sextupoles_to_disable and not completed:
                     self.interface.restore_sextupoles_state(saved_state)
-                    self.log("Sextupoles restored.")
+                    self.log("Sextupoles restored after interrupted procedure.")
         else:
             self._step = True
 
@@ -591,16 +477,30 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         ylabel = f"Residual norm [{self.bpm_unit}]"
         if canvas is None or ax is None:
             return
+        if getattr(self, "_suppress_main_plots", False):
+            return
         ax.clear()
 
+        def matching_yerr(errors, values):
+            if errors is None:
+                return None
+            try:
+                if len(errors) == 0:
+                    return None
+                if len(errors) != len(values):
+                    return None
+            except TypeError:
+                return errors
+            return errors
+
         if values_x:
-            err_x=error_x if error_x is not None else None
+            err_x = matching_yerr(error_x, values_x)
             ax.errorbar(range(len(values_x)), values_x,yerr=err_x, marker="o",color='red',label="x",capsize=6, elinewidth=2, capthick=2, markersize=4) #yerr - height of the error bar on the plot, capsize - size of the top line on the error bar
         if values_y:
-            err_y=error_y if error_y is not None else None
+            err_y = matching_yerr(error_y, values_y)
             ax.errorbar(range(len(values_y)), values_y, yerr=err_y,marker="o",color='blue',label="y", capsize=6, elinewidth=2, capthick=2, markersize=4)
         if vals:
-            err_all=error_all if error_all is not None else None
+            err_all = matching_yerr(error_all, vals)
             ax.errorbar(range(len(vals)), vals, yerr=err_all,linestyle="dashed",color='black',label="combined norm",capsize=6, elinewidth=2, capthick=2, markersize=4)
         if values_x or values_y:
             ax.legend(fontsize=7,loc="upper right")
@@ -775,10 +675,35 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.reset_ref_orb=True
         self.log("Resetting reference orbit")
 
-    def _start_correction(self):
+    def _start_correction(self, silent=False, preserve_plots=False):
         try:
+            plot_snapshot = None
+            if preserve_plots:
+                plot_snapshot = {
+                    "orbit_x": list(self._hist_orbit_x),
+                    "orbit_y": list(self._hist_orbit_y),
+                    "orbit": list(self._hist_orbit),
+                    "disp_x": list(self._hist_disp_x),
+                    "disp_y": list(self._hist_disp_y),
+                    "disp": list(self._hist_disp),
+                    "wake_x": list(self._hist_wake_x),
+                    "wake_y": list(self._hist_wake_y),
+                    "wake": list(self._hist_wake),
+                    "orbit_x_err": list(self._hist_orbit_x_err),
+                    "orbit_y_err": list(self._hist_orbit_y_err),
+                    "orbit_err": list(self._hist_orbit_err),
+                    "disp_x_err": list(self._hist_disp_x_err),
+                    "disp_y_err": list(self._hist_disp_y_err),
+                    "disp_err": list(self._hist_disp_err),
+                    "wake_x_err": list(self._hist_wake_x_err),
+                    "wake_y_err": list(self._hist_wake_y_err),
+                    "wake_err": list(self._hist_wake_err),
+                    "abs_rms_x": list(self._hist_abs_rms_x),
+                    "abs_rms_y": list(self._hist_abs_rms_y),
+                    "abs_rms_xy": list(self._hist_abs_rms_xy),
+                }
             if self.actuator_mode == ActuatorMode.QM:
-                self._start_qm_correction()
+                self._start_qm_correction(silent=silent, preserve_plots=preserve_plots)
                 return
             corrs, bpms = self._get_selection()
             self._build_jitter_model_for_correction(actuators = corrs, bpms = bpms)
@@ -786,29 +711,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 refs = set(self.jitter_model["reference_bpms"])
                 bpms = [bpm for bpm in bpms if bpm not in refs]
                 self.log("Removed jitter reference BPMs from QM correction targets")
-            '''
-            Restore only selected correctors
-            '''
-            # self.S0bdes = []
-            # corrs, bpms = self._get_selection()
-            print(f'debug: corrs = {corrs}')
-            print(f'debug: bpms = {bpms}')
-            # self.selected_correctors = []
-            # # save list of initial bdes for reset
-            # for cname, bdes in zip(self.S0.correctors['names'], self.S0.correctors['bdes']):
-            #     if cname in corrs:
-            #         self.S0bdes.append(bdes)
-            #         self.selected_correctors.append(cname)
             print("Starting correction...")
             self.log("Starting correction...")
+
             self._cancel = False
-            self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
             w1, w2, w3, rcond, iters, gain,beta = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
-            #corrs, bpms = self._get_selection()
-
             Cx = [s for s in corrs if self._is_h_corrector(s)]
-
             Cy = [s for s in corrs if self._is_v_corrector(s)]
 
             Axx, Ayy,Axy,Ayx, B0x, B0y,hcorrs,vcorrs, bpms_common = self._creating_response_matrices(selected_corrs = corrs, selected_bpms = bpms)
@@ -845,9 +754,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             w_xy_bpms=np.sqrt(W_xy)
 
             self.setWindowTitle("BBA GUI - [Correction running]")
-
             target_disp_x, target_disp_y = self.interface.get_target_dispersion(bpms)
-
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
 
@@ -901,11 +808,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self._hist_abs_rms_xy.append(orbit_rms_xy)
 
                 '''
-                UNCOMMENT AFTER SANITY CHECKS
+                UNCOMMENT AFTER SANITY CHECKS 
+                '''
+   
                 if it == 0: # instead of golden orbit, correct from current orbit
                     B0x = O0x
                     B0y = O0y
-                '''
+
 
                 if self.reset_ref_orb==True:
                     B0x = O0x.copy()
@@ -913,7 +822,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self.reset_ref_orb=False
                     self.log("Reference orbit reset to current orbit")
 
-                # COMMENT AFTER SANITY CHECKS
+                # # COMMENT AFTER SANITY CHECKS
                 if it == 0:
                     if self.nominal_state is not None:
                         # nominal_state = self._apply_jitter_subtraction_to_state(self.nominal_state)
@@ -1052,10 +961,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 Cy_cut=[corr for corr,true in zip(vcorrs,filter_corr_y) if true]
                 Cx_cut=[corr for corr,true in zip(hcorrs,filter_corr_x) if true]
 
-                # Axy_it[:]=0.0 # REMOVE LATER!
-                # Ayx_it[:]=0.0 # REMOVE LATER!
-
-
                 A = np.block([[Axx_it,Axy_it],
                               [Ayx_it,Ayy_it]])
 
@@ -1120,16 +1025,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
                 # current_bdes + delta -> clamp(final_bdes) -> set_correctors(final_bdes)
 
-                def filtering_norm_x(Ox,Bx):
-                    Ox[np.isnan(Ox)] = 0
-                    Bx[np.isnan(Bx)] = 0
-                    return float(np.linalg.norm(Ox - Bx))
-
-                def filtering_norm_y(Oy,By):
-                    Oy[np.isnan(Oy)] = 0
-                    By[np.isnan(By)] = 0
-                    return float(np.linalg.norm(Oy - By))
-
                 if w1>0:
                     mean_orbit_x,mean_orbit_y,err_x_orbit,err_y_orbit,mean_orbit_all,err_orbit_all=self._calc_error(x0_vals,y0_vals,ref_x=B0x.ravel(),ref_y=B0y.ravel()) # ravel makes data a vector
                     self._hist_orbit_x.append(mean_orbit_x)
@@ -1167,7 +1062,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 QApplication.processEvents()
 
             self.setWindowTitle("BBA GUI")
-            QMessageBox.information(self, "Correction", "Correction finished.")
+            if not silent:
+                QMessageBox.information(self, "Correction", "Correction finished.")
             final_state = self.interface.get_state()
             screens_f=final_state.get_screens()
             print("Screen values after correction:")
@@ -1200,8 +1096,37 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._hist_abs_rms_y.append(final_rms_y)
             self._hist_abs_rms_xy.append(final_rms_xy)
 
-            self.log("Correction finished.")
-            self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h,max_curr_v, bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy,Axy,Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()))
+            if silent:
+                self.log("Internal orbit correction finished.")
+            else:
+                self.log("Correction finished.")
+            if not silent:
+                self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h,max_curr_v, bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy,Axy,Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()))
+            if preserve_plots and plot_snapshot is not None:
+                self._hist_orbit_x[:] = plot_snapshot["orbit_x"]
+                self._hist_orbit_y[:] = plot_snapshot["orbit_y"]
+                self._hist_orbit[:] = plot_snapshot["orbit"]
+                self._hist_disp_x[:] = plot_snapshot["disp_x"]
+                self._hist_disp_y[:] = plot_snapshot["disp_y"]
+                self._hist_disp[:] = plot_snapshot["disp"]
+                self._hist_wake_x[:] = plot_snapshot["wake_x"]
+                self._hist_wake_y[:] = plot_snapshot["wake_y"]
+                self._hist_wake[:] = plot_snapshot["wake"]
+                self._hist_orbit_x_err[:] = plot_snapshot["orbit_x_err"]
+                self._hist_orbit_y_err[:] = plot_snapshot["orbit_y_err"]
+                self._hist_orbit_err[:] = plot_snapshot["orbit_err"]
+                self._hist_disp_x_err[:] = plot_snapshot["disp_x_err"]
+                self._hist_disp_y_err[:] = plot_snapshot["disp_y_err"]
+                self._hist_disp_err[:] = plot_snapshot["disp_err"]
+                self._hist_wake_x_err[:] = plot_snapshot["wake_x_err"]
+                self._hist_wake_y_err[:] = plot_snapshot["wake_y_err"]
+                self._hist_wake_err[:] = plot_snapshot["wake_err"]
+                self._hist_abs_rms_x[:] = plot_snapshot["abs_rms_x"]
+                self._hist_abs_rms_y[:] = plot_snapshot["abs_rms_y"]
+                self._hist_abs_rms_xy[:] = plot_snapshot["abs_rms_xy"]
+                self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x, values_y=self._hist_orbit_y, vals=self._hist_orbit, error_x=self._hist_orbit_x_err, error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None)
+                self._plot_series(ax=self.disp_ax, canvas=self.disp_canvas, values_x=self._hist_disp_x, values_y=self._hist_disp_y, vals=self._hist_disp, error_x=self._hist_disp_x_err, error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None)
+                self._plot_series(ax=self.wake_ax, canvas=self.wake_canvas, values_x=self._hist_wake_x, values_y=self._hist_wake_y, vals=self._hist_wake, error_x=self._hist_wake_x_err, error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None)
 
         except Exception as e:
             self.setWindowTitle("BBA GUI")
@@ -1220,24 +1145,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
             QMessageBox.information(self, "Error", "No RMS orbits available.")
         else:
-            self.rms_plots.plot_all(
-                selected_bpms=self.rms_orbits_data["selected_bpms"],
-                start_x=self.rms_orbits_data.get("start_x"),
-                start_y=self.rms_orbits_data.get("start_y"),
-                current_x=self.rms_orbits_data.get("current_x"),
-                current_y=self.rms_orbits_data.get("current_y"),
-                final_x=self.rms_orbits_data.get("final_x"),
-                final_y=self.rms_orbits_data.get("final_y"),
-                x1_vals=self.rms_orbits_data.get("x1_vals"),
-                y1_vals=self.rms_orbits_data.get("y1_vals"),
-                x2_vals=self.rms_orbits_data.get("x2_vals"),
-                y2_vals=self.rms_orbits_data.get("y2_vals"),
-                rms_x_iter=self._hist_abs_rms_x,
-                rms_y_iter=self._hist_abs_rms_y,
-                rms_xy_iter=self._hist_abs_rms_xy,
-                nominal_x=self.rms_orbits_data.get("nominal_x"),
-                nominal_y=self.rms_orbits_data.get("nominal_y"),
-            )
+            self.rms_plots.plot_all(selected_bpms=self.rms_orbits_data["selected_bpms"], start_x=self.rms_orbits_data.get("start_x"),
+                start_y=self.rms_orbits_data.get("start_y"), current_x=self.rms_orbits_data.get("current_x"), current_y=self.rms_orbits_data.get("current_y"),
+                final_x=self.rms_orbits_data.get("final_x"), final_y=self.rms_orbits_data.get("final_y"), x1_vals=self.rms_orbits_data.get("x1_vals"),
+                y1_vals=self.rms_orbits_data.get("y1_vals"), x2_vals=self.rms_orbits_data.get("x2_vals"), y2_vals=self.rms_orbits_data.get("y2_vals"),
+                rms_x_iter=self._hist_abs_rms_x, rms_y_iter=self._hist_abs_rms_y, rms_xy_iter=self._hist_abs_rms_xy, nominal_x=self.rms_orbits_data.get("nominal_x"), nominal_y=self.rms_orbits_data.get("nominal_y"))
         self.rms_plots.show()
         self.rms_plots.raise_()
         self.rms_plots.activateWindow()
@@ -1268,241 +1180,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.log_console=LogConsole(self)
             #self.log_console.show()
         self.log_console.log(line)
-
-    def _start_qm_correction(self):
-        if not hasattr(self.interface, "apply_qmag_xyroll"):
-            raise RuntimeError("Interface does not support quadrupole mover correction")
-
-        self._cancel = False
-        self._hist_orbit_x.clear()
-        self._hist_orbit_y.clear()
-        self._hist_orbit.clear()
-        self._hist_disp_x.clear()
-        self._hist_disp_y.clear()
-        self._hist_disp.clear()
-        self._hist_wake_x.clear()
-        self._hist_wake_y.clear()
-        self._hist_wake.clear()
-        self._hist_abs_rms_x.clear()
-        self._hist_abs_rms_y.clear()
-        self._hist_abs_rms_xy.clear()
-        self._refresh_metric_plots_for_mode()
-
-        w1, w2, w3, rcond, iters, gain, beta = self._read_params()
-
-        qcorrs, bpms_selected = self._get_selection()
-        self._build_jitter_model_for_correction(actuators=qcorrs, bpms=bpms_selected)
-        bpms = self._qm_control_bpms(qcorrs, bpms_selected)
-        if self.jitter_model is not None:
-            refs = set(self.jitter_model["reference_bpms"])
-            bpms = [bpm for bpm in bpms if bpm not in refs]
-            self.log("Removed jitter reference BPMs from correction targets")
-
-        if len(qcorrs) == 0:
-            raise RuntimeError("No quadrupoles selected")
-
-        if len(bpms) == 0:
-            raise RuntimeError("No BPMs selected")
-
-        spec_bpm = self.specific_bpm_combo.currentText().strip()
-        response = self._creating_qm_response_matrices(selected_corrs=qcorrs, selected_bpms=bpms, triangular=True)
-
-        if response is not None:
-            qcorrs = list(response["qcorrs"])
-            bpms = list(response["bpms"])
-            self.log("Using measured QM response matrix from loaded trajectory data")
-        else:
-            self.log("No loaded QM response matrix data")
-            return
-        Rxx_raw = np.asarray(response["R_xx"], dtype=float) # + np.asarray(response["T_xx"], dtype=float)
-        Rxy_raw = np.asarray(response["R_xy"], dtype=float)
-        Ryx_raw = np.asarray(response["R_yx"], dtype=float)
-        Ryy_raw = np.asarray(response["R_yy"], dtype=float) # + np.asarray(response["T_yy"], dtype=float)
-
-        def _log_matrix_stats(name, mat):
-            arr = np.asarray(mat, dtype=float)
-            finite = arr[np.isfinite(arr)]
-            if finite.size == 0:
-                self.log(f"QM response {name}: all values are non-finite")
-                return
-            self.log(
-                f"QM response {name}: shape={arr.shape}, "
-                f"max|R|={float(np.max(np.abs(finite))):.6g} mm/um, "
-                f"median|R|={float(np.median(np.abs(finite))):.6g} mm/um"
-            )
-
-        _log_matrix_stats("Rxx", Rxx_raw)
-        _log_matrix_stats("Rxy", Rxy_raw)
-        _log_matrix_stats("Ryx", Ryx_raw)
-        _log_matrix_stats("Ryy", Ryy_raw)
-
-        Rxx = np.nan_to_num(Rxx_raw, nan=0.0, posinf=0.0, neginf=0.0)
-        Rxy = np.nan_to_num(Rxy_raw, nan=0.0, posinf=0.0, neginf=0.0)
-        Ryx = np.nan_to_num(Ryx_raw, nan=0.0, posinf=0.0, neginf=0.0)
-        Ryy = np.nan_to_num(Ryy_raw, nan=0.0, posinf=0.0, neginf=0.0)
-
-        max_x = self.max_horizontal_current_spinbox.value()
-        max_y = self.max_vertical_current_spinbox.value()
-
-        B0x = None
-        B0y = None
-
-        for it in range(iters):
-            if self._cancel:
-                break
-
-            state = self.interface.get_state()
-            state = self._apply_jitter_subtraction_to_state(state)
-            orbit = state.get_orbit(bpms)
-
-            bpms_qm = state.get_bpms(bpms)
-
-            x_vals = np.asarray(bpms_qm['x'], dtype=float)
-            y_vals = np.asarray(bpms_qm['y'], dtype=float)
-
-            mean_x = np.mean(x_vals, axis=0) if x_vals.ndim == 2 else x_vals
-            mean_y = np.mean(y_vals, axis=0) if y_vals.ndim == 2 else y_vals
-
-            orbit_rms_x = float(np.sqrt(np.mean(mean_x ** 2)))
-            orbit_rms_y = float(np.sqrt(np.mean(mean_y ** 2)))
-            orbit_rms_xy = float(np.sqrt(np.mean(mean_x ** 2 + mean_y ** 2)))
-
-            self._hist_abs_rms_x.append(orbit_rms_x)
-            self._hist_abs_rms_y.append(orbit_rms_y)
-            self._hist_abs_rms_xy.append(orbit_rms_xy)
-
-            O0x = np.asarray(orbit["x"], dtype=float).reshape(-1, 1)
-            O0y = np.asarray(orbit["y"], dtype=float).reshape(-1, 1)
-
-            if B0x is None:
-                B0x = O0x.copy()
-                B0y = O0y.copy()
-
-            blocks_A = []
-            blocks_B = []
-
-            if w1 > 0:
-                top = np.hstack((w1 * Rxx, w1 * Rxy))
-                bottom = np.hstack((w1 * Ryx, w1 * Ryy))
-
-                blocks_A.extend((top, bottom))
-                blocks_B.extend((w1 * (O0x - B0x), w1 * (O0y - B0y)))
-
-            if w2 > 0:
-                top = np.hstack((w2 * Rxx, w2 * Rxy))
-                bottom = np.hstack((w2 * Ryx, w2 * Ryy))
-
-                blocks_A.extend((top, bottom))
-                blocks_B.extend((w2 * O0x, w2 * O0y))
-
-            if w3 > 0 and spec_bpm in bpms:
-                idx = bpms.index(spec_bpm)
-
-                row_top = np.hstack((Rxx[idx:idx+1, :], Rxy[idx:idx+1, :]))
-                row_bottom = np.hstack((Ryx[idx:idx+1, :], Ryy[idx:idx+1, :]))
-
-                blocks_A.extend((w3 * row_top, w3 * row_bottom))
-                blocks_B.extend((w3 * O0x[idx:idx+1, :], w3 * O0y[idx:idx+1, :]))
-
-            A = np.vstack(blocks_A)
-            B = np.vstack(blocks_B)
-
-            A = np.nan_to_num(A, nan=0.0, posinf=0.0, neginf=0.0)
-            B = np.nan_to_num(B, nan=0.0, posinf=0.0, neginf=0.0)
-
-            if it == 0:
-                try:
-                    singular_values = np.linalg.svd(A, compute_uv=False)
-                    if singular_values.size:
-                        cutoff = float(rcond) * float(np.max(singular_values))
-                        kept = int(np.sum(singular_values > cutoff))
-                        self.log(
-                            f"QM A SVD: shape={A.shape}, smax={float(np.max(singular_values)):.6g}, "
-                            f"smin={float(np.min(singular_values)):.6g}, cutoff={cutoff:.6g}, kept={kept}/{singular_values.size}"
-                        )
-                except Exception as exc:
-                    self.log(f"QM A SVD diagnostic failed: {exc}")
-
-            delta = -gain * (np.linalg.pinv(A, rcond=rcond) @ B).reshape(-1)
-            self.log(
-                f"QM iteration {it}: ||B||={float(np.linalg.norm(B)):.6g}, "
-                f"max|delta|={float(np.max(np.abs(delta))) if delta.size else 0.0:.6g} um"
-            )
-
-            nq = len(qcorrs)
-            dx = delta[:nq]
-            dy = delta[nq:nq + nq]
-
-            qstate = self.interface.get_quadrupoles(qcorrs)
-
-            x_now = np.asarray(qstate["xdes"], dtype=float)
-            y_now = np.asarray(qstate["ydes"], dtype=float)
-            r_now = np.asarray(qstate["rolldes"], dtype=float)
-
-            x_target = np.clip(x_now + dx, -max_x, max_x)
-            y_target = np.clip(y_now + dy, -max_y, max_y)
-
-            self.log(
-                f"QM iteration {it}: max|target_x|={float(np.max(np.abs(x_target))) if x_target.size else 0.0:.6g} um, "
-                f"max|target_y|={float(np.max(np.abs(y_target))) if y_target.size else 0.0:.6g} um"
-            )
-
-            self.interface.apply_qmag_xyroll(qcorrs, x_target, y_target, r_now, wait=True)
-
-            self._hist_orbit_x.append(float(np.linalg.norm(np.nan_to_num(O0x - B0x))))
-            self._hist_orbit_y.append(float(np.linalg.norm(np.nan_to_num(O0y - B0y))))
-            self._hist_orbit.append(self._hist_orbit_x[-1] + self._hist_orbit_y[-1])
-
-            self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x, values_y=self._hist_orbit_y, vals=self._hist_orbit, title="QM - distance from initial trajectory")
-
-            if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
-                self.rms_orbits_data = {}
-
-            self.rms_orbits_data = {
-                "selected_bpms": list(bpms),
-                "start_x": np.asarray(x_vals, dtype=float) if it == 0 else self.rms_orbits_data.get("start_x"),
-                "start_y": np.asarray(y_vals, dtype=float) if it == 0 else self.rms_orbits_data.get("start_y"),
-                "current_x": np.asarray(x_vals, dtype=float),
-                "current_y": np.asarray(y_vals, dtype=float),
-                "final_x": self.rms_orbits_data.get("final_x"),
-                "final_y": self.rms_orbits_data.get("final_y"),
-                "x1_vals": None,
-                "y1_vals": None,
-                "x2_vals": None,
-                "y2_vals": None,
-                "nominal_x": None,
-                "nominal_y": None,
-            }
-
-            if self.nominal_state is not None:
-                nominal_bpms = self.nominal_state.get_bpms(bpms)
-                self.rms_orbits_data["nominal_x"] = np.asarray(nominal_bpms["x"], dtype=float)
-                self.rms_orbits_data["nominal_y"] = np.asarray(nominal_bpms["y"], dtype=float)
-
-            QApplication.processEvents()
-
-        final_state = self.interface.get_state()
-        final_state = self._apply_jitter_subtraction_to_state(final_state)
-        final_bpms = final_state.get_bpms(bpms)
-        final_x_vals = np.asarray(final_bpms["x"], dtype=float)
-        final_y_vals = np.asarray(final_bpms["y"], dtype=float)
-
-        if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
-            self.rms_orbits_data = {"selected_bpms": list(bpms)}
-        self.rms_orbits_data["final_x"] = final_x_vals
-        self.rms_orbits_data["final_y"] = final_y_vals
-
-        mean_final_x = np.nanmean(final_x_vals, axis=0) if final_x_vals.ndim == 2 else final_x_vals
-        mean_final_y = np.nanmean(final_y_vals, axis=0) if final_y_vals.ndim == 2 else final_y_vals
-        final_rms_x = float(np.sqrt(np.nanmean(mean_final_x ** 2)))
-        final_rms_y = float(np.sqrt(np.nanmean(mean_final_y ** 2)))
-        final_rms_xy = float(np.sqrt(np.nanmean(mean_final_x ** 2 + mean_final_y ** 2)))
-        self._hist_abs_rms_x.append(final_rms_x)
-        self._hist_abs_rms_y.append(final_rms_y)
-        self._hist_abs_rms_xy.append(final_rms_xy)
-        self.save_session_settings_qm_correction(w1=w1, w2=w2, w3=w3, specific_bpm=spec_bpm, rcond=rcond, iters=iters, gain=gain, beta=beta, max_horizontal_range=max_x, max_vertical_range=max_y, is_triangular=bool(self.triangular_checkbox.isChecked()), bpm_weights=self.bpm_weights, response=response, is_jitter_subtraction_checked=bool(self.subtract_jitter_checkbox.isChecked()))
-
-        QMessageBox.information(self, "QM correction", "QM correction finished")
 
     def _clear_graphs(self):
         # it doesnt do fresh start, it only clears the graphs
@@ -1540,47 +1217,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title=None)
             self._plot_series(self.disp_ax, self.disp_canvas, [], [], [], title=None)
             self._plot_series(self.wake_ax, self.wake_canvas, [], [], [], title=None)
-
-    def _build_jitter_model_for_correction(self, actuators, bpms):
-        if not self.subtract_jitter_checkbox.isChecked():
-            self.jitter_model = None
-            return None
-
-        sequence = self.interface.get_sequence()
-        refs, reason = explain_reference_selection(bpms, actuators, sequence, min_refs=2)
-
-        if reason:
-            self.log(f"Jitter subtraction disabled: {reason}")
-            self.jitter_model = None
-            return None
-
-        old_nsamples = getattr(self.interface, "nsamples", None)
-        fit_nsamples = 300
-
-        try:
-            if old_nsamples is not None:
-                self.interface.nsamples = fit_nsamples
-            bpms_snapshot = self.interface.get_bpms()
-        finally:
-            if old_nsamples is not None:
-                self.interface.nsamples = old_nsamples
-
-        targets = [str(bpm) for bpm in bpms if str(bpm) not in set(refs)]
-
-        model, fit_reason = fit_jitter_model(bpms_list=[bpms_snapshot], reference_bpms=refs, target_bpms=targets)
-
-        if model is None:
-            self.log(f"Jitter subtraction disabled: {fit_reason}")
-            self.jitter_model = None
-            return None
-
-        self.jitter_model = model
-        self.log(
-            "Jitter subtraction enabled with refs: "
-            + ", ".join(refs)
-            + f"; fitted from {fit_nsamples} fixed-config BPM samples"
-        )
-        return model
 
     def _apply_jitter_subtraction_to_state(self, state):
         if self.jitter_model is None:
@@ -1662,11 +1298,9 @@ if __name__ == "__main__":
 
     # COMMENT AFTER SANITY CHECKS
     I = dialog
-    I.align_everything()
-    nominal_state = I.get_state()
-    I.misalign_bpms()
-    start_state = I.get_state()
     project_name = I.get_name()
+    nominal_state = None
+    start_state = I.get_state()
 
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")

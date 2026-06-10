@@ -1,4 +1,4 @@
-import os, sys, time, copy
+import os, sys, time
 import numpy as np
 import matplotlib
 matplotlib.use("QtAgg")
@@ -25,9 +25,9 @@ from Interfaces.interface_setup import INTERFACE_SETUP
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
-from Backend.QuadrupoleScan_EM import QuadrupoleScan_EM
+from Backend.EM_helpers.QuadrupoleScan_EM import QuadrupoleScan_EM
 from Backend.LogConsole import LogConsole
-from Backend.PhaseSpaceGraphs_EM import PhaseSpaces
+from Backend.EM_helpers.PhaseSpaceGraphs_EM import PhaseSpaces
 from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
 
 class SPositionDelegate(QStyledItemDelegate):

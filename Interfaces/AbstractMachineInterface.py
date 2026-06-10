@@ -99,6 +99,15 @@ class AbstractMachineInterface(ABC):
             except NotImplementedError:
                 pass
 
+    def restore_sextupoles_one_by_one(self, state, callback=None):
+        sextupoles = state.get_sextupoles()
+        names = list(sextupoles["names"])
+        values = np.asarray(sextupoles["bdes"], dtype=float)
+        for name, value in zip(names, values):
+            self.set_sextupoles([name], [value])
+            if callback is not None:
+                callback(name)
+
     def restore_sextupoles_state(self, state):
         sextupoles = state.get_sextupoles()
         if len(sextupoles["names"]) > 0:

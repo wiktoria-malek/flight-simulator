@@ -1,4 +1,4 @@
-from Backend.Optimization_EM import Optimization_EM
+from Backend.EM_helpers.Optimization_EM import Optimization_EM
 from Backend.EmittanceComputingEngines.AbstractComputingEngine import AbstractComputingEngine
 
 

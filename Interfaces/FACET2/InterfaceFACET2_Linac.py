@@ -182,7 +182,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         return self
 
     def get_icts(self, names=None):
-        return {"names": np.array([]), "charge": np.array([])}
+        return {"names": [], "charge": np.array([])}
 
     def get_sequence(self):
         return self.sequence
@@ -219,11 +219,11 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            idx = [i for i, s in enumerate(correctors["names"]) if s in names]
             correctors = {
-                "names": np.array(correctors["names"])[idx],
-                "bdes": np.array(correctors["bdes"])[idx],
-                "bact": np.array(correctors["bact"])[idx],
+                "names": [correctors["names"][i] for i in idx],
+                "bdes": np.asarray(correctors["bdes"])[idx],
+                "bact": np.asarray(correctors["bact"])[idx],
             }
 
         return correctors
@@ -236,12 +236,12 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
                 if isinstance(names, str):
                     names = [names]
                 if names is not None:
-                    idx = np.array([i for i, s in enumerate(bpmdata["names"]) if s in names])
+                    idx = [i for i, s in enumerate(bpmdata["names"]) if s in names]
                     bpmdata = {
-                        "names": np.array(bpmdata["names"])[idx],
-                        "x": np.array(bpmdata["x"])[:, idx],
-                        "y": np.array(bpmdata["y"])[:, idx],
-                        "tmit": np.array(bpmdata["tmit"])[:, idx],
+                        "names": [bpmdata["names"][i] for i in idx],
+                        "x": np.asarray(bpmdata["x"])[:, idx],
+                        "y": np.asarray(bpmdata["y"])[:, idx],
+                        "tmit": np.asarray(bpmdata["tmit"])[:, idx],
                     }
                 return bpmdata
             except Exception as e:
@@ -254,12 +254,12 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
             if isinstance(names, str):
                 names = [names]
             if names is not None:
-                idx = np.array([i for i, s in enumerate(bpmdata["names"]) if s in names])
+                idx = [i for i, s in enumerate(bpmdata["names"]) if s in names]
                 bpmdata = {
-                    "names": np.array(bpmdata["names"])[idx],
-                    "x": np.array(bpmdata["x"])[:, idx],
-                    "y": np.array(bpmdata["y"])[:, idx],
-                    "tmit": np.array(bpmdata["tmit"])[:, idx],
+                    "names": [bpmdata["names"][i] for i in idx],
+                    "x": np.asarray(bpmdata["x"])[:, idx],
+                    "y": np.asarray(bpmdata["y"])[:, idx],
+                    "tmit": np.asarray(bpmdata["tmit"])[:, idx],
                 }
             return bpmdata
 

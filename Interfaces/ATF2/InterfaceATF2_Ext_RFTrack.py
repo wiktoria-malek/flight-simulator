@@ -29,10 +29,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
-    def __init__(self, population=2e10, jitter=1.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
+    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
-        self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
+        #self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
         self.lattice = rft.Lattice(self.twiss_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
@@ -186,18 +186,18 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
-        # dx = self.jitter * I0.sigma_x
-        # dy = self.jitter * I0.sigma_y
-        # dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
-        # pitch = self.jitter * I0.sigma_py
-        # yaw = self.jitter * I0.sigma_px
+        dx = self.jitter * I0.sigma_x
+        dy = self.jitter * I0.sigma_y
+        dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
+        pitch = self.jitter * I0.sigma_py
+        yaw = self.jitter * I0.sigma_px
 
         #Uncomment for jitter subtraction tests
-        dx = self.rng.normal(0.0, self.jitter * I0.sigma_x)
-        dy = self.rng.normal(0.0, self.jitter * I0.sigma_y)
-        pitch = self.rng.normal(0.0, self.jitter * I0.sigma_py)
-        yaw = self.rng.normal(0.0, self.jitter * I0.sigma_px)
-        dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
+        # dx = self.rng.normal(0.0, self.jitter * I0.sigma_x)
+        # dy = self.rng.normal(0.0, self.jitter * I0.sigma_y)
+        # pitch = self.rng.normal(0.0, self.jitter * I0.sigma_py)
+        # yaw = self.rng.normal(0.0, self.jitter * I0.sigma_px)
+        # dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
 
         B0_offset = self.B0.displaced(dx, dy, dz, dt, roll, pitch, yaw)
         B1=self.lattice.track(B0_offset)
@@ -264,8 +264,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         target_disp_x, target_disp_y = [], []
         for line in lines[dollar_sign + 1:]:
             data = line.split()
-            if len(data) <= max(DX_column, DY_column,
-                                elements_names):  # if a line has less column than needed, it is omitted
+            if len(data) <= max(DX_column, DY_column, elements_names):  # if a line has less column than needed, it is omitted
                 continue
             bpms_name = data[elements_names].strip('"')
             try:
@@ -290,10 +289,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(icts["names"]) if s in names])
+            idx = [i for i, s in enumerate(icts["names"]) if s in names]
             icts = {
-                "names": np.array(icts["names"])[idx],
-                "charge": np.array(icts["charge"])[idx],
+                "names": [icts["names"][i] for i in idx],
+                "charge": np.asarray(icts["charge"])[idx],
             }
 
         return icts
@@ -312,11 +311,11 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(correctors["names"]) if s in names])
+            idx = [i for i, s in enumerate(correctors["names"]) if s in names]
             correctors = {
-                "names": np.array(correctors["names"])[idx],
-                "bdes": np.array(correctors["bdes"])[idx],
-                "bact": np.array(correctors["bact"])[idx],
+                "names": [correctors["names"][i] for i in idx],
+                "bdes": np.asarray(correctors["bdes"])[idx],
+                "bact": np.asarray(correctors["bact"])[idx],
             }
 
         return correctors
@@ -327,18 +326,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         y = np.zeros(x.shape)
         tmit = np.zeros(x.shape)
 
-        # for i in range(self.nsamples):
-        #     for j, bpm in enumerate(self.bpms):
-        #         b = self.lattice[bpm]
-        #         reading = b.get_reading()
-        #         x[i, j] = reading[0]
-        #         y[i, j] = reading[1]
-        #         tmit[i, j] = b.get_total_charge()
-
-
-        # Uncomment for jitter subtraction tests
         for i in range(self.nsamples):
-            self.__track_bunch()
             for j, bpm in enumerate(self.bpms):
                 b = self.lattice[bpm]
                 reading = b.get_reading()
@@ -347,17 +335,27 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 tmit[i, j] = b.get_total_charge()
 
 
+        # Uncomment for jitter subtraction tests
+        # for i in range(self.nsamples):
+        #     self.__track_bunch()
+        #     for j, bpm in enumerate(self.bpms):
+        #         b = self.lattice[bpm]
+        #         reading = b.get_reading()
+        #         x[i, j] = reading[0]
+        #         y[i, j] = reading[1]
+        #         tmit[i, j] = b.get_total_charge()
+
         bpms = {"names": self.bpms, "x": x, "y": y, "tmit": tmit}
 
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(bpms["names"]) if s in names])
+            idx = [i for i, s in enumerate(bpms["names"]) if s in names]
             bpms = {
-                "names": np.array(bpms["names"])[idx],
-                "x": np.array(bpms["x"])[:, idx],
-                "y": np.array(bpms["y"])[:, idx],
-                "tmit": np.array(bpms["tmit"])[:, idx],
+                "names": [bpms["names"][i] for i in idx],
+                "x": np.asarray(bpms["x"])[:, idx],
+                "y": np.asarray(bpms["y"])[:, idx],
+                "tmit": np.asarray(bpms["tmit"])[:, idx],
             }
 
         return bpms
@@ -505,14 +503,14 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(quadrupoles["names"]) if s in names])
+            idx = [i for i, s in enumerate(quadrupoles["names"]) if s in names]
             quadrupoles = {
-                "names": np.array(quadrupoles["names"])[idx],
-                "bdes": np.array(quadrupoles["bdes"])[idx],
-                "bact": np.array(quadrupoles["bact"])[idx],
-                "xdes": np.array(quadrupoles["xdes"])[idx],
-                "ydes": np.array(quadrupoles["ydes"])[idx],
-                "rolldes": np.array(quadrupoles["rolldes"])[idx],
+                "names": [quadrupoles["names"][i] for i in idx],
+                "bdes": np.asarray(quadrupoles["bdes"])[idx],
+                "bact": np.asarray(quadrupoles["bact"])[idx],
+                "xdes": np.asarray(quadrupoles["xdes"])[idx],
+                "ydes": np.asarray(quadrupoles["ydes"])[idx],
+                "rolldes": np.asarray(quadrupoles["rolldes"])[idx],
             }
 
         return quadrupoles
@@ -906,11 +904,11 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            idx = np.array([i for i, s in enumerate(sextupoles["names"]) if s in names])
+            idx = [i for i, s in enumerate(sextupoles["names"]) if s in names]
             sextupoles = {
-                "names": np.array(sextupoles["names"])[idx],
-                "bdes": np.array(sextupoles["bdes"])[idx],
-                "bact": np.array(sextupoles["bact"])[idx],
+                "names": [sextupoles["names"][i] for i in idx],
+                "bdes": np.asarray(sextupoles["bdes"])[idx],
+                "bact": np.asarray(sextupoles["bact"])[idx],
             }
         return sextupoles
 
@@ -1087,14 +1085,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         # self.__track_bunch()
         self._needs_tracking = True
 
-    def apply_random_misalignment(
-            self,
-            seed: int,
-            sigma_dx_um: float,
-            sigma_dy_um: float,
-            sigma_dtheta_urad: float,
-            sigma_dk_rel: float, ):
-
+    def apply_random_misalignment(self, seed: int, sigma_dx_um: float, sigma_dy_um: float, sigma_dtheta_urad: float, sigma_dk_rel: float):
         print(
             f"Applying random misalignment (custom): seed={seed}, "
             f"sigma_dx={sigma_dx_um}um, sigma_dy={sigma_dy_um}um, "
