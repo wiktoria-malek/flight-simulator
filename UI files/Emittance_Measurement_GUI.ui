@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1604</width>
-    <height>956</height>
+    <height>846</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -153,12 +153,12 @@ QGroupBox#screensGroup::title {
            <widget class="QComboBox" name="computing_method_combo">
             <item>
              <property name="text">
-              <string>Linear R-response model</string>
+              <string>Machine learning model</string>
              </property>
             </item>
             <item>
              <property name="text">
-              <string>Machine learning model</string>
+              <string>Linear R-response model</string>
              </property>
             </item>
             <item>
@@ -1198,7 +1198,7 @@ QGroupBox#fit_results_group::title {
     font-weight: bold;
 }
 QToolButton#ToolTip_opt:hover {
-    background-color: #e6e6e6;
+    background-color: #d9d9d9 ;
 }</string>
             </property>
             <property name="text">

@@ -202,7 +202,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
-
         self._setup_qm_controls()
         self._refresh_corrector_list()
         self._update_qm_widgets_visibility()
@@ -424,7 +423,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             try:
                 if sextupoles_to_disable:
                     #self._start_correction()
-                    
+
                     self.interface.set_sextupoles(sextupoles["names"], np.zeros(len(sextupoles["names"]), dtype=float))
                     self.log("Sextupoles disabled before BBA")
                     self._start_correction(silent=True)

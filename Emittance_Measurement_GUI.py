@@ -4,20 +4,17 @@ import matplotlib
 matplotlib.use("QtAgg")
 import matplotlib.colors as mcolors
 from datetime import datetime
+from enum import Enum
 try:
     pyqt_version = 6
     from PyQt6 import uic
-    from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
-    )
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
     from PyQt6.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt6.QtGui import QPainter, QPixmap, QFont
 except ImportError:
     pyqt_version = 5
     from PyQt5 import uic
-    from PyQt5.QtWidgets import (
-        QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
-    )
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 
@@ -29,6 +26,11 @@ from Backend.EM_helpers.QuadrupoleScan_EM import QuadrupoleScan_EM
 from Backend.LogConsole import LogConsole
 from Backend.EM_helpers.PhaseSpaceGraphs_EM import PhaseSpaces
 from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
+
+class ComputationMode(Enum):
+    LRM = "Linear R-response model"
+    ML = "Machine learning model"
+    RFT = "RFTrack tracking"
 
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -191,6 +193,16 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         self._scan_is_paused = False
         self._optimization_paused = False
         self._last_scan_status = None
+        self.computation_mode = ComputationMode(self.computing_method_combo.currentText())
+        self.computing_method_combo.currentTextChanged.connect(self._on_computation_mode_changed)
+        self._on_computation_mode_changed(self.computing_method_combo.currentText())
+
+    def _on_computation_mode_changed(self, text):
+        self.computation_mode = ComputationMode(text)
+        is_linear_mode = self.computation_mode == ComputationMode.LRM
+        widgets_to_disable = [self.xoptSettingsGroup,self.localOptimizationSettingsGroup]
+        for widget in widgets_to_disable:
+            widget.setEnabled(not is_linear_mode)
 
     def _log_scan_status(self, session_partial, current_step, total_steps):
         if not isinstance(session_partial, dict):

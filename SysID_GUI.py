@@ -447,13 +447,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.mode=Mode.Orbit
         self._update_folder_path()
         self.choose_mode.currentTextChanged.connect(self._choose_the_correction_mode)
-        # self.initial_hkick_settings.setText("0.01")
-        # self.initial_vkick_settings.setText("0.01")
-
-        #for FACET2:
-        # self.initial_hkick_settings.setText("0.0001")
-        # self.initial_vkick_settings.setText("0.0001")
-
         self.correctors_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.correctors_list.insertItems(0, correctors_list)
         self.actuator_mode_combo.clear()

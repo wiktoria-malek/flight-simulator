@@ -324,47 +324,107 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             data["pvs"] = {name: dict(self.qmag_pv[name]) for name in names}
         return data
 
-    def _read_screen_status(self, screen_pv_name):
-        return self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
+    """Methods for OTRs"""
 
-    def _read_screen_calibration(self, screen_pv_name, plane):
-        if plane.lower()=='h':
-            pvs = [
-                f'{screen_pv_name}:H:x1:Calibration:Factor',
-                f'{screen_pv_name}:H:X1:Calibration:Factor',
-            ]
-        else:
-            pvs = [
-                f'{screen_pv_name}:V:y1:Calibration:Factor',
-                f'{screen_pv_name}:V:Y1:Calibration:Factor',
-            ]
-        return self._valid_pv_value(pvs, default = np.nan)
+    # --- Gaussian Fit ---
+    def gaussian(self, x, amplitude, mean, stddev, offset):
+        """1D Gaussian function for curve fitting."""
+        return amplitude * np.exp(-((x - mean) / (2 * stddev)) ** 2) + offset
 
-    def _acquire_screen_image(self, screen_pv_name):
+    def plot_otr_analysis_inset(self, ax_main, img_data, title_str, h_factor_um_px=1.0, v_factor_um_px=1.0):
+
+        im = ax_main.imshow(img_data, cmap='gray', origin='lower')
+        ax_main.set_title(title_str)
+        ax_main.axis('off')
+
+        plt.colorbar(im, ax=ax_main, fraction=0.046, pad=0.04, label='Pixel Intensity (Counts)')
+
+        h, w = img_data.shape
+        proj_x = np.sum(img_data, axis=0)
+        proj_y = np.sum(img_data, axis=1)
+        x_coords = np.arange(w)
+        y_coords = np.arange(h)
+        p0_x = [np.max(proj_x), np.argmax(proj_x), w / 10, np.min(proj_x)]
+        p0_y = [np.max(proj_y), np.argmax(proj_y), h / 10, np.min(proj_y)]
+
+        sigma_h_um = None
+        sigma_v_um = None
+
         try:
-            PV(f'{screen_pv_name}:CAMERA:Acquire').put(1)
-            time.sleep(2)
-        except Exception:
-            pass
+            popt_x, pcov_x = curve_fit(self.gaussian, x_coords, proj_x, p0=p0_x)
+            amp_x, mean_x, stddev_x, offset_x = popt_x
+            fit_x = self.gaussian(x_coords, *popt_x)
+            beam_size_x_px = abs(stddev_x) * 2
+            sigma_h_um = beam_size_x_px * h_factor_um_px
 
-        raw_img = caget(f'{screen_pv_name}:IMAGE:ArrayData')
-        if raw_img is None:
-            return None
-        raw_img = np.asanyarray(raw_img)
-        if raw_img.size == 0:
-            return None
+            popt_y, pcov_y = curve_fit(self.gaussian, y_coords, proj_y, p0=p0_y)
+            amp_y, mean_y, stddev_y, offset_y = popt_y
+            fit_y = self.gaussian(y_coords, *popt_y)
+            beam_size_y_px = abs(stddev_y) * 2
+            sigma_v_um = beam_size_y_px * v_factor_um_px
 
-        nx, ny = self.screen_image_shape
-        correct_image_size = ny * nx
-        if raw_img.size < correct_image_size:
-            return None
-        raw_img = raw_img[:correct_image_size]
+            # PLOTS
+            # Horizontal histogram (top margin)
+            ax_hist_x = ax_main.inset_axes([0.0, 1.05, 1.0, 0.2], transform=ax_main.transAxes)
+            ax_hist_x.plot(x_coords, proj_x, label='H Projection')
+            ax_hist_x.plot(x_coords, fit_x, 'r--', label=f'Size: {sigma_h_um:.2f} $\\mu$m')
+            ax_hist_x.legend(fontsize='x-small', loc='upper right')
+            ax_hist_x.axis('off')
 
-        image = raw_img.reshape((ny, nx)).astype(float)
-        return image
+            # Vertical histogram (right margin)
+            ax_hist_y = ax_main.inset_axes([1.05, 0.0, 0.2, 1.0], transform=ax_main.transAxes)
+            ax_hist_y.plot(proj_y, y_coords, label='V Projection')
+            ax_hist_y.plot(fit_y, y_coords, 'r--', label=f'Size: {sigma_v_um:.2f} $\\mu$m')
+            ax_hist_y.legend(fontsize='x-small', loc='lower right')
+            ax_hist_y.axis('off')
 
-    @staticmethod
-    def _screen_data_from_image(image,hpixel,vpixel):
+        except RuntimeError:
+            print(f"Could not fit Gaussian for {title_str}")
+            ax_hist_x = ax_main.inset_axes([0.0, 1.05, 1.0, 0.2], transform=ax_main.transAxes)
+            ax_hist_y = ax_main.inset_axes([1.05, 0.0, 0.2, 1.0], transform=ax_main.transAxes)
+            ax_hist_x.axis('off')
+            ax_hist_y.axis('off')
+
+        return proj_x, proj_y, sigma_h_um, sigma_v_um
+
+    # --- Data Acquisition Functions ---
+    def get_pixel_calibrations(self, otr_id_str):
+        h_pv_name = f'mOTR{otr_id_str}:H:x1:Calibration:Factor'
+        v_pv_name = f'mOTR{otr_id_str}:V:x1:Calibration:Factor'
+        h_factor = PV(h_pv_name).get()
+        v_factor = PV(v_pv_name).get()
+        if h_factor is None or v_factor is None:
+            h_factor = 1.0
+            v_factor = 1.0
+        return h_factor, v_factor
+
+    def acquire_otr_image(self, otr_id_str):
+        """
+        It might be super slow.
+        1 call of get_screens() will take 8s x number_of_screens
+        So, for 4 screens it's 32 seconds.
+        EM GUI calls get_screens() multiple times, every K1 change.
+        """
+        print(f"Acquiring data for OTR{otr_id_str}...")
+        pv_in_name = f'mOTR{otr_id_str}:Target:WRITE:IN'
+        pv_out_name = f'mOTR{otr_id_str}:Target:WRITE:OUT'
+        pv_img_data_name = f'mOTR{otr_id_str}:IMAGE:ArrayData'
+        pv_acquire_name = f'mOTR{otr_id_str}:CAMERA:Acquire'
+        otr_in_pv = PV(pv_in_name)
+        otr_out_pv = PV(pv_out_name)
+        image_data_pv = PV(pv_img_data_name)
+        image_acquire_pv = PV(pv_acquire_name)
+        otr_in_pv.put(1)
+        time.sleep(5)
+        image_acquire_pv.put(1)
+        time.sleep(3)
+        img_data = image_data_pv.get()
+        image_acquire_pv.put(0)
+        otr_out_pv.put(1)
+        img_reshaped = img_data.reshape(960, 1280)
+        return img_reshaped
+
+    def _screen_data_from_image(self, image,hpixel,vpixel):
         if image is None:
             return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1,1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
         img = np.asarray(image, dtype=float)
@@ -399,15 +459,13 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
 
+
     def get_screens(self, names=None):
         print('Reading screens...')
-
         if isinstance(names, str):
             names = [names]
         selected_names = self.screen_names if names is None else [name for name in self.screen_names if name in names]
-
         s_positions = self._get_twiss_s_positions(selected_names)
-
         hpixel_list = []
         vpixel_list = []
         xb_list = []
@@ -436,12 +494,11 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 inout_list.append(np.nan)
                 continue
 
-            status = self._read_screen_status(screen_pv_name)
-            hpixel = self._read_screen_calibration(screen_pv_name, 'h')
-            vpixel = self._read_screen_calibration(screen_pv_name, 'v')
-            image = self._acquire_screen_image(screen_pv_name)
+            otr_id = screen_name.replace('OTR', '')
+            hpixel, vpixel = self.get_pixel_calibrations(otr_id)
+            status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
+            image = self.acquire_otr_image(otr_id)
             x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel)
-
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             xb_list.append(x_mean)
