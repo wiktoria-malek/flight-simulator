@@ -7,7 +7,10 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from ipbsm_opt_math import GPParams, GaussianFitResult, SimpleGP
+try:
+    from .ipbsm_opt_math import GPParams, GaussianFitResult, SimpleGP
+except ImportError:
+    from ipbsm_opt_math import GPParams, GaussianFitResult, SimpleGP
 
 
 def ensure_dir(p: Path) -> Path:

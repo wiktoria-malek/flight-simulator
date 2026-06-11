@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import csv
+import sys
 import traceback
 import threading
 from dataclasses import asdict
@@ -26,6 +27,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+
+_GUI_DIR = Path(__file__).resolve().parent
+_KNOBS_DIR = _GUI_DIR.parent
+_REPO_ROOT = _KNOBS_DIR.parent
+for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap

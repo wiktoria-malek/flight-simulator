@@ -14,9 +14,19 @@ The "true" peak:
 """
 
 from __future__ import annotations
+
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+
 import numpy as np
+
+_KNOBS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _KNOBS_DIR.parent
+for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from IPBSM_Opt import BaseIPBSMController
 
