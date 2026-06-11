@@ -762,21 +762,10 @@ class Optimizer:
                 self._attach_machine_state_to_record(rec)
                 w.writerow(self._csv_row_for_record(rec))
 
-    def _format_autoscan_filename(self, rec: StepRecord) -> str:
-        t_iso = str(getattr(rec, "t_iso", "") or "")
-        digits = "".join(ch for ch in t_iso if ch.isdigit())
-        if len(digits) >= 14:
-            stamp = f"{digits[:8]}_{digits[8:14]}"
-        else:
-            stamp = self.run_tag.replace("-", "_")
-        return f"AutoScan_{stamp}_s{int(rec.step):03d}.binary"
-
     def _gf_file_tag(self) -> str:
         digits = "".join(ch for ch in self.run_tag if ch.isdigit())
         if len(digits) >= 14:
-            return f"{digits[2:8]}_{digits[8:14]}"
-        if len(self.run_tag) >= 2:
-            return self.run_tag[2:].replace("-", "_")
+            return f"{digits[:8]}_{digits[8:14]}"
         return self.run_tag.replace("-", "_")
 
     def _gf_axis_name_from_chosen_by(self, chosen_by: str) -> str:
@@ -796,12 +785,10 @@ class Optimizer:
         return f"{axis_name} {mode_label} scan [Auto Scan]"
 
     def _gf_dat_file_stem(self, axis_name: str, mode_label: str) -> str:
-        # Keep edge underscores so "[Auto Scan]" naturally becomes "__Auto_Scan_".
-        title_text = self._gf_dat_title_text(axis_name=axis_name, mode_label=mode_label)
-        stem = "".join(ch if ch.isalnum() else "_" for ch in title_text)
-        if any(ch.isalnum() for ch in stem):
-            return stem
-        return f"{self._gf_axis_file_label(axis_name)}_{mode_label}_scan__Auto_Scan_"
+        axis_label = self._gf_axis_file_label(axis_name)
+        mode_text = "".join(ch if ch.isalnum() else "_" for ch in str(mode_label)).strip("_")
+        mode_tag = mode_text or "mode"
+        return f"{axis_label}_{mode_tag}_auto_scan"
 
     def _gf_dat_export_paths(self, axis_names: Optional[List[str]] = None) -> List[str]:
         if not self._is_sequential_method():
@@ -854,7 +841,7 @@ class Optimizer:
                     mod_err = float(rec.y_err)
                     beamsize = float(dat.get("beamsize", float("nan")))
                     ebeamsize = float(dat.get("ebeamsize", float("nan")))
-                    row_filename = self._format_autoscan_filename(rec)
+                    row_filename = str(dat.get("filename", "") or "")
 
                     def _fmt(val: float, ndig: int) -> str:
                         if not np.isfinite(val):
