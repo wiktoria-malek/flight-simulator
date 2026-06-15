@@ -23,7 +23,9 @@ for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
 try:
     from Knobs.IPBSM_Opt import Optimizer, OptimizerConfig, fit_gaussian_from_samples, plot_results, now_tag
     from Knobs.IPBSM_Opt_Synthetic_Controller import make_random_spec, SyntheticGaussianIPBSMController
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    if exc.name not in {"Knobs", "Knobs.IPBSM_Opt", "Knobs.IPBSM_Opt_Synthetic_Controller"}:
+        raise
     from IPBSM_Opt import Optimizer, OptimizerConfig, fit_gaussian_from_samples, plot_results, now_tag
     from IPBSM_Opt_Synthetic_Controller import make_random_spec, SyntheticGaussianIPBSMController
 

@@ -45,7 +45,9 @@ from PyQt6.QtWidgets import (
 
 try:
     from Knobs.IPBSM_Opt import IPBSMInterface
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    if exc.name not in {"Knobs", "Knobs.IPBSM_Opt"}:
+        raise
     from IPBSM_Opt import IPBSMInterface
 from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
 from Interfaces.ATF2.InterfaceATF2_Ext import InterfaceATF2_Ext

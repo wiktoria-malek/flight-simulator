@@ -55,7 +55,9 @@ try:
         EPICSIPBSMController, DAT_CSV_COLUMNS,
     )
     from Knobs.IPBSM_Opt import IPBSMInterface
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    if exc.name not in {"Knobs", "Knobs.IPBSM_Opt"}:
+        raise
     from IPBSM_Opt import (
         Optimizer, OptimizerConfig, StopFlag,
         build_gf_axiswise_fit, fit_gaussian_from_samples, plot_bo_gp_heatmap, plot_results, now_tag,

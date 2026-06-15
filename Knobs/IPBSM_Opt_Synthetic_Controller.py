@@ -30,7 +30,9 @@ for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
 
 try:
     from Knobs.IPBSM_Opt import BaseIPBSMController
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    if exc.name not in {"Knobs", "Knobs.IPBSM_Opt"}:
+        raise
     from IPBSM_Opt import BaseIPBSMController
 
 @dataclass
