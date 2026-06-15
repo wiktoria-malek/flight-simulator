@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import csv
+import importlib.util
 import sys
 import traceback
 import threading
@@ -48,22 +49,38 @@ from PyQt6.QtWidgets import (
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-try:
-    from Knobs.IPBSM_Opt import (
-        Optimizer, OptimizerConfig, StopFlag,
-        build_gf_axiswise_fit, fit_gaussian_from_samples, plot_bo_gp_heatmap, plot_results, now_tag,
-        EPICSIPBSMController, DAT_CSV_COLUMNS,
-    )
-    from Knobs.IPBSM_Opt import IPBSMInterface
-except ModuleNotFoundError as exc:
-    if exc.name not in {"Knobs", "Knobs.IPBSM_Opt"}:
-        raise
-    from IPBSM_Opt import (
-        Optimizer, OptimizerConfig, StopFlag,
-        build_gf_axiswise_fit, fit_gaussian_from_samples, plot_bo_gp_heatmap, plot_results, now_tag,
-        EPICSIPBSMController, DAT_CSV_COLUMNS,
-    )
-    from IPBSM_Opt import IPBSMInterface
+def _load_ipbsm_opt_module():
+    module_name = "Knobs.IPBSM_Opt"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    legacy_name = "IPBSM_Opt"
+    if legacy_name in sys.modules:
+        return sys.modules[legacy_name]
+
+    module_path = _KNOBS_DIR / "IPBSM_Opt.py"
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise ModuleNotFoundError(f"Could not load module from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    sys.modules.setdefault(legacy_name, module)
+    spec.loader.exec_module(module)
+    return module
+
+
+_IPBSM_OPT = _load_ipbsm_opt_module()
+
+Optimizer = _IPBSM_OPT.Optimizer
+OptimizerConfig = _IPBSM_OPT.OptimizerConfig
+StopFlag = _IPBSM_OPT.StopFlag
+build_gf_axiswise_fit = _IPBSM_OPT.build_gf_axiswise_fit
+fit_gaussian_from_samples = _IPBSM_OPT.fit_gaussian_from_samples
+plot_bo_gp_heatmap = _IPBSM_OPT.plot_bo_gp_heatmap
+plot_results = _IPBSM_OPT.plot_results
+now_tag = _IPBSM_OPT.now_tag
+EPICSIPBSMController = _IPBSM_OPT.EPICSIPBSMController
+DAT_CSV_COLUMNS = _IPBSM_OPT.DAT_CSV_COLUMNS
+IPBSMInterface = _IPBSM_OPT.IPBSMInterface
 
 
 ZSCAN_DEFAULT_RANGE = 0.0085
