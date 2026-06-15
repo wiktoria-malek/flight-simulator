@@ -20,8 +20,12 @@ for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from IPBSM_Opt import Optimizer, OptimizerConfig, fit_gaussian_from_samples, plot_results, now_tag
-from IPBSM_Opt_Synthetic_Controller import make_random_spec, SyntheticGaussianIPBSMController
+try:
+    from Knobs.IPBSM_Opt import Optimizer, OptimizerConfig, fit_gaussian_from_samples, plot_results, now_tag
+    from Knobs.IPBSM_Opt_Synthetic_Controller import make_random_spec, SyntheticGaussianIPBSMController
+except ModuleNotFoundError:
+    from IPBSM_Opt import Optimizer, OptimizerConfig, fit_gaussian_from_samples, plot_results, now_tag
+    from IPBSM_Opt_Synthetic_Controller import make_random_spec, SyntheticGaussianIPBSMController
 
 
 def build_run_output_dir(base_dir: Path, tag: str, suffix: str) -> Path:

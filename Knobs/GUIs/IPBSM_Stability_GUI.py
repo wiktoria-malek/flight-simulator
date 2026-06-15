@@ -43,7 +43,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from IPBSM_Opt import IPBSMInterface
+try:
+    from Knobs.IPBSM_Opt import IPBSMInterface
+except ModuleNotFoundError:
+    from IPBSM_Opt import IPBSMInterface
 from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
 from Interfaces.ATF2.InterfaceATF2_Ext import InterfaceATF2_Ext
 from Interfaces.ATF2.InterfaceATF2_Linac import InterfaceATF2_Linac

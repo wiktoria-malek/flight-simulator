@@ -28,7 +28,10 @@ for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from IPBSM_Opt import BaseIPBSMController
+try:
+    from Knobs.IPBSM_Opt import BaseIPBSMController
+except ModuleNotFoundError:
+    from IPBSM_Opt import BaseIPBSMController
 
 @dataclass
 class SyntheticGaussianSpec:
