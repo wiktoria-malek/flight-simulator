@@ -14,7 +14,7 @@ except ImportError:
     from PyQt5.QtCore import QEvent, Qt
 
 import importlib
-
+import importlib.util
 from Interfaces.interface_setup import INTERFACE_SETUP
 
 def _no_focus_policy():
@@ -22,6 +22,34 @@ def _no_focus_policy():
 
 def _strong_focus_policy():
     return Qt.FocusPolicy.StrongFocus if hasattr(Qt, "FocusPolicy") else Qt.StrongFocus
+
+def get_available_interface_setup():
+    available_setup = {}
+    for machine_name, entries in INTERFACE_SETUP.items():
+        available_entries = []
+        for entry in entries:
+            module_name = entry.get("module", "")
+            class_name = entry.get("class_name", "")
+            if not module_name:
+                continue
+
+            try:
+                module_spec = importlib.util.find_spec(module_name)
+            except (ModuleNotFoundError, ValueError, ImportError):
+                continue
+
+            if module_spec is None:
+                continue
+            try:
+                module = importlib.import_module(module_name)
+            except Exception:
+                continue
+            if not hasattr(module, class_name):
+                continue
+            available_entries.append(entry)
+        if available_entries:
+            available_setup[machine_name] = available_entries
+    return available_setup
 
 class SelectAcc(QDialog):
     def __init__(self,machines,parent=None):
@@ -104,8 +132,9 @@ class InterfaceSelectionDialog(QDialog):
         self.selected_interface_name = None
         self.selected_acc = selected_acc
         self.go_back=False
-        self.are_more_machines=len(INTERFACE_SETUP.keys())>1
-        self.entries=INTERFACE_SETUP.get(selected_acc,[])
+        self.available_interface_setup = get_available_interface_setup()
+        self.are_more_machines = len(self.available_interface_setup.keys()) > 1
+        self.entries = self.available_interface_setup.get(selected_acc, [])
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose one of the following Interfaces:"))
 
@@ -210,7 +239,11 @@ class InterfaceSelectionDialog(QDialog):
 
 
 def choose_acc_and_interface(parent=None):
-    machines=sorted(INTERFACE_SETUP.keys())
+    available_interface_setup = get_available_interface_setup()
+    machines = sorted(available_interface_setup.keys())
+    if not machines:
+        QMessageBox.critical(parent, "Interface unavailable", "No available interfaces were found.")
+        return None
 
     if len(machines)==1:
         accelerator=machines[0]
@@ -230,5 +263,4 @@ def choose_acc_and_interface(parent=None):
         if getattr(interface_dialog,"go_back",False):
             continue
         return None
-
 

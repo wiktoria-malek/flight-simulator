@@ -29,7 +29,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             'OTR3X': 'mOTR4'
         }
         self.bpm_sample_interval_s = 0.5
-
         self.screen_image_shape = (960, 1280) # image size = 1280 x 960
 
         # Bpms and correctors in beamline order
@@ -89,13 +88,16 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
+
         # Check if the bpms in the config files are known to Epics
         bpm_ok = all(bpm in monitors for bpm in monitors_from_sequence)
         if not bpm_ok:
             bpms_unknown = [bpm for bpm in monitors_from_sequence if bpm not in monitors]
             print(f'Unknown bpms {bpms_unknown} removed from list')
+
         # Only retain BPMs in config file which are known by Epics
         sequence_filtered = [element for element in sequence if (element in monitors) or element.lower().startswith('z')]
+
         # Subset of BPMs and correctors from the config file
         self.sequence = sequence_filtered
         self.sequence_raw = list(sequence)
@@ -139,6 +141,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
         self.test_laser_intensity = wfs_intensity
         #PV('RFGun:LaserIntensity1:Read').get()
+
+        # k_T_per_A : integrated-gradient slope GL/I [T/A]
+        # L_m       : magnetic length
+        self.QUAD_CALIB ={"QD18X": {"k_T_per_A": 0.0, "L_m": 0.0}} # TODO with real numbers
 
         # IPBSM hooks and FF knob definitions (real machine)
         self.error_history = []
@@ -208,6 +214,35 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for alias in self.qmag_alias_to_canonical.keys():
             # Use the alias itself for mover PVs (e.g. QM16FF:MAG:DES:X).
             self.qmag_pv[alias] = self._build_qmag_pv_names(alias)
+
+    def _quad_calib(self, name):
+        canonical = self.qmag_alias_to_canonical.get(name, name)
+        calib = self.QUAD_CALIB.get(name) or self.QUAD_CALIB.get(canonical)
+        if calib is None:
+            raise KeyError(f"No A<->K1 calibration for quadrupole '{name}' ")
+        k_T_per_A = float(calib["k_T_per_A"])
+        L_m = float(calib["L_m"])
+        if k_T_per_A == 0.0 or L_m == 0.0:
+            raise ValueError(f"Calibration for '{name}' is 0. ")
+        return k_T_per_A, L_m
+
+    def get_grad(self, name, current_A):
+        """Current [A] -> gradient G [T/m]."""
+        k_T_per_A, L_m = self._quad_calib(name)
+        GL = k_T_per_A * float(current_A)  # integrated gradient [T]
+        return GL / L_m  # gradient [T/m]
+
+    def current_to_k1(self, name, current_A):
+        """Current [A] -> focusing strength K1 [1/m^2]."""
+        G = self.get_grad(name, current_A)
+        return 299.8 * G / self.Pref  # K1 = G / Brho  [1/m^2]
+
+    def k1_to_current(self, name, k1):
+        """K1 [1/m^2] -> current [A]."""
+        k_T_per_A, L_m = self._quad_calib(name)
+        G = float(k1) * self.Pref / 299.8  # gradient [T/m]
+        GL = G * L_m  # integrated gradient [T]
+        return GL / k_T_per_A  # current [A]
 
     def insert_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -287,6 +322,11 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return self.movable_magnets
 
     def get_quadrupoles(self, names=None, include_pv_names=False):
+        """
+        We need to implement a conversion how current can be
+        converted to K1, something like:
+        k_T_per_A -> prototype of equations is in CLEAR RFT interface
+        """
         if names is None:
             names = self.qmags # quadrupoles names
         if type(names) == str:
@@ -309,8 +349,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             yact.append(self._pv_get(pv["pv_read_enc_y"]))
             rollact.append(self._pv_get(pv["pv_read_enc_roll"]))
 
+        ides = np.array(ides, dtype=float)
+        iact = np.array(iact, dtype=float)
+        bdes = np.array([self.current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
+        bact = np.array([self.current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
+
         data = {
             "names": names,
+            "bdes": bdes, # 1/m^2,
+            "bact": bact,  # 1/m^2
             "ides": np.array(ides, dtype=float),
             "iact": np.array(iact, dtype=float),
             "xdes": np.array(xdes, dtype=float),
@@ -324,7 +371,23 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             data["pvs"] = {name: dict(self.qmag_pv[name]) for name in names}
         return data
 
-    """Methods for OTRs"""
+    def set_quadrupoles(self, names, k1_values, track=True):
+        if type(names) == str:
+            names = [names]
+        if not isinstance(k1_values, (list, tuple, np.ndarray)):
+            k1_values = [k1_values]
+        if len(names) != len(k1_values):
+            raise ValueError(f"len(names)={len(names)} != len(k1_values)={len(k1_values)} in set_quadrupoles")
+
+        for name, k1 in zip(names, k1_values):
+            if name not in self.qmag_pv:
+                raise ValueError(f"Quadrupole '{name}' is not magnet list.")
+            canonical = self.qmag_alias_to_canonical.get(name, name)
+            target_current = self.k1_to_current(name, float(k1))  # A
+            self._pv_put(f"{canonical}:currentWrite", float(target_current))
+            self._wait_for_magnet_readback(canonical, float(target_current))
+
+    """Methods for OTRs from mOTRs_measurement.py"""
 
     # --- Gaussian Fit ---
     def gaussian(self, x, amplitude, mean, stddev, offset):
@@ -388,9 +451,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return proj_x, proj_y, sigma_h_um, sigma_v_um
 
     # --- Data Acquisition Functions ---
-    def get_pixel_calibrations(self, otr_id_str):
-        h_pv_name = f'mOTR{otr_id_str}:H:x1:Calibration:Factor'
-        v_pv_name = f'mOTR{otr_id_str}:V:x1:Calibration:Factor'
+    def get_pixel_calibrations(self, screen_pv_name):
+        h_pv_name = f'{screen_pv_name}:H:x1:Calibration:Factor'
+        v_pv_name = f'{screen_pv_name}:V:x1:Calibration:Factor'
         h_factor = PV(h_pv_name).get()
         v_factor = PV(v_pv_name).get()
         if h_factor is None or v_factor is None:
@@ -398,7 +461,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             v_factor = 1.0
         return h_factor, v_factor
 
-    def acquire_otr_image(self, otr_id_str):
+    def acquire_otr_image(self, screen_pv_name):
         """
         It might be super slow.
         1 call of get_screens() will take 8s x number_of_screens
@@ -406,10 +469,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         EM GUI calls get_screens() multiple times, every K1 change.
         """
         print(f"Acquiring data for OTR{otr_id_str}...")
-        pv_in_name = f'mOTR{otr_id_str}:Target:WRITE:IN'
-        pv_out_name = f'mOTR{otr_id_str}:Target:WRITE:OUT'
-        pv_img_data_name = f'mOTR{otr_id_str}:IMAGE:ArrayData'
-        pv_acquire_name = f'mOTR{otr_id_str}:CAMERA:Acquire'
+        pv_in_name = f'{screen_pv_name}:Target:WRITE:IN'
+        pv_out_name = f'{screen_pv_name}:Target:WRITE:OUT'
+        pv_img_data_name = f'{screen_pv_name}:IMAGE:ArrayData'
+        pv_acquire_name = f'{screen_pv_name}:CAMERA:Acquire'
         otr_in_pv = PV(pv_in_name)
         otr_out_pv = PV(pv_out_name)
         image_data_pv = PV(pv_img_data_name)
@@ -495,9 +558,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 continue
 
             otr_id = screen_name.replace('OTR', '')
-            hpixel, vpixel = self.get_pixel_calibrations(otr_id)
+            hpixel, vpixel = self.get_pixel_calibrations(screen_pv_name)
             status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
-            image = self.acquire_otr_image(otr_id)
+            image = self.acquire_otr_image(screen_pv_name)
             x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel)
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
@@ -752,10 +815,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             raise ValueError("len(names) != len(values) in set_sextupoles")
         for name, value in zip(names, values):
             self._pv_put(f"{name}:currentWrite", float(value))
-            self._wait_for_corrector_readback(name, value)
+            self._wait_for_magnet_readback(name, value)
 
-    def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
-        readback_pv = PV(f'{corrector}:currentRead')
+    def _wait_for_magnet_readback(self, magnet, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
+        readback_pv = PV(f'{magnet}:currentRead')
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
@@ -767,7 +830,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 return True
             time.sleep(poll_interval)
         print(
-            f'Warning: {corrector}:currentRead did not reach target {float(target):.6g} '
+            f'Warning: {magnet}:currentRead did not reach target {float(target):.6g} '
             f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
         )
         return False
@@ -782,7 +845,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for corrector, corr_val in zip(names, corr_vals):
             pv_des = PV(f'{corrector}:currentWrite')
             pv_des.put(corr_val)
-            self._wait_for_corrector_readback(corrector, corr_val)
+            self._wait_for_magnet_readback(corrector, corr_val)
 
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -796,7 +859,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             curr_val = self.make_safe_float(pv_des.get(), default=np.nan)
             target = curr_val + float(corr_val)
             pv_des.put(target)
-            self._wait_for_corrector_readback(corrector, target)
+            self._wait_for_magnet_readback(corrector, target)
 
 
     '''
@@ -846,6 +909,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         }
 
     def apply_qmag_current(self, names, currents):
+        # cannot be used as se_quadrupoles, because it adds up values,
+        # wouldn't be suitable for a scan
         if type(currents) is float:
             currents = np.array([currents])
         if type(names) == str:

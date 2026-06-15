@@ -1008,6 +1008,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
             self.log_console=LogConsole(self)
         self.log_console.log(line)
 
+
 if __name__ == "__main__":
 
     app = QApplication(sys.argv)

@@ -1,4 +1,4 @@
-from State import State
+from Backend.State import State
 from datetime import datetime
 from collections import deque
 
@@ -486,7 +486,7 @@ class MainWindow(QMainWindow):
 
         self.cwd = os.getcwd()
         self.interface = interface
-        bpms_list = self.interface.get_bpms_names()
+        bpms_list = self.interface.get_bpms()["names"]
         correctors = self.interface.get_correctors()
         correctors_list = correctors["names"]
 

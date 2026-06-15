@@ -422,17 +422,17 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             completed = False
             try:
                 if sextupoles_to_disable:
-                    #self._start_correction()
+                    self._start_correction()
 
-                    self.interface.set_sextupoles(sextupoles["names"], np.zeros(len(sextupoles["names"]), dtype=float))
-                    self.log("Sextupoles disabled before BBA")
-                    self._start_correction(silent=True)
-                    golden_state = self.interface.get_state()
-                    golden_state = self._apply_jitter_subtraction_to_state(golden_state)
-                    self.log("BBA finished with sextupoles off. Stored this orbit as the post-BBA reference.")
-                    self.sextupole_restoration_history = self._restore_sextupoles_one_by_one_with_orbit_correction(saved_state, golden_state, orbit_iters=30)
-                    self._show_sextupole_restoration_popup()
-                    QMessageBox.information(self, "Correction", "BBA and sextupole restoration finished.")
+                    # self.interface.set_sextupoles(sextupoles["names"], np.zeros(len(sextupoles["names"]), dtype=float))
+                    # self.log("Sextupoles disabled before BBA")
+                    # self._start_correction(silent=True)
+                    # golden_state = self.interface.get_state()
+                    # golden_state = self._apply_jitter_subtraction_to_state(golden_state)
+                    # self.log("BBA finished with sextupoles off. Stored this orbit as the post-BBA reference.")
+                    # self.sextupole_restoration_history = self._restore_sextupoles_one_by_one_with_orbit_correction(saved_state, golden_state, orbit_iters=30)
+                    # self._show_sextupole_restoration_popup()
+                    # QMessageBox.information(self, "Correction", "BBA and sextupole restoration finished.")
                 else:
                     self._start_correction()
                 completed = True
@@ -810,7 +810,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 UNCOMMENT AFTER SANITY CHECKS 
                 '''
    
-                if it == 0: # instead of golden orbit, correct from current orbit
+                if it == 0: # instead of golden orbit, correct from current orbit -- is it okay, if a machine is not well corrected?
                     B0x = O0x
                     B0y = O0y
 
@@ -820,18 +820,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     B0y=O0y.copy()
                     self.reset_ref_orb=False
                     self.log("Reference orbit reset to current orbit")
-
-                # # COMMENT AFTER SANITY CHECKS
-                if it == 0:
-                    if self.nominal_state is not None:
-                        # nominal_state = self._apply_jitter_subtraction_to_state(self.nominal_state)
-                        # nominal_orbit = nominal_state.get_orbit(bpms)
-                        nominal_orbit = self.nominal_state.get_orbit(bpms)
-                        B0x = np.asarray(nominal_orbit["x"], dtype=float).reshape(-1, 1)
-                        B0y = np.asarray(nominal_orbit["y"], dtype=float).reshape(-1, 1)
-                    else:
-                        B0x = O0x.copy()
-                        B0y = O0y.copy()
 
                 # dfs
                 if w2>0:

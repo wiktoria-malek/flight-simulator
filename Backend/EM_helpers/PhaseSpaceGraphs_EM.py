@@ -302,10 +302,7 @@ class PhaseSpaces(QDialog):
                 transport = get_transport(reference_screen=reference_screen, screens=screens)
 
         if not isinstance(transport, dict):
-            self.plot_from_result(
-                result,
-                reference_name=session.get("reference_screen", session.get("quad_name", "fitted scan reference")),
-            )
+            self.plot_from_result(result, reference_name=session.get("reference_screen", session.get("quad_name", "fitted scan reference")))
             return
 
         sigx = np.asarray(session.get("sigx_mean", []), dtype=float)
