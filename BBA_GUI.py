@@ -838,7 +838,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     Dx = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1,1)
                     Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1,1)
                     plt.clf()
-                    plt.plot(Dx, label='nominal')
+                    plt.plot(Dx, label="target dispersion")
                 else:
                     O1x=O1y=None
                     Dx=Dy=None
@@ -899,7 +899,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     By.append(wgt_orb*(O0y-B0y))
 
                 if w2>0 and O1x is not None:
-                    plt.plot((O1x-O0x), label='measured')
+                    plt.plot((O1x-O0x), label="measured")
+                    plt.xlabel("BPM index")
+                    plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
+                    plt.title("DFS: measured orbit difference vs target dispersion")
+                    plt.legend()
+                    plt.grid(True, alpha=0.3)
                     plt.show()
                     Bx.append(wgt_dfs*((O1x-O0x) - Dx))
                     By.append(wgt_dfs*((O1y-O0y) - Dy))

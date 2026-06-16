@@ -446,8 +446,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             tilt_list.append(tilt)
             sum_list.append(sumw)
 
-            nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(
-                m[:, 0]) > 0 else 1  # ceil rounds up, so it can take the whole range
+            nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(m[:, 0]) > 0 else 1  # ceil rounds up, so it can take the whole range
             ny = int(np.ceil(np.ptp(m[:, 1]) / vpixel)) if np.ptp(m[:, 1]) > 0 else 1
             nx = int(np.clip(nx, 10, 400))
             ny = int(np.clip(ny, 10, 400))

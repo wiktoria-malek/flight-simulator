@@ -69,6 +69,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.plot_singular_values_button.clicked.connect(self._plot_singular_values)
         self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
         self.load_bpms_button.clicked.connect(self.__load_bpms_button_clicked)
+        self.hcorrector_prefixes=("zh", "zx")
+        self.vcorrector_prefixes=("zv")
 
         layout = self.plot_widget.layout()
         if layout is None:
@@ -196,6 +198,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
         self.bpms_list.clear()
         self.bpms_list.addItems([str(b) for b in self.bpms])
+
+
+    def _is_h_corrector(self, s):
+        name=str(s).lower()
+        return name.startswith(self.hcorrector_prefixes)
+
+    def _is_v_corrector(self, s):
+        name=str(s).lower()
+        return name.startswith(self.vcorrector_prefixes)
 
     def _quadrupole_movers_from_datafiles(self, datafiles):
         pattern = re.compile(r"DATA_(.+)_(p|m)(\d+)\.pkl$")
