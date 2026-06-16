@@ -10,13 +10,17 @@ except ImportError:
 class QM_mode_helpers:
 
     def _setup_qm_controls(self):
-        row_mode = QHBoxLayout()
-        row_mode.addWidget(QLabel("Actuator mode"))
-        self.actuator_mode_combo = QComboBox(self)
+        # row_mode = QHBoxLayout()
+        # row_mode.addWidget(QLabel("Actuator mode"))
+        #self.actuator_mode_combo = QComboBox(self)
+        # actuator_mode_cls = self.actuator_mode.__class__
+        # self.actuator_mode_combo.addItems([actuator_mode_cls.Kicker.value, actuator_mode_cls.QM.value])
+        # row_mode.addWidget(self.actuator_mode_combo)
+        # self.verticalLayout_3.insertLayout(0, row_mode)
         actuator_mode_cls = self.actuator_mode.__class__
-        self.actuator_mode_combo.addItems([actuator_mode_cls.Kicker.value, actuator_mode_cls.QM.value])
-        row_mode.addWidget(self.actuator_mode_combo)
-        self.verticalLayout_3.insertLayout(0, row_mode)
+        #self.actuator_mode_combo.clear()
+        #self.actuator_mode_combo.addItems([actuator_mode_cls.Kicker.value, actuator_mode_cls.QM.value])
+        #self.actuator_mode_combo.setCurrentText(self.actuator_mode.value)
         self.correctors_list.itemSelectionChanged.connect(self._refresh_specific_bpm_candidates)
         self.specific_bpm_row = QWidget(self)
         row_specific = QHBoxLayout(self.specific_bpm_row)
@@ -28,7 +32,7 @@ class QM_mode_helpers:
         self.verticalLayout_3.insertWidget(4, self.specific_bpm_row)
         self.specific_bpm_row.setFixedHeight(self.specific_bpm_row.sizeHint().height())
 
-        self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
+        #self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
         self.bpms_list.itemSelectionChanged.connect(self._refresh_specific_bpm_candidates)
         self._refresh_specific_bpm_candidates()
 

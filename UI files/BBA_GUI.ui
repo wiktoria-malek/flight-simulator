@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1453</width>
-    <height>916</height>
+    <width>1512</width>
+    <height>909</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -436,6 +436,72 @@ QToolButton#triangular_tooltip:hover {
                </item>
                <item>
                 <spacer name="triangular_right_spacer">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeType">
+                  <enum>QSizePolicy::Expanding</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="actuator_mode_layout">
+               <item>
+                <spacer name="actuator_mode_left_spacer">
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                 <property name="sizeType">
+                  <enum>QSizePolicy::Expanding</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>40</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item>
+                <widget class="QLabel" name="actuator_mode_label">
+                 <property name="text">
+                  <string>Actuator type</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QComboBox" name="actuator_mode_combo">
+                 <property name="minimumSize">
+                  <size>
+                   <width>160</width>
+                   <height>0</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;Select which devices are used as BBA actuators.&lt;/p&gt;&lt;p&gt;Correctors use steering magnets. Quadrupole movers mode uses quadrupole mover offsets, if supported by the selected interface.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <item>
+                  <property name="text">
+                   <string>Correctors</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>Quadrupole movers</string>
+                  </property>
+                 </item>
+                </widget>
+               </item>
+               <item>
+                <spacer name="actuator_mode_right_spacer">
                  <property name="orientation">
                   <enum>Qt::Horizontal</enum>
                  </property>
@@ -968,6 +1034,31 @@ QGroupBox#groupBox::title {
                        </property>
                       </widget>
                      </item>
+                     <item>
+                      <widget class="QToolButton" name="orbit_weight_tooltip">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Weight of the orbit residual in the correction. &lt;/p&gt;&lt;p&gt;Higher value makes the algorithm prioritize matching the reference orbit, which is the initial, sarting orbit. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#orbit_weight_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#orbit_weight_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
+                       </property>
+                      </widget>
+                     </item>
                     </layout>
                    </item>
                    <item>
@@ -1001,6 +1092,31 @@ QGroupBox#groupBox::title {
                        </property>
                       </widget>
                      </item>
+                     <item>
+                      <widget class="QToolButton" name="dispersion_weight_tooltip">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Weight of the DFS term. &lt;/p&gt;&lt;p&gt;Higher value makes the correction prioritize reducing residual dispersion. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#dispersion_weight_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#dispersion_weight_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
+                       </property>
+                      </widget>
+                     </item>
                     </layout>
                    </item>
                    <item>
@@ -1031,6 +1147,31 @@ QGroupBox#groupBox::title {
                          <horstretch>0</horstretch>
                          <verstretch>0</verstretch>
                         </sizepolicy>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QToolButton" name="wakefield_weight_tooltip">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Weight of the WFS term. &lt;/p&gt;&lt;p&gt;Higher value makes the correction prioritize reducing intensity-dependent orbit changes. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#wakefield_weight_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#wakefield_weight_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
                        </property>
                       </widget>
                      </item>
@@ -1085,7 +1226,7 @@ QGroupBox#groupBox::title {
                         <enum>Qt::NoFocus</enum>
                        </property>
                        <property name="toolTip">
-                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;PINV tolerance sets the pseudoinverse cutoff. Smaller values keep more modes and give stronger but noisier correction. Larger values remove weak modes, making correction more stable but sometimes weaker.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;PINV tolerance sets the pseudoinverse cutoff. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Smaller values&lt;/span&gt; keep &lt;span style=&quot; font-weight:600;&quot;&gt;more modes&lt;/span&gt; and give &lt;span style=&quot; font-weight:600;&quot;&gt;stronger but noisier correction&lt;/span&gt;. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Larger values&lt;/span&gt; remove &lt;span style=&quot; font-weight:600;&quot;&gt;weak modes&lt;/span&gt;, making &lt;span style=&quot; font-weight:600;&quot;&gt;correction more stable but sometimes weaker&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                        </property>
                        <property name="styleSheet">
                         <string notr="true">QToolButton#pinv_tooltip {
@@ -1143,6 +1284,31 @@ QToolButton#pinv_tooltip:hover {
                        </property>
                       </widget>
                      </item>
+                     <item>
+                      <widget class="QToolButton" name="n_iterations_tooltip">
+                       <property name="toolTip">
+                        <string>Number of correction iterations to run.</string>
+                       </property>
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#n_iterations_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#n_iterations_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
+                       </property>
+                      </widget>
+                     </item>
                     </layout>
                    </item>
                    <item>
@@ -1173,6 +1339,31 @@ QToolButton#pinv_tooltip:hover {
                          <horstretch>0</horstretch>
                          <verstretch>0</verstretch>
                         </sizepolicy>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QToolButton" name="gain_tooltip">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fraction of the &lt;span style=&quot; font-weight:600;&quot;&gt;computed correction &lt;/span&gt;applied at each iteration. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Lower gain is safer&lt;/span&gt;; higher gain is faster but can overshoot.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#gain_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#gain_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
                        </property>
                       </widget>
                      </item>
@@ -1233,7 +1424,7 @@ QToolButton#pinv_tooltip:hover {
                         <enum>Qt::NoFocus</enum>
                        </property>
                        <property name="toolTip">
-                        <string>Regularization parameter. If beta &gt; 0, the solver uses (A^T A + beta I)^-1 to stabilize the correction.</string>
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Tikhonov regularization strength. &lt;/p&gt;&lt;p&gt;If beta &amp;gt; 0, the solver uses (A^T A + beta I)^-1 to stabilize the correction.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Use &lt;span style=&quot; font-weight:600;&quot;&gt;0 for standard pseudo-inverse.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Increase&lt;/span&gt; it to &lt;span style=&quot; font-weight:600;&quot;&gt;make the solution smoother and less sensitive to noise&lt;/span&gt;. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                        </property>
                        <property name="styleSheet">
                         <string notr="true">QToolButton#beta_tooltip {
@@ -1319,9 +1510,6 @@ QToolButton#jitter_subtraction_tooltip:hover {
                       </widget>
                      </item>
                     </layout>
-                   </item>
-                   <item>
-                    <layout class="QVBoxLayout" name="verticalLayout_6"/>
                    </item>
                    <item>
                     <widget class="QCheckBox" name="disable_sextupoles_button">
@@ -1483,6 +1671,31 @@ QGroupBox#current_groupbox_right::title {
                          <widget class="QDoubleSpinBox" name="max_vertical_current_spinbox">
                           <property name="singleStep">
                            <double>0.010000000000000</double>
+                          </property>
+                         </widget>
+                        </item>
+                        <item>
+                         <widget class="QToolButton" name="max_strength_tooltip">
+                          <property name="toolTip">
+                           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Maximum allowed corrector strength during correction. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Computed corrections are clipped to these limits.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                          </property>
+                          <property name="styleSheet">
+                           <string notr="true">QToolButton#max_strength_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#max_strength_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                          </property>
+                          <property name="text">
+                           <string>?</string>
                           </property>
                          </widget>
                         </item>

@@ -4,13 +4,13 @@ import numpy as np
 try:
     from PyQt6 import uic
     from PyQt6.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt6.QtWidgets import (QGroupBox, QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
+    from PyQt6.QtWidgets import (QGroupBox, QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout)
     from PyQt6.QtGui import QPainter, QPixmap, QPalette
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt,QProcess,QProcessEnvironment
-    from PyQt5.QtWidgets import (QGroupBox, QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout, QComboBox)
+    from PyQt5.QtWidgets import (QGroupBox, QApplication, QRadioButton,QSizePolicy, QMainWindow, QFileDialog, QListWidget, QListWidgetItem,QMessageBox,QProgressDialog, QVBoxLayout, QPushButton, QDialog, QLabel,QStyledItemDelegate, QWidget, QHBoxLayout)
     from PyQt5.QtGui import QPainter, QPixmap, QPalette
     pyqt_version = 5
 matplotlib.use("QtAgg")
@@ -152,6 +152,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.jitter_model = None
         self.subtract_jitter_checkbox.setChecked(False)
         self.actuator_mode = ActuatorMode.Kicker
+        self._setup_actuator_mode_combo()
+
+    def _setup_actuator_mode_combo(self):
+        self.actuator_mode_combo.blockSignals(True)
+        self.actuator_mode_combo.setCurrentText(self.actuator_mode.value)
+        self.actuator_mode_combo.blockSignals(False)
+
+        self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
         self.pushButton_11.clicked.connect(self.load_session_settings)
         self.sextupole_restoration_button.clicked.connect(self._show_sextupole_restoration_popup)
         if hasattr(self.interface, "get_quadrupoles"):
@@ -220,6 +228,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             widget.setEnabled(not is_qm)
 
     def _on_actuator_mode_changed(self, text):
+        if text not in [mode.value for mode in ActuatorMode]:
+            return
+        self.actuator_mode = ActuatorMode(text)
+        if not hasattr(self, "specific_bpm_row"):
+            return
         self.actuator_mode = ActuatorMode(text)
         self._refresh_corrector_list()
         self._update_qm_widgets_visibility()
