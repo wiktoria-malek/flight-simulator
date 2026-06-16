@@ -1,7 +1,7 @@
 from datetime import datetime
 import numpy as np
 from Backend.SaveOrLoad import SaveOrLoad
-import time, sys, os,matplotlib
+import time, sys, os, matplotlib, fnmatch, re
 try:
     from PyQt6 import uic
     from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox
@@ -485,27 +485,23 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self._refresh_actuator_labels()
         self.hcorrector_names = set(map(str, self.interface.get_hcorrectors_names() or [])) # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
         self.vcorrector_names = set(map(str, self.interface.get_vcorrectors_names() or []))
-        self.select_h_corrs_checkbox.setChecked(False)
-        self.select_v_corrs_checkbox.setChecked(False)
-        self.select_h_corrs_checkbox.stateChanged.connect(self._apply_corrector_checkbox_selection)
-        self.select_v_corrs_checkbox.stateChanged.connect(self._apply_corrector_checkbox_selection)
+        self.pattern_corrs_input.setPlaceholderText("e.g. ZH*, ZV*, IP*")
+        self.pattern_corrs_input.textChanged.connect(self.pattern_matching)
 
     def _is_h_corrector(self, s):
         return str(s) in self.hcorrector_names
     def _is_v_corrector(self, s):
         return str(s) in self.vcorrector_names
 
-    def pattern_matching(self, correctors_items):
-        is_h_checked = bool(self.select_h_corrs_checkbox.isChecked())
-        is_v_checked = bool(self.select_v_corrs_checkbox.isChecked())
-        for item in correctors_items:
-            name = item.text()
-            if self._is_h_corrector(name) and is_h_checked:
-                item.setSelected(True)
-            elif self._is_v_corrector(name) and is_v_checked:
-                item.setSelected(True)
-            else:
-                item.setSelected(False)
+    def pattern_matching(self, pattern):
+        pattern_wanted = self.pattern_corrs_input.text().strip()
+        if not pattern_wanted:
+            return
+        multiple_patterns = [p.strip() for p in re.split(r"[,;\s]+", pattern_wanted) if p.strip()]
+        for i in range(self.correctors_list.count()):
+            item = self.correctors_list.item(i)
+            name=item.text()
+            item.setSelected(any(fnmatch.fnmatchcase(name, pattern) for pattern in multiple_patterns))
 
     def _apply_corrector_checkbox_selection(self):
         if self.actuator_mode == ActuatorMode.QM:
@@ -600,8 +596,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self.initial_vkick_settings.setText(str(self.sysid_kick))
             self.excursion_label.setText(f"Target orbit excursion ({self.bpm_unit})")
             self.choose_mode.setEnabled(True)
-            self.select_h_corrs_checkbox.setEnabled(True)
-            self.select_v_corrs_checkbox.setEnabled(True)
 
     def _on_actuator_mode_changed(self, text):
         self.actuator_mode = ActuatorMode(text)
