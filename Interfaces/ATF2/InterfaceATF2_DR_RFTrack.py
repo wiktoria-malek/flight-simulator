@@ -14,6 +14,8 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.log = print
         self.twiss_path=os.path.join(os.path.dirname(__file__),'DR_ATF2','ATF_DR_twiss_file.tws')
         self.lattice = rft.Lattice(self.twiss_path)
+        for rf in self.lattice.get_rf_elements():
+            rf.replace_with(rft.Drift(rf.get_length()))
         for i,q in enumerate(self.lattice.get_quadrupoles()):
             if i%3 == 0:
                 cx, cy = rft.Corrector(), rft.Corrector()
@@ -163,9 +165,9 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.lattice.track(B0_offset)
         I=B0_offset.get_info()
         self.log("Emittance after tracking:")
-        self.log(f"εx = {I.emitt_x}[mm.rad]")
-        self.log(f"εy = {I.emitt_y}[mm.rad]")
-        self.log(f"εz = {I.emitt_z}[mm.permille]")
+        self.log(f"εx = {I.emitt_x} [mm.mrad]")
+        self.log(f"εy = {I.emitt_y} [mm.mrad]")
+        self.log(f"εz = {I.emitt_z} [mm.permille]")
 
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
