@@ -323,6 +323,11 @@ class Worker(QObject):
 
                 Diff_x = (Op['x'] - Om['x']) / 2.0
                 Diff_y = (Op['y'] - Om['y']) / 2.0
+
+                print("last bpms:", self.bpms[-10:])
+                print("last Diff_x:", Diff_x[-10:])
+                print("last Diff_y:", Diff_y[-10:])
+
                 nsamples = max(1, int(np.asarray(Op['stdx']).size))
                 Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
@@ -478,6 +483,12 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.initial_vkick_settings.setText(str(self.sysid_kick))
         self._set_directory_edit_enabled(True)
         self._refresh_actuator_labels()
+        self.select_h_corrs_checkbox.setChecked(False)
+        self.select_v_corrs_checkbox.setChecked(False)
+
+    def pattern_matching(self):
+        pass
+
 
     def _load_logo(self):
         self.logo_label.setText("")

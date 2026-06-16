@@ -87,6 +87,8 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         #     'ZX50T', 'ML106T', 'ZX50T', 'ML7T', 'ZX51T', 'ZV50T', 'ML8T', 'ZH50T',
         #     'ZV51T', 'ML9T', 'MB10T', 'MB11T'
         # ]'''
+        self.sequence=list(LINAC_SEQUENCE)
+        self.monitors=list(LINAC_MONITORS)
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         # monitors = [

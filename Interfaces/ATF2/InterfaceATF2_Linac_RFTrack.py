@@ -222,6 +222,14 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
             ('CA16L', 76.73305000000002, 'TW'),
         ]
 
+        corrector_specifics = [
+            ("ZH1L", 1.356), ("ZV1L", 1.356),
+            ("ZH2L", 1.703), ("ZV2L", 1.703),
+            ("ZH3L", 2.128), ("ZV3L", 2.128),
+            ("ZH4L", 4.774), ("ZV4L", 4.774),
+            ("ZH5L", 5.171), ("ZV5L", 5.171),
+        ]
+
         actions = []
 
         for name, length, pos, k1 in quad_specifics:
@@ -255,6 +263,14 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
                 }
             )
 
+        for name, pos in corrector_specifics:
+            actions.append({
+                "element_type": "corrector",
+                "position": pos,
+                "name": name,
+                "length": 0.0,
+            })
+
         actions.sort(key = lambda item: item['position'])
 
         drift_id = 1
@@ -268,6 +284,12 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
                 quadrupole = rft.Quadrupole(item['length'], P_Q, item['k1'])
                 self._set_name(quadrupole, item['name'])
                 lattice.append(quadrupole)
+
+            elif item['element_type'] == 'corrector':
+                corrector = rft.Corrector()
+                self._set_name(corrector, item['name'])
+                lattice.append(corrector)
+
             else:
                 if item['ctype'] == 'TW':
                     cavity = self._make_tw(item['name'])
