@@ -579,7 +579,7 @@ if __name__ == "__main__":
 
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     dir_name = os.path.expanduser(
-        f"~/CERN-Flight_Simulator-Data/EM_{project_name}_{time_str}"
+        f"~/CERN-Flight_Simulator-Data/EM_{project_name}{time_str}"
     )
 
     w = MainWindow(interface, dir_name)
