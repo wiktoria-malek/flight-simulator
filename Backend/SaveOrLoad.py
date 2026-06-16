@@ -138,7 +138,7 @@ class SaveOrLoad():
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
-        save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}_{time_str}_session_settings")
+        save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
 
         self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors",
@@ -335,7 +335,7 @@ class SaveOrLoad():
     def save_emittance_measurement_session(self,session):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir=os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
-        save_session_dir=os.path.join(default_dir, f"EmittanceMeasurement_{self.interface.get_name()}_{time_str}_session")
+        save_session_dir=os.path.join(default_dir, f"EmittanceMeasurement_{self.interface.get_name()}{time_str}_session")
         os.makedirs(save_session_dir, exist_ok=True)
 
         self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt",saving_name="Save quadrupoles",use_dialog=False, base_dir=save_session_dir)
@@ -378,7 +378,7 @@ class SaveOrLoad():
     def save_session_settings_qm_correction(self, w1, w2, w3, specific_bpm, rcond, iters, gain, beta, max_horizontal_range, max_vertical_range, is_triangular, bpm_weights, response, is_jitter_subtraction_checked):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
-        save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}_{time_str}_QM_session_settings")
+        save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_QM_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
         self._saving_func(elements_list=self.correctors_list, filename="quadrupole_movers.txt", saving_name="Save Quadrupole Movers", use_dialog=False, base_dir=save_session_dir)
         self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs", use_dialog=False, base_dir=save_session_dir)

@@ -1296,7 +1296,7 @@ if __name__ == "__main__":
 
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dir_name = f"~/CERN-Flight_Simulator-Data/BBA_{I.get_name()}_{time_str}_session_settings"
+    dir_name = f"~/CERN-Flight_Simulator-Data/BBA_{I.get_name()}{time_str}_session_settings"
     dir_name = os.path.expanduser(os.path.expandvars(dir_name))
     w = MainWindow(interface=I, dir_name=dir_name,nominal_state=nominal_state,start_state=start_state)
 
