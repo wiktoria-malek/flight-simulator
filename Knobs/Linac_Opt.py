@@ -1394,13 +1394,13 @@ class OptimizationWorker(QThread):
         candidates = np.unique(np.array(scan_values, dtype=float))
         candidates.sort()
 
-        self.log_signal.emit(f"[BO-1D] Optimizing {device_label} ({pv_name}) on {len(candidates)} candidates ...")
-
         # Sequential method selection (user request):
         # - In SEQUENTIAL mode, allow choosing BO or discrete ternary search (unimodal assumption).
         # - In GROUP modes, always use BO.
         seq_method = str(self.config.get("seq_method", "BO")).upper()
         method = seq_method if str(mode).upper() == "SEQUENTIAL" else "BO"
+        log_method = "TERNARY-1D" if method in ("TERNARY", "TERNARY_SEARCH", "BINARY", "BINARY_SEARCH") else "BO-1D"
+        self.log_signal.emit(f"[{log_method}] Optimizing {device_label} ({pv_name}) on {len(candidates)} candidates ...")
 
         # Config knobs (reasonable defaults)
         min_init = int(self.config.get("bo_min_init", 5))  # initial evaluations
