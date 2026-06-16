@@ -2606,40 +2606,40 @@ files = [
 
 [[package]]
 name = "rf-track"
-version = "2.5.5"
+version = "2.5.6"
 description = "The CERN tracking code RF-Track"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "rf_track-2.5.5-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:da10c821feb1579f652e7d52e41f15b5947fc2273312a3930b346ea542ed95d7"},
-    {file = "rf_track-2.5.5-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:8fabc0a60cf7a19323ed4f6b86a5e5e65e178ea8da02a689d52b5d2b637a1248"},
-    {file = "rf_track-2.5.5-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:7faaade4b2a7ea818ba31a32f2b6ae4e3b13928cf29b02bdf5d44c2172bea87a"},
-    {file = "rf_track-2.5.5-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bee709e91fedeb81572d907d57c90850a38dbeb0bf4c8898781624716247127b"},
-    {file = "rf_track-2.5.5-cp311-cp311-macosx_10_13_x86_64.whl", hash = "sha256:b5dd3071a8183904d264ba8bd07b26ea1e3b4b42b7ad227a1ec668ee30bb5488"},
-    {file = "rf_track-2.5.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:82cfe5bc3a3955f23a06c4fc556e6dca382ae1761a8cd151036e5b93f163b2bd"},
-    {file = "rf_track-2.5.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:be11bf07e74ba45268f4b1253c725ad5fd62cd485e0f4681372d504ec4123dd2"},
-    {file = "rf_track-2.5.5-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:7d69ed019f25e110eb6b526ae3495216ecedf05c7f7eac4c2ec34472bffdecd7"},
-    {file = "rf_track-2.5.5-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:ba7d98f3a2d1f2cd75894e5c54015254456c8551ccbe495d737fa05f475ac184"},
-    {file = "rf_track-2.5.5-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:39f010d9fe2e6f006f2c8f11aad2b2bb9af443fa2bb8f871dcfa603176250905"},
-    {file = "rf_track-2.5.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2c32b3af1d20af3f80f9baf8dd0a0064f8a8eec3b6f6f7b74c3a378d9810cb8a"},
-    {file = "rf_track-2.5.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3c7f20eb56417f1f6097cadc55a6136a7b944ab803cbeeacde01d2f3f58ca065"},
-    {file = "rf_track-2.5.5-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:a67cc6f3567c4b9a04e98cdeaf8c6de1885bf8024e841872fee688ad583c7a89"},
-    {file = "rf_track-2.5.5-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:0c44d3a0ad8c74b563ea124b119eccd7140df088b4909d359f055f5f3a09b2fb"},
-    {file = "rf_track-2.5.5-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:d789352a18149c2cfafe4172d993dfda447f36d4404561d36505224f2d48fd97"},
-    {file = "rf_track-2.5.5-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b8f890b4853f97ced62261709c577ea475f75b32666e4b94ac05fa6a60c9c582"},
-    {file = "rf_track-2.5.5-cp314-cp314-macosx_10_13_x86_64.whl", hash = "sha256:d2bf25cfa4511018ea6cf705106653fcad74e3d311c9c3006ebcef8e17313657"},
-    {file = "rf_track-2.5.5-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:0d9da674c625e33f74778ce7b582a4257898fb0ae3138a76e5dfa2151b256c15"},
-    {file = "rf_track-2.5.5-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:13fed59e3224cd9c4b3e5219f4e04210be5ee6dd18fac674927565937e2f64c2"},
-    {file = "rf_track-2.5.5-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:8a3d2dbd71a1c09874fda7176b3c1344bf9ddcb74a3ff69654d953f62e12439a"},
-    {file = "rf_track-2.5.5-cp38-cp38-macosx_10_13_x86_64.whl", hash = "sha256:0b16513364c57797d73eb78bad26de60eab5ce56458b6b971c2a4464cb446075"},
-    {file = "rf_track-2.5.5-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:b498e45e454eef66e4911162babdd4848386ea05ee65204d32a65ef13e4170a9"},
-    {file = "rf_track-2.5.5-cp38-cp38-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:5a9e50f9cc0be351811acd3bd46c002ccbb8abfd09b82f7497a131a7a1764fae"},
-    {file = "rf_track-2.5.5-cp38-cp38-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2e105699c2c030e811e38326a9635bdee3a65d324e465f1bd67b230081075fbf"},
-    {file = "rf_track-2.5.5-cp39-cp39-macosx_10_13_x86_64.whl", hash = "sha256:0f4ec9652a4c55036be7e2a0e7acadd4152ef6d2dd5ea778af6028a823f16c89"},
-    {file = "rf_track-2.5.5-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:a4923fdd16d724625353b22bab25fbcc3f31ac530c5db6cd1b39ee71b3dd1da3"},
-    {file = "rf_track-2.5.5-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:cab8d70396ff824616b2194c2a5e1ea7b135923b6153d919bf468050e9dde863"},
-    {file = "rf_track-2.5.5-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f45497cd8896b3252987fccbb86e4b81bf3df832aeddaf5770b85ae06d85a83c"},
+    {file = "rf_track-2.5.6-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:e2495c17b8b44ab383d68996e92b7ae564611c25ed66b424df94bc07287f8cdc"},
+    {file = "rf_track-2.5.6-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:7730c01ea1acd4093fd7e5ba4627107f1753cca94acc53a99bb77be859781fb6"},
+    {file = "rf_track-2.5.6-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:163b374afa86d5de36cda1cc4da36cb0c502cdf8c9eb827c69ad103154188e44"},
+    {file = "rf_track-2.5.6-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2fe3f41b7af4ed039cadcd9273d6486e02fa2772f46abb9ec29ab629b9ac433a"},
+    {file = "rf_track-2.5.6-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:151817154e79887959c68ad6efe53d51d8fa88560c1c650402237b399827e7e5"},
+    {file = "rf_track-2.5.6-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:487997fd81164b33b980a9bdaf709b463e22548d5e81a02504f33f91735cece1"},
+    {file = "rf_track-2.5.6-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b092e011731aef1fb6e0c38a36c24d07dcfe7fa17f73c604cdc2a05b5fbfa9e4"},
+    {file = "rf_track-2.5.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ebe3ceea2073fa2da0d23adcf01a189c8c18dacda016afb6628d3958ff95a43c"},
+    {file = "rf_track-2.5.6-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:5fe7211ef70789ededb7e6abe153092775abeb912d2b09bc60e812ae8d8dacb0"},
+    {file = "rf_track-2.5.6-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:a95d4fc3456459bae6560d6f4c8d7403dad0cc912630a22fe9f43be6b583cb8d"},
+    {file = "rf_track-2.5.6-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:901b4ee3411a8d7a6d0ada0c07856e6ccbc35a033520fe8d4e28ed6028e9b9c9"},
+    {file = "rf_track-2.5.6-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:61865cea9c5f46d329edb5b717f1fba081cf677e0dbe6879f3eca4aca072fd37"},
+    {file = "rf_track-2.5.6-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:655b225e5e2d36d8b77e6a28446c0988787339eefdfc4a86cbf2a8fb5fdd812d"},
+    {file = "rf_track-2.5.6-cp313-cp313-macosx_11_0_x86_64.whl", hash = "sha256:b4fa604c93c450bef9cb40c2b298c0cb0318cf1a214a232c0b453a930b80eed5"},
+    {file = "rf_track-2.5.6-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c7d61f7e1c817be0d1abcb1e54addd6cf50fa8986d315bb1731704d73d590338"},
+    {file = "rf_track-2.5.6-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6408cfd896f4a269ba9e056d4bf57e3c8c70557def0f00daa022b8727f324ed6"},
+    {file = "rf_track-2.5.6-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:585c5108f13dc5126ea54bf4e27edd0dec23e27e0172814e40dc9d40a26ba1ce"},
+    {file = "rf_track-2.5.6-cp314-cp314-macosx_11_0_x86_64.whl", hash = "sha256:66abf320831f5844aedea0596805f10a735445f1999c89a73e7b3ccdbfed5f3e"},
+    {file = "rf_track-2.5.6-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:652209c69393aa42ef279e435dbf74e6ca4f06ee3c00b7492e06e8d7a239f5a0"},
+    {file = "rf_track-2.5.6-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6d80a5285ed188786465d763d5703f13b91a832a9d26ad4e19a3285ff1181188"},
+    {file = "rf_track-2.5.6-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:4abbe13c9869899c856bbfef103cf9139c8a495a559b28f2e35776ee728865eb"},
+    {file = "rf_track-2.5.6-cp38-cp38-macosx_11_0_x86_64.whl", hash = "sha256:563460598c550d5b79397cde696e7a4056c67215a762559fdd705def34a2e3ae"},
+    {file = "rf_track-2.5.6-cp38-cp38-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:42c0302641956dc5dc5fa70982075b13ae65c1925d84484dc9e5c9c5875a7f0d"},
+    {file = "rf_track-2.5.6-cp38-cp38-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5b5a8937e50c486b8eeef6484d9ceba8c5cfdce92af7977f6ac5cd2d659bb3f4"},
+    {file = "rf_track-2.5.6-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:b6a7ff7bce12476a194206da7cb4f2d811fc1a8db34fe1c4d38862221ef54de9"},
+    {file = "rf_track-2.5.6-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:443a7624bb454d2aba0c34c9020313574c74f06897306c735f7679dea3965b71"},
+    {file = "rf_track-2.5.6-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b9eaa91fae3b9dbd1d4d30ba2f1fafd1818bbfb39e3386aebc8c33424c313b5a"},
+    {file = "rf_track-2.5.6-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:697fcf4d5a19c465032e8daa8a3dd913fab0f5f90d003fee1fd78ee26b4cc7d5"},
 ]
 
 [package.dependencies]
@@ -3196,6 +3196,7 @@ optional = false
 python-versions = ">=3.11"
 groups = ["main"]
 files = [
+    {file = "xopt-3.0.0-py3-none-any.whl", hash = "sha256:dfd47a0aed6d59af96321dd176779a26edcc8c4a5d21bf8e42835337ef540867"},
     {file = "xopt-3.0.0.tar.gz", hash = "sha256:233b31faeeef4c9caea6d8eae388dff9487f578fecbd257031f7ae4b451ba490"},
 ]
 
@@ -3220,4 +3221,4 @@ doc = ["mkdocs", "mkdocs-jupyter", "mkdocs-macros-plugin", "mkdocs-material", "m
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "1aee22b95d25e650ebe1329f1c579ddfa4637448458b88d3ee0d892d6bb70d6a"
+content-hash = "a3b97e20f3bff298efbc868c87b883638aba514667f0d1c81f69df1c002d0ef6"
