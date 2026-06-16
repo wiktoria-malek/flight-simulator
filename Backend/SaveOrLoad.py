@@ -112,7 +112,7 @@ class SaveOrLoad():
         self._loading_func(loading_name="Load Screens", filename="screens.txt", elements_list=self.screens_list)
 
     def _pick_and_load_data_dir(self, button_ui, button_name, oper):
-        default_dir = f"~/flight-simulator-data/"
+        default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select data directory", default_dir)
@@ -136,7 +136,7 @@ class SaveOrLoad():
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By, is_jitter_subtraction_checked):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
-        default_dir = f"~/flight-simulator-data/"
+        default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}_{time_str}_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
@@ -195,7 +195,7 @@ class SaveOrLoad():
             pickle.dump(correction_matrices, f)
 
     def load_session_settings_quad_scan(self):
-        default_dir = f"~/flight-simulator-data/"
+        default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
@@ -228,7 +228,7 @@ class SaveOrLoad():
         if "nshots" in settings: self.meas_per_step.setValue(float(settings["nshots"]))
 
     def load_session_settings(self):
-        default_dir = f"~/flight-simulator-data/"
+        default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
@@ -334,7 +334,7 @@ class SaveOrLoad():
 
     def save_emittance_measurement_session(self,session):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
-        default_dir=os.path.expanduser(os.path.expandvars("~/flight-simulator-data/"))
+        default_dir=os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
         save_session_dir=os.path.join(default_dir, f"EmittanceMeasurement_{self.interface.get_name()}_{time_str}_session")
         os.makedirs(save_session_dir, exist_ok=True)
 
@@ -350,7 +350,7 @@ class SaveOrLoad():
 
 
     def load_emittance_measurement_session(self):
-        default_dir = os.path.expanduser(os.path.expandvars("~/flight-simulator-data/"))
+        default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
         os.makedirs(default_dir, exist_ok=True)
         folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
         if not folder:
@@ -377,7 +377,7 @@ class SaveOrLoad():
 
     def save_session_settings_qm_correction(self, w1, w2, w3, specific_bpm, rcond, iters, gain, beta, max_horizontal_range, max_vertical_range, is_triangular, bpm_weights, response, is_jitter_subtraction_checked):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
-        default_dir = os.path.expanduser(os.path.expandvars("~/flight-simulator-data/"))
+        default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
         save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}_{time_str}_QM_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
         self._saving_func(elements_list=self.correctors_list, filename="quadrupole_movers.txt", saving_name="Save Quadrupole Movers", use_dialog=False, base_dir=save_session_dir)
