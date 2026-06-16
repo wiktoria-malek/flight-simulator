@@ -390,7 +390,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.progressBar.setValue(value)
 
     def _update_folder_path(self):
-        base = os.path.expanduser(os.path.expandvars("~/flight-simulator-data"))
+        base = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data"))
         project_name=self.interface.get_name()
         mode=self.mode
         time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -791,7 +791,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
         self.mode_dirs={}
         project_name = self.interface.get_name()
-        base = os.path.expanduser(os.path.expandvars("~/flight-simulator-data"))
+        base = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data"))
 
         for mode in self.modes_to_do:
             if len(self.modes_to_do)==1:
@@ -1008,7 +1008,7 @@ print(f"Selected interface: {project_name}")
 ## Prepare project space
 #project_name = dialog.selected_interface_name
 time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-dir_name = f"~/flight-simulator-data/{project_name}_{time_str}"
+dir_name = f"~/CERN-Flight_Simulator-Data/{project_name}_{time_str}"
 dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
 ## Main Window

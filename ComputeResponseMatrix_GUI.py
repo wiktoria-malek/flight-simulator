@@ -344,7 +344,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             print_exception(e)
 
     def __save_as_button_clicked(self):
-        default_dir = f"~/flight-simulator-data/"
+        default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         dir_name = default_dir + '/response.pkl'
         os.chdir (self.cwd)
