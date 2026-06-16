@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1512</width>
-    <height>841</height>
+    <height>813</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -127,7 +127,7 @@ QGroupBox#correctorsGroup::title {
               <item>
                <widget class="QListWidget" name="correctors_list">
                 <property name="sizePolicy">
-                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                   <horstretch>0</horstretch>
                   <verstretch>0</verstretch>
                  </sizepolicy>
@@ -203,7 +203,7 @@ QGroupBox#bpmsGroup::title {
               <item>
                <widget class="QListWidget" name="bpms_list">
                 <property name="sizePolicy">
-                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                   <horstretch>0</horstretch>
                   <verstretch>0</verstretch>
                  </sizepolicy>
