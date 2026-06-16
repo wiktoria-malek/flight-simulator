@@ -14,6 +14,8 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.log = print
         self.twiss_path=os.path.join(os.path.dirname(__file__),'DR_ATF2','ATF_DR_twiss_file.tws')
         self.lattice = rft.Lattice(self.twiss_path)
+        for rf in self.lattice.get_rf_elements():
+            rf.replace_with(rft.Drift(rf.get_length()))
         for i,q in enumerate(self.lattice.get_quadrupoles()):
             if i%3 == 0:
                 cx, cy = rft.Corrector(), rft.Corrector()
