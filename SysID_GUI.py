@@ -483,12 +483,35 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.initial_vkick_settings.setText(str(self.sysid_kick))
         self._set_directory_edit_enabled(True)
         self._refresh_actuator_labels()
+        self.hcorrector_names = set(map(str, self.interface.get_hcorrectors_names() or [])) # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
+        self.vcorrector_names = set(map(str, self.interface.get_vcorrectors_names() or []))
         self.select_h_corrs_checkbox.setChecked(False)
         self.select_v_corrs_checkbox.setChecked(False)
+        self.select_h_corrs_checkbox.stateChanged.connect(self._apply_corrector_checkbox_selection)
+        self.select_v_corrs_checkbox.stateChanged.connect(self._apply_corrector_checkbox_selection)
 
-    def pattern_matching(self):
-        pass
+    def _is_h_corrector(self, s):
+        return str(s) in self.hcorrector_names
+    def _is_v_corrector(self, s):
+        return str(s) in self.vcorrector_names
 
+    def pattern_matching(self, correctors_items):
+        is_h_checked = bool(self.select_h_corrs_checkbox.isChecked())
+        is_v_checked = bool(self.select_v_corrs_checkbox.isChecked())
+        for item in correctors_items:
+            name = item.text()
+            if self._is_h_corrector(name) and is_h_checked:
+                item.setSelected(True)
+            elif self._is_v_corrector(name) and is_v_checked:
+                item.setSelected(True)
+            else:
+                item.setSelected(False)
+
+    def _apply_corrector_checkbox_selection(self):
+        if self.actuator_mode == ActuatorMode.QM:
+            return
+        items = [self.correctors_list.item(i) for i in range(self.correctors_list.count())]
+        self.pattern_matching(items)
 
     def _load_logo(self):
         self.logo_label.setText("")
@@ -539,6 +562,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         for name in selected:
             for item in self.correctors_list.findItems(name, Qt.MatchFlag.MatchExactly):
                 item.setSelected(True)
+        self._apply_corrector_checkbox_selection()
 
     def _refresh_actuator_labels(self):
         if self.actuator_mode == ActuatorMode.QM:
@@ -559,6 +583,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self.excursion_label.setText(f"Target orbit excursion ({self.bpm_unit})")
             self.choose_mode.setCurrentText(Mode.Orbit.value)
             self.choose_mode.setEnabled(False)
+            self.select_h_corrs_checkbox.setEnabled(False)
+            self.select_v_corrs_checkbox.setEnabled(False)
         else:
             self.correctorsGroup.setTitle("Correctors")
             self.initial_hkick_label.setText("Initial hkick")
@@ -574,6 +600,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self.initial_vkick_settings.setText(str(self.sysid_kick))
             self.excursion_label.setText(f"Target orbit excursion ({self.bpm_unit})")
             self.choose_mode.setEnabled(True)
+            self.select_h_corrs_checkbox.setEnabled(True)
+            self.select_v_corrs_checkbox.setEnabled(True)
 
     def _on_actuator_mode_changed(self, text):
         self.actuator_mode = ActuatorMode(text)
