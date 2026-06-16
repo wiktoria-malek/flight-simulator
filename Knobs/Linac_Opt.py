@@ -35,7 +35,7 @@ for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
 
 from PyQt6.QtCore import QThread, QTimer, pyqtSignal, Qt
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QCheckBox, QLabel, QFileDialog, QTextEdit, QGroupBox,
     QMessageBox, QDoubleSpinBox, QSpinBox, QComboBox, QTabWidget, QSizePolicy, QLineEdit,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QStackedWidget
@@ -90,6 +90,18 @@ TARGET_LABELS = {
     "timing": "Timing",
     "qa": "QA",
     "qm": "QM",
+}
+GROUP_BO_MAX_EVAL_SPECS = [
+    {"config_id": "gun_sol_l0", "ui_label": TARGET_LABELS["gun_sol_l0"], "runtime_name": TARGET_LABELS["gun_sol_l0"], "dim": 3},
+    {"config_id": "kly_group_1", "ui_label": TARGET_LABELS["kly_group_1"], "runtime_name": "L1-4", "dim": 4},
+    {"config_id": "kly_group_2", "ui_label": TARGET_LABELS["kly_group_2"], "runtime_name": "L5-8", "dim": 4},
+    {"config_id": "timing", "ui_label": TARGET_LABELS["timing"], "runtime_name": TARGET_LABELS["timing"], "dim": 1},
+    {"config_id": "qa", "ui_label": TARGET_LABELS["qa"], "runtime_name": TARGET_LABELS["qa"], "dim": 5},
+    {"config_id": "qm", "ui_label": TARGET_LABELS["qm"], "runtime_name": TARGET_LABELS["qm"], "dim": 3},
+]
+GROUP_BO_RUNTIME_TO_SPEC = {
+    str(spec["runtime_name"]): spec
+    for spec in GROUP_BO_MAX_EVAL_SPECS
 }
 KLY_GROUP_1_SPECS = [
     (f"L{i}", f"CM{i}L:phaseWrite", f"CM{i}L:phaseRead", "deg")
@@ -161,6 +173,30 @@ def _auto_group_bo_budget(ndim: int) -> Dict[str, int]:
         "candidate_pool": int(candidate_pool),
         "stall_iters": int(stall_iters),
     }
+
+
+def _recommended_group_bo_max_evals(ndim: int) -> int:
+    dim = max(1, int(ndim))
+    if dim == 1:
+        return 17
+    return int(_auto_group_bo_budget(dim)["max_evals"])
+
+
+def _group_bo_max_evals_config_key(config_id: str) -> str:
+    return f"gbo_max_evals_{str(config_id)}"
+
+
+def _resolve_group_bo_max_evals(config: Dict[str, Any], group_name: str, ndim: int) -> int:
+    fallback = _recommended_group_bo_max_evals(ndim)
+    spec = GROUP_BO_RUNTIME_TO_SPEC.get(str(group_name))
+    if spec is not None:
+        value = config.get(_group_bo_max_evals_config_key(str(spec["config_id"])))
+        if value is not None:
+            return max(1, int(value))
+    value = config.get("gbo_max_evals")
+    if value is not None:
+        return max(1, int(value))
+    return max(1, int(fallback))
 
 
 def build_display_value_texts(pv_values: Dict[str, float]) -> Dict[str, str]:
@@ -1104,7 +1140,8 @@ class OptimizationWorker(QThread):
         # Config
         auto_budget = _auto_group_bo_budget(len(params))
         min_init = int(self.config.get("gbo_min_init", auto_budget["min_init"]))
-        max_evals = int(self.config.get("gbo_max_evals", auto_budget["max_evals"]))
+        max_evals = _resolve_group_bo_max_evals(self.config, group_name, len(params))
+        min_init = max(1, min(min_init, max_evals))
         cand_pool = int(self.config.get("gbo_candidate_pool", auto_budget["candidate_pool"]))
         ei_tol = float(self.config.get("bo_ei_tol", 0.0))
         xi = float(self.config.get("bo_xi", 0.1))
@@ -1404,7 +1441,10 @@ class OptimizationWorker(QThread):
 
         # Config knobs (reasonable defaults)
         min_init = int(self.config.get("bo_min_init", 5))  # initial evaluations
-        max_evals = int(self.config.get("bo_max_evals", min(17, len(candidates))))
+        if str(mode).upper() == "GROUP_BO":
+            max_evals = _resolve_group_bo_max_evals(self.config, group or device_label, 1)
+        else:
+            max_evals = int(self.config.get("bo_max_evals", min(17, len(candidates))))
         ei_tol = float(self.config.get("bo_ei_tol", 1e-6))
         stall_iters = int(self.config.get("bo_stall_iters", 4))
         refine_enabled = bool(self.config.get("bo_refine", True))
@@ -1480,9 +1520,6 @@ class OptimizationWorker(QThread):
         # Discrete ternary search (unimodal) on the candidate grid
         # ------------------------------------------------------------------
         if method in ("TERNARY", "TERNARY_SEARCH", "BINARY", "BINARY_SEARCH"):
-            # Use the same evaluation budget knob for simplicity
-            max_evals = int(self.config.get("bo_max_evals", min(17, len(candidates))))
-
             # Cache helper
             def _y_at(xv: float) -> float:
                 # Ensure evaluated
@@ -2283,6 +2320,7 @@ class MainWindow(QMainWindow):
         self.dev_actuator_row_map: Dict[str, int] = {}
         self.dev_actuator_spinboxes: Dict[str, Dict[str, QDoubleSpinBox]] = {}
         self.dev_bpm_row_map: Dict[str, int] = {}
+        self.group_bo_max_eval_spinboxes: Dict[str, QSpinBox] = {}
 
         self._init_ui()
         self._current_value_timer = QTimer(self)
@@ -2934,6 +2972,25 @@ class MainWindow(QMainWindow):
         lay_score.addWidget(self.cb_downstream_ict)
         lay_score.addStretch(1)
 
+        self.grp_group_bo_budget = QGroupBox("Group BO Max Evals")
+        layout.addWidget(self.grp_group_bo_budget)
+        lay_gbo = QGridLayout(self.grp_group_bo_budget)
+        lay_gbo.setHorizontalSpacing(18)
+        lay_gbo.setVerticalSpacing(8)
+        for idx, spec in enumerate(GROUP_BO_MAX_EVAL_SPECS):
+            label = QLabel(f"{spec['ui_label']} (D={spec['dim']})")
+            spin = QSpinBox()
+            spin.setRange(1, 999)
+            spin.setValue(_recommended_group_bo_max_evals(int(spec["dim"])))
+            spin.setSuffix(" evals")
+            spin.setToolTip(f"Recommended default for dimension {spec['dim']}.")
+            self.group_bo_max_eval_spinboxes[str(spec["config_id"])] = spin
+
+            row = idx // 2
+            col = (idx % 2) * 2
+            lay_gbo.addWidget(label, row, col)
+            lay_gbo.addWidget(spin, row, col + 1)
+
         grp_adv = QGroupBox("Advanced")
         layout.addWidget(grp_adv)
         lay_adv = QHBoxLayout(grp_adv)
@@ -3545,6 +3602,7 @@ class MainWindow(QMainWindow):
     def _update_mode_ui(self):
         is_seq = (self.mode_box.currentText() == "SEQUENTIAL")
         self.seq_method_box.setEnabled(is_seq)
+        self.grp_group_bo_budget.setEnabled(not is_seq)
         enable_kly_subgroups = (self.mode_box.currentText() == "GROUP_BO") and self.chk_kly_phase.isChecked()
         self.chk_kly_group1.setEnabled(enable_kly_subgroups)
         self.chk_kly_group2.setEnabled(enable_kly_subgroups)
@@ -3731,6 +3789,12 @@ class MainWindow(QMainWindow):
         self.sp_qm_step.setValue(float(payload.get("qm_step_a", self.sp_qm_step.value())))
         self.sp_timing_step.setValue(float(payload.get("timing_step_ns", self.sp_timing_step.value())))
         self.sp_timing_half_steps.setValue(int(payload.get("timing_half_steps", self.sp_timing_half_steps.value())))
+        for spec in GROUP_BO_MAX_EVAL_SPECS:
+            box = self.group_bo_max_eval_spinboxes.get(str(spec["config_id"]))
+            if box is None:
+                continue
+            key = _group_bo_max_evals_config_key(str(spec["config_id"]))
+            box.setValue(int(payload.get(key, box.value())))
         self._update_mode_ui()
 
         if run_profile == RUN_PROFILE_DEVELOPER:
@@ -4052,6 +4116,11 @@ class MainWindow(QMainWindow):
             "restore_pvs": list(RESTORE_PVS),
             "resume_csv_path": str(Path(resume_path_text).expanduser().resolve()) if resume_path_text else "",
         }
+        for spec in GROUP_BO_MAX_EVAL_SPECS:
+            box = self.group_bo_max_eval_spinboxes.get(str(spec["config_id"]))
+            if box is None:
+                continue
+            config[_group_bo_max_evals_config_key(str(spec["config_id"]))] = int(box.value())
 
         if not (config["gun_sol_l0_phase"] or config["kly_phase"] or config["timing"] or config["qa"] or config["qm"]):
             QMessageBox.warning(self, "Warning", "Please select at least one target.")
