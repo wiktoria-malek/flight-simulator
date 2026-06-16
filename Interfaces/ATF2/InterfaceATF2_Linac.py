@@ -130,7 +130,8 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
         self.phase_kl1 = PV('CM1L:phaseRead').get()
-        self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
+        self.laser_intensity1 = PV('RFGun:LaserIntensity1:Read').get()
+        self.laser_intensity2 = PV('RFGun:LaserIntensity2:Read').get()
 
     def log_messages(self,console):
         self.log=console or print
@@ -155,16 +156,16 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         pv.put(self.phase_kl1)
         time.sleep(1)
 
-    def change_intensity(self, laserintensity=0.15):
+    def change_intensity(self, intensity=0.15):
         print(f'Changing laser intensity to {laserintensity}...')
-        laser_intensity = float(laserintensity) * 100 * 5  # Korysko dixit: 100 for percent, 5 convesion factor
-        PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
+        laser_intensity1 = 10000 * float(intensity) / self.laser_intensity2
+        PV('RFGun:LaserIntensity1:Write').put(laser_intensity1)
         time.sleep(3)
         return self
 
     def reset_intensity(self):
         print('Resetting laser intensity...')
-        PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity)
+        PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity1)
         return self
 
     def get_sequence(self):
