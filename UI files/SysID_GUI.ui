@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1214</width>
-    <height>791</height>
+    <height>841</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -36,6 +36,12 @@
        <layout class="QHBoxLayout" name="horizontal_layout">
         <item>
          <widget class="QGroupBox" name="devicesGroup">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
           <property name="styleSheet">
            <string notr="true">QGroupBox#devicesGroup {
     background-color: rgb(245, 245, 245);
