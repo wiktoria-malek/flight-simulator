@@ -57,6 +57,8 @@ L0_PHASE_STEP_DEG = 0.1
 SOLENOIDE_MIN_A = 80.0
 SOLENOIDE_MAX_A = 125.0
 SOLENOIDE_STEP_A = 0.5
+SOLENOIDE_WRITE_PV = "SOLENOIDE:CurrentWrite"
+SOLENOIDE_READ_PV = "SOLENOIDE:internalCurrentWrite"
 
 QA_HALF_RANGE_A = 1.0
 QA_STEP_A = 0.05
@@ -114,7 +116,7 @@ KLY_GROUP_2_SPECS = [
 TARGET_VALUE_SPECS = {
     "gun_sol_l0": [
         ("GUN", "RFGUN:PHASE_WRITE", None, "deg"),
-        ("Solenoid", "SOLENOIDE:internalCurrentWrite", None, "A"),
+        ("Solenoid", SOLENOIDE_WRITE_PV, SOLENOIDE_READ_PV, "A"),
         ("L0", "CM0L:phaseWrite", None, "deg"),
     ],
     "kly_group_1": KLY_GROUP_1_SPECS,
@@ -125,7 +127,7 @@ TARGET_VALUE_SPECS = {
 }
 RESTORE_PVS = [
                   "RFGUN:PHASE_WRITE",
-                  "SOLENOIDE:internalCurrentWrite",
+                  SOLENOIDE_WRITE_PV,
                   "CM0L:phaseWrite",
                   "EVE_LINAC:OUT0:SetData",
               ] + [f"CM{i}L:phaseWrite" for i in range(1, 9)] + [f"QA{i}L:currentWrite" for i in range(1, 6)] + [
@@ -197,6 +199,12 @@ def _resolve_group_bo_max_evals(config: Dict[str, Any], group_name: str, ndim: i
     if value is not None:
         return max(1, int(value))
     return max(1, int(fallback))
+
+
+def _default_readback_pv(pv_write: str) -> Optional[str]:
+    if str(pv_write).strip() == SOLENOIDE_WRITE_PV:
+        return SOLENOIDE_READ_PV
+    return None
 
 
 def build_display_value_texts(pv_values: Dict[str, float]) -> Dict[str, str]:
@@ -712,7 +720,7 @@ class OptimizationWorker(QThread):
         setpoints: Dict[str, float] = {}
         restore_pvs = [str(pv) for pv in list(self.config.get("restore_pvs", RESTORE_PVS))]
         for pv in restore_pvs:
-            setpoints[pv] = float(self._read_current(pv, None))
+            setpoints[pv] = float(self._read_current(pv, _default_readback_pv(pv)))
 
         (
             initial_ict,
@@ -1759,6 +1767,8 @@ class OptimizationWorker(QThread):
         return float(np.clip(xq, lo, hi))
 
     def _read_current(self, pv_write: str, pv_read: Optional[str] = None) -> float:
+        if pv_read is None:
+            pv_read = _default_readback_pv(pv_write)
         return self.interface.read_current(pv_write=pv_write, pv_read=pv_read, quantize_phase=True)
 
     def _lbo_group(self, group_name: str, params: List[tuple]):
@@ -2045,7 +2055,7 @@ class OptimizationWorker(QThread):
             sol_hi = max(sol_min, sol_max)
             specs = [
                 ("GUN phase", "RFGUN:PHASE_WRITE", gun_phase_half, gun_phase_step),
-                ("Solenoid current", "SOLENOIDE:internalCurrentWrite", None, sol_step),
+                ("Solenoid current", SOLENOIDE_WRITE_PV, None, sol_step),
                 ("L0 phase", "CM0L:phaseWrite", l0_phase_half, l0_phase_step),
             ]
             for label, pv_write, half, step in specs:
@@ -2140,7 +2150,7 @@ class OptimizationWorker(QThread):
             sol_hi = max(sol_min, sol_max)
             params = [
                 ("GUN phase", "RFGUN:PHASE_WRITE", gun_phase_step, gun_phase_half),
-                ("SOLENOIDE current", "SOLENOIDE:internalCurrentWrite", sol_step, 0.0, sol_lo, sol_hi),
+                ("SOLENOIDE current", SOLENOIDE_WRITE_PV, sol_step, 0.0, sol_lo, sol_hi),
                 ("L0 phase", "CM0L:phaseWrite", l0_phase_step, l0_phase_half),
             ]
             self.log_signal.emit("--- GROUP_LBO: GUN&SOLENOIDE&L0 ---")
@@ -2216,7 +2226,7 @@ class OptimizationWorker(QThread):
             sol_hi = max(sol_min, sol_max)
             params = [
                 ("GUN phase", "RFGUN:PHASE_WRITE", gun_phase_step, gun_phase_half),
-                ("Solenoid current", "SOLENOIDE:internalCurrentWrite", sol_step, 0.0, sol_lo, sol_hi),
+                ("Solenoid current", SOLENOIDE_WRITE_PV, sol_step, 0.0, sol_lo, sol_hi),
                 ("L0 phase", "CM0L:phaseWrite", l0_phase_step, l0_phase_half),
             ]
             self._group_bo_simultaneous(gun_group_name, params)
@@ -3610,7 +3620,10 @@ class MainWindow(QMainWindow):
     def _capture_machine_origin(self, config: Dict[str, Any]) -> Dict[str, Any]:
         interface = self._ensure_interface()
         restore_pvs = [str(pv) for pv in list(config.get("restore_pvs", RESTORE_PVS))]
-        setpoints = {pv: float(interface.read_current(pv, None)) for pv in restore_pvs}
+        setpoints = {
+            pv: float(interface.read_current(pv, _default_readback_pv(pv)))
+            for pv in restore_pvs
+        }
         initial_ict, initial_measurement_ok, initial_measurement_reason = _read_icts_with_retry(
             interface,
             downstream_key=str(config.get("downstream_ict", "DR")).upper().replace("LN0", "L0"),
