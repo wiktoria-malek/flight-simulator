@@ -163,9 +163,9 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.lattice.track(B0_offset)
         I=B0_offset.get_info()
         self.log("Emittance after tracking:")
-        self.log(f"εx = {I.emitt_x}[mm.rad]")
-        self.log(f"εy = {I.emitt_y}[mm.rad]")
-        self.log(f"εz = {I.emitt_z}[mm.permille]")
+        self.log(f"εx = {I.emitt_x} [mm.mrad]")
+        self.log(f"εy = {I.emitt_y} [mm.mrad]")
+        self.log(f"εz = {I.emitt_z} [mm.permille]")
 
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
