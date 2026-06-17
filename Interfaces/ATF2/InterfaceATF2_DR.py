@@ -365,8 +365,6 @@ class InterfaceATF2_DR(AbstractMachineInterface):
             try:
                 self.log(f'Sample = {sample}')
                 a = p.get().reshape((-1, 10))
-                # a = a[a[:, 0] == 1, :]
-                # a = a[a[:, 3] > 0, :]
                 status = a[self.bpm_indexes, 0]
                 status[status != 1] = 0
                 x.append(a[self.bpm_indexes, 1])

@@ -715,8 +715,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     "abs_rms_xy": list(self._hist_abs_rms_xy),
                 }
             corrs, bpms = self._get_selection()
-            machine_state = self.interface.get_state()
-
+            try:
+                machine_state = self.interface.get_state()
+            except Exception as e:
+                pass
             if self.actuator_mode == ActuatorMode.QM:
                 self._start_qm_correction(silent=silent, preserve_plots=preserve_plots)
                 return
