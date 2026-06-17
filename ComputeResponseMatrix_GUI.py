@@ -95,6 +95,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.plot.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.plot)
         self.plot.mpl_connect("button_press_event", self._handle_plot_double_click)
+
     def _handle_plot_double_click(self, event):
         if event is None:
             return

@@ -44,7 +44,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
              'MB70R', 'ZV36R', 'MB71R', 'ZH35R', 'ZV37R', 'MB72R', 'ZH36R', 'MB73R', 'ZV38R',
              'MB74R', 'ZH37R', 'ZV39R', 'MB76R', 'ZV40R', 'MB77R', 'ZH38R',
              'MB78R', 'ZV41R', 'MB79R', 'ZH42R', 'MB80R', 'ZV43R', 'ZH40R',
-             'MB81R','MB82R', 'ZV44R', 'ZH41R', 'MB83R', 'ZV45R', 'MB84R', 'ZH42R', 'MB85R', 'MB86R',
+             'MB81R','MB82R', 'ZV44R', 'ZH41R', 'MB83R', 'ZV45R', 'MB84R', 'MB85R', 'MB86R',
              'ZV46R', 'ZH43R', 'MB87R', 'MB88R', 'ZV47R', 'ZH44R', 'MB89R', 'MB90R',
              'ZV48R', 'ZH45R', 'MB91R', 'MB92R', 'ZV49R', 'ZH46R', 'MB93R', 'MB94R',
              'ZV50R', 'ZH47R', 'MB95R', 'MB96R', 'ZV51R', 'ZH48R', 'MB97R', 'MB98R'
@@ -52,25 +52,25 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
-        # monitors = [
-        #     'MB1R', 'MB2R', 'MB3R', 'MB4R', 'MB5R', 'MB6R', 'MB7R', 'MB8R',
-        #     'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R', 'MBX1',
-        #     'MBX2', 'MB21R', 'MB22R',
-        #     'MB23R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB30R', 'MB31R', 'MB32R', 'MB33R',
-        #     'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R',
-        #     'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB57R',
-        #     'MB58R', 'MB59R', 'MB60R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R',
-        #     'MB70R', 'MB71R', 'MB72R', 'MB73R', 'MB74R', 'MB76R', 'MB77R', 'MB78R', 'MB79R', 'MB80R', 'MB81R', 'MB82R',
-        #     'MB83R', 'MB84R', 'MB85R', 'MB86R', 'MB87R', 'MB88R', 'MB89R', 'MB90R', 'MB91R', 'MB92R', 'MB93R', 'MB94R',
-        #     'MB95R', 'MB96R', 'MB97R', 'MB98R'
-        # ]
+        monitors = [
+            'MB1R', 'MB2R', 'MB3R', 'MB4R', 'MB5R', 'MB6R', 'MB7R', 'MB8R',
+            'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R', 'MBX1',
+            'MBX2', 'MB21R', 'MB22R',
+            'MB23R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB30R', 'MB31R', 'MB32R', 'MB33R',
+            'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R',
+            'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB57R',
+            'MB58R', 'MB59R', 'MB60R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R',
+            'MB70R', 'MB71R', 'MB72R', 'MB73R', 'MB74R', 'MB76R', 'MB77R', 'MB78R', 'MB79R', 'MB80R', 'MB81R', 'MB82R',
+            'MB83R', 'MB84R', 'MB85R', 'MB86R', 'MB87R', 'MB88R', 'MB89R', 'MB90R', 'MB91R', 'MB92R', 'MB93R', 'MB94R',
+            'MB95R', 'MB96R', 'MB97R', 'MB98R'
+        ]
         # monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R',
         #             'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R',
         #             'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R',
         #             'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R',
         #             'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R',
         #             'MB71R']
-        monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB71R']
+        #monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB71R']
 
         self.sextupoles = [
             "SF1R.1", "SD1R.1", "SBH1R.1", "SBH1R.2", "SQF1R.1", "SQF1R.2",
@@ -142,7 +142,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         self.screens = []
-        # Index of the selected BPMs in the Epics PV ATF2:monitors
+        # Index of the selected BPMs in the Epics PV DR:monitors
         self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
         self.ict_names = [
