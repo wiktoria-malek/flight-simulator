@@ -396,21 +396,21 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
         return bpms
 
-    def get_sextupoles(self, names=None):
-        if names is None:
-            names = self.sextupoles
-        if isinstance(names, str):
-            names = [names]
-        bdes, bact = [], []
-
-        for name in names:
-            bdes.append(self._pv_get(f"{name}:currentWrite"))
-            bact.append(self._pv_get(f"{name}:currentRead"))
-        return {
-            "names": names,
-            "bdes": np.array(bdes, dtype=float),
-            "bact": np.array(bact, dtype=float),
-        }
+    # def get_sextupoles(self, names=None):
+    #     if names is None:
+    #         names = self.sextupoles
+    #     if isinstance(names, str):
+    #         names = [names]
+    #     bdes, bact = [], []
+    #
+    #     for name in names:
+    #         bdes.append(self.pv_get(f"{name}:currentWrite"))
+    #         bact.append(self.pv_get(f"{name}:currentRead"))
+    #     return {
+    #         "names": names,
+    #         "bdes": np.array(bdes, dtype=float),
+    #         "bact": np.array(bact, dtype=float),
+    #     }
 
     def set_sextupoles(self, names, values):
         if isinstance(names, str):

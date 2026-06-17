@@ -501,6 +501,31 @@ QToolButton#triangular_tooltip:hover {
                 </widget>
                </item>
                <item>
+                <widget class="QToolButton" name="actuator_type_tooltip">
+                 <property name="toolTip">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Correctors: uses horizontal/vertical steering magnets.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Quadrupole movers: uses quadrupole mover offsets.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">QToolButton#actuator_type_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#actuator_type_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                 </property>
+                 <property name="text">
+                  <string>?</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
                 <spacer name="actuator_mode_right_spacer">
                  <property name="orientation">
                   <enum>Qt::Horizontal</enum>
