@@ -3702,18 +3702,18 @@ class MainWindow(QMainWindow):
             str(pv): float(value)
             for pv, value in dict(origin.get("initial_setpoints", {}) or {}).items()
         }
-        interface = self._ensure_interface()
+        final_setpoints = {
+            str(pv): float(value)
+            for pv, value in dict(self._current_pv_values or {}).items()
+        }
         lines = [
-            "[FINAL DELTA] final - initial",
+            "[FINAL DELTA] final set - initial set",
             "Device | Initial | Final | Delta",
         ]
         has_row = False
         for label, pv_write, pv_read, unit in specs:
             initial = float(initial_setpoints.get(pv_write, float("nan")))
-            try:
-                final = float(interface.read_current(pv_write, pv_read))
-            except Exception:
-                final = float("nan")
+            final = float(final_setpoints.get(pv_write, float("nan")))
             delta = final - initial if np.isfinite(initial) and np.isfinite(final) else float("nan")
             lines.append(
                 f"{label} | {_format_machine_value(initial, unit)} | "
