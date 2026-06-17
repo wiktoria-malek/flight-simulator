@@ -2327,6 +2327,7 @@ class MainWindow(QMainWindow):
         self._result_labels: Dict[str, QLabel] = {}
         self._log_widgets: Dict[str, QTextEdit] = {}
         self._plot_widgets: Dict[str, Dict[str, Any]] = {}
+        self._last_setpoint_values: Dict[str, float] = {}
         self.dev_actuator_row_map: Dict[str, int] = {}
         self.dev_actuator_spinboxes: Dict[str, Dict[str, QDoubleSpinBox]] = {}
         self.dev_bpm_row_map: Dict[str, int] = {}
@@ -3704,7 +3705,7 @@ class MainWindow(QMainWindow):
         }
         final_setpoints = {
             str(pv): float(value)
-            for pv, value in dict(self._current_pv_values or {}).items()
+            for pv, value in dict(self._last_setpoint_values or {}).items()
         }
         lines = [
             "[FINAL DELTA] final set - initial set",
@@ -4205,6 +4206,11 @@ class MainWindow(QMainWindow):
 
     def optimization_finished(self):
         finished_profile = self._run_profile
+        if self.worker is not None:
+            self._last_setpoint_values = {
+                str(pv): float(value)
+                for pv, value in dict(getattr(self.worker, "_current_pv_values", {}) or {}).items()
+            }
         self.worker = None
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
