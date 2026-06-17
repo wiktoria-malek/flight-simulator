@@ -453,7 +453,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             completed = False
             try:
                 if sextupoles_to_disable:
-                    self._start_correction()
+                    self._start_correction(machine_state=saved_state)
 
                     # self.interface.set_sextupoles(sextupoles["names"], np.zeros(len(sextupoles["names"]), dtype=float))
                     # self.log("Sextupoles disabled before BBA")
@@ -465,7 +465,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     # self._show_sextupole_restoration_popup()
                     # QMessageBox.information(self, "Correction", "BBA and sextupole restoration finished.")
                 else:
-                    self._start_correction()
+                    self._start_correction(machine_state=saved_state)
                 completed = True
             finally:
                 self._running = False
@@ -713,7 +713,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.reset_ref_orb = True
         self.log("Resetting reference orbit")
 
-    def _start_correction(self, silent=False, preserve_plots=False):
+    def _start_correction(self, silent=False, preserve_plots=False, machine_state=None):
         try:
             plot_snapshot = None
             if preserve_plots:
@@ -740,10 +740,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     "abs_rms_y": list(self._hist_abs_rms_y),
                     "abs_rms_xy": list(self._hist_abs_rms_xy),
                 }
+            corrs, bpms = self._get_selection()
+            if machine_state is None:
+                machine_state = self.interface.get_state()
+
             if self.actuator_mode == ActuatorMode.QM:
                 self._start_qm_correction(silent=silent, preserve_plots=preserve_plots)
                 return
-            corrs, bpms = self._get_selection()
+
             self._build_jitter_model_for_correction(actuators=corrs, bpms=bpms)
             if self.jitter_model is not None:
                 refs = set(self.jitter_model["reference_bpms"])
@@ -793,6 +797,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             w_xy_bpms = np.sqrt(W_xy)
 
             self.setWindowTitle("BBA GUI - [Correction running]")
+
             target_disp_x, target_disp_y = self.interface.get_target_dispersion(bpms)
             max_curr_h = self.max_horizontal_current_spinbox.value()  # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value()  # gauss * m
@@ -1145,7 +1150,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             if not silent:
                 self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h, max_curr_v,
                                            bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy, Axy,
-                                           Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()))
+                                           Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()),
+                                           machine_state=machine_state)
             if preserve_plots and plot_snapshot is not None:
                 self._hist_orbit_x[:] = plot_snapshot["orbit_x"]
                 self._hist_orbit_y[:] = plot_snapshot["orbit_y"]
