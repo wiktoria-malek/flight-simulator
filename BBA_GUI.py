@@ -1151,7 +1151,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h, max_curr_v,
                                            bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy, Axy,
                                            Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()),
-                                           machine_state=machine_state)
+                                           machine_state_file=machine_state)
             if preserve_plots and plot_snapshot is not None:
                 self._hist_orbit_x[:] = plot_snapshot["orbit_x"]
                 self._hist_orbit_y[:] = plot_snapshot["orbit_y"]
