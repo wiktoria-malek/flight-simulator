@@ -14,7 +14,7 @@
    <string>Compute Response Matrix Tool</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="main_layout">
+   <layout class="QVBoxLayout" name="main_layout" stretch="0,1">
     <property name="leftMargin">
      <number>4</number>
     </property>
@@ -388,7 +388,7 @@ QGroupBox#bpmsGroup::title {
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="right_layout">
+       <layout class="QVBoxLayout" name="right_layout" stretch="0,0,1,0,0">
         <property name="leftMargin">
          <number>0</number>
         </property>

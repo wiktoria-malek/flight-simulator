@@ -359,12 +359,14 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
     def get_bpms(self, names=None):
         self.log('Reading bpms...')
+        p = PV('DR:monitors')
         x, y, tmit = [], [], []
         for sample in range(self.nsamples):
             try:
                 self.log(f'Sample = {sample}')
-                m = caget('DR:monitors')
-                a = m.reshape((-1, 10))
+                a = p.get().reshape((-1, 10))
+                a = a[a[:, 0] == 1, :]
+                a = a[a[:, 3] > 0, :]
                 status = a[self.bpm_indexes, 0]
                 status[status != 1] = 0
                 x.append(a[self.bpm_indexes, 1])
@@ -374,7 +376,6 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                 time.sleep(1)
             except Exception as e:
                 self.log(f'An error occurred: {e}')
-                sample = sample - 1
 
         bpms = {
             "names": self.bpms,
