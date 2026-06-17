@@ -160,7 +160,9 @@ class InterfaceATF2_DR(AbstractMachineInterface):
             "proj_h_mean_ave": "XSR:PROJ_H_MEAN_AVE",
         }
         self.arc_dispersion_pv = "MONITOR:DR:ARCDISPERSION"
-        self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
+        self.laser_intensity1 = PV('RFGun:LaserIntensity1:Read').get()
+        self.laser_intensity2 = PV('RFGun:LaserIntensity2:Read').get()
+
 
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
@@ -238,20 +240,16 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         PV('RAMP:CONTROL_OFF_SW').put(0)
         time.sleep(2)
 
-    def change_intensity(self):
-        new_laser_intensity = self.test_laser_intensity
-        self.log(f'Changing laser intensity to {new_laser_intensity}...')
-        laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
-        PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
+    def change_intensity(self, intensity=0.1):
+        print(f'Changing laser intensity to {intensity}...')
+        laser_intensity1 = 10000 * float(intensity) / self.laser_intensity2
+        PV('RFGun:LaserIntensity1:Write').put(laser_intensity1)
         time.sleep(3)
         return self
 
     def reset_intensity(self):
-        new_laser_intensity = self.nominal_laser_intensity
-        self.log(f'Resetting laser intensity to {new_laser_intensity}...')
-        laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
-        PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
-        time.sleep(3)
+        print('Resetting laser intensity...')
+        PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity1)
         return self
 
     def get_sequence(self):

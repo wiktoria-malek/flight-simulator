@@ -156,7 +156,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         pv.put(self.phase_kl1)
         time.sleep(1)
 
-    def change_intensity(self, intensity=0.15):
+    def change_intensity(self, intensity=0.1):
         print(f'Changing laser intensity to {intensity}...')
         laser_intensity1 = 10000 * float(intensity) / self.laser_intensity2
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity1)
