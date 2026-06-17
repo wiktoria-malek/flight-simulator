@@ -142,8 +142,8 @@ class SaveOrLoad():
         os.makedirs(save_session_dir, exist_ok=True)
         self.session_database_3.setText(save_session_dir)
 
-        if machine_state is not None:
-            machine_state.save(filename=os.path.join(save_session_dir, "machine_status.pkl"))
+        if machine_state_file is not None:
+            machine_state_file.save(filename=os.path.join(save_session_dir, "machine_status.pkl"))
         self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors",
                           use_dialog=False, base_dir=save_session_dir)
         self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs", use_dialog=False,
