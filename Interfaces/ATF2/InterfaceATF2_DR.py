@@ -369,7 +369,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         while sample < int(self.nsamples) and attempts < max_attempts:
             attempts += 1
             try:
-                self.log(f'Sample = {sample} attempt to read bmps = {attempts}')
+                self.log(f'Sample = {sample} attempt to read bpms = {attempts}')
                 data_returned = p.get()
                 if data_returned is None:
                     raise RuntimeError('DR:monitors returned None')
@@ -378,7 +378,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                     raise RuntimeError('DR:monitors returned an empty array')
                 a = data_returned.reshape((-1, 10))
                 if not self.bpm_indexes:
-                    raise RuntimeError('No BPM indesxes')
+                    raise RuntimeError('No BPM indexes')
                 if max(self.bpm_indexes) >= a.shape[0]:
                     raise RuntimeError(f'Shape mismatch between BPM indexes and what DR:monitors is giving back')
 
