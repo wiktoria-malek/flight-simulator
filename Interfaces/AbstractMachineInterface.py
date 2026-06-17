@@ -115,12 +115,3 @@ class AbstractMachineInterface(ABC):
                 self.set_sextupoles(sextupoles["names"], sextupoles["bdes"])
             except NotImplementedError:
                 pass
-
-
-
-
-
-
-
-
-
