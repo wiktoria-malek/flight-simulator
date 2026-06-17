@@ -406,8 +406,8 @@ class InterfaceATF2_DR(AbstractMachineInterface):
     #     bdes, bact = [], []
     #
     #     for name in names:
-    #         bdes.append(self._pv_get(f"{name}:currentWrite"))
-    #         bact.append(self._pv_get(f"{name}:currentRead"))
+    #         bdes.append(self.pv_get(f"{name}:currentWrite"))
+    #         bact.append(self.pv_get(f"{name}:currentRead"))
     #     return {
     #         "names": names,
     #         "bdes": np.array(bdes, dtype=float),
