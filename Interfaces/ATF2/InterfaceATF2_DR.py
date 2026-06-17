@@ -361,19 +361,52 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         self.log('Reading bpms...')
         p = PV('DR:monitors')
         x, y, tmit = [], [], []
-        for sample in range(self.nsamples):
+        max_attempts = max(1, int(self.nsamples) * 3)
+        sample = 0
+        attempts = 0
+
+        while sample < int(self.nsamples) and attempts < max_attempts:
+            attempts += 1
             try:
-                self.log(f'Sample = {sample}')
-                a = p.get().reshape((-1, 10))
-                status = a[self.bpm_indexes, 0]
-                status[status != 1] = 0
-                x.append(a[self.bpm_indexes, 1])
-                y.append(a[self.bpm_indexes, 2])
-                self.log('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
-                tmit.append(status * a[self.bpm_indexes, 3])
+                self.log(f'Sample = {sample} attempt to read bmps = {attempts}')
+                data_returned = p.get()
+                if data_returned is None:
+                    raise RuntimeError('DR:monitors returned None')
+                data_returned = np.asarray(data_returned, dtype=float)
+                if data_returned.size == 0:
+                    raise RuntimeError('DR:monitors returned an empty array')
+                a = raw.reshape((-1, 10))
+                if not self.bpm_indexes:
+                    raise RuntimeError('No BPM indesxes')
+                if max(self.bpm_indexes) >= a.shape[0]:
+                    raise RuntimeError(f'Shape mismatch between BPM indexes and what DR:monitors is giving back')
+
+                selected = np.array(a[self.bpm_indexes, :], dtype=float, copy=True)
+                status = np.asarray(selected[:, 0], dtype=float)
+                charge = np.asarray(selected[:, 3], dtype=float)
+                valid = (status == 1) & np.isfinite(charge) & (charge > 0)
+                x_sample = np.asarray(selected[:, 1], dtype=float)
+                y_sample = np.asarray(selected[:, 2], dtype=float)
+                tmit_sample = np.where(valid, charge, 0.0)
+
+                x_sample[~valid] = np.nan
+                y_sample[~valid] = np.nan
+
+                if np.any(~valid):
+                    nonvalid_bpms = [name for name, ok in zip(self.bpms, valid) if not ok]
+                    self.log(f'There are invalid BPMs in the DR')
+                x.append(x_sample)
+                y.append(y_sample)
+                tmit.append(tmit_sample)
+                self.log(f'Interface::get_bpms() = {x_sample}')
+                sample += 1
                 time.sleep(1)
             except Exception as e:
-                self.log(f'An error occurred: {e}')
+                self.log(f'An error occurred while reading DR BPM sample: {e}')
+                time.sleep(1)
+
+        if not x or not y or not tmit:
+            raise RuntimeError("Idk man, everything failed")
 
         bpms = {
             "names": self.bpms,

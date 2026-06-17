@@ -116,3 +116,53 @@ class AbstractMachineInterface(ABC):
             except NotImplementedError:
                 pass
 
+
+
+
+    def get_bpms(self, names=None):
+        self.log('Reading bpms...')
+        p = PV('DR:monitors')
+        x, y, tmit = [], [], []
+        for sample in range(self.nsamples):
+            try:
+                self.log(f'Sample = {sample}')
+                a = p.get().reshape((-1, 10))
+                status = a[self.bpm_indexes, 0]
+                status[status != 1] = 0
+                x.append(a[self.bpm_indexes, 1])
+                y.append(a[self.bpm_indexes, 2])
+                self.log('Interface::get_bpms() = ', a[self.bpm_indexes, 1])
+                tmit.append(status * a[self.bpm_indexes, 3])
+                time.sleep(1)
+            except Exception as e:
+                self.log(f'An error occurred: {e}')
+
+        bpms = {
+            "names": self.bpms,
+            "x": np.vstack(x) / 1e3, # mm
+            "y": np.vstack(y) / 1e3, # mm
+            "tmit": np.vstack(tmit),
+        }
+
+        if isinstance(names, str):
+            names = [names]
+        if names is not None:
+            idx = [i for i, s in enumerate(bpms["names"]) if s in names]
+            bpms = {
+                "names": [bpms["names"][i] for i in idx],
+                "x": np.asarray(bpms["x"])[:, idx],
+                "y": np.asarray(bpms["y"])[:, idx],
+                "tmit": np.asarray(bpms["tmit"])[:, idx],
+            }
+
+        return bpms
+
+
+
+
+
+
+
+
+
+
