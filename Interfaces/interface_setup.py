@@ -4,7 +4,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Damping Ring",
             "module": "Interfaces.ATF2.InterfaceATF2_DR",
             "class_name": "InterfaceATF2_DR",
-            "settings": {"nsamples": 10},
+            "settings": {"nsamples": 3},
             "actions": [],
             "units":
             {

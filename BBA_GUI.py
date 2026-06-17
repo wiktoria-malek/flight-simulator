@@ -714,10 +714,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     "abs_rms_y": list(self._hist_abs_rms_y),
                     "abs_rms_xy": list(self._hist_abs_rms_xy),
                 }
+            corrs, bpms = self._get_selection()
+            machine_state = self.interface.get_state()
+
             if self.actuator_mode == ActuatorMode.QM:
                 self._start_qm_correction(silent=silent, preserve_plots=preserve_plots)
                 return
-            corrs, bpms = self._get_selection()
+
             self._build_jitter_model_for_correction(actuators = corrs, bpms = bpms)
             if self.jitter_model is not None:
                 refs = set(self.jitter_model["reference_bpms"])
@@ -766,6 +769,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             w_xy_bpms=np.sqrt(W_xy)
 
             self.setWindowTitle("BBA GUI - [Correction running]")
+
             target_disp_x, target_disp_y = self.interface.get_target_dispersion(bpms)
             max_curr_h = self.max_horizontal_current_spinbox.value() # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value() # gauss * m
@@ -1106,7 +1110,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             else:
                 self.log("Correction finished.")
             if not silent:
-                self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h,max_curr_v, bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy,Axy,Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()))
+                self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h,max_curr_v, bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy,Axy,Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()), machine_state=machine_state)
             if preserve_plots and plot_snapshot is not None:
                 self._hist_orbit_x[:] = plot_snapshot["orbit_x"]
                 self._hist_orbit_y[:] = plot_snapshot["orbit_y"]

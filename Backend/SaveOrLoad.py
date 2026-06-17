@@ -134,13 +134,16 @@ class SaveOrLoad():
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
 
-    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By, is_jitter_subtraction_checked):
+    def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By, is_jitter_subtraction_checked, machine_state_file):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
         save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
+        self.session_database_3.setText(save_session_dir)
 
+        if machine_state is not None:
+            machine_state.save(filename=os.path.join(save_session_dir, "machine_status.pkl"))
         self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors",
                           use_dialog=False, base_dir=save_session_dir)
         self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs", use_dialog=False,
