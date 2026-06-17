@@ -63,7 +63,7 @@ class Worker(QObject):
     progress=pyqtSignal(int)
     finished = pyqtSignal()
 
-    def __init__(self, interface, state, correctors, bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, output_dir, actuator_mode=ActuatorMode.Kicker):
+    def __init__(self, interface, state, correctors, bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, output_dir, actuator_mode=ActuatorMode.Kicker, state_class=None):
         super().__init__()
         self.output_dir=output_dir
         self.interface = interface
@@ -82,6 +82,7 @@ class Worker(QObject):
         self.running = False
         self.paused = False
         self.progress_value=0
+        self.state_class = state_class if state_class is not None else interface.get_state().__class__
 
     @pyqtSlot()
     def run(self):
@@ -172,7 +173,7 @@ class Worker(QObject):
                                 state_p.save(filename=filename_p)
                                 measured_this_magnet = True
                             else:
-                                state_p = I.get_state().__class__(filename=filename_p)
+                                state_p = self.state_class(filename=filename_p)
                             Op = state_p.get_orbit(self.bpms)
 
                             if apply_new_measurement or not os.path.isfile(filename_m):
@@ -185,7 +186,7 @@ class Worker(QObject):
                                 state_m.save(filename=filename_m)
                                 measured_this_magnet = True
                             else:
-                                state_m = I.get_state().__class__(filename=filename_m)
+                                state_m = self.state_class(filename=filename_m)
                             Om = state_m.get_orbit(self.bpms)
                         finally:
                             try:
@@ -295,7 +296,7 @@ class Worker(QObject):
                     state_p=I.get_state()
                     state_p.save(filename=filename_p)
                 else:
-                    state_p=self.interface.get_state().__class__(filename=filename_p)
+                    state_p=self.state_class(filename=filename_p)
                 Op = state_p.get_orbit(self.bpms)
                 if not corr_fully_measured:
                     print(f"Corrector {corrector} '-' excitation...")
@@ -312,7 +313,7 @@ class Worker(QObject):
                     state_m=I.get_state()
                     state_m.save(filename=filename_m)
                 else:
-                    state_m=self.interface.get_state().__class__(filename=filename_m)
+                    state_m=self.state_class(filename=filename_m)
                 Om = state_m.get_orbit(self.bpms)
 
                 if corr_changed:
@@ -437,7 +438,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot_widget.deleteLater()
         self.plot_widget = MatplotlibWidget(self)
         self.right_layout.addWidget(self.plot_widget)
-
         # Setting up the interface
         self.save_correctors_button.clicked.connect(self.__save_correctors_button_clicked)
         self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
@@ -468,7 +468,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.horizontal_excursion_spinbox.setSingleStep(0.1)
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
-
+        self.state_class = interface.get_state().__class__
         self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
         self.__set_status_in_title("[Idle]")
         interface_name=interface.get_name()
@@ -648,7 +648,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         print(f"Currently at mode: {mode.name}")
         self.__set_status_in_title(f"[Running {mode.name} mode]")
         self.progressBar.setValue(0)
-        machine_state=self.interface.get_state().__class__(filename=os.path.join(dir_name,'machine_status.pkl'))
+        machine_state=self.state_class(filename=os.path.join(dir_name,'machine_status.pkl'))
         if self.actuator_mode != ActuatorMode.QM:
             self.interface.restore_correctors_state(machine_state)
 
@@ -838,10 +838,14 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self._save_names_if_missing(d,'correctors.txt',selected_correctors)
             self._save_names_if_missing(d,'bpms.txt',selected_bpms)
 
-        machine_state=self.interface.get_state()
-        for mode,d in self.mode_dirs.items():
-            machine_status=os.path.join(d,'machine_status.pkl')
-            if not os.path.isfile(machine_status):
+        missing_machine_status = [
+            os.path.join(d, 'machine_status.pkl')
+            for d in self.mode_dirs.values()
+            if not os.path.isfile(os.path.join(d, 'machine_status.pkl'))
+        ]
+        if missing_machine_status:
+            machine_state = self.interface.get_state()
+            for machine_status in missing_machine_status:
                 machine_state.save(filename=machine_status)
 
         self.counter=0
@@ -872,7 +876,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
 
         self.thread = QThread()
         out_dir=self.mode_dirs[self.current_mode]
-        self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, out_dir, self.actuator_mode)
+        self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, out_dir, self.actuator_mode, state_class=self.state_class)
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
@@ -893,7 +897,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
             print("Restoring initial correctors' settings...")
             #self.S.load('machine_status')
             current_dir=self.mode_dirs[self.current_mode]
-            machine_state=self.interface.get_state().__class__(filename=os.path.join(current_dir,"machine_status.pkl"))
+            machine_state=self.state_class(filename=os.path.join(current_dir,"machine_status.pkl"))
             if self.actuator_mode != ActuatorMode.QM:
                 self.interface.restore_correctors_state(machine_state)
             self.progressBar.setValue(100)
@@ -930,7 +934,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 print(f"Niter: {Niter}")
                 self.thread = QThread()
                 out_dir = self.mode_dirs[self.current_mode]
-                self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, out_dir, self.actuator_mode)
+                self.worker = Worker(self.interface, None, selected_correctors, selected_bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, out_dir, self.actuator_mode, state_class=self.state_class)
                 self.worker.moveToThread(self.thread)
                 self.thread.started.connect(self.worker.run)
                 self.worker.finished.connect(self.thread.quit)
