@@ -7,6 +7,7 @@ try:
         QApplication, QMainWindow, QVBoxLayout,
         QLineEdit, QListWidget, QPushButton,
         QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+        QWidget,
         )
     from PyQt6.QtCore import Qt,QTimer
     from PyQt6.QtGui import QPixmap
@@ -18,6 +19,7 @@ except ImportError:
         QApplication, QMainWindow, QVBoxLayout,
         QLineEdit, QListWidget, QPushButton,
         QCheckBox, QFileDialog, QSizePolicy,QMessageBox,
+        QWidget,
         )
     from PyQt5.QtCore import Qt,QTimer
     from PyQt5.QtGui import QPixmap
@@ -30,6 +32,19 @@ matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
+
+class PlotPopup(QMainWindow):
+    def __init__(self, title="Response Matrix", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(1100, 850)
+        central = QWidget(self)
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(6, 6, 6, 6)
+        self.plot = MatplotlibWidget(central)
+        self.plot.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self.plot)
 
 class MatplotlibWidget(FigureCanvas):
     def __init__(self, parent=None, title='', orbit=None):
@@ -45,6 +60,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._load_logo()
         self.cwd = os.getcwd()
         self.R=None
+        self.response_matrix_popup = None
         self.data_dir_1=data_dir_1
         self.data_dir_2=data_dir_2
         self.comp_difference=comp_difference
@@ -78,6 +94,64 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.plot = MatplotlibWidget(self.plot_widget)
         self.plot.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.plot)
+        self.plot.mpl_connect("button_press_event", self._handle_plot_double_click)
+    def _handle_plot_double_click(self, event):
+        if event is None:
+            return
+        if getattr(event, "dblclick", False) and getattr(event, "button", None) == 1:
+            self._show_response_matrix_popup()
+
+    def _show_response_matrix_popup(self):
+        if self.R is None:
+            QMessageBox.information(self, "No response matrix", "Compute a response matrix first.")
+            return
+        if self.response_matrix_popup is None:
+            self.response_matrix_popup = PlotPopup("Response Matrix", parent=self)
+        self._draw_response_matrix(self.response_matrix_popup.plot, self.R)
+        self.response_matrix_popup.show()
+        self.response_matrix_popup.raise_()
+        self.response_matrix_popup.activateWindow()
+
+    def _draw_response_matrix(self, plot, R):
+        plot.figure.clf()
+        fig1 = plot.figure
+
+        ax1 = fig1.add_subplot(2, 2, 1, projection='3d')
+        ax3 = fig1.add_subplot(2, 2, 3, projection='3d')
+        ax2 = fig1.add_subplot(2, 2, 2, projection='3d')
+        ax4 = fig1.add_subplot(2, 2, 4, projection='3d')
+
+        x = np.array(range(len(R.hcorrs)))
+        y = np.array(range(len(R.bpms)))
+        X, Y = np.meshgrid(x, y)
+
+        ax1.plot_surface(X, Y, R.Rxx, cmap='viridis')
+        ax1.set_title('$R_{xx}$')
+        ax1.set_xlabel('Corrector [#]')
+        ax1.set_ylabel('BPM [#]')
+
+        ax3.plot_surface(X, Y, R.Ryx, cmap='viridis')
+        ax3.set_title('$R_{yx}$')
+        ax3.set_xlabel('Corrector [#]')
+        ax3.set_ylabel('BPM [#]')
+
+        x = np.array(range(len(R.vcorrs)))
+        X, Y = np.meshgrid(x, y)
+
+        ax2.plot_surface(X, Y, R.Rxy, cmap='viridis')
+        ax2.set_title('$R_{xy}$')
+        ax2.set_xlabel('Corrector [#]')
+        ax2.set_ylabel('BPM [#]')
+
+        ax4.plot_surface(X, Y, R.Ryy, cmap='viridis')
+        ax4.set_title('$R_{yy}$')
+        ax4.set_xlabel('Corrector [#]')
+        ax4.set_ylabel('BPM [#]')
+
+        fig1.tight_layout()
+        plot.draw()
+        plot.flush_events()
+        plot.repaint()
 
         if self.data_dir_1:
             self.data_dir_1=self._expand_path(self.data_dir_1)
@@ -264,55 +338,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.bpms_list.clearSelection()
 
     def _plot_response_matrix(self,R):
-        # Clear existing figure
-        self.plot.figure.clf()
-
-        # === 3D surface plots ===
-        # If you want to show both sets (2D + 3D), you need two canvases.
-        # But if you want to reuse the same canvas, just do this after the first draw:
-
-        # Clear and re-plot the 3D figure
-        self.plot.figure.clf()
-        fig1 = self.plot.figure
-        # fig1.set_size_inches(12, 10)
-
-        ax1 = fig1.add_subplot(2, 2, 1, projection='3d')
-        ax3 = fig1.add_subplot(2, 2, 3, projection='3d')
-        ax2 = fig1.add_subplot(2, 2, 2, projection='3d')
-        ax4 = fig1.add_subplot(2, 2, 4, projection='3d')
-
-        x = np.array(range(len(R.hcorrs)))
-        y = np.array(range(len(R.bpms)))
-        X, Y = np.meshgrid(x, y)
-
-        ax1.plot_surface(X, Y, R.Rxx, cmap='viridis')
-        ax1.set_title('$R_{xx}$')
-        ax1.set_xlabel('Corrector [#]')
-        ax1.set_ylabel('BPM [#]')
-
-        ax3.plot_surface(X, Y, R.Ryx, cmap='viridis')
-        ax3.set_title('$R_{yx}$')
-        ax3.set_xlabel('Corrector [#]')
-        ax3.set_ylabel('BPM [#]')
-
-        x = np.array(range(len(R.vcorrs)))
-        X, Y = np.meshgrid(x, y)
-
-        ax2.plot_surface(X, Y, R.Rxy, cmap='viridis')
-        ax2.set_title('$R_{xy}$')
-        ax2.set_xlabel('Corrector [#]')
-        ax2.set_ylabel('BPM [#]')
-
-        ax4.plot_surface(X, Y, R.Ryy, cmap='viridis')
-        ax4.set_title('$R_{yy}$')
-        ax4.set_xlabel('Corrector [#]')
-        ax4.set_ylabel('BPM [#]')
-
-        fig1.tight_layout()
-
-        self.plot.draw()
-        self.plot.flush_events()
-        self.plot.repaint()
+        self._draw_response_matrix(self.plot, R)
+        if self.response_matrix_popup is not None and self.response_matrix_popup.isVisible():
+            self._draw_response_matrix(self.response_matrix_popup.plot, R)
 
     def __compute_button_clicked(self):
         try:
