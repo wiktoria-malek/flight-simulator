@@ -375,7 +375,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                 data_returned = np.asarray(data_returned, dtype=float)
                 if data_returned.size == 0:
                     raise RuntimeError('DR:monitors returned an empty array')
-                a = raw.reshape((-1, 10))
+                a = data_returned.reshape((-1, 10))
                 if not self.bpm_indexes:
                     raise RuntimeError('No BPM indesxes')
                 if max(self.bpm_indexes) >= a.shape[0]:
