@@ -22,9 +22,9 @@ from Interfaces.interface_setup import INTERFACE_SETUP
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
-from Backend.EM_helpers.QuadrupoleScan_EM import QuadrupoleScan_EM
+from Backend.EM_helpers.QuadrupoleScan import QuadrupoleScan
 from Backend.LogConsole import LogConsole
-from Backend.EM_helpers.PhaseSpaceGraphs_EM import PhaseSpaces
+from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
 from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
 
 class ComputationMode(Enum):
@@ -129,7 +129,7 @@ class OptimizationWorker(QObject):
         finally:
             self.done.emit()
 
-class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
+class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
     def __init__(self, interface, dir_name):
         super().__init__()
         self.interface = interface
@@ -389,6 +389,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         self.result_quad_strength.setText("-")
         self.result_emit_x_norm.setText("-")
         self.result_emit_y_norm.setText("-")
+        self.result_emit_x_geom.setText("-")
+        self.result_emit_y_geom.setText("-")
         self.result_beta_x0.setText("-")
         self.result_alpha_x0.setText("-")
         self.result_beta_y0.setText("-")
@@ -416,6 +418,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan_EM):
         self.result_quad_strength.setText(quad_strength_text)
         self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), " mm·mrad"))
         self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), " mm·mrad"))
+        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), " mm·mrad"))
+        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), " mm·mrad"))
         self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), " m"))
         self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0")))
         self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), " m"))
@@ -1026,9 +1030,7 @@ if __name__ == "__main__":
     )
 
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dir_name = os.path.expanduser(
-        f"~/CERN-Flight_Simulator-Data/EM_{project_name}{time_str}"
-    )
+    dir_name = os.path.expanduser(f"~/CERN-Flight_Simulator-Data/EM_{project_name}{time_str}")
 
     w = MainWindow(interface, dir_name)
     w.show()

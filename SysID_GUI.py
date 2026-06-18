@@ -4,14 +4,14 @@ from Backend.SaveOrLoad import SaveOrLoad
 import time, sys, os, matplotlib, fnmatch, re
 try:
     from PyQt6 import uic
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QWidget, QVBoxLayout, QSizePolicy
     from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
     from PyQt6.QtGui import QPixmap
     from PyQt6.QtTest import QTest
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
-    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidget, QMessageBox, QWidget, QVBoxLayout, QSizePolicy
     from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot
     from PyQt5.QtGui import QPixmap
     from PyQt5.QtTest import QTest
@@ -22,12 +22,24 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Interfaces.interface_setup import INTERFACE_SETUP
 
+class PlotPopup(QMainWindow):
+    def __init__(self, title="SysID", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(1100, 850)
+        central = QWidget(self)
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(6, 6, 6, 6)
+        self.plot = MatplotlibWidget(central)
+        self.plot.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self.plot)
+
 class Mode(Enum):
     Orbit = "Orbit Correction"
     Dispersion = "Changed energy"
     Wakefield = "Changed intensity"
     All = "All modes at once"
-
 
 class ActuatorMode(Enum):
     Kicker = "Correctors" #Kicker"
@@ -438,6 +450,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.plot_widget.deleteLater()
         self.plot_widget = MatplotlibWidget(self)
         self.right_layout.addWidget(self.plot_widget)
+        self.plot_widget.mpl_connect("button_press_event", self._handle_plot_double_click)
+
         # Setting up the interface
         self.save_correctors_button.clicked.connect(self.__save_correctors_button_clicked)
         self.load_correctors_button.clicked.connect(self.__load_correctors_button_clicked)
@@ -487,6 +501,24 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.vcorrector_names = set(map(str, self.interface.get_vcorrectors_names() or []))
         self.pattern_corrs_input.setPlaceholderText("e.g. ZH*, ZV*, IP*")
         self.pattern_corrs_input.textChanged.connect(self.pattern_matching)
+        self.sysid_graph_popup = None
+
+    def _handle_plot_double_click(self, event):
+        if event is None:
+            return
+        if getattr(event, "dblclick", False) and getattr(event, "button", None) == 1:
+            self._show_sysid_graph_popup()
+
+    def _show_sysid_graph_popup(self):
+        if self.R is None:
+            QMessageBox.information(self, "No SysID data", "Run SysID first.")
+            return
+        if self.sysid_graph_popup is None:
+            self.sysid_graph_popup = PlotPopup("Response Matrix", parent=self)
+        self._draw_sysid_graph(self.sysid_graph_popup.plot, self.R)
+        self.sysid_graph_popup.show()
+        self.sysid_graph_popup.raise_()
+        self.sysid_graph_popup.activateWindow()
 
     def _is_h_corrector(self, s):
         return str(s) in self.hcorrector_names

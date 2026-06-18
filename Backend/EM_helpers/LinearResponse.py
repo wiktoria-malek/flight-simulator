@@ -2,10 +2,10 @@ import os
 import numpy as np
 
 '''
-LinearResponse_EM - pure mathematics behind linear response approach
+LinearResponse - pure mathematics behind linear response approach
 linear_response_engine.py - using this mathematics on session from GUI
 '''
-class LinearResponse_EM:
+class LinearResponse:
     def __init__(self, coefficients_path=None, dataset_path=None):
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 

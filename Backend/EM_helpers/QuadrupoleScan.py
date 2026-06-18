@@ -21,7 +21,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from scipy.optimize import least_squares
 
-class QuadrupoleScan_EM:
+class QuadrupoleScan:
 
     # 1 screen, steps = 0: run scan -> otherwise, we get only one sigma2 value, but we need to fit emit, beta and alpha
     # 2 screens: run scan

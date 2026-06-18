@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import median_abs_deviation
-from Backend.EM_helpers.LinearResponse_EM import LinearResponse_EM
+from Backend.EM_helpers.LinearResponse import LinearResponse
 from Backend.EmittanceComputingEngines.AbstractComputingEngine import AbstractComputingEngine
 
 class LinearResponseEngine(AbstractComputingEngine):

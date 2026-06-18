@@ -70,7 +70,6 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         #             'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R',
         #             'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R',
         #             'MB71R']
-        #monitors = ['MB1R', 'MB3R', 'MB4R', 'MB5R', 'MB7R', 'MB8R', 'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB18R', 'MB21R', 'MB22R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB31R', 'MB33R', 'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB58R', 'MB59R', 'MB61R', 'MB62R', 'MB63R', 'MB64R', 'MB65R', 'MB66R', 'MB67R', 'MB68R', 'MB69R', 'MB71R']
 
         self.sextupoles = [
             "SF1R.1", "SD1R.1", "SBH1R.1", "SBH1R.2", "SQF1R.1", "SQF1R.2",
@@ -142,8 +141,6 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         self.screens = []
-        # Index of the selected BPMs in the Epics PV DR:monitors
-        self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
         # Bunch current monitors
         self.ict_names = [
             'gun:GUNcharge', 'l0:L0charge', 'linacbt:LNEcharge', 'linacbt:BTMcharge',
@@ -377,55 +374,44 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                 if data_returned.size == 0:
                     raise RuntimeError('DR:monitors returned an empty array')
                 a = data_returned.reshape((-1, 10))
-                if not self.bpm_indexes:
-                    raise RuntimeError('No BPM indexes')
-                if max(self.bpm_indexes) >= a.shape[0]:
-                    raise RuntimeError(f'Shape mismatch between BPM indexes and what DR:monitors is giving back')
 
-                selected = np.array(a[self.bpm_indexes, :], dtype=float, copy=True)
-                status = np.asarray(selected[:, 0], dtype=float)
-                charge = np.asarray(selected[:, 3], dtype=float)
-                valid = (status == 1) & np.isfinite(charge) & (charge > 0)
-                x_sample = np.asarray(selected[:, 1], dtype=float)
-                y_sample = np.asarray(selected[:, 2], dtype=float)
-                tmit_sample = np.where(valid, charge, 0.0)
+                if names is None:
+                    names = self.bpms
 
-                x_sample[~valid] = np.nan
-                y_sample[~valid] = np.nan
+                if isinstance(names, str):
+                    names = [names]
 
-                if np.any(~valid):
-                    nonvalid_bpms = [name for name, ok in zip(self.bpms, valid) if not ok]
-                    self.log(f'There are invalid BPMs in the DR')
-                x.append(x_sample)
-                y.append(y_sample)
-                tmit.append(tmit_sample)
-                self.log(f'Interface::get_bpms() = {x_sample}')
+                for name in names:
+                    k = int(name[2:-1])-1
+                    charge = a[k,3]
+                    status = a[k,0]
+                    valid = (status == 1) & np.isfinite(charge) & (charge > 0)
+                    if valid:
+                        x.append(a[k,1])
+                        y.append(a[k,2])
+                        tmit.append(charge)
+                    else:
+                        x.append(np.nan)
+                        y.append(np.nan)
+                        tmit.append(np.nan)
+
+                self.log(f'Interface::get_bpms() = {x}')
                 sample += 1
                 time.sleep(1)
+
             except Exception as e:
                 self.log(f'An error occurred while reading DR BPM sample: {e}')
                 time.sleep(1)
 
         if not x or not y or not tmit:
-            raise RuntimeError("Idk man, everything failed")
+            raise RuntimeError("everything failed")
 
         bpms = {
-            "names": self.bpms,
+            "names": names,
             "x": np.vstack(x) / 1e3, # mm
             "y": np.vstack(y) / 1e3, # mm
             "tmit": np.vstack(tmit),
         }
-
-        if isinstance(names, str):
-            names = [names]
-        if names is not None:
-            idx = [i for i, s in enumerate(bpms["names"]) if s in names]
-            bpms = {
-                "names": [bpms["names"][i] for i in idx],
-                "x": np.asarray(bpms["x"])[:, idx],
-                "y": np.asarray(bpms["y"])[:, idx],
-                "tmit": np.asarray(bpms["tmit"])[:, idx],
-            }
 
         return bpms
 

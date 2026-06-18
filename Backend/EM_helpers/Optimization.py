@@ -17,7 +17,7 @@ class OptimizationPaused(Exception):
         super().__init__(message)
         self.solution = solution
 
-class Optimization_EM:
+class Optimization:
     def __init__(self, interface, n_starts=8, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None):
         self.progress_callback = progress_callback
         self.interface = interface
