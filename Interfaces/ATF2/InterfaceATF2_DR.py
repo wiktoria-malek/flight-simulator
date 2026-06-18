@@ -54,8 +54,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
         monitors = [
             'MB1R', 'MB2R', 'MB3R', 'MB4R', 'MB5R', 'MB6R', 'MB7R', 'MB8R',
-            'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R', 'MBX1',
-            'MBX2', 'MB21R', 'MB22R',
+            'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R','MB21R', 'MB22R',
             'MB23R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB30R', 'MB31R', 'MB32R', 'MB33R',
             'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R',
             'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB57R',
@@ -381,19 +380,24 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                 if isinstance(names, str):
                     names = [names]
 
+                x_, y_, tmit_ = [], [], []
                 for name in names:
                     k = int(name[2:-1])-1
                     charge = a[k,3]
                     status = a[k,0]
                     valid = (status == 1) & np.isfinite(charge) & (charge > 0)
                     if valid:
-                        x.append(a[k,1])
-                        y.append(a[k,2])
-                        tmit.append(charge)
+                        x_.append(a[k,1])
+                        y_.append(a[k,2])
+                        tmit_.append(charge)
                     else:
-                        x.append(np.nan)
-                        y.append(np.nan)
-                        tmit.append(np.nan)
+                        x_.append(np.nan)
+                        y_.append(np.nan)
+                        tmit_.append(np.nan)
+
+                x.append(np.asarray(x_))
+                y.append(np.asarray(y_))
+                tmit.append(np.asarray(tmit_))
 
                 self.log(f'Interface::get_bpms() = {x}')
                 sample += 1
@@ -403,8 +407,9 @@ class InterfaceATF2_DR(AbstractMachineInterface):
                 self.log(f'An error occurred while reading DR BPM sample: {e}')
                 time.sleep(1)
 
-        if not x or not y or not tmit:
-            raise RuntimeError("everything failed")
+        x = np.asarray(x)
+        y = np.asarray(y)
+        tmit = np.asarray(tmit)
 
         bpms = {
             "names": names,
