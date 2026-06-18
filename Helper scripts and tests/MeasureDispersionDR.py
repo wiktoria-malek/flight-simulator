@@ -1,17 +1,18 @@
 from epics import PV, ca, caget
 from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
 import numpy as np
-
-I = InterfaceATF2_DR(nsamples= 10)
+import sys
+I = InterfaceATF2_DR(nsamples= 3)
 
 # Reading initial BPM readings
-bmps0 = I.get_bmps()
+bmps0 = I.get_bpms()
+sys.exit(0)
 
 # Changing the energy
-dP_P = self.interface.change_energy()
+dP_P = I.change_energy()
 
 # Reading BPM readings after changing the energy
-bmps1 = I.get_bmps()
+bmps1 = I.get_bpms()
 
 # Resetting the energy
 I.reset_energy()
