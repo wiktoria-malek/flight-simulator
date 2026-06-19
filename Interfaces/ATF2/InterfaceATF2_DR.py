@@ -55,6 +55,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         monitors = [
             'MB1R', 'MB2R', 'MB3R', 'MB4R', 'MB5R', 'MB6R', 'MB7R', 'MB8R',
             'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R','MB21R', 'MB22R',
+            'MB9R', 'MB10R', 'MB11R', 'MB12R', 'MB13R', 'MB14R', 'MB15R', 'MB16R', 'MB17R', 'MB18R', 'MB19R', 'MB21R', 'MB22R',
             'MB23R', 'MB24R', 'MB25R', 'MB26R', 'MB27R', 'MB28R', 'MB29R', 'MB30R', 'MB31R', 'MB32R', 'MB33R',
             'MB34R', 'MB35R', 'MB36R', 'MB37R', 'MB38R', 'MB39R', 'MB40R', 'MB41R', 'MB42R', 'MB43R', 'MB44R', 'MB45R',
             'MB46R', 'MB47R', 'MB48R', 'MB49R', 'MB50R', 'MB51R', 'MB52R', 'MB53R', 'MB54R', 'MB55R', 'MB56R', 'MB57R',

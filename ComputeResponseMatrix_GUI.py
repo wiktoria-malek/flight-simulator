@@ -96,6 +96,21 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         layout.addWidget(self.plot)
         self.plot.mpl_connect("button_press_event", self._handle_plot_double_click)
 
+        if self.data_dir_1:
+            self.data_dir_1=self._expand_path(self.data_dir_1)
+            self.data_directory_1.setText(self.data_dir_1)
+            self._load_lists_from_directory(self.data_dir_1)
+        if self.comp_difference==True:
+            self.diff_checkbox.setChecked(True)
+            self._compute_difference_clicked(checked=True)
+        if self.data_dir_2:
+            self.data_dir_2=self._expand_path(self.data_dir_2)
+            self.data_directory_2.setText(self.data_dir_2)
+            self._load_lists_from_directory(self.data_dir_2)
+        if self.auto_click_compute:
+            QTimer.singleShot(0, self.__compute_button_clicked)
+
+
     def _handle_plot_double_click(self, event):
         if event is None:
             return
@@ -153,20 +168,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         plot.draw()
         plot.flush_events()
         plot.repaint()
-
-        if self.data_dir_1:
-            self.data_dir_1=self._expand_path(self.data_dir_1)
-            self.data_directory_1.setText(self.data_dir_1)
-            self._load_lists_from_directory(self.data_dir_1)
-        if self.comp_difference==True:
-            self.diff_checkbox.setChecked(True)
-            self._compute_difference_clicked(checked=True)
-        if self.data_dir_2:
-            self.data_dir_2=self._expand_path(self.data_dir_2)
-            self.data_directory_2.setText(self.data_dir_2)
-            self._load_lists_from_directory(self.data_dir_2)
-        if self.auto_click_compute:
-            QTimer.singleShot(0, self.__compute_button_clicked)
 
     def _compute_response_of_one_data_directory(self,directory):
         directory=self._expand_path(directory)

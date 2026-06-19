@@ -728,6 +728,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         }
 
     def get_bpms(self, names=None):
+        """
+        Check the bpms names, lists, refactor etc, etc.
+        """
         print('Reading bpms...')
         if isinstance(names, str):
             names = [names]

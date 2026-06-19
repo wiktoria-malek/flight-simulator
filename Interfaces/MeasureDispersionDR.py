@@ -2,10 +2,17 @@ from epics import PV, ca, caget
 from Interfaces.ATF2.InterfaceATF2_DR import InterfaceATF2_DR
 import numpy as np
 import sys
+from matplotlib import pyplot as plt
 I = InterfaceATF2_DR(nsamples= 3)
 
 # Reading initial BPM readings
-bmps0 = I.get_bpms()
+state = I.get_state()
+bpms0 = state.get_orbit()
+
+plt.clf()
+plt.ion()
+plt.plot(bpms0['x'], label = "x")
+plt.plot(bpms0['y'], label = "y")
 sys.exit(0)
 
 # Changing the energy
