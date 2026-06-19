@@ -14,6 +14,9 @@ def get_quadrupoles(self):
     pass
 def set_quadrupoles(self):
     pass
+    
+BPMs at 0 dispersion region:
+ ML6T, ML5T, ML105T 
 '''
 
 LINAC_SEQUENCE = [
@@ -22,7 +25,13 @@ LINAC_SEQUENCE = [
     'ZH4L', 'ZV4L', 'ZH5L', 'ZV5L', 'ML4L', 'ZH6L', 'ZV6L', 'ML5L',
     'ZH7L', 'ZV7L', 'ML6L', 'ZH8L', 'ZV8L', 'ML7L', 'ZH9L', 'ML8L',
     'ZV9L', 'ML9L', 'ZH10L', 'ML10L', 'ZV10L', 'ML11L', 'ZH11L',
-    'ML12L', 'ZV11L', 'ML13L', 'ZH12L', 'ML14L', 'ZV12L', 'ML15L'
+    'ML12L', 'ZV11L', 'ML13L', 'ZH12L', 'ML14L', 'ZV12L', 'ML15L',
+    "ZX10T", "ZX11T", "ML1T", "ZH10T", "ZV11T", "MB1T", "ZX12T",
+    "ML2T", "ZY20T", "ZY21T", "ML101T", "ML102T", "ZY22T", "ZY23T", "ML103T",
+    "ZX30T", "ML3T", "ZX31T", "ZV30T", "ZH30T", "ML104T", "ZX32T", "ML4T",
+    "ML105T", "ZV40T", "ZH40T", "ML5T", "ML6T",
+    "ZX50T", "ML106T", "ZX51T", "ML7T", "ZX52T", "ZV50T", "ML8T", "ZH50T", "ZV51T", "ML9T",
+    "MB10T", "MB11T"
 ]
 
 LINAC_MONITORS = [
