@@ -313,14 +313,14 @@ class PhaseSpaces(QDialog):
         if sigy.ndim == 2:
             sigy = sigy[0, :]
 
-        emit_x = float(result.get("emit_x_norm", np.nan))
-        emit_y = float(result.get("emit_y_norm", np.nan))
+        emit_x_nom = float(result.get("emit_x_norm", np.nan))
+        emit_y_norm = float(result.get("emit_y_norm", np.nan))
 
         if interface is not None and hasattr(interface, "get_beam_factors"):
             gamma_rel, beta_rel = interface.get_beam_factors()
             beta_gamma = float(gamma_rel) * float(beta_rel)
-            emit_x = emit_x / beta_gamma
-            emit_y = emit_y / beta_gamma
+            emit_x_geom = emit_x_norm / beta_gamma
+            emit_y_geom = emit_y / beta_gamma
 
         tx = transport["x"]
         ty = transport["y"]
@@ -334,14 +334,14 @@ class PhaseSpaces(QDialog):
                 "screen": screen,
                 "R11": tx["R11"][i],
                 "R12": tx["R12"][i],
-                "sigma_over_sqrt_emit": sigx[i] / np.sqrt(emit_x),
+                "sigma_over_sqrt_emit": sigx[i] / np.sqrt(emit_x_geom),
             })
 
             projection_lines["y"].append({
                 "screen": screen,
                 "R11": ty["R33"][i],
                 "R12": ty["R34"][i],
-                "sigma_over_sqrt_emit": sigy[i] / np.sqrt(emit_y),
+                "sigma_over_sqrt_emit": sigy[i] / np.sqrt(emit_y_geom),
             })
 
         def propagate_twiss(beta0, alpha0, R11, R12, R21, R22):

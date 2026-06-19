@@ -383,6 +383,8 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
                 x_, y_, tmit_ = [], [], []
                 for name in names:
+                    # it can also be written as
+                    # re.findall(r'\d+', "MB12R") --> ['12']
                     k = int(name[2:-1])-1
                     charge = a[k,3]
                     status = a[k,0]

@@ -42,7 +42,7 @@ class LinearResponseEngine(AbstractComputingEngine):
         if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")
 
-        linear = LinearResponse_EM()
+        linear = LinearResponse()
         direct = linear.solve_twiss_from_measured_sigma2(screens=screens, sigma2_x=sigma2_x[0], sigma2_y=sigma2_y[0], beta_gamma=beta_gamma)
 
         pred_x = np.asarray(direct["pred_x"], dtype=float)
@@ -70,6 +70,8 @@ class LinearResponseEngine(AbstractComputingEngine):
             "quad_name": quad_name,
             "emit_x_norm": direct["emit_x_norm"],
             "emit_y_norm": direct["emit_y_norm"],
+            "emit_x_geom": direct["emit_x_norm"] / beta_gamma * 1e3, # um
+            "emit_y_geom": direct["emit_y_norm"] / beta_gamma * 1e3, # um
             "beta_x0": direct["beta_x0"],
             "alpha_x0": direct["alpha_x0"],
             "beta_y0": direct["beta_y0"],

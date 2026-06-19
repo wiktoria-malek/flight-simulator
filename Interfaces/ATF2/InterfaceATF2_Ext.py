@@ -124,13 +124,12 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
            Sato-san's way:
            BPM order must follow MONITOR_INDEX_TO_NAME, independent from sequence.
            
-        self.bpm_indexes = np.array(sorted(self.MONITOR_INDEX_TO_NAME.keys()), dtype=int)
-        self.bpms = [self.MONITOR_INDEX_TO_NAME[i] for i in self.bpm_indexes]
-        
         '''
         name_to_monitor_index = {name: index for index, name in self.MONITOR_INDEX_TO_NAME.items()}
-        self.bpms = [element for element in self.sequence if not element.lower().startswith('z') and element in name_to_monitor_index]
-        self.bpm_indexes = np.array([name_to_monitor_index[name] for name in self.bpms], dtype=int)
+        #self.bpms = [element for element in self.sequence if not element.lower().startswith('z') and element in name_to_monitor_index]
+        #self.bpm_indexes = np.array([name_to_monitor_index[name] for name in self.bpms], dtype=int)
+        self.bpm_indexes = np.array(sorted(self.MONITOR_INDEX_TO_NAME.keys()), dtype=int)
+        self.bpms = [self.MONITOR_INDEX_TO_NAME[i] for i in self.bpm_indexes]
 
         # Bunch current monitors
         self.ict_names = [
@@ -728,9 +727,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         }
 
     def get_bpms(self, names=None):
-        """
-        Check the bpms names, lists, refactor etc, etc.
-        """
         print('Reading bpms...')
         if isinstance(names, str):
             names = [names]

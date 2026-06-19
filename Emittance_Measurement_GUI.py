@@ -26,7 +26,7 @@ from Backend.EM_helpers.QuadrupoleScan import QuadrupoleScan
 from Backend.LogConsole import LogConsole
 from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
 from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
-
+from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 class ComputationMode(Enum):
     LRM = "Linear R-response model"
     ML = "Machine learning model"
@@ -185,8 +185,10 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self.clear_plots_button.clicked.connect(self._clear_plots)
         self.log_console=None
         self.phase_spaces = None
+        self.screen_images = None
         self.log_console_button.clicked.connect(self._show_console_log)
         self.phase_spaces_button.clicked.connect(self._show_phase_spaces)
+        self.display_screen_images_button.clicked.connect(self._show_screen_images)
         self.pause_button.clicked.connect(self._pause_task)
         self.resume_button.clicked.connect(self._resume_task)
         self._scan_pause_requested = False
@@ -408,7 +410,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
                 return "-"
             if not np.isfinite(value):
                 return "-"
-            return f"{value:.4f}{suffix}"
+            return f"{value:.10f}{suffix}"
 
         quad_strength_text = fmt_value(result.get("quad_k1_0"), " 1/m²")
         if result.get("quad_k1_0_is_fitted", False) and quad_strength_text != "-":
@@ -418,8 +420,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self.result_quad_strength.setText(quad_strength_text)
         self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), " mm·mrad"))
         self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), " mm·mrad"))
-        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), " mm·mrad"))
-        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), " mm·mrad"))
+        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), " μ·mrad"))
+        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), " μ·mrad"))
         self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), " m"))
         self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0")))
         self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), " m"))
@@ -1004,6 +1006,17 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self.phase_spaces.show()
         self.phase_spaces.raise_()
         self.phase_spaces.activateWindow()
+
+    def _show_screen_images(self):
+        result = None
+        if self.screen_images is None:
+            self.screen_images = DisplayScreenImages(self)
+        if not isinstance(result, dict):
+            QMessageBox.information(self, "Screen Images", "Read the screens first." )
+            return
+        self.screen_images.show()
+        self.screen_images.raise_()
+        self.screen_images.activateWindow()
 
     def log(self,text):
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")

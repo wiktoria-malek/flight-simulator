@@ -65,19 +65,19 @@ class LinearResponse:
 
         beta_gamma = self._get_beta_gamma(dataset)
 
-        emit_x = I[:, 0] / beta_gamma
+        emit_x_geom = I[:, 0] / beta_gamma
         beta_x = I[:, 1]
         alpha_x = I[:, 2]
         gamma_x = (1.0 + alpha_x**2) / beta_x
 
-        emit_y = I[:, 3] / beta_gamma
+        emit_y_geom = I[:, 3] / beta_gamma
         beta_y = I[:, 4]
         alpha_y = I[:, 5]
         gamma_y = (1.0 + alpha_y**2) / beta_y
 
         ones = np.ones(len(I))
-        Cx = np.column_stack((beta_x * emit_x, -alpha_x * emit_x, gamma_x * emit_x, ones))
-        Cy = np.column_stack((beta_y * emit_y, -alpha_y * emit_y, gamma_y * emit_y, ones))
+        Cx = np.column_stack((beta_x * emit_x_geom, -alpha_x * emit_x_geom, gamma_x * emit_x_geom, ones))
+        Cy = np.column_stack((beta_y * emit_y_geom, -alpha_y * emit_y_geom, gamma_y * emit_y_geom, ones))
 
         Bx = O[:, 0::2]**2
         By = O[:, 1::2]**2
@@ -93,17 +93,8 @@ class LinearResponse:
             return float(dataset["beta_gamma"])
         return 1300.0 / 0.51099895
 
-    def predict_sigma2_from_twiss_set(
-        self,
-        screens,
-        emit_x_norm,
-        beta_x0,
-        alpha_x0,
-        emit_y_norm,
-        beta_y0,
-        alpha_y0,
-        beta_gamma,
-    ):
+    def predict_sigma2_from_twiss_set(self, screens, emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, beta_gamma):
+
         emit_x_geom = float(emit_x_norm) / float(beta_gamma)
         emit_y_geom = float(emit_y_norm) / float(beta_gamma)
 
@@ -143,19 +134,19 @@ class LinearResponse:
         px = np.linalg.lstsq(Mx, yx, rcond=None)[0]
         py = np.linalg.lstsq(My, yy, rcond=None)[0]
 
-        emit_x = np.sqrt(px[0] * px[2] - px[1] ** 2)
-        beta_x0 = px[0] / emit_x
-        alpha_x0 = -px[1] / emit_x
+        emit_x_geom = np.sqrt(px[0] * px[2] - px[1] ** 2)
+        beta_x0 = px[0] / emit_x_geom
+        alpha_x0 = -px[1] / emit_x_geom
 
-        emit_y = np.sqrt(py[0] * py[2] - py[1] ** 2)
-        beta_y0 = py[0] / emit_y
-        alpha_y0 = -py[1] / emit_y
+        emit_y_geom = np.sqrt(py[0] * py[2] - py[1] ** 2)
+        beta_y0 = py[0] / emit_y_geom
+        alpha_y0 = -py[1] / emit_y_geom
 
         return {
-            "emit_x": emit_x,
-            "emit_y": emit_y,
-            "emit_x_norm": emit_x * beta_gamma,
-            "emit_y_norm": emit_y * beta_gamma,
+            "emit_x_geom": emit_x_geom,
+            "emit_y_geom": emit_y_geom,
+            "emit_x_norm": emit_x_geom * beta_gamma,
+            "emit_y_norm": emit_y_geom * beta_gamma,
             "beta_x0": beta_x0,
             "alpha_x0": alpha_x0,
             "beta_y0": beta_y0,

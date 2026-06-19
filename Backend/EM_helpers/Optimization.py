@@ -119,7 +119,7 @@ class Optimization:
             joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1_values=K1_values,
                                     sigx=sigx, sigx_std=sigx_std, sigy=sigy, sigy_std=sigy_std, bounds = bounds)
             fit_x = {
-                "emit": joint_fit["emit_x"],
+                "emit": joint_fit["emit_x_geom"],
                 "beta0": joint_fit["beta_x0"],
                 "alpha0": joint_fit["alpha_x0"],
                 "pred": joint_fit["pred_x"],
@@ -133,7 +133,7 @@ class Optimization:
                 "stopped": bool(joint_fit.get("stopped", False)),
             }
             fit_y = {
-                "emit": joint_fit["emit_y"],
+                "emit": joint_fit["emit_y_geom"],
                 "beta0": joint_fit["beta_y0"],
                 "alpha0": joint_fit["alpha_y0"],
                 "pred": joint_fit["pred_y"],
@@ -150,15 +150,15 @@ class Optimization:
             if self.print_M:
                 print(
                     f"Joint fit done: success={joint_fit['success']}, cost={joint_fit['cost']:.6g}, "
-                    f"emit_x={joint_fit['emit_x']:.6g}, beta_x0={joint_fit['beta_x0']:.6g}, alpha_x0={joint_fit['alpha_x0']:.6g}, "
-                    f"emit_y={joint_fit['emit_y']:.6g}, beta_y0={joint_fit['beta_y0']:.6g}, alpha_y0={joint_fit['alpha_y0']:.6g}"
+                    f"emit_x_geom={joint_fit['emit_x_geom']:.6g}, beta_x0={joint_fit['beta_x0']:.6g}, alpha_x0={joint_fit['alpha_x0']:.6g}, "
+                    f"emit_y_geom={joint_fit['emit_y_geom']:.6g}, beta_y0={joint_fit['beta_y0']:.6g}, alpha_y0={joint_fit['alpha_y0']:.6g}"
                 )
 
         except (OptimizationStopped, OptimizationPaused) as e:
             if isinstance(getattr(e, "solution", None), dict):
                 joint_fit = e.solution
                 fit_x = {
-                        "emit": joint_fit["emit_x"],
+                        "emit": joint_fit["emit_x_geom"],
                         "beta0": joint_fit["beta_x0"],
                         "alpha0": joint_fit["alpha_x0"],
                         "pred": joint_fit["pred_x"],
@@ -172,7 +172,7 @@ class Optimization:
                         "stopped": True,
                     }
                 fit_y = {
-                        "emit": joint_fit["emit_y"],
+                        "emit": joint_fit["emit_y_geom"],
                         "beta0": joint_fit["beta_y0"],
                         "alpha0": joint_fit["alpha_y0"],
                         "pred": joint_fit["pred_y"],
@@ -206,6 +206,9 @@ class Optimization:
             else np.nan
         )
 
+        emit_x_geom = fit_x["emit"]
+        emit_y_geom = fit_y["emit"]
+
         stopped = bool(fit_x.get("stopped", False) or fit_y.get("stopped", False) or self._stop_requested)
 
         result = {
@@ -213,6 +216,8 @@ class Optimization:
             "quad_name": quad_name,
             "emit_x_norm": emit_x_norm,
             "emit_y_norm": emit_y_norm,
+            "emit_x_geom": emit_x_geom * 1e3 , # μm
+            "emit_y_geom": emit_y_geom * 1e3, # μm
             "beta_x0": fit_x["beta0"],
             "alpha_x0": fit_x["alpha0"],
             "beta_y0": fit_y["beta0"],
@@ -322,10 +327,10 @@ class Optimization:
         emit_y_geom = max(float(best_row["emit_y_norm"]) / beta_gamma, 1e-12) if np.isfinite(beta_gamma) and beta_gamma > 0 else np.nan
 
         return {
-            "emit_x": emit_x_geom,
+            "emit_x_geom": emit_x_geom,
             "beta_x0": float(best_row["beta_x0"]),
             "alpha_x0": float(best_row["alpha_x0"]),
-            "emit_y": emit_y_geom,
+            "emit_y_geom": emit_y_geom,
             "beta_y0": float(best_row["beta_y0"]),
             "alpha_y0": float(best_row["alpha_y0"]),
             "pred_x": pred2_x,
@@ -425,19 +430,10 @@ class Optimization:
                 K1_values_used = K1_values
 
             try:
-                pred_sigx, pred_sigy = self.interface.predict_emittance_scan_response(
-                    quad_name=quad_name,
-                    screens=screens,
-                    K1_values=K1_values_used,
-                    emit_x=emit_x_norm,
-                    emit_y=emit_y_norm,
-                    beta_x0=beta_x0,
-                    beta_y0=beta_y0,
-                    alpha_x0=alpha_x0,
-                    alpha_y0=alpha_y0,
-                    reference_screen=screens[0],
-                    stop_checker=(lambda: self._stop_requested or self._pause_requested) if allow_stop else None,
-                )
+                pred_sigx, pred_sigy = self.interface.predict_emittance_scan_response(quad_name=quad_name, screens=screens,
+                    K1_values=K1_values_used, emit_x=emit_x_norm, emit_y=emit_y_norm, beta_x0=beta_x0, beta_y0=beta_y0,
+                    alpha_x0=alpha_x0, alpha_y0=alpha_y0, reference_screen=screens[0], stop_checker=(lambda: self._stop_requested or self._pause_requested) if allow_stop else None)
+
             except RuntimeError as e:
                 if str(e) == "__OPTIMIZATION_STOP__":
                     if self._pause_requested:
@@ -447,9 +443,7 @@ class Optimization:
             pred_sigx = np.asarray(pred_sigx, dtype=float)
             pred_sigy = np.asarray(pred_sigy, dtype=float)
             if pred_sigx.shape != sigx.shape or pred_sigy.shape != sigy.shape:
-                raise RuntimeError(
-                    f"Sigma shape does not match measured shape"
-                )
+                raise RuntimeError(f"Sigma shape does not match measured shape")
             return pred_sigx ** 2, pred_sigy ** 2
 
         def compute_cost(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
@@ -730,7 +724,7 @@ class Optimization:
         except Exception:
             pass
 
-        # Remove near-duplicate starts.
+        # remove near-duplicate starts
         unique_starts = []
         for candidate in ls_starts:
             if not np.all(np.isfinite(candidate)):

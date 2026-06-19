@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1546</width>
-    <height>826</height>
+    <height>828</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -374,6 +374,9 @@ QToolButton#delta_max_info_button:hover {
             </item>
             <item>
              <widget class="QToolButton" name="steps_toolbutton">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of quadrupole scan steps between Delta min and Delta max.&lt;br/&gt;Set to 0 to run conventional multi-screen emittance measurement without scanning the quadrupole. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#steps_toolbutton {
     border: 1px solid #888;
@@ -407,6 +410,9 @@ QToolButton#steps_toolbutton:hover {
             </item>
             <item>
              <widget class="QToolButton" name="nshots_toolbutton">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of beam size measurements acquired at each quadrupole setting.&lt;br/&gt;The displayed beam size is the average of all measurements. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#nshots_toolbutton {
     border: 1px solid #888;
@@ -495,6 +501,9 @@ QGroupBox#xoptSettingsGroup::title {
             </item>
             <item>
              <widget class="QToolButton" name="bo_initial_steps_toolbutton">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of random starting points used by Bayesian optimization. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#bo_initial_steps_toolbutton {
     border: 1px solid #888;
@@ -528,6 +537,9 @@ QToolButton#bo_initial_steps_toolbutton:hover {
             </item>
             <item>
              <widget class="QToolButton" name="bo_opt_steps_toolbutton">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of Bayesian optimization iterations used to search for Twiss parameters and emittance. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#bo_opt_steps_toolbutton{
     border: 1px solid #888;
@@ -579,13 +591,6 @@ QGroupBox#localOptimizationSettingsGroup::title {
           <property name="verticalSpacing">
            <number>6</number>
           </property>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_nm_steps">
-            <property name="text">
-             <string>Least squares steps</string>
-            </property>
-           </widget>
-          </item>
           <item row="0" column="1">
            <widget class="QSpinBox" name="nm_steps_spin">
             <property name="minimum">
@@ -657,6 +662,42 @@ QToolButton#fit_k1_scale_info_button:hover {
               </property>
               <property name="autoRaise">
                <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="0" column="0">
+           <layout class="QHBoxLayout" name="horizontalLayout_6">
+            <item>
+             <widget class="QLabel" name="label_nm_steps">
+              <property name="text">
+               <string>Least squares steps</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="ls_steps_tooltip">
+              <property name="toolTip">
+               <string>Maximum number of local least-squares iterations performed after Bayesian optimization.</string>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QToolButton#ls_steps_tooltip {
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#ls_steps_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+              </property>
+              <property name="text">
+               <string>?</string>
               </property>
              </widget>
             </item>
@@ -1149,6 +1190,13 @@ QGroupBox#fit_results_group::title {
               <widget class="QPushButton" name="emittance_evolution_button">
                <property name="text">
                 <string>Show emittance evolution</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="display_screen_images_button">
+               <property name="text">
+                <string>Display screen images</string>
                </property>
               </widget>
              </item>
