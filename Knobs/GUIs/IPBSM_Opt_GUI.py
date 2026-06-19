@@ -85,6 +85,7 @@ IPBSMInterface = _IPBSM_OPT.IPBSMInterface
 
 ZSCAN_DEFAULT_RANGE = 0.0085
 ZSCAN_DEFAULT_STEP = 0.001
+DEFAULT_IPBSM_OUTPUT_BASE_DIR = Path.home() / "atf" / "data" / "flight-simulator" / "IPBSMOpt"
 ZAY_PRESET_INIT_POINTS = 9
 ZAY_PRESET_MAX_STEPS = 20
 ZSCAN_KNOBS = ["Z scan knob"]
@@ -152,6 +153,10 @@ EI_STOP_MODES = {
     "Standard": (1e-3, 2),
     "Careful": (3e-4, 3),
 }
+
+
+def default_output_base_dir() -> Path:
+    return DEFAULT_IPBSM_OUTPUT_BASE_DIR
 
 
 def recommended_initial_points(d: int) -> int:
@@ -642,7 +647,7 @@ class MainWindow(QMainWindow):
         self.zscan_step.setSingleStep(0.0001)
         self.zscan_step.setValue(ZSCAN_DEFAULT_STEP)
 
-        self.output_dir_edit = QLineEdit(str(Path("Data").resolve()))
+        self.output_dir_edit = QLineEdit(str(default_output_base_dir()))
         self.output_dir_browse_btn = QPushButton("Browse...")
 
         self.n_init = QSpinBox()
@@ -1121,7 +1126,7 @@ class MainWindow(QMainWindow):
             box.setValue(sigma_for_mode(mode, name))
 
     def _browse_output_dir(self):
-        current = self.output_dir_edit.text().strip() or str(Path("Data").resolve())
+        current = self.output_dir_edit.text().strip() or str(default_output_base_dir())
         path = QFileDialog.getExistingDirectory(self, "Select save directory", current)
         if path:
             self.output_dir_edit.setText(path)
@@ -1198,7 +1203,8 @@ class MainWindow(QMainWindow):
             return json.load(f)
 
     def _browse_resume_file(self):
-        current = self.resume_file_edit.text().strip() or str(Path(self.output_dir_edit.text().strip() or "Data").resolve())
+        current_base = self.output_dir_edit.text().strip() or str(default_output_base_dir())
+        current = self.resume_file_edit.text().strip() or str(Path(current_base).expanduser().resolve())
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Select interrupted measurements.csv",
@@ -2009,7 +2015,7 @@ class MainWindow(QMainWindow):
             return
 
         tag = now_tag()
-        output_base_dir = Path(self.output_dir_edit.text().strip() or "Data")
+        output_base_dir = Path(self.output_dir_edit.text().strip() or str(default_output_base_dir())).expanduser()
         out_dir = self._build_run_output_dir(
             output_base_dir,
             tag,

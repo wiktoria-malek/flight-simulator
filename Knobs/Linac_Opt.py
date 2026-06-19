@@ -44,6 +44,14 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Interfaces.ATF2.InterfaceATF2_LinacBT import InterfaceATF2_LinacBT, BT_SEQUENCE
 
+FLIGHT_SIMULATOR_DATA_ROOT = Path.home() / "atf" / "data" / "flight-simulator"
+
+
+def default_linacopt_save_dir(year: Optional[str] = None) -> Path:
+    year_text = str(year or datetime.datetime.now().strftime("%Y"))
+    return FLIGHT_SIMULATOR_DATA_ROOT / "LinacOpt" / year_text
+
+
 # ----------------------------
 # Scan defaults (same values used by Sequential and Group-LBO)
 # ----------------------------
@@ -2302,7 +2310,7 @@ class MainWindow(QMainWindow):
 
         self.worker: Optional[OptimizationWorker] = None
         self.interface: Optional[InterfaceATF2_LinacBT] = None
-        self.save_path = Path.cwd() / "Data" / datetime.datetime.now().strftime("%Y")
+        self.save_path = default_linacopt_save_dir()
         self._run_profile: str = RUN_PROFILE_MAIN
         self.target_checks: Dict[str, QCheckBox] = {}
         self.target_status_labels: Dict[str, QLabel] = {}
