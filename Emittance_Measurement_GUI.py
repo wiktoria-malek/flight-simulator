@@ -202,6 +202,10 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
     def _on_computation_mode_changed(self, text):
         self.computation_mode = ComputationMode(text)
         is_linear_mode = self.computation_mode == ComputationMode.LRM
+        if is_linear_mode:
+            self.steps_settings.setValue(0)
+        else:
+            self.steps_settings.setValue(5)
         widgets_to_disable = [self.xoptSettingsGroup,self.localOptimizationSettingsGroup]
         for widget in widgets_to_disable:
             widget.setEnabled(not is_linear_mode)
@@ -1008,12 +1012,13 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self.phase_spaces.activateWindow()
 
     def _show_screen_images(self):
-        result = None
         if self.screen_images is None:
             self.screen_images = DisplayScreenImages(self)
-        if not isinstance(result, dict):
-            QMessageBox.information(self, "Screen Images", "Read the screens first." )
-            return
+
+        # here goes the self.screen_images._plot_whatever
+
+
+
         self.screen_images.show()
         self.screen_images.raise_()
         self.screen_images.activateWindow()

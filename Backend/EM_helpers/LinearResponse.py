@@ -4,6 +4,11 @@ import numpy as np
 '''
 LinearResponse - pure mathematics behind linear response approach
 linear_response_engine.py - using this mathematics on session from GUI
+sigma² = R11² * <x²> + 2 R11 R12 * <x x'> + R12² * <x'²>
+<x²>   = emit * beta
+<x x'> = -emit * alpha
+<x'²>  = emit * gamma
+gamma = (1 + alpha²) / beta
 '''
 class LinearResponse:
     def __init__(self, coefficients_path=None, dataset_path=None):
@@ -59,8 +64,32 @@ class LinearResponse:
             dataset_path = self.dataset_path
 
         dataset = np.load(dataset_path, allow_pickle=True)
-        I = np.asarray(dataset["X"], dtype=float)
-        O = np.asarray(dataset["Y"], dtype=float)
+        I = np.asarray(dataset["X"], dtype=float) # twiss parameters at the entrance
+        # I[i] = [
+        #     emit_x_norm,
+        #     beta_x,
+        #     alpha_x,
+        #     emit_y_norm,
+        #     beta_y,
+        #     alpha_y
+        # ]
+
+        # O[i] = [
+        #     [
+        #         sigx_screen0,
+        #         sigy_screen0,
+        #         sigx_screen1,
+        #         sigy_screen1,
+        #         sigx_screen2,
+        #         sigy_screen2,
+        #         sigx_screen3,
+        #         sigy_screen3,
+        #     ]
+        # ]
+
+
+
+        O = np.asarray(dataset["Y"], dtype=float) # response on screens, sigma**2
         self.screens = [str(s) for s in dataset["screens"]]
 
         beta_gamma = self._get_beta_gamma(dataset)
