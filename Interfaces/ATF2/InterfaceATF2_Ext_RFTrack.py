@@ -968,7 +968,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             ], dtype=float)
 
             bunch_x = rft.Bunch6d(rft.electronmass, 0.0, self.Q, bx)
-            tracked_x = self.lattice.track(bunch_x, start_element, end_element)
+            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+            tracked_x = lattice_view.track(bunch_x)
 
             for screen in screens:
                 screen_element = self.lattice[screen]
@@ -992,7 +993,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             ], dtype=float)
 
             bunch_y = rft.Bunch6d(rft.electronmass, 0.0, self.Q, by)
-            tracked_y = self.lattice.track(bunch_y, start_element, end_element)
+            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+            tracked_y = lattice_view.track(bunch_y)
 
             for screen in screens:
                 screen_element = self.lattice[screen]
