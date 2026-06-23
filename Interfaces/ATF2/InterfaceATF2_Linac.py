@@ -268,6 +268,8 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
                 x.append(a[self.bpm_indexes, 1])
                 y.append(a[self.bpm_indexes, 2])
                 tmit.append(status * a[self.bpm_indexes, 3])
+                for name in names:
+                    print(f"{name} = {self.bpm_indexes[name]}")
             time.sleep(0.35)
 
         bpms = {
