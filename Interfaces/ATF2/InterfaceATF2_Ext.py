@@ -218,7 +218,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         canonical = self.qmag_alias_to_canonical.get(name, name)
         calib = self.QUAD_CALIB.get(name) or self.QUAD_CALIB.get(canonical)
         if calib is None:
-            raise KeyError(f"No A<->K1 calibration for quadrupole '{name}' ")
+            raise KeyError(f"No A-K1 calibration for quadrupole '{name}' ")
         k_T_per_A = float(calib["k_T_per_A"])
         L_m = float(calib["L_m"])
         if k_T_per_A == 0.0 or L_m == 0.0:
@@ -350,13 +350,13 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         ides = np.array(ides, dtype=float)
         iact = np.array(iact, dtype=float)
-        bdes = np.array([self.current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
-        bact = np.array([self.current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
+        #bdes = np.array([self.current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
+        #bact = np.array([self.current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
 
         data = {
             "names": names,
-            "bdes": bdes, # 1/m^2,
-            "bact": bact,  # 1/m^2
+            #"bdes": bdes, # 1/m^2,
+            #"bact": bact,  # 1/m^2
             "ides": np.array(ides, dtype=float),
             "iact": np.array(iact, dtype=float),
             "xdes": np.array(xdes, dtype=float),
