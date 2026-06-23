@@ -83,7 +83,7 @@ class AbstractMachineInterface(ABC):
             hcorrectors_names=self.get_hcorrectors_names(),
             vcorrectors_names=self.get_vcorrectors_names(),
             #screens=self.get_screens(),
-            quadrupoles=self.get_quadrupoles(),
+            #quadrupoles=self.get_quadrupoles(),
             sextupoles=self.get_sextupoles(),
         )
 
