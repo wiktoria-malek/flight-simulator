@@ -326,6 +326,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         converted to K1, something like:
         k_T_per_A -> prototype of equations is in CLEAR RFT interface
         """
+        print("get_quadrupoles running")
         if names is None:
             names = self.qmags # quadrupoles names
         if type(names) == str:
@@ -467,6 +468,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         So, for 4 screens it's 32 seconds.
         EM GUI calls get_screens() multiple times, every K1 change.
         """
+
         print(f"Acquiring data for OTR{otr_id_str}...")
         pv_in_name = f'{screen_pv_name}:Target:WRITE:IN'
         pv_out_name = f'{screen_pv_name}:Target:WRITE:OUT'
