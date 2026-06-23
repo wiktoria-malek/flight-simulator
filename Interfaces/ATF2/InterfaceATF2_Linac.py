@@ -34,6 +34,8 @@ LINAC_SEQUENCE = [
     "MB10T", "MB11T"
 ]
 
+# ATF2' BPMs Epics names
+# https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
 LINAC_MONITORS = [
     "MB5L", "MB6L", "MB7L", "MB8L", "MB9L", "MB10L", "MB11L", "ML1L",
     "ML2L", "ML3L", "ML4L", "ML5L", "ML6L", "ML7L", "ML8L", "ML9L",
@@ -165,7 +167,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         pv.put(self.phase_kl1)
         time.sleep(1)
 
-    def change_intensity(self, intensity=0.1):
+    def change_intensity(self, intensity=0.15):
         print(f'Changing laser intensity to {intensity}...')
         laser_intensity1 = 10000 * float(intensity) / self.laser_intensity2
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity1)
