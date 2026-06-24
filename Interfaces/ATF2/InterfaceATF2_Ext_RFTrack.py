@@ -185,7 +185,9 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles)
 
     def __track_bunch(self):
+        print("ciao3")
         I0 = self.B0.get_info()
+        print("ciao4")
         dx = self.jitter * I0.sigma_x
         dy = self.jitter * I0.sigma_y
         dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)
@@ -630,7 +632,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         '''
         data=np.loadtxt(path)
         s = data[:,0]
-        wake = data[:,1]
+        wake = data[:, 1] * float(scale)
         trailing=s<=0
         s=s[trailing]
         wake=wake[trailing]
@@ -651,7 +653,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def _attach_wake_data_to_elements(self,wake_scale=1000,nsteps=20):
         wake_data_directory=os.path.join(os.path.dirname(__file__),"Ext_ATF2","WakeData")
-
+        if float(wake_scale)==0:
+            return
         def _attach(name,WF):
             self.lattice[name].add_collective_effect(WF)
             self.lattice[name].set_cfx_nsteps(int(nsteps))
@@ -712,7 +715,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return {
             "names": all_names,
-            #"S": np.array(all_s, dtype=float),
+            "S": np.array(all_s, dtype=float),
             "L": np.array(all_l, dtype=float),
         }
 

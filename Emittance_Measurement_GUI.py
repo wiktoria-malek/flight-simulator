@@ -1,8 +1,6 @@
+import RF_Track as rft
 import os, sys, time
 import numpy as np
-import matplotlib
-matplotlib.use("QtAgg")
-import matplotlib.colors as mcolors
 from datetime import datetime
 from enum import Enum
 try:
@@ -17,15 +15,17 @@ except ImportError:
     from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
-
+import matplotlib
+import matplotlib.colors as mcolors
+matplotlib.use("QtAgg")
 from Interfaces.interface_setup import INTERFACE_SETUP
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
+from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
 from Backend.EM_helpers.QuadrupoleScan import QuadrupoleScan
 from Backend.LogConsole import LogConsole
 from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
-from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
 from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 class ComputationMode(Enum):
     LRM = "Linear R-response model"
@@ -1032,24 +1032,19 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
 
 
 if __name__ == "__main__":
-
     app = QApplication(sys.argv)
-
     from Backend import SelectInterface
-    interface = SelectInterface.choose_acc_and_interface()
+    dialog = SelectInterface.choose_acc_and_interface()
+    if dialog is None:
+        print("Selection cancelled.")
+        sys.exit(1)
 
-    if interface is None:
-        sys.exit(0)
-
-    project_name = (
-        interface.get_name()
-        if hasattr(interface, "get_name")
-        else type(interface).__name__
-    )
-
+    I = dialog
+    project_name = I.get_name()
+    print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     dir_name = os.path.expanduser(f"~/CERN-Flight_Simulator-Data/EM_{project_name}{time_str}")
 
-    w = MainWindow(interface, dir_name)
+    w = MainWindow(I, dir_name)
     w.show()
     sys.exit(app.exec())

@@ -1353,7 +1353,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     from Backend import SelectInterface
-
     dialog = SelectInterface.choose_acc_and_interface()
     if dialog is None:
         print("Selection cancelled.")
