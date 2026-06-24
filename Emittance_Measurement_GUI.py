@@ -1,4 +1,4 @@
-import RF_Track as rft
+import RF_Track as rft # do not touch this
 import os, sys, time
 import numpy as np
 from datetime import datetime
@@ -158,9 +158,9 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         if layout is None:
             layout = QVBoxLayout(self.plotPlaceholder)
         layout.addWidget(self.canvas)
+        quadrupoles = list(getattr(self.interface, "quadrupoles", []))
         quadrupoles = list(self.interface.get_quadrupoles()["names"])
-        #screens_data = self.interface.get_screens()
-        screens = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
+        screens = self.interface.get_screens()["names"]
         screen_order, screen_order_type = self._get_element_order_values(screens)
         screen_pairs = sorted(zip(screens, screen_order),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf) # assigns S position to each screen
         screens_sorted = [name for name, _ in screen_pairs] # only names
@@ -290,9 +290,9 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self._scan_is_paused = False
         self.quad_on_plot.clear()
         self.screen_on_plot.clear()
-        quadrupoles = list(self.interface.get_quadrupoles()["names"])
-        screens_data = self.interface.get_screens()
-        screens = list(screens_data["names"])
+        quadrupoles = list(getattr(self.interface, "quadrupoles", []))
+        #screens_data = self.interface.get_screens()
+        screens = list(getattr(self.interface, "screens", []))
         screen_order, screen_order_type = self._get_element_order_values(screens)
         screen_pairs = sorted(zip(screens, screen_order),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf)
         screens_sorted = [name for name, _ in screen_pairs]
@@ -755,7 +755,6 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
             self.screens_list.blockSignals(True)
             self.screens_list.selectAll()
             self.screens_list.blockSignals(False)
-
         _, screens = self._get_selection()
         self.screen_on_plot.blockSignals(True)
         self.screen_on_plot.clear()

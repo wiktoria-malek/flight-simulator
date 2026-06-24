@@ -45,23 +45,20 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "MQF5AFF", "MQD4BFF", "MSD4FF", "MQD4AFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
             "MSF1FF", "MQF1FF", "MSD0FF", "MQD0FF", "PREIP", "IPA", "IPB", "IPC", "M-PIP"
         ]
-        #sequence = [ 'MB1X', 'MB2X', 'ZV1X', 'MQF1X', 'ZV2X', 'MQD2X', 'MQF3X', 'ZH1X', 'ZV3X', 'MQF4X', 'ZH2X', 'MQD5X', 'ZV4X', 'ZV5X', 'MQF6X', 'MQF7X', 'ZVFB1X', 'ZHFB1X', 'ZH3X', 'MQD8X', 'ZV6X', 'ZHFB2X', 'MQF9X', 'ZH4X', 'ZVFB2X', 'ZV7X', 'MQD10X', 'ZH5X', 'MQF11X', 'ZV8X', 'MQD12X', 'ZH6X', 'MQF13X', 'MQD14X', 'ZH7X', 'MQF15X', 'ZV9X', 'MQD16X', 'ZH8X', 'MQF17X', 'ZV10X', 'MQD18X', 'ZH9X', 'MQF19X', 'ZV11X', 'MQD20X', 'ZVFB1FF', 'ZHFB1FF', 'ZH10X', 'MQF21X', 'MQM16FF', 'ZH1FF', 'ZV1FF', 'MQM15FF', 'MQM14FF', 'MQM12FF', 'MQM11FF', 'MQD10AFF', 'MQF9AFF', 'MQD8FF', 'MQF7FF', 'MQF5BFF', 'MQD4BFF', 'MQF3FF', 'MQD2BFF', 'MQD2AFF', 'MSF1FF', 'MPREIP', 'MW1IP', 'MPIP', 'MDUMP' ]
+
+        quadrupoles = [
+            "MQF1X", "MQD2X", "MQF3X","MQF4X", "MQD5X", "MQF6X", "MQF7X","MQD8X","MQF9X", "MQD10X",
+            "MQF11X", "MQD12X", "MQF13X", "MQD14X", "MQF15X","MQD16X", "MQF17X","MQD18X","MQF19X",
+            "MQD20X", "MQF21X", "MQM16FF", "MQM15FF", "MQM14FF", "MQM13FF", "MQM12FF", "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9BFF",
+            "MQF9AFF", "MQD8FF", "MQF7FF", "MQD6FF", "MQF5BFF", "MQF5AFF", "MQD4BFF", "MQD4AFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
+            "MQF1FF",  "MQD0FF"
+        ]
+        self.quadrupoles = list(quadrupoles)
+
+        screens = ['OTR0X','OTR1X','OTR2X','OTR3X']
+        self.screens = list(screens)
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
-        '''
-        monitors = ['MB1X', 'MB2X', 'MQF1X', 'MQD2X', 'MQF3X', 'MQF4X',
-                    'MQD5X', 'MQF6X', 'MQF7X', 'MQD8X', 'MQF9X', 'MQD10X', 'MQF11X',
-                    'MQD12X', 'MQF13X', 'MQD14X', 'MQF15X', 'MQD16X', 'MQF17X', 'MQD18X',
-                    'MQF19X', 'MQD20X', 'MQF21X', 'IPBPM1', 'IPBPM2', 'nBPM1', 'nBPM2',
-                    'nBPM3', 'MQM16FF', 'MQM15FF', 'MQM14FF', 'MFB2FF', 'MQM13FF',
-                    'MQM12FF', 'MFB1FF', 'MQM11FF', 'MQD10BFF', 'MQD10AFF', 'MQF9BFF',
-                    'MSF6FF', 'MQF9AFF', 'MQD8FF', 'MQF7FF', 'MQD6FF', 'MQF5BFF',
-                    'MSF5FF', 'MQF5AFF', 'MQD4BFF', 'MSD4FF', 'MQD4AFF', 'MQF3FF',
-                    'MQD2BFF', 'MQD2AFF', 'MSF1FF', 'MQF1FF', 'MSD0FF', 'MQD0FF',
-                    'M1&2IP', 'MPIP', 'MDUMP', 'ICT1X', 'ICTDUMP', 'MW1X', 'MW1IP',
-                    'MPREIP', 'MIPA', 'MIPB']
-        '''
-
         monitors = [
             "MB1X", "MB2X", "MQF1X", "MQD2X", "MQF3X", "MQF4X", "MQD5X", "MQF6X",
             "MQF7X", "MQD8X", "MQF9X", "MQD10X", "MQF11X", "MQD12X", "MQF13X",
@@ -85,6 +82,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             59: "MDUMP", 60: "ICT1X", 61: "ICTDUMP", 62: "MW1X", 63: "MW1IP", 64: "MPREIP", 65: "MIPA", 66: "MIPB"}
 
         self.sextupoles = ["SF6FF", "SK4FF", "SK3FF", "SF5FF", "SD4FF", "SK2FF", "SK1FF", "SF1FF", "SD0FF"]
+        self.screens = ['OTR0X', 'OTR1X','OTR2X','OTR3X']
+        #self.quadrupoles = ['OTR0X', 'OTR1X','OTR2X','OTR3X']
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]

@@ -185,9 +185,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles)
 
     def __track_bunch(self):
-        print("ciao3")
         I0 = self.B0.get_info()
-        print("ciao4")
         dx = self.jitter * I0.sigma_x
         dy = self.jitter * I0.sigma_y
         dz, dt, roll = 0.0, 0.0, float(self.coupling_roll)

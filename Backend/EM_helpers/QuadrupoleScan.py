@@ -38,6 +38,7 @@ class QuadrupoleScan:
 
         if len(quad_names) == 1:
             return self._run_single_scan(quad_name=quad_names[0], screens=screens, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, bpms=bpms, reference_screen=reference_screen, progress_callback=progress_callback)
+
         per_quad_sessions = []
         cancelled = False
         skipped_quadrupoles = []
@@ -116,7 +117,6 @@ class QuadrupoleScan:
             bpms = list(self.interface.get_bpms()["names"])
         else:
             bpms = list(bpms)
-
         if len(screens) == 0:
             raise ValueError("At least one screen is required")
         if reference_screen is None:
@@ -128,7 +128,6 @@ class QuadrupoleScan:
             raise ValueError("steps must be zero or positive")
         if steps_requested > 0 and delta_max <= delta_min:
             raise ValueError("delta_max must be larger than delta_min")
-
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
         quadrupoles = self.interface.get_quadrupoles()
         quad_names = list(quadrupoles["names"])
@@ -148,7 +147,6 @@ class QuadrupoleScan:
             deltas = np.linspace(float(delta_min), float(delta_max), steps_requested)
             K1_values = K1_0 * (1 + deltas)
             measurement_mode = "quadrupole_scan"
-
         nsteps_scan = len(K1_values)
         nscreens = len(screens)
         nbpms = len(bpms)
@@ -180,12 +178,10 @@ class QuadrupoleScan:
                 if getattr(self, "_cancel", False):
                     cancel_requested = True
                     break
-
                 insert_screen = getattr(self.interface, "insert_screen", None)
                 extract_screen = getattr(self.interface, "extract_screen", None)
                 if callable(insert_screen):
                     insert_screen(screen_name)
-
                 try:
                     for i, K1 in enumerate(K1_values):
                         while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
@@ -193,13 +189,11 @@ class QuadrupoleScan:
                             QApplication.processEvents()
                             time.sleep(0.05)
                         setattr(self, "_scan_is_paused", False)
-
                         if getattr(self, "_scan_stop_requested", False):
                             raise KeyboardInterrupt("Scan stopped by user.")
                         if getattr(self, "_cancel", False):
                             cancel_requested = True
                             break
-
                         self.interface.set_quadrupoles([quad_name], [float(K1)])
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
@@ -218,12 +212,13 @@ class QuadrupoleScan:
                             if getattr(self, "_cancel", False):
                                 cancel_requested = True
                                 break
-
                             state = self.interface.get_state()
                             state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
                             state.save(filename=state_filename)
                             state_files.append(state_filename)
-                            screens_data = state.get_screens([screen_name])
+                            print("debug21")
+                            screens_data = state.get_screens([screen_name]) # ta linia produkuje błąd
+                            print("debug22")
                             screen_name_to_index = {name: index for index, name in enumerate(screens_data["names"])}
                             idx = screen_name_to_index.get(screen_name)
                             if idx is not None:
