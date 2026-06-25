@@ -260,6 +260,11 @@ class MainWindow(QMainWindow):
         self.live_average: List[float] = []
         self.live_average_limit: Optional[float] = None
         self.live_chosen_by: List[str] = []
+        self.live_discarded_eval_index: List[int] = []
+        self.live_discarded_modulation: List[float] = []
+        self.live_discarded_average: List[float] = []
+        self.live_discarded_chosen_by: List[str] = []
+        self.resume_discarded_rows: List[Dict[str, Any]] = []
         self._last_recommended_n_init = 0
         self._last_recommended_max_steps = 0
         self._last_recommended_candidate_pool = 0
@@ -1289,6 +1294,11 @@ class MainWindow(QMainWindow):
                 })
         return rows_out
 
+    def _split_resume_rows_for_remeasure(self, rows: List[Dict]) -> tuple[List[Dict], List[Dict]]:
+        if not rows:
+            return [], []
+        return list(rows[:-1]), [dict(rows[-1])]
+
     def _update_method_visibility(self):
         method = self.method_box.currentText().upper()
         is_gf = self._is_sequential_method(method)
@@ -1838,6 +1848,7 @@ class MainWindow(QMainWindow):
             average_pause_ratio=float(getattr(cfg, "average_pause_ratio", 0.80)),
             include_1d=True,
             bo_data_only_1d=bool(bo_data_only_1d),
+            discarded_rows=self.resume_discarded_rows,
         )
         png_saved = [p for p in saved if str(p).lower().endswith(".png")]
         self._populate_gallery(
@@ -1870,15 +1881,24 @@ class MainWindow(QMainWindow):
         self.live_average = []
         self.live_average_limit = None
         self.live_chosen_by = []
+        self.live_discarded_eval_index = []
+        self.live_discarded_modulation = []
+        self.live_discarded_average = []
+        self.live_discarded_chosen_by = []
+        self.resume_discarded_rows = []
         self._redraw_live_plot()
 
-    def _prime_live_history(self, warm_start_rows: List[Dict]) -> None:
+    def _prime_live_history(self, warm_start_rows: List[Dict], discarded_rows: Optional[List[Dict]] = None) -> None:
         self.live_eval_index = []
         self.live_modulation = []
         self.live_best = []
         self.live_average = []
         self.live_average_limit = None
         self.live_chosen_by = []
+        self.live_discarded_eval_index = []
+        self.live_discarded_modulation = []
+        self.live_discarded_average = []
+        self.live_discarded_chosen_by = []
         best = None
         ratio = float(getattr(self.last_run_cfg, "average_pause_ratio", self.avg_pause_ratio.value()))
         for idx, item in enumerate(warm_start_rows, start=1):
@@ -1899,6 +1919,23 @@ class MainWindow(QMainWindow):
             self.live_average.append(avg)
             if self.live_average_limit is None and np.isfinite(avg):
                 self.live_average_limit = float(avg) * ratio
+        for item in list(discarded_rows or []):
+            try:
+                step = int(item.get("step", len(self.live_eval_index) + len(self.live_discarded_eval_index) + 1))
+                y = float(item.get("y", float("nan")))
+            except Exception:
+                continue
+            if not np.isfinite(y):
+                continue
+            self.live_discarded_eval_index.append(step)
+            self.live_discarded_modulation.append(y)
+            self.live_discarded_chosen_by.append(str(item.get("chosen_by", "warm_start_discarded")))
+            dat = dict(item.get("dat", {}) or {})
+            try:
+                avg = float(dat.get("average", float("nan")))
+            except Exception:
+                avg = float("nan")
+            self.live_discarded_average.append(avg)
         self._redraw_live_plot()
 
     def _redraw_live_plot(self):
@@ -1963,6 +2000,30 @@ class MainWindow(QMainWindow):
                         label=f"Pause limit: {lim:.3f}",
                     )
                     self.ax_live_avg.legend(loc="best")
+        if self.live_discarded_eval_index:
+            self.ax_live.plot(
+                self.live_discarded_eval_index,
+                self.live_discarded_modulation,
+                linestyle="None",
+                marker="x",
+                color="#dc2626",
+                markersize=8,
+                markeredgewidth=2.0,
+                zorder=4,
+            )
+            xs_disc = np.asarray(self.live_discarded_eval_index, float)
+            ys_disc = np.asarray(self.live_discarded_average, float)
+            disc_mask = np.isfinite(xs_disc) & np.isfinite(ys_disc)
+            if np.any(disc_mask):
+                self.ax_live_avg.plot(
+                    xs_disc[disc_mask],
+                    ys_disc[disc_mask],
+                    linestyle="None",
+                    marker="x",
+                    color="#dc2626",
+                    markersize=8,
+                    markeredgewidth=2.0,
+                )
         self.ax_live.set_title("IPBSM modulation vs evaluation")
         self.ax_live.set_ylabel("Modulation")
         self.ax_live.grid(True, alpha=0.3)
@@ -2026,21 +2087,23 @@ class MainWindow(QMainWindow):
         self.last_run_cfg = cfg
         self.stop_flag = StopFlag()
         warm_start_rows: List[Dict] = []
+        warm_start_rows_all: List[Dict] = []
+        resume_discarded_rows: List[Dict] = []
         baseline_state: Optional[Dict[str, Any]] = None
 
         resume_path_text = self.resume_file_edit.text().strip()
         if resume_path_text:
             try:
                 resume_path = Path(resume_path_text).expanduser().resolve()
-                warm_start_rows = self._load_warm_start_rows(resume_path)
+                warm_start_rows_all = self._load_warm_start_rows(resume_path)
                 baseline_state = self._load_resume_origin_state(resume_path)
             except Exception as e:
                 QMessageBox.warning(self, "Resume file error", str(e))
                 return
-            if not warm_start_rows:
+            if not warm_start_rows_all:
                 QMessageBox.warning(self, "Resume file error", "Resume CSV did not contain any valid measurements.")
                 return
-            resume_params = list(warm_start_rows[0]["x"].keys())
+            resume_params = list(warm_start_rows_all[0]["x"].keys())
             if resume_params != list(cfg.params):
                 QMessageBox.warning(
                     self,
@@ -2061,6 +2124,13 @@ class MainWindow(QMainWindow):
                         f"Resume: {resume_mode}",
                     )
                     return
+            warm_start_rows, resume_discarded_rows = self._split_resume_rows_for_remeasure(warm_start_rows_all)
+            if resume_discarded_rows:
+                discard_step = int(resume_discarded_rows[0].get("step", len(warm_start_rows) + 1))
+                discard_by = str(resume_discarded_rows[0].get("chosen_by", "warm_start"))
+                self._append_log(
+                    f"Resume: dropping previous step={discard_step} by={discard_by} and re-measuring it first."
+                )
 
         try:
             ctrl = self._make_controller(cfg, baseline_state=baseline_state)
@@ -2092,6 +2162,7 @@ class MainWindow(QMainWindow):
             out_dir=out_dir,
             stop_flag=self.stop_flag,
             warm_start_data=warm_start_rows,
+            resume_pending_row=resume_discarded_rows[0] if resume_discarded_rows else None,
         )
         self.current_measurements_csv = Path(opt.measurements_csv_path)
         self.worker = OptimizerWorker(opt)
@@ -2100,8 +2171,9 @@ class MainWindow(QMainWindow):
         self.worker.failed.connect(self._on_failed)
         self.worker.pause_requested.connect(self._on_pause_requested)
 
-        if warm_start_rows:
-            self._prime_live_history(warm_start_rows)
+        self.resume_discarded_rows = list(resume_discarded_rows)
+        if warm_start_rows or resume_discarded_rows:
+            self._prime_live_history(warm_start_rows, discarded_rows=resume_discarded_rows)
         else:
             self._reset_live_history()
         self._clear_gallery()
@@ -2312,7 +2384,7 @@ class MainWindow(QMainWindow):
                     if ch in machine_vals:
                         self._run_current_values[ch] = float(machine_vals[ch])
 
-        if y is not None and phase in ("init", "loop", "axis_finalize"):
+        if y is not None and phase in ("init", "loop", "axis_finalize", "resume_remeasure"):
             try:
                 avg = float(info.get("average", float("nan")))
             except Exception:
@@ -2395,6 +2467,10 @@ class MainWindow(QMainWindow):
                             v = float(machine_final[ch])
                             self._run_current_values[ch] = v
                             self._run_final_values[ch] = v
+        elif phase == "resume_remeasure":
+            self._append_log(
+                f"step={int(step):02d} re-measured discarded resume point by={chosen_by}"
+            )
 
         if y is not None:
             line = (
@@ -2492,6 +2568,7 @@ class MainWindow(QMainWindow):
             average_pause_ratio=float(getattr(cfg, "average_pause_ratio", 0.80)),
             include_1d=True,
             bo_data_only_1d=bool(str(getattr(cfg, "method", "")).upper() == "BO"),
+            discarded_rows=self.resume_discarded_rows,
         )
         png_saved = [p for p in saved if str(p).lower().endswith(".png")]
         if self._is_sequential_method(cfg.method):

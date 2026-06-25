@@ -502,6 +502,7 @@ class OptimizationWorker(QThread):
             config.get("resume_csv_path", "")).strip() else None
         self._resume_seq_rows: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = {}
         self._resume_group_rows: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+        self._resume_discarded_row: Optional[Dict[str, Any]] = None
 
         # Fixed machine interface for Linac operations
         self.interface = InterfaceATF2_LinacBT(nsamples=1)
@@ -629,7 +630,7 @@ class OptimizationWorker(QThread):
             self.log_signal.emit(f"[RESUME] CSV not found: {self.resume_csv_path}")
             return
 
-        row_count = 0
+        parsed_rows: List[Dict[str, Any]] = []
         with open(self.resume_csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for raw in reader:
@@ -665,17 +666,72 @@ class OptimizationWorker(QThread):
 
                 if row["pv_name"] == "MULTI":
                     vec = self._parse_resume_vector_note(row["note"])
-                    if vec:
-                        row["vector"] = vec
-                        key = self._resume_group_key(row["mode"], row["group"])
-                        self._resume_group_rows.setdefault(key, []).append(row)
-                        row_count += 1
-                else:
-                    key = self._resume_seq_key(row["mode"], row["group"], row["pv_name"])
-                    self._resume_seq_rows.setdefault(key, []).append(row)
-                    row_count += 1
+                    if not vec:
+                        continue
+                    row["vector"] = vec
+                parsed_rows.append(row)
 
-        self.log_signal.emit(f"[RESUME] Loaded {row_count} previous evaluations from {self.resume_csv_path}")
+        if not parsed_rows:
+            self.log_signal.emit(f"[RESUME] No valid resume rows found in {self.resume_csv_path}")
+            return
+
+        self._resume_discarded_row = dict(parsed_rows[-1])
+        kept_rows = parsed_rows[:-1]
+        self._eval_counter = len(kept_rows)
+
+        for row in kept_rows:
+            if row["pv_name"] == "MULTI":
+                key = self._resume_group_key(row["mode"], row["group"])
+                self._resume_group_rows.setdefault(key, []).append(row)
+            else:
+                key = self._resume_seq_key(row["mode"], row["group"], row["pv_name"])
+                self._resume_seq_rows.setdefault(key, []).append(row)
+
+        discarded = self._resume_discarded_row
+        discard_desc = (
+            f"{discarded.get('mode', '')}/{discarded.get('group', '')}/{discarded.get('device_label', discarded.get('pv_name', ''))}"
+            if discarded is not None else "-"
+        )
+        self.log_signal.emit(
+            f"[RESUME] Loaded {len(kept_rows)} previous evaluations from {self.resume_csv_path}. "
+            f"Discarded last row for re-measurement: {discard_desc}"
+        )
+
+    def _resume_note_is_completed(self, row: Optional[Dict[str, Any]]) -> bool:
+        if row is None:
+            return False
+        note = str(row.get("note", ""))
+        return ("OPTIMIZED_SET" in note) or ("RESUME_COMPLETED_SET" in note)
+
+    def _resume_pending_matches_seq(self, mode: str, group: str, pv_name: str) -> bool:
+        row = self._resume_discarded_row
+        if row is None:
+            return False
+        if str(row.get("pv_name", "")) == "MULTI":
+            return False
+        return self._resume_seq_key(row.get("mode", ""), row.get("group", ""), row.get("pv_name", "")) == self._resume_seq_key(mode, group, pv_name)
+
+    def _resume_pending_matches_group(self, mode: str, group: str) -> bool:
+        row = self._resume_discarded_row
+        if row is None:
+            return False
+        if str(row.get("pv_name", "")) != "MULTI":
+            return False
+        return self._resume_group_key(row.get("mode", ""), row.get("group", "")) == self._resume_group_key(mode, group)
+
+    def _consume_resume_pending_seq_row(self, mode: str, group: str, pv_name: str) -> Optional[Dict[str, Any]]:
+        if (not self._resume_pending_matches_seq(mode, group, pv_name)) or self._resume_note_is_completed(self._resume_discarded_row):
+            return None
+        row = dict(self._resume_discarded_row or {})
+        self._resume_discarded_row = None
+        return row
+
+    def _consume_resume_pending_group_row(self, mode: str, group: str) -> Optional[Dict[str, Any]]:
+        if (not self._resume_pending_matches_group(mode, group)) or self._resume_note_is_completed(self._resume_discarded_row):
+            return None
+        row = dict(self._resume_discarded_row or {})
+        self._resume_discarded_row = None
+        return row
 
     def _resume_eval_result(self, row: Dict[str, Any]) -> EvalResult:
         return EvalResult(
@@ -696,13 +752,21 @@ class OptimizationWorker(QThread):
 
     def _resume_seq_completed_row(self, mode: str, group: str, pv_name: str) -> Optional[Dict[str, Any]]:
         rows = self._resume_seq_rows.get(self._resume_seq_key(mode, group, pv_name), [])
-        done_rows = [row for row in rows if "OPTIMIZED_SET" in str(row.get("note", ""))]
-        return done_rows[-1] if done_rows else None
+        done_rows = [row for row in rows if self._resume_note_is_completed(row)]
+        if done_rows:
+            return done_rows[-1]
+        if self._resume_pending_matches_seq(mode, group, pv_name) and self._resume_note_is_completed(self._resume_discarded_row):
+            return dict(self._resume_discarded_row or {})
+        return None
 
     def _resume_group_completed_row(self, mode: str, group: str) -> Optional[Dict[str, Any]]:
         rows = self._resume_group_rows.get(self._resume_group_key(mode, group), [])
-        done_rows = [row for row in rows if "OPTIMIZED_SET" in str(row.get("note", ""))]
-        return done_rows[-1] if done_rows else None
+        done_rows = [row for row in rows if self._resume_note_is_completed(row)]
+        if done_rows:
+            return done_rows[-1]
+        if self._resume_pending_matches_group(mode, group) and self._resume_note_is_completed(self._resume_discarded_row):
+            return dict(self._resume_discarded_row or {})
+        return None
 
     def _resume_scan_candidates(self, mode: str, group: str, pv_name: str, fallback: np.ndarray) -> np.ndarray:
         rows = self._resume_seq_rows.get(self._resume_seq_key(mode, group, pv_name), [])
@@ -1247,6 +1311,8 @@ class OptimizationWorker(QThread):
             if isinstance(vec, dict):
                 x_best = np.array([float(vec.get(pv, np.nan)) for pv in pvs], dtype=float)
                 if np.all(np.isfinite(x_best)):
+                    if self._resume_pending_matches_group("GROUP_BO_SIMUL", group_name):
+                        self._resume_discarded_row = None
                     self.log_signal.emit(
                         f"[RESUME] Group {group_name} already completed previously. Re-applying saved best vector.")
                     _ = self._evaluate_point_multi(
@@ -1284,6 +1350,27 @@ class OptimizationWorker(QThread):
                     eval_cache[key(x_vec)] = resume_r
                 self.log_signal.emit(
                     f"[RESUME] Warm start for group {group_name}: loaded {len(X)} previous evaluations.")
+
+        resume_pending_row = self._consume_resume_pending_group_row("GROUP_BO_SIMUL", group_name)
+        if resume_pending_row is not None:
+            vec = resume_pending_row.get("vector", {})
+            if isinstance(vec, dict):
+                x_resume = quantize_vec(np.array([float(vec.get(pv, np.nan)) for pv in pvs], dtype=float))
+                if np.all(np.isfinite(x_resume)):
+                    self.log_signal.emit(
+                        f"[RESUME] Re-measuring discarded last group point for {group_name} before continuing."
+                    )
+                    r_resume = self._evaluate_point_multi(
+                        device_label=f"Group:{group_name}",
+                        pv_to_value=vec_to_dict(x_resume),
+                        mode="GROUP_BO_SIMUL",
+                        group=group_name,
+                        note="RESUME_REMEASURE_LAST",
+                    )
+                    X.append(x_resume.copy())
+                    Y.append(float(r_resume.score))
+                    R.append(r_resume)
+                    eval_cache[key(x_resume)] = r_resume
 
         # Initial design: current + random points
         if len(X) == 0:
@@ -1479,6 +1566,8 @@ class OptimizationWorker(QThread):
         if resume_done_row is not None:
             best_x = float(resume_done_row.get("set_value", float("nan")))
             if np.isfinite(best_x):
+                if self._resume_pending_matches_seq(mode, group, pv_name):
+                    self._resume_discarded_row = None
                 self.log_signal.emit(
                     f"[RESUME] {device_label} already completed previously. Re-applying x={best_x:.6g}.")
                 _ = self._evaluate_point(device_label, pv_name, best_x, mode=mode, group=group,
@@ -1503,6 +1592,25 @@ class OptimizationWorker(QThread):
                     Y.append(float(row["score"]))
                     R.append(self._resume_eval_result(row))
                 self.log_signal.emit(f"[RESUME] Warm start for {device_label}: loaded {len(X)} previous evaluations.")
+
+        resume_pending_row = self._consume_resume_pending_seq_row(mode, group, pv_name)
+        if resume_pending_row is not None:
+            x_resume = float(resume_pending_row.get("set_value", float("nan")))
+            if np.isfinite(x_resume):
+                self.log_signal.emit(
+                    f"[RESUME] Re-measuring discarded last point for {device_label} before continuing."
+                )
+                r_resume = self._evaluate_point(
+                    device_label,
+                    pv_name,
+                    x_resume,
+                    mode=mode,
+                    group=group,
+                    note="RESUME_REMEASURE_LAST",
+                )
+                X.append(float(x_resume))
+                Y.append(float(r_resume.score))
+                R.append(r_resume)
 
         def eval_at(x: float, note: str = ""):
             reused = self._try_reuse_initial_point(
@@ -2327,9 +2435,26 @@ class MainWindow(QMainWindow):
         }
         self.resume_snapshot_state: Optional[Dict[str, Any]] = None
         self._plot_state: Dict[str, Dict[str, Any]] = {
-            RUN_PROFILE_MAIN: {"eval_index": [], "ttot": [], "metric": [], "metric_label": "DR", "measurement_ok": []},
-            RUN_PROFILE_DEVELOPER: {"eval_index": [], "ttot": [], "metric": [], "metric_label": "DR",
-                                    "measurement_ok": []},
+            RUN_PROFILE_MAIN: {
+                "eval_index": [],
+                "ttot": [],
+                "metric": [],
+                "metric_label": "DR",
+                "measurement_ok": [],
+                "discarded_eval_index": [],
+                "discarded_ttot": [],
+                "discarded_metric": [],
+            },
+            RUN_PROFILE_DEVELOPER: {
+                "eval_index": [],
+                "ttot": [],
+                "metric": [],
+                "metric_label": "DR",
+                "measurement_ok": [],
+                "discarded_eval_index": [],
+                "discarded_ttot": [],
+                "discarded_metric": [],
+            },
         }
         self._status_labels: Dict[str, QLabel] = {}
         self._result_labels: Dict[str, QLabel] = {}
@@ -3472,12 +3597,24 @@ class MainWindow(QMainWindow):
         context = str(profile or self._run_profile or RUN_PROFILE_MAIN).upper()
         state = self._plot_state.setdefault(
             context,
-            {"eval_index": [], "ttot": [], "metric": [], "metric_label": "DR", "measurement_ok": []},
+            {
+                "eval_index": [],
+                "ttot": [],
+                "metric": [],
+                "metric_label": "DR",
+                "measurement_ok": [],
+                "discarded_eval_index": [],
+                "discarded_ttot": [],
+                "discarded_metric": [],
+            },
         )
         state["eval_index"] = []
         state["ttot"] = []
         state["metric"] = []
         state["measurement_ok"] = []
+        state["discarded_eval_index"] = []
+        state["discarded_ttot"] = []
+        state["discarded_metric"] = []
         if metric_label is not None:
             state["metric_label"] = str(metric_label)
         self._refresh_eval_plot(context)
@@ -3539,6 +3676,29 @@ class MainWindow(QMainWindow):
                     markeredgewidth=2.0,
                 )
 
+        discarded_eval = np.asarray(state.get("discarded_eval_index", []), dtype=float)
+        discarded_ttot = np.asarray(state.get("discarded_ttot", []), dtype=float)
+        discarded_metric = np.asarray(state.get("discarded_metric", []), dtype=float)
+        if discarded_eval.size > 0:
+            ax_ttot.plot(
+                discarded_eval,
+                discarded_ttot,
+                linestyle="None",
+                marker="x",
+                color="#dc2626",
+                markersize=8,
+                markeredgewidth=2.0,
+            )
+            ax_metric.plot(
+                discarded_eval,
+                discarded_metric,
+                linestyle="None",
+                marker="x",
+                color="#dc2626",
+                markersize=8,
+                markeredgewidth=2.0,
+            )
+
         widgets["canvas"].draw_idle()
 
     def _on_worker_progress(self, payload: dict):
@@ -3580,7 +3740,16 @@ class MainWindow(QMainWindow):
             self._update_value_labels(dict(payload.get("display_values") or {}))
             state = self._plot_state.setdefault(
                 context,
-                {"eval_index": [], "ttot": [], "metric": [], "metric_label": "DR", "measurement_ok": []},
+                {
+                    "eval_index": [],
+                    "ttot": [],
+                    "metric": [],
+                    "metric_label": "DR",
+                    "measurement_ok": [],
+                    "discarded_eval_index": [],
+                    "discarded_ttot": [],
+                    "discarded_metric": [],
+                },
             )
             state["eval_index"].append(int(payload.get("eval_index", len(state["eval_index"]) + 1)))
             state["ttot"].append(float(payload.get("ttot", float("nan"))))
@@ -3773,6 +3942,100 @@ class MainWindow(QMainWindow):
             return None
         with open(snap_path, "r", encoding="utf-8") as f:
             return json.load(f)
+
+    def _resume_plot_metric_value(self, row: Dict[str, Any], fallback_label: Optional[str] = None) -> tuple[str, float]:
+        metric_label = str(row.get("ObjectiveLabel", "") or fallback_label or row.get("ScoreDownstreamICT", "Metric"))
+        objective_type = str(row.get("ObjectiveType", DEVELOPER_OBJECTIVE_ICT)).upper()
+        try:
+            metric_value = float(row.get("ObjectiveValue", float("nan")))
+        except Exception:
+            metric_value = float("nan")
+        if objective_type == DEVELOPER_OBJECTIVE_BPM and not np.isfinite(metric_value):
+            try:
+                metric_value = float(row.get("BPMMetric", float("nan")))
+            except Exception:
+                metric_value = float("nan")
+        if np.isfinite(metric_value):
+            return metric_label, metric_value
+
+        downstream_name = str(row.get("ScoreDownstreamICT", metric_label)).upper()
+        if downstream_name == "L0":
+            downstream_name = "LN0"
+        downstream_column = "ICT_L0" if downstream_name == "LN0" else f"ICT_{downstream_name}"
+        try:
+            metric_value = float(row.get(downstream_column, float("nan")))
+        except Exception:
+            metric_value = float("nan")
+        if not metric_label:
+            metric_label = downstream_name or "Metric"
+        return metric_label, metric_value
+
+    def _prime_eval_plot_from_resume(self, csv_path: Path, *, profile: str, metric_label: Optional[str] = None) -> None:
+        if not csv_path.exists():
+            return
+
+        resume_rows: List[Dict[str, Any]] = []
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for raw in reader:
+                if not raw:
+                    continue
+                label, metric_value = self._resume_plot_metric_value(raw, metric_label)
+                try:
+                    ttot = float(raw.get("Ttot", float("nan")))
+                except Exception:
+                    ttot = float("nan")
+                note = str(raw.get("Note", ""))
+                resume_rows.append({
+                    "ttot": ttot,
+                    "metric": metric_value,
+                    "metric_label": label,
+                    "measurement_ok": "ICT_INVALID_ZERO" not in note,
+                })
+
+        if not resume_rows:
+            return
+
+        kept_rows = resume_rows[:-1]
+        discarded_rows = resume_rows[-1:]
+        context = str(profile or RUN_PROFILE_MAIN).upper()
+        state = self._plot_state.setdefault(
+            context,
+            {
+                "eval_index": [],
+                "ttot": [],
+                "metric": [],
+                "metric_label": "DR",
+                "measurement_ok": [],
+                "discarded_eval_index": [],
+                "discarded_ttot": [],
+                "discarded_metric": [],
+            },
+        )
+        state["eval_index"] = [idx for idx in range(1, len(kept_rows) + 1)]
+        state["ttot"] = [float(row["ttot"]) for row in kept_rows]
+        state["metric"] = [float(row["metric"]) for row in kept_rows]
+        state["measurement_ok"] = [bool(row["measurement_ok"]) for row in kept_rows]
+        if metric_label is not None:
+            state["metric_label"] = str(metric_label)
+        elif resume_rows:
+            state["metric_label"] = str(resume_rows[-1].get("metric_label", state.get("metric_label", "DR")))
+
+        if discarded_rows:
+            discarded = discarded_rows[0]
+            state["discarded_eval_index"] = [len(kept_rows) + 1]
+            state["discarded_ttot"] = [float(discarded.get("ttot", float("nan")))]
+            state["discarded_metric"] = [float(discarded.get("metric", float("nan")))]
+            self._append_log_text(
+                f"[RESUME] Dropped last plot point from {csv_path.name}; it will be re-measured.",
+                profile=context,
+            )
+        else:
+            state["discarded_eval_index"] = []
+            state["discarded_ttot"] = []
+            state["discarded_metric"] = []
+
+        self._refresh_eval_plot(context)
 
     def _apply_config_to_ui(self, payload: Dict[str, Any]):
         run_profile = str(payload.get("run_profile", RUN_PROFILE_MAIN)).upper()
@@ -4074,6 +4337,12 @@ class MainWindow(QMainWindow):
         metric_label = str(
             self.dev_downstream_ict_box.currentText()) if objective_key == DEVELOPER_OBJECTIVE_ICT else f"BPM {self.dev_bpm_plane_box.currentText()} sumsq"
         self._reset_eval_plot(metric_label, profile=RUN_PROFILE_DEVELOPER)
+        if resume_path_text:
+            self._prime_eval_plot_from_resume(
+                Path(resume_path_text).expanduser(),
+                profile=RUN_PROFILE_DEVELOPER,
+                metric_label=metric_label,
+            )
         self._refresh_current_values()
         self._refresh_developer_live_values()
         self._set_status(f"Status: RUNNING {mode}", state="running", profile=RUN_PROFILE_DEVELOPER)
@@ -4170,6 +4439,12 @@ class MainWindow(QMainWindow):
         self._update_result_label("Result: running...", profile=RUN_PROFILE_MAIN)
         self._prepare_target_states_for_run(mode)
         self._reset_eval_plot(config["downstream_ict"], profile=RUN_PROFILE_MAIN)
+        if resume_path_text:
+            self._prime_eval_plot_from_resume(
+                Path(resume_path_text).expanduser(),
+                profile=RUN_PROFILE_MAIN,
+                metric_label=config["downstream_ict"],
+            )
         self._refresh_current_values()
         self._set_status(f"Status: RUNNING {mode}", state="running", profile=RUN_PROFILE_MAIN)
         self._set_main_run_controls_enabled(False)

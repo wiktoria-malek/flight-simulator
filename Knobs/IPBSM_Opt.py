@@ -510,6 +510,7 @@ class Optimizer:
         stop_flag: Optional[StopFlag] = None,
         pause_hook: Optional[Callable[[Dict[str, Any]], bool]] = None,
         warm_start_data: Optional[List[Dict[str, Any]]] = None,
+        resume_pending_row: Optional[Dict[str, Any]] = None,
     ):
         self.controller = controller
         self.cfg = config
@@ -540,6 +541,7 @@ class Optimizer:
         self._average_pause_ratio = min(1.0, max(0.0, ratio))
         self._machine_state_channels: List[str] = []
         self._machine_state_init_values: Dict[str, float] = {}
+        self._resume_pending_row = dict(resume_pending_row) if isinstance(resume_pending_row, dict) else None
         self._init_machine_state_tracking()
 
         if warm_start_data:
@@ -882,6 +884,56 @@ class Optimizer:
             self.yerr.append(float(rec.y_err))
             self._last_dat = dict(rec.dat)
 
+    def _measure_resume_pending_row(self) -> None:
+        if not self._resume_pending_row:
+            return
+
+        item = dict(self._resume_pending_row)
+        x_map_raw = item.get("x", {})
+        if not isinstance(x_map_raw, dict):
+            self._resume_pending_row = None
+            return
+
+        x = {p: float(x_map_raw[p]) for p in self.cfg.params}
+        x_vec = np.array([x[p] for p in self.cfg.params], float)
+        chosen_by = str(item.get("chosen_by", "resume_remeasure"))
+        step = len(self.records) + 1
+        xq = self._x_dict(self._quantize_x_vec(x_vec))
+
+        self._emit(step, {
+            "phase": "warn",
+            "reason": "resume_last_point_discarded",
+            "message": "Discarding the last resume point and re-measuring it.",
+            "chosen_by": chosen_by,
+            "x": xq,
+        })
+
+        y, yerr = self._measure_at(x_vec, chosen_by=chosen_by, force_remeasure=True)
+        x_vec_q = self._quantize_x_vec(x_vec)
+        self.X.append(x_vec_q.copy())
+        self.y.append(float(y))
+        self.yerr.append(float(yerr))
+        rec = StepRecord(
+            step=len(self.records) + 1,
+            t_iso=_dt.datetime.now().isoformat(timespec="seconds"),
+            x=self._x_dict(x_vec_q),
+            y=float(y),
+            y_err=float(yerr),
+            chosen_by=chosen_by,
+            dat=dict(self._last_dat),
+        )
+        self._log_step(rec)
+        self._emit(rec.step, {
+            "phase": "resume_remeasure",
+            "chosen_by": chosen_by,
+            "x": rec.x,
+            "y": float(y),
+            "y_err": float(yerr),
+            "best_y": float(np.max(self.y)) if self.y else float(y),
+            "average": float(rec.dat.get("average", float("nan"))),
+        })
+        self._resume_pending_row = None
+
 
     def _emit(self, step: int, info: Dict):
         if self.progress_cb:
@@ -1190,7 +1242,7 @@ class Optimizer:
             "next_axis_idx": next_axis_idx,
         }
 
-    def _measure_at(self, x_vec: np.ndarray, chosen_by: str) -> Tuple[float, float]:
+    def _measure_at(self, x_vec: np.ndarray, chosen_by: str, force_remeasure: bool = False) -> Tuple[float, float]:
         # Quantize knobs to hardware-like step and clamp
         lo, hi = self._bounds_arrays()
         self._last_measure_reused = False
@@ -1208,7 +1260,7 @@ class Optimizer:
         })
 
         # Reuse previously measured point (skip PV IO) if exactly same quantized setpoint.
-        if len(self.X) > 0:
+        if (not force_remeasure) and len(self.X) > 0:
             X_prev = np.asarray(self.X, float)
             steps = self._step_array()
             X_prev_q = np.round(X_prev / steps.reshape(1, -1)) * steps.reshape(1, -1)
@@ -1791,6 +1843,8 @@ class Optimizer:
         gf_final_x: Dict[str, float] = {}
         gf_final_y: float = float("nan")
         try:
+            self._measure_resume_pending_row()
+
             # Initialize (structured first, then random fill)
             init_pts = []
             if self.cfg.init_strategy == "structured":
