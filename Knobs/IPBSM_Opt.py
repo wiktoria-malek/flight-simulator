@@ -542,6 +542,7 @@ class Optimizer:
         self._machine_state_channels: List[str] = []
         self._machine_state_init_values: Dict[str, float] = {}
         self._resume_pending_row = dict(resume_pending_row) if isinstance(resume_pending_row, dict) else None
+        self._remeasure_current_point_requested = False
         self._init_machine_state_tracking()
 
         if warm_start_data:
@@ -553,6 +554,14 @@ class Optimizer:
 
     def request_manual_pause(self) -> None:
         self._manual_pause_requested = True
+
+    def request_remeasure_current_point(self) -> None:
+        self._remeasure_current_point_requested = True
+
+    def _consume_remeasure_current_point_request(self) -> bool:
+        requested = bool(self._remeasure_current_point_requested)
+        self._remeasure_current_point_requested = False
+        return requested
 
     def _save_config(self):
         cfg_path = self.out_dir / "config.json"
@@ -1288,129 +1297,151 @@ class Optimizer:
                 return y, yerr
 
         while True:
-            try:
-                self.controller.apply_knobs(self._x_dict(xq))
-                break
-            except CurrentDropToZeroError as exc:
-                payload = {
-                    "reason": "current_drop_to_zero",
-                    "step": meas_idx,
-                    "x": self._x_dict(xq),
-                    "magnets": list(getattr(exc, "magnets", [])),
-                    "target": dict(getattr(exc, "target", {})),
-                    "readback": dict(getattr(exc, "readback", {})),
-                    "message": str(exc),
-                }
-                should_continue = True
-                if self.pause_hook is not None:
-                    should_continue = bool(self.pause_hook(payload))
-                if not should_continue:
-                    self.stop_flag.request_stop()
-                    raise GracefulStopRequested("current_drop_to_zero") from exc
-            except Exception as exc:
-                payload = {
-                    "reason": "operation_error",
-                    "operation": "apply_knobs",
-                    "step": meas_idx,
-                    "x": self._x_dict(xq),
-                    "message": str(exc),
-                    "error_type": exc.__class__.__name__,
-                }
-                should_continue = True
-                if self.pause_hook is not None:
-                    should_continue = bool(self.pause_hook(payload))
-                if not should_continue:
-                    self.stop_flag.request_stop()
-                    raise GracefulStopRequested("apply_knobs_error") from exc
-
-        while True:
-            try:
-                dat_raw: Dict[str, Any] = {}
-                if hasattr(self.controller, "get_ipbsm_full"):
-                    dat_raw = self.controller.get_ipbsm_full()
-                else:
-                    y0, yerr0 = self.controller.get_ipbsm()
-                    dat_raw = {"modulation": y0, "error": yerr0}
-                break
-            except Exception as exc:
-                payload = {
-                    "reason": "operation_error",
-                    "operation": "get_ipbsm",
-                    "step": meas_idx,
-                    "x": self._x_dict(xq),
-                    "message": str(exc),
-                    "error_type": exc.__class__.__name__,
-                }
-                should_continue = True
-                if self.pause_hook is not None:
-                    should_continue = bool(self.pause_hook(payload))
-                if not should_continue:
-                    self.stop_flag.request_stop()
-                    raise GracefulStopRequested("get_ipbsm_error") from exc
-
-        def _f(v: Any) -> float:
-            try:
-                return float(v)
-            except Exception:
-                return float("nan")
-
-        dat = {
-            "modulation": _f(dat_raw.get("modulation", float("nan"))),
-            "error": abs(_f(dat_raw.get("error", float("nan")))),
-            "beamsize": _f(dat_raw.get("beamsize", float("nan"))),
-            "ebeamsize": _f(dat_raw.get("ebeamsize", float("nan"))),
-            "average": _f(dat_raw.get("average", float("nan"))),
-            "phase": _f(dat_raw.get("phase", float("nan"))),
-            "filename": str(dat_raw.get("filename", "")),
-            "ict_average": _f(dat_raw.get("ict_average", float("nan"))),
-        }
-        self._last_dat = dat
-
-        y = float(dat["modulation"])
-        yerr = float(dat["error"])
-
-        avg = dat["average"]
-        if np.isfinite(avg):
-            if self._average_baseline is None:
-                self._average_baseline = float(avg)
-            else:
-                threshold = self._average_pause_ratio * self._average_baseline
-                if avg < threshold:
+            while True:
+                try:
+                    self.controller.apply_knobs(self._x_dict(xq))
+                    break
+                except CurrentDropToZeroError as exc:
                     payload = {
-                        "reason": "average_below_threshold",
+                        "reason": "current_drop_to_zero",
                         "step": meas_idx,
-                        "average": float(avg),
-                        "baseline_average": float(self._average_baseline),
-                        "threshold_average": float(threshold),
-                        "ratio": float(avg / self._average_baseline) if self._average_baseline else float("nan"),
+                        "x": self._x_dict(xq),
+                        "magnets": list(getattr(exc, "magnets", [])),
+                        "target": dict(getattr(exc, "target", {})),
+                        "readback": dict(getattr(exc, "readback", {})),
+                        "message": str(exc),
                     }
                     should_continue = True
                     if self.pause_hook is not None:
                         should_continue = bool(self.pause_hook(payload))
                     if not should_continue:
                         self.stop_flag.request_stop()
+                        raise GracefulStopRequested("current_drop_to_zero") from exc
+                except Exception as exc:
+                    payload = {
+                        "reason": "operation_error",
+                        "operation": "apply_knobs",
+                        "step": meas_idx,
+                        "x": self._x_dict(xq),
+                        "message": str(exc),
+                        "error_type": exc.__class__.__name__,
+                    }
+                    should_continue = True
+                    if self.pause_hook is not None:
+                        should_continue = bool(self.pause_hook(payload))
+                    if not should_continue:
+                        self.stop_flag.request_stop()
+                        raise GracefulStopRequested("apply_knobs_error") from exc
 
-        best = max([float(y)] + [float(v) for v in self.y]) if self.y else float(y)
-        print(f"[MEAS] i={meas_idx} by={chosen_by}   y={float(y):.6f} ± {float(yerr):.6f}  best={best:.6f}")
+            while True:
+                try:
+                    dat_raw: Dict[str, Any] = {}
+                    if hasattr(self.controller, "get_ipbsm_full"):
+                        dat_raw = self.controller.get_ipbsm_full()
+                    else:
+                        y0, yerr0 = self.controller.get_ipbsm()
+                        dat_raw = {"modulation": y0, "error": yerr0}
+                    break
+                except Exception as exc:
+                    payload = {
+                        "reason": "operation_error",
+                        "operation": "get_ipbsm",
+                        "step": meas_idx,
+                        "x": self._x_dict(xq),
+                        "message": str(exc),
+                        "error_type": exc.__class__.__name__,
+                    }
+                    should_continue = True
+                    if self.pause_hook is not None:
+                        should_continue = bool(self.pause_hook(payload))
+                    if not should_continue:
+                        self.stop_flag.request_stop()
+                        raise GracefulStopRequested("get_ipbsm_error") from exc
 
-        # Manual pause request from GUI: stop only after current measurement has completed.
-        if self._manual_pause_requested:
-            self._manual_pause_requested = False
-            payload = {
-                "reason": "manual_pause",
-                "step": meas_idx,
-                "x": self._x_dict(xq),
-                "y": float(y),
-                "y_err": float(yerr),
-                "best_y": float(best),
+            def _f(v: Any) -> float:
+                try:
+                    return float(v)
+                except Exception:
+                    return float("nan")
+
+            dat = {
+                "modulation": _f(dat_raw.get("modulation", float("nan"))),
+                "error": abs(_f(dat_raw.get("error", float("nan")))),
+                "beamsize": _f(dat_raw.get("beamsize", float("nan"))),
+                "ebeamsize": _f(dat_raw.get("ebeamsize", float("nan"))),
+                "average": _f(dat_raw.get("average", float("nan"))),
+                "phase": _f(dat_raw.get("phase", float("nan"))),
+                "filename": str(dat_raw.get("filename", "")),
+                "ict_average": _f(dat_raw.get("ict_average", float("nan"))),
             }
-            should_continue = True
-            if self.pause_hook is not None:
-                should_continue = bool(self.pause_hook(payload))
-            if not should_continue:
-                self.stop_flag.request_stop()
+            self._last_dat = dat
 
-        return float(y), float(yerr)
+            y = float(dat["modulation"])
+            yerr = float(dat["error"])
+            avg = dat["average"]
+            best = max([float(y)] + [float(v) for v in self.y]) if self.y else float(y)
+
+            discard_reason = ""
+            threshold = float("nan")
+            if np.isfinite(avg):
+                if self._average_baseline is None:
+                    self._average_baseline = float(avg)
+                else:
+                    threshold = self._average_pause_ratio * self._average_baseline
+                    if avg < threshold:
+                        payload = {
+                            "reason": "average_below_threshold",
+                            "step": meas_idx,
+                            "average": float(avg),
+                            "baseline_average": float(self._average_baseline),
+                            "threshold_average": float(threshold),
+                            "ratio": float(avg / self._average_baseline) if self._average_baseline else float("nan"),
+                        }
+                        should_continue = True
+                        if self.pause_hook is not None:
+                            should_continue = bool(self.pause_hook(payload))
+                        if not should_continue:
+                            self.stop_flag.request_stop()
+                        elif self._consume_remeasure_current_point_request():
+                            discard_reason = "average_warning_resume"
+                            self._manual_pause_requested = False
+
+            print(f"[MEAS] i={meas_idx} by={chosen_by}   y={float(y):.6f} ± {float(yerr):.6f}  best={best:.6f}")
+
+            # Manual pause request from GUI: stop only after current measurement has completed.
+            if (not discard_reason) and self._manual_pause_requested:
+                self._manual_pause_requested = False
+                payload = {
+                    "reason": "manual_pause",
+                    "step": meas_idx,
+                    "x": self._x_dict(xq),
+                    "y": float(y),
+                    "y_err": float(yerr),
+                    "best_y": float(best),
+                }
+                should_continue = True
+                if self.pause_hook is not None:
+                    should_continue = bool(self.pause_hook(payload))
+                if not should_continue:
+                    self.stop_flag.request_stop()
+                elif self._consume_remeasure_current_point_request():
+                    discard_reason = "manual_pause_resume"
+
+            if discard_reason:
+                self._emit(meas_idx, {
+                    "phase": "discarded_measurement",
+                    "reason": discard_reason,
+                    "chosen_by": chosen_by,
+                    "x": self._x_dict(xq),
+                    "y": float(y),
+                    "y_err": float(yerr),
+                    "best_y": float(best),
+                    "average": float(avg),
+                    "threshold_average": float(threshold),
+                })
+                continue
+
+            return float(y), float(yerr)
 
     def _random_point(self) -> np.ndarray:
         lo, hi = self._bounds_arrays()

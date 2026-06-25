@@ -206,7 +206,9 @@ class OptimizerWorker(QThread):
         self._pause_event.wait()
         return self._pause_continue
 
-    def resume_from_pause(self, should_continue: bool = True) -> None:
+    def resume_from_pause(self, should_continue: bool = True, *, remeasure_current_point: bool = False) -> None:
+        if should_continue and remeasure_current_point:
+            self.optimizer.request_remeasure_current_point()
         self._pause_continue = bool(should_continue)
         self._pause_event.set()
 
@@ -2331,8 +2333,8 @@ class MainWindow(QMainWindow):
                 self._set_status("Status: stop requested from pause", state="warning")
                 self.worker.resume_from_pause(False)
             else:
-                self._set_status("Status: resumed", state="running")
-                self.worker.resume_from_pause(True)
+                self._set_status("Status: re-measuring paused point", state="running")
+                self.worker.resume_from_pause(True, remeasure_current_point=True)
             return
 
         avg = float(info.get("average", float("nan")))
@@ -2360,8 +2362,8 @@ class MainWindow(QMainWindow):
             self._set_status("Status: stop requested from average warning", state="warning")
             self.worker.resume_from_pause(False)
         else:
-            self._set_status("Status: resumed after warning", state="running")
-            self.worker.resume_from_pause(True)
+            self._set_status("Status: re-measuring warning point", state="running")
+            self.worker.resume_from_pause(True, remeasure_current_point=True)
 
     def _on_progress(self, payload: dict):
         step = int(payload.get("step", 0))
@@ -2383,6 +2385,35 @@ class MainWindow(QMainWindow):
                 for ch in self._run_state_channels:
                     if ch in machine_vals:
                         self._run_current_values[ch] = float(machine_vals[ch])
+
+        if phase == "discarded_measurement":
+            try:
+                avg = float(info.get("average", float("nan")))
+            except Exception:
+                avg = float("nan")
+            if not np.isfinite(avg):
+                avg = self._lookup_average_from_csv(step)
+            self.live_discarded_eval_index.append(step)
+            self.live_discarded_modulation.append(float(y) if y is not None else float("nan"))
+            self.live_discarded_average.append(float(avg))
+            self.live_discarded_chosen_by.append(chosen_by)
+            self.resume_discarded_rows.append({
+                "step": int(step),
+                "x": dict(x_map),
+                "y": float(y) if y is not None else float("nan"),
+                "y_err": float(info.get("y_err", float("nan"))),
+                "chosen_by": chosen_by,
+                "dat": {
+                    "average": float(avg),
+                },
+            })
+            try:
+                threshold_average = float(info.get("threshold_average", float("nan")))
+            except Exception:
+                threshold_average = float("nan")
+            if np.isfinite(threshold_average):
+                self.live_average_limit = threshold_average
+            self._redraw_live_plot()
 
         if y is not None and phase in ("init", "loop", "axis_finalize", "resume_remeasure"):
             try:
@@ -2470,6 +2501,10 @@ class MainWindow(QMainWindow):
         elif phase == "resume_remeasure":
             self._append_log(
                 f"step={int(step):02d} re-measured discarded resume point by={chosen_by}"
+            )
+        elif phase == "discarded_measurement":
+            self._append_log(
+                f"step={int(step):02d} discarded measurement by={chosen_by} reason={info.get('reason', '')}"
             )
 
         if y is not None:
