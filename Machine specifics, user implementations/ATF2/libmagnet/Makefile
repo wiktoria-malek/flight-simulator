@@ -80,7 +80,7 @@ OBJS += mag_ki_q_sf1.o
 OBJS += mag_ki_q_sd0.o
 OBJS += qkilnbt.o
 
-all: libmagnet.a
+all: libmagnet.a libmagnet.so
 
 .c.o:
 	gcc $(OPT) -c $< $(CFLAG)
@@ -94,6 +94,9 @@ libmagnet.a: $(OBJS)
 	ar q libmagnet.a $(OBJS)
 	ranlib libmagnet.a
 
+libmagnet.so: $(OBJS)
+	gfortran -shared -fPIC -o libmagnet.so *.o
+
 clean:
-	rm -f *.o *.a
+	rm -f *.o *.a *.so
 
