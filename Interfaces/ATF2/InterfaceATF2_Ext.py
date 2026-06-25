@@ -489,9 +489,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for name, k1 in zip(names, k1_values):
             if name not in self.quadrupoles:
                 raise ValueError(f"Quadrupole '{name}' is not magnet list.")
-            canonical = self.qmag_alias_to_canonical.get(name, name)
+            #canonical = self.qmag_alias_to_canonical.get(name, name)
             target_current = self.k1_to_current(name, float(k1))  # A
-            self._pv_put(f"{canonical}:currentWrite", float(target_current))
+            self._pv_put(f"{name}:currentWrite", float(target_current))
             self._wait_for_magnet_readback(canonical, float(target_current))
 
     """Methods for OTRs from mOTRs_measurement.py"""
