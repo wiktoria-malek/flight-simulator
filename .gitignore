@@ -13,3 +13,7 @@ Data/**
 *.csv
 *.h5
 .DS_Store
+*.o
+*.a
+*.dylib
+*.so

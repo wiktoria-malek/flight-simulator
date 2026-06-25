@@ -1,4 +1,4 @@
-import sys, time, math, os, threading, struct
+import sys, time, math, os, threading, struct, ctypes
 import numpy as np
 from epics import PV, ca, caget
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
@@ -10,6 +10,56 @@ class CurrentDropToZeroError(RuntimeError):
         self.target = dict(target or {})
         self.readback = dict(readback or {})
         self.magnets = list(magnets or [])
+
+class MagKiWrapper:
+    MODE_K_TO_I = 1
+    MODE_I_TO_K = 2
+
+    def __init__(self, library_path):
+        self.library_path = os.path.abspath(str(library_path))
+        self.lib = ctypes.CDLL(self.library_path)
+        self._func = self.lib.mag_ki_main
+        self._func.argtypes = [
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_float,
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_float),
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        self._func.restype = ctypes.c_int
+
+    def _call(self, mode, name, energy_GeV, k_main=0.0, current_main=0.0):
+        kvalue = (ctypes.c_float * 2)(float(k_main), 0.0)
+        current = (ctypes.c_float * 2)(float(current_main), 0.0)
+        field = (ctypes.c_float * 2)(0.0, 0.0)
+        efflen = ctypes.c_float(0.0)
+        status = int(
+            self._func(
+                int(mode),
+                str(name).encode("ascii"),
+                ctypes.c_float(float(energy_GeV)),
+                kvalue,
+                current,
+                ctypes.byref(efflen),
+                field,
+            )
+        )
+        if status != 1:
+            raise RuntimeError(f"mag_ki_main failed for {name}, mode={mode}, status={status}")
+        return {
+            "k": float(kvalue[0]),
+            "current": float(current[0]),
+            "efflen": float(efflen.value),
+            "field": float(field[0]),
+        }
+
+    def current_to_k1(self, name, current_A, energy_GeV):
+        return self._call(self.MODE_I_TO_K, name, energy_GeV, current_main=current_A)["k"]
+
+    def k1_to_current(self, name, k1, energy_GeV):
+        return self._call(self.MODE_K_TO_I, name, energy_GeV, k_main=k1)["current"]
 
 class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_name(self):
@@ -143,6 +193,32 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # k_T_per_A : integrated-gradient slope GL/I [T/A]
         # L_m       : magnetic length
         self.QUAD_CALIB ={"QD18X": {"k_T_per_A": 0.0, "L_m": 0.0}} # TODO with real numbers
+        self.mag_ki = None
+        mag_ki_library_candidates = []
+
+        env_mag_ki_library_path = os.environ.get("ATF2_MAG_KI_LIB", "")
+        if env_mag_ki_library_path:
+            mag_ki_library_candidates.append(env_mag_ki_library_path)
+
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        libmagnet_dir = os.path.join(repo_root, "Machine specifics, user implementations", "ATF2", "libmagnet")
+        mag_ki_library_candidates.extend([
+            os.path.join(libmagnet_dir, "libmagnet.dylib"),
+            os.path.join(libmagnet_dir, "libmagnet.so"),
+        ])
+
+        for mag_ki_library_path in mag_ki_library_candidates:
+            if not mag_ki_library_path or not os.path.exists(mag_ki_library_path):
+                continue
+            try:
+                self.mag_ki = MagKiWrapper(mag_ki_library_path)
+                print(f"Loaded ATF2 mag_ki library: {mag_ki_library_path}")
+                break
+            except Exception as exc:
+                print(f"ATF2 mag_ki library '{mag_ki_library_path}': {exc} not loaded")
+
+        if self.mag_ki is None:
+            print("ATF2 mag_ki library not loaded.")
 
         # IPBSM hooks and FF knob definitions (real machine)
         self.error_history = []
@@ -224,23 +300,39 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             raise ValueError(f"Calibration for '{name}' is 0. ")
         return k_T_per_A, L_m
 
-    def get_grad(self, name, current_A):
-        """Current [A] -> gradient G [T/m]."""
-        k_T_per_A, L_m = self._quad_calib(name)
-        GL = k_T_per_A * float(current_A)  # integrated gradient [T]
-        return GL / L_m  # gradient [T/m]
-
     def current_to_k1(self, name, current_A):
-        """Current [A] -> focusing strength K1 [1/m^2]."""
-        G = self.get_grad(name, current_A)
-        return 299.8 * G / self.Pref  # K1 = G / Brho  [1/m^2]
+        current_A = float(current_A)
+        if not np.isfinite(current_A):
+            return np.nan
+        canonical = self.qmag_alias_to_canonical.get(name, name)
+        mag_name_for_library = canonical[1:] if canonical.startswith("M") else canonical
+        if self.mag_ki is not None:
+            return self.mag_ki.current_to_k1(mag_name_for_library, current_A, self.Pref / 1e3)
+
+        k_T_per_A, L_m = self._quad_calib(name)
+        integrated_gradient_T = k_T_per_A * current_A
+        gradient_T_per_m = integrated_gradient_T / L_m
+        beam_rigidity_Tm = 3.3356409519815204 * (self.Pref / 1e3)
+        k1 = gradient_T_per_m / beam_rigidity_Tm
+        if mag_name_for_library.upper().startswith("QD"):
+            k1 = -abs(k1)
+        return float(k1)
 
     def k1_to_current(self, name, k1):
-        """K1 [1/m^2] -> current [A]."""
+        k1 = float(k1)
+        if not np.isfinite(k1):
+            raise ValueError(f"Cannot convert K1 for quadrupole '{name}': {k1}")
+        canonical = self.qmag_alias_to_canonical.get(name, name)
+        mag_name_for_library = canonical[1:] if canonical.startswith("M") else canonical
+        if self.mag_ki is not None:
+            return self.mag_ki.k1_to_current(mag_name_for_library, k1, self.Pref / 1e3)
+
         k_T_per_A, L_m = self._quad_calib(name)
-        G = float(k1) * self.Pref / 299.8  # gradient [T/m]
-        GL = G * L_m  # integrated gradient [T]
-        return GL / k_T_per_A  # current [A]
+        beam_rigidity_Tm = 3.3356409519815204 * (self.Pref / 1e3)
+        gradient_T_per_m = abs(k1) * beam_rigidity_Tm
+        integrated_gradient_T = gradient_T_per_m * L_m
+        current_A = integrated_gradient_T / k_T_per_A
+        return float(current_A)
 
     def insert_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -339,8 +431,14 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for name in names:
             pv = self.qmag_pv[name]
             canonical = self.qmag_alias_to_canonical.get(name, name)
-            ides.append(self._pv_get(f"{canonical}:currentWrite"))
-            iact.append(self._pv_get(f"{canonical}:currentRead"))
+            desired_current = self._pv_get(f"{canonical}:currentWrite", default=np.nan, timeout=0.7)
+            actual_current = self._pv_get(f"{canonical}:current", default=np.nan, timeout=0.7)
+            if not np.isfinite(actual_current):
+                actual_current = self._pv_get(f"{canonical}:currentRead", default=np.nan, timeout=0.7)
+            if not np.isfinite(desired_current):
+                desired_current = actual_current
+            ides.append(desired_current)
+            iact.append(actual_current)
             xdes.append(self._pv_get(pv["pv_set_x"]))
             ydes.append(self._pv_get(pv["pv_set_y"]))
             rolldes.append(self._pv_get(pv["pv_set_roll"]))
@@ -350,10 +448,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         ides = np.array(ides, dtype=float)
         iact = np.array(iact, dtype=float)
-        bdes = np.array(ides, dtype=float) # TO BE CHANGED
-        bdact = np.array(iact, dtype=float) # TO BE CHANGED
-        #bdes = np.array([self.current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
-        #bact = np.array([self.current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
+        def _safe_current_to_k1(magnet_name, current):
+            try:
+                return self.current_to_k1(magnet_name, current)
+            except Exception as exc:
+                print(f"Could not convert current to K1 for {magnet_name}: {exc}")
+                return np.nan
+
+        bdes = np.array([_safe_current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
+        bact = np.array([_safe_current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
 
         data = {
             "names": names,
@@ -481,13 +584,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         image_acquire_pv = PV(pv_acquire_name)
         if move_screen:
             otr_in_pv.put(1)
+            print("Inserting the screen...")
             time.sleep(5)
         image_acquire_pv.put(1)
         time.sleep(3)
         img_data = image_data_pv.get()
         image_acquire_pv.put(0)
         if move_screen:
-            otr_in_pv.put(1)
+            otr_out_pv.put(1)
+            print("Extracting the screen...")
         img_reshaped = img_data.reshape(960, 1280)
         return img_reshaped
 
