@@ -85,7 +85,7 @@ IPBSMInterface = _IPBSM_OPT.IPBSMInterface
 
 ZSCAN_DEFAULT_RANGE = 0.0085
 ZSCAN_DEFAULT_STEP = 0.001
-DEFAULT_IPBSM_OUTPUT_BASE_DIR = Path.home() / "atf" / "data" / "flight-simulator" / "IPBSMOpt"
+DEFAULT_IPBSM_OUTPUT_BASE_DIR = Path("/atf/data/flight-simulator/IPBSMOpt")
 ZAY_PRESET_INIT_POINTS = 9
 ZAY_PRESET_MAX_STEPS = 20
 ZSCAN_KNOBS = ["Z scan knob"]

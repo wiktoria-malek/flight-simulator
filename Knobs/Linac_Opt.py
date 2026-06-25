@@ -44,7 +44,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Interfaces.ATF2.InterfaceATF2_LinacBT import InterfaceATF2_LinacBT, BT_SEQUENCE
 
-FLIGHT_SIMULATOR_DATA_ROOT = Path.home() / "atf" / "data" / "flight-simulator"
+FLIGHT_SIMULATOR_DATA_ROOT = Path("/atf/data/flight-simulator")
 
 
 def default_linacopt_save_dir(year: Optional[str] = None) -> Path:
