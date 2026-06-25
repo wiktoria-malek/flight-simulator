@@ -411,6 +411,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_movable_magnets_names(self):
         return self.movable_magnets
 
+    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+        current0 = caget(f"{quad_name}:current")
+
     def get_quadrupoles(self, names=None, include_pv_names=False):
         """
         We need to implement a conversion how current can be
@@ -484,7 +487,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             raise ValueError(f"len(names)={len(names)} != len(k1_values)={len(k1_values)} in set_quadrupoles")
 
         for name, k1 in zip(names, k1_values):
-            if name not in self.qmag_pv:
+            if name not in self.quadrupoles:
                 raise ValueError(f"Quadrupole '{name}' is not magnet list.")
             canonical = self.qmag_alias_to_canonical.get(name, name)
             target_current = self.k1_to_current(name, float(k1))  # A
