@@ -138,8 +138,9 @@ def plot_results(
         Q = np.eye(d)
 
     def gaussian(x_vec: np.ndarray) -> float:
-        dx = (x_vec - mu).reshape(-1, 1)
-        val = amp * float(np.exp(-0.5 * (dx.T @ Q @ dx)))
+        dx = np.asarray(x_vec - mu, dtype=float).reshape(-1)
+        quad = float(dx @ Q @ dx)
+        val = amp * float(np.exp(-0.5 * quad))
         return val
 
     saved = []
