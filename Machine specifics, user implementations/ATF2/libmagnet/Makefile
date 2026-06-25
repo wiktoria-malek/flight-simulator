@@ -95,7 +95,7 @@ libmagnet.a: $(OBJS)
 	ranlib libmagnet.a
 
 libmagnet.so: $(OBJS)
-	gcc -shared -fPIC -o libmagnet.so *.o
+	gfortran -shared -fPIC -o libmagnet.so *.o
 
 clean:
 	rm -f *.o *.a *.so
