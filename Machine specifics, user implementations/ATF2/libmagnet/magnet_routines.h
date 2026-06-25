@@ -6,7 +6,7 @@ extern "C" {
 int mag_ki_calc( int mode, int n, float cur[], float fld[], float energy, float eff_len, 
         float *kvalue, float *field, float *current );
 
-int mag_ki_main( int mode, char *magname0, 
+int mag_ki_main( int mode, const char *magname0, 
 	float energy, float kvalue[2],  float current[2], float *efflen, float field[2] );
 int mag_ki_z_nkk_cv( int mode, float energy, 
 	float *kvalue, float *current, float *efflen, float *field );

@@ -30,7 +30,7 @@
 //#include "atf_common.h"
 #include "magnet.h"
 
-int mag_ki_main( int mode, char *magname0, 
+int mag_ki_main( int mode, const char *magname0, 
 		 float energy, float kvalue[2],  float current[2], float *efflen, float field[2] )
 {
   char magname[80];
