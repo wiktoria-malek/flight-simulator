@@ -788,28 +788,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
                 self.set_quadrupoles([quad_name], [float(K1)], track = False)
-
-                # start_element = self.lattice[start_element_name]
-                # if isinstance(start_element, list):
-                #     start_element = start_element[0]
-                # for si, screen_name in enumerate(screens):
-                #     screen_elem = self.lattice[screen_name]
-                #     if isinstance(screen_elem, list):
-                #         screen_elem = screen_elem[-1]
-                #     temp_bunch = self._build_bunch_from_guesses(
-                #         emit_x=float(emit_x), emit_y=float(emit_y),
-                #         beta_x0=float(beta_x0), beta_y0=float(beta_y0),
-                #         alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
-                #     )
-                #
-                #     tracked = self.lattice.track(temp_bunch, start_element, screen_elem)
-                #     m = tracked.get_phase_space('%x %y')
-                #     if m is not None and len(m) > 0:
-                #         output_x[k, si] = float(np.std(m[:, 0]))
-                #         output_y[k, si] = float(np.std(m[:, 1]))
-
-
-## FOR A TEST
                 start_element = self.lattice[start_element_name]
                 if isinstance(start_element, list):
                     start_element = start_element[0]
@@ -842,7 +820,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                     if m is not None and len(m) > 0:
                         output_x[k, si] = float(np.std(m[:, 0]))
                         output_y[k, si] = float(np.std(m[:, 1]))
-## FOR A TEST
 
         finally:
             self.set_quadrupoles([quad_name], [float(K1_original)], track=False)

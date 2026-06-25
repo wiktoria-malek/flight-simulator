@@ -631,15 +631,7 @@ class Optimization:
                 allow_stop=False, quad_k1_0 = quad_k1_0_best,
             )
 
-            solution = self._build_joint_partial_output(
-                screens=screens,
-                sigma2_x=sig_x2,
-                sigma2_y=sig_y2,
-                pred2_x=pred2_x_partial,
-                pred2_y=pred2_y_partial,
-                best_row=best_row,
-                best_cost=best_cost,
-            )
+            solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x_partial, pred2_y=pred2_y_partial, best_row=best_row, best_cost=best_cost)
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             raise OptimizationStopped("Optimization stopped.", solution=solution)

@@ -122,13 +122,13 @@ class QuadrupoleScan:
         if steps_requested > 0 and delta_max <= delta_min:
             raise ValueError("delta_max must be larger than delta_min")
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
-        quadrupoles = self.interface.get_quadrupoles()
-        quad_names = list(quadrupoles["names"])
+        quadrupoles = self.interface.get_quadrupoles([quad_name])
+        quad_names = list(getattr(self.interface, "quadrupoles", []))
         if quad_name not in quad_names:
             raise ValueError("Quadrupole name not found in quadrupoles")
 
         quad_index = quad_names.index(quad_name)
-        K1_0 = float(quadrupoles["bdes"][quad_index])
+        K1_0 = float(quadrupoles["bdes"][0])
         if np.isclose(K1_0, 0.0):
             raise ValueError("This quadrupole has zero K1_0. You should choose another one.")
 
@@ -173,8 +173,8 @@ class QuadrupoleScan:
                     break
                 insert_screen = getattr(self.interface, "insert_screen", None)
                 extract_screen = getattr(self.interface, "extract_screen", None)
-                # if callable(insert_screen):
-                #     insert_screen(screen_name)
+                if callable(insert_screen):
+                     insert_screen(screen_name)
                 try:
                     for i, K1 in enumerate(K1_values):
                         while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
@@ -193,6 +193,7 @@ class QuadrupoleScan:
                         sxy_shots = np.full(nshots, np.nan, dtype=float)
                         # tilt_shots = np.full(nshots, np.nan, dtype=float)
                         state_files = []
+                        quad_data = self.interface.get_quadrupoles([quad_name])
                         for j in range(nshots):
                             while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
                                 setattr(self, "_scan_is_paused", True)
@@ -205,15 +206,9 @@ class QuadrupoleScan:
                             if getattr(self, "_cancel", False):
                                 cancel_requested = True
                                 break
-                            screen_data = self.interface.get_screens([screen_name], move_screen = (j==0))
+                            screens_data = self.interface.get_screens([screen_name], move_screen = (j==0))
                             idx_map = {name: idx for idx, name in enumerate(screens_data["names"])}
                             idx = idx_map.get(screen_name)
-                            #state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
-                            #state.save(filename=state_filename)
-                            #state_files.append(state_filename)
-                            #screens_data = state.get_screens([screen_name])
-                            #screen_name_to_index = {name: index for index, name in enumerate(screens_data["names"])}
-                            #idx = screen_name_to_index.get(screen_name)
                             if idx is not None:
                                 sx_shots[j] = float(screens_data["sigx"][idx])
                                 sy_shots[j] = float(screens_data["sigy"][idx])
@@ -222,7 +217,7 @@ class QuadrupoleScan:
                                 #tilt_shots[j] = float(screens_data["tilt"][idx])
                             state_for_scan = State(sextupoles=None, correctors=None, bpms=None,
                                 icts=None, sequence=self.interface.get_sequence(), hcorrectors_names=None,
-                                vcorrectors_names=None, screens=screens_data, quadrupoles=self.interface.get_quadrupoles([quad_name]))
+                                vcorrectors_names=None, screens=screens_data, quadrupoles=quad_data)
                             state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
                             state_for_scan.save(filename=state_filename)
                             state_files.append(state_filename)
