@@ -87,8 +87,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "ZH2X", "MQD5X", "ZV4X", "ZV5X", "MQF6X", "MQF7X", "ZH3X", "MQD8X", "ZV6X",
             "MQF9X", "ZH4X", "FONTK1", "ZV7X", "FONTP1", "MQD10X", "ZH5X", "MQF11X",
             "FONTK2", "ZV8X", "FONTP2", "MQD12X", "ZH6X", "MQF13X", "MQD14X", "FONTP3",
-            "ZH7X", "MQF15X", "ZV9X", "MQD16X", "ZH8X", "MQF17X", "ZV10X", "MQD18X",
-            "ZH9X", "MQF19X", "ZV11X", "MQD20X", "ZH10X", "MQF21X", "IPT1", "IPT2",
+            "ZH7X", "MQF15X", "ZV9X", "MQD16X", "ZH8X", "MQF17X", "ZV10X", "MQD18X","OTR0X",
+            "ZH9X", "MQF19X","OTR1X", "ZV11X", "MQD20X","OTR2X" , "ZH10X", "MQF21X", "OTR3X","IPT1", "IPT2",
             "IPT3", "IPT4", "MQM16FF", "ZH1FF", "ZV1FF", "MQM15FF", "MQM14FF", "FB2FF",
             "MQM13FF", "MQM12FF", "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9BFF",
             "MSF6FF", "MQF9AFF", "MQD8FF", "MQF7FF", "MQD6FF", "MQF5BFF", "MSF5FF",
@@ -489,10 +489,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for name, k1 in zip(names, k1_values):
             if name not in self.quadrupoles:
                 raise ValueError(f"Quadrupole '{name}' is not magnet list.")
-            #canonical = self.qmag_alias_to_canonical.get(name, name)
+            canonical = self.qmag_alias_to_canonical.get(name, name)
             target_current = self.k1_to_current(name, float(k1))  # A
             self._pv_put(f"{name}:currentWrite", float(target_current))
-            self._wait_for_magnet_readback(canonical, float(target_current))
+            self._wait_for_magnet_readback(name, float(target_current))
 
     """Methods for OTRs from mOTRs_measurement.py"""
 
@@ -750,7 +750,14 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_elements_indices(self, names):
         if isinstance(names, str):
             names = [names]
-        name_to_index = {string: index for index, string in enumerate(self.sequence)}
+        sequence_for_index = list(getattr(self, "sequence_raw", self.sequence))
+        name_to_index = {string: index for index, string in enumerate(sequence_for_index)}
+
+        for alias, canonical in getattr(self, "qmag_alias_to_canonical", {}).items():
+            if alias in name_to_index and canonical not in name_to_index:
+                name_to_index[canonical] = name_to_index[alias]
+            if canonical in name_to_index and alias not in name_to_index:
+                name_to_index[alias] = name_to_index[canonical]
         return [name_to_index.get(name, np.nan) for name in names]
 
     def get_target_dispersion(self, names=None): # for DR too
