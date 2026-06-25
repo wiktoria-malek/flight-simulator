@@ -350,14 +350,12 @@ def plot_results(
                     disc_idx = list(range(discarded_y.size))
             if disc_idx:
                 disc_idx_arr = np.asarray(disc_idx, dtype=int)
-                ax.errorbar(
+                ax.plot(
                     discarded_X[disc_idx_arr, i],
                     discarded_y[disc_idx_arr],
-                    yerr=discarded_yerr[disc_idx_arr],
-                    fmt="x",
-                    capsize=2,
+                    linestyle="None",
+                    marker="x",
                     color="#dc2626",
-                    ecolor="#dc2626",
                     markersize=8,
                     markeredgewidth=2.0,
                 )
