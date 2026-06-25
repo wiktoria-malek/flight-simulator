@@ -1013,10 +1013,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
     def _show_screen_images(self):
         if self.screen_images is None:
             self.screen_images = DisplayScreenImages(self)
-
-        # here goes the self.screen_images._plot_whatever
-
-
+        self.screen_images._plot_screen_image(session=self.session)
 
         self.screen_images.show()
         self.screen_images.raise_()

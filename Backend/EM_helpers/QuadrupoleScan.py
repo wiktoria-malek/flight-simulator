@@ -66,17 +66,9 @@ class QuadrupoleScan:
                     progress_callback(merged_partial, i, nsteps)
 
             try:
-                single_session = self._run_single_scan(
-                    quad_name=quad_name,
-                    screens=screens,
-                    delta_min=delta_min,
-                    delta_max=delta_max,
-                    steps=steps,
-                    nshots=nshots,
-                    bpms=bpms,
-                    reference_screen=reference_screen,
-                    progress_callback=_wrapped_progress,
-                )
+                single_session = self._run_single_scan(quad_name=quad_name, screens=screens, delta_min=delta_min, delta_max=delta_max,
+                    steps=steps, nshots=nshots, bpms=bpms, reference_screen=reference_screen, progress_callback=_wrapped_progress)
+
             except ValueError as e:
                 msg = str(e)
                 if "zero K1_0" in msg:
