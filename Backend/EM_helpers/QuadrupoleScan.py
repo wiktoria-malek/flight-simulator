@@ -187,7 +187,9 @@ class QuadrupoleScan:
                         if getattr(self, "_cancel", False):
                             cancel_requested = True
                             break
+                        print("debug0")
                         self.interface.set_quadrupoles([quad_name], [float(K1)])
+                        print("debug1")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
                         sxy_shots = np.full(nshots, np.nan, dtype=float)

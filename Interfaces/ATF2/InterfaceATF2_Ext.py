@@ -425,19 +425,19 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             names = self.qmags # quadrupoles names
         if type(names) == str:
             names = [names]
-        names = [name for name in names if name in self.qmag_pv]
+        names = [name for name in names if name in self.quadrupoles]
 
         ides, iact = [], []
         xdes, ydes, rolldes = [], [], []
         xact, yact, rollact = [], [], []
 
         for name in names:
-            pv = self.qmag_pv[name]
-            canonical = self.qmag_alias_to_canonical.get(name, name)
-            desired_current = self._pv_get(f"{canonical}:currentWrite", default=np.nan, timeout=0.7)
-            actual_current = self._pv_get(f"{canonical}:current", default=np.nan, timeout=0.7)
+            pv = self.quadrupoles[name]
+            #canonical = self.qmag_alias_to_canonical.get(name, name)
+            desired_current = self._pv_get(f"{name}:currentWrite", default=np.nan, timeout=0.7)
+            actual_current = self._pv_get(f"{name}:current", default=np.nan, timeout=0.7)
             if not np.isfinite(actual_current):
-                actual_current = self._pv_get(f"{canonical}:currentRead", default=np.nan, timeout=0.7)
+                actual_current = self._pv_get(f"{name}:currentRead", default=np.nan, timeout=0.7)
             if not np.isfinite(desired_current):
                 desired_current = actual_current
             ides.append(desired_current)
