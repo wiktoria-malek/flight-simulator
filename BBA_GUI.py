@@ -762,8 +762,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             Cx = [s for s in corrs if self._is_h_corrector(s)]
             Cy = [s for s in corrs if self._is_v_corrector(s)]
 
-            Axx, Ayy, Axy, Ayx, B0x, B0y, hcorrs, vcorrs, bpms_common = self._creating_response_matrices(
-                selected_corrs=corrs, selected_bpms=bpms)
+            Axx, Ayy, Axy, Ayx, B0x, B0y, hcorrs, vcorrs, bpms_common = self._creating_response_matrices(selected_corrs=corrs, selected_bpms=bpms)
             print("hcorrs order =", hcorrs)
             print("vcorrs order =", vcorrs)
             print("Cx from GUI =", Cx)
@@ -856,9 +855,20 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 UNCOMMENT AFTER SANITY CHECKS 
                 '''
 
-                if it == 0:  # instead of golden orbit, correct from current orbit -- is it okay, if a machine is not well corrected?
+                if it==0:
                     B0x = O0x
                     B0y = O0y
+
+                # if it == 0:
+                #     B0x = np.asarray(B0x, dtype=float).reshape(-1, 1)
+                #     B0y = np.asarray(B0y, dtype=float).reshape(-1, 1)
+                #     print("||O0x - B0x|| =", np.linalg.norm(O0x - B0x))
+                #     print("||O0y - B0y|| =", np.linalg.norm(O0y - B0y))
+                #     self.log(
+                #         f"Initial orbit error from reference: "
+                #         f"x={np.linalg.norm(O0x - B0x):.6g}, "
+                #         f"y={np.linalg.norm(O0y - B0y):.6g}"
+                #     )
 
                 if self.reset_ref_orb == True:
                     B0x = O0x.copy()
@@ -1148,7 +1158,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             else:
                 self.log("Correction finished.")
             if not silent:
-                self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, max_curr_h, max_curr_v,
+                self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, self.max_horizontal_current_spinbox.value(), self.max_vertical_current_spinbox.value(),
                                            bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy, Axy,
                                            Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()),
                                            machine_state_file=machine_state)
@@ -1358,13 +1368,6 @@ if __name__ == "__main__":
         print("Selection cancelled.")
         sys.exit(1)
 
-    # UNCOMMENT AFTER SANITY CHECKS
-    # I = dialog
-    # project_name = I.get_name()
-    # nominal_state = None
-    # start_state = I.get_state()
-
-    # COMMENT AFTER SANITY CHECKS
     I = dialog
     project_name = I.get_name()
     nominal_state = None

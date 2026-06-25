@@ -350,13 +350,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         ides = np.array(ides, dtype=float)
         iact = np.array(iact, dtype=float)
+        bdes = np.array(ides, dtype=float) # TO BE CHANGED
+        bdact = np.array(iact, dtype=float) # TO BE CHANGED
         #bdes = np.array([self.current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
         #bact = np.array([self.current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
 
         data = {
             "names": names,
-            #"bdes": bdes, # 1/m^2,
-            #"bact": bact,  # 1/m^2
+            "bdes": bdes, # 1/m^2,
+            "bact": bact,  # 1/m^2
             "ides": np.array(ides, dtype=float),
             "iact": np.array(iact, dtype=float),
             "xdes": np.array(xdes, dtype=float),
@@ -460,7 +462,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             v_factor = 1.0
         return h_factor, v_factor
 
-    def acquire_otr_image(self, screen_pv_name):
+    def acquire_otr_image(self, screen_pv_name, move_screen = True):
         """
         It might be super slow.
         1 call of get_screens() will take 8s x number_of_screens
@@ -468,7 +470,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         EM GUI calls get_screens() multiple times, every K1 change.
         """
 
-        print(f"Acquiring data for OTR{otr_id_str}...")
+        print(f"Acquiring data for {screen_pv_name}...")
         pv_in_name = f'{screen_pv_name}:Target:WRITE:IN'
         pv_out_name = f'{screen_pv_name}:Target:WRITE:OUT'
         pv_img_data_name = f'{screen_pv_name}:IMAGE:ArrayData'
@@ -477,13 +479,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         otr_out_pv = PV(pv_out_name)
         image_data_pv = PV(pv_img_data_name)
         image_acquire_pv = PV(pv_acquire_name)
-        otr_in_pv.put(1)
-        time.sleep(5)
+        if move_screen:
+            otr_in_pv.put(1)
+            time.sleep(5)
         image_acquire_pv.put(1)
         time.sleep(3)
         img_data = image_data_pv.get()
         image_acquire_pv.put(0)
-        otr_out_pv.put(1)
+        if move_screen:
+            otr_in_pv.put(1)
         img_reshaped = img_data.reshape(960, 1280)
         return img_reshaped
 
@@ -523,7 +527,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
 
 
-    def get_screens(self, names=None):
+    def get_screens(self, names=None, move_screen=True):
         print('Reading screens...')
         if isinstance(names, str):
             names = [names]
@@ -560,7 +564,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             otr_id = screen_name.replace('OTR', '')
             hpixel, vpixel = self.get_pixel_calibrations(screen_pv_name)
             status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
-            image = self.acquire_otr_image(screen_pv_name)
+            image = self.acquire_otr_image(screen_pv_name, move_screen=move_screen)
             x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel)
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)

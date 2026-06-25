@@ -1,6 +1,7 @@
 import os, sys, matplotlib, pickle, time
 from datetime import datetime
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
+from Backend.State import State
 import numpy as np
 matplotlib.use("QtAgg")
 try:
@@ -172,8 +173,8 @@ class QuadrupoleScan:
                     break
                 insert_screen = getattr(self.interface, "insert_screen", None)
                 extract_screen = getattr(self.interface, "extract_screen", None)
-                if callable(insert_screen):
-                    insert_screen(screen_name)
+                # if callable(insert_screen):
+                #     insert_screen(screen_name)
                 try:
                     for i, K1 in enumerate(K1_values):
                         while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
@@ -204,21 +205,28 @@ class QuadrupoleScan:
                             if getattr(self, "_cancel", False):
                                 cancel_requested = True
                                 break
-                            state = self.interface.get_state()
-                            state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
-                            state.save(filename=state_filename)
-                            state_files.append(state_filename)
-                            print("debug21")
-                            screens_data = state.get_screens([screen_name]) # ta linia produkuje błąd
-                            print("debug22")
-                            screen_name_to_index = {name: index for index, name in enumerate(screens_data["names"])}
-                            idx = screen_name_to_index.get(screen_name)
+                            screen_data = self.interface.get_screens([screen_name], move_screen = (j==0))
+                            idx_map = {name: idx for idx, name in enumerate(screens_data["names"])}
+                            idx = idx_map.get(screen_name)
+                            #state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
+                            #state.save(filename=state_filename)
+                            #state_files.append(state_filename)
+                            #screens_data = state.get_screens([screen_name])
+                            #screen_name_to_index = {name: index for index, name in enumerate(screens_data["names"])}
+                            #idx = screen_name_to_index.get(screen_name)
                             if idx is not None:
                                 sx_shots[j] = float(screens_data["sigx"][idx])
                                 sy_shots[j] = float(screens_data["sigy"][idx])
                                 if "sigxy" in screens_data:
                                     sxy_shots[j] = float(screens_data["sigxy"][idx])
                                 #tilt_shots[j] = float(screens_data["tilt"][idx])
+                            state_for_scan = State(sextupoles=None, correctors=None, bpms=None,
+                                icts=None, sequence=self.interface.get_sequence(), hcorrectors_names=None,
+                                vcorrectors_names=None, screens=screens_data, quadrupoles=self.interface.get_quadrupoles([quad_name]))
+                            state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
+                            state_for_scan.save(filename=state_filename)
+                            state_files.append(state_filename)
+
                         if state_files:
                             sigx_mean[i, k] = np.nanmean(sx_shots)
                             sigy_mean[i, k] = np.nanmean(sy_shots)
@@ -240,7 +248,6 @@ class QuadrupoleScan:
                         existing_step["state_files"].extend(state_files)
 
                         session_partial = {
-                            "mode": "single_quad_scan",
                             "delta_min": float(delta_min),
                             "delta_max": float(delta_max),
                             "steps": int(steps_requested),
@@ -262,13 +269,9 @@ class QuadrupoleScan:
                             "K1_values": K1_values.tolist(),
                             "scan_steps": scan_steps,
                             "states_dir": output_dir,
-                            "measured_optics": None,
-                            "fit_result_twiss_emit": None,
                             "cancelled": bool(cancel_requested),
                             "current_screen": screen_name,
                             "current_screen_index": int(k),
-                            "measurement_mode": measurement_mode,
-                            "is_conventional_em": bool(steps_requested == 0),
                             "nsteps_scan": int(nsteps_scan),
                         }
 
@@ -288,7 +291,6 @@ class QuadrupoleScan:
             self.interface.set_quadrupoles([quad_name], [float(K1_0)])
 
         session = {
-            "mode": "single_quad_scan",
             "delta_min": float(delta_min),
             "delta_max": float(delta_max),
             "steps": int(steps_requested),
@@ -311,11 +313,7 @@ class QuadrupoleScan:
             "K1_values": K1_values.tolist(),
             "scan_steps": scan_steps,
             "states_dir": output_dir,
-            "measured_optics": None,
-            "fit_result_twiss_emit": None,
             "cancelled": bool(cancel_requested),
-            "measurement_mode": measurement_mode,
-            "is_conventional_em": bool(steps_requested == 0),
             "nsteps_scan": int(nsteps_scan),
         }
         return session

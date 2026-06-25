@@ -159,8 +159,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
             layout = QVBoxLayout(self.plotPlaceholder)
         layout.addWidget(self.canvas)
         quadrupoles = list(getattr(self.interface, "quadrupoles", []))
-        quadrupoles = list(self.interface.get_quadrupoles()["names"])
-        screens = self.interface.get_screens()["names"]
+        screens = list(getattr(self.interface, "screens", []))
         screen_order, screen_order_type = self._get_element_order_values(screens)
         screen_pairs = sorted(zip(screens, screen_order),key=lambda x: x[1] if np.isfinite(x[1]) else np.inf) # assigns S position to each screen
         screens_sorted = [name for name, _ in screen_pairs] # only names
@@ -1014,7 +1013,6 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         if self.screen_images is None:
             self.screen_images = DisplayScreenImages(self)
         self.screen_images._plot_screen_image(session=self.session)
-
         self.screen_images.show()
         self.screen_images.raise_()
         self.screen_images.activateWindow()

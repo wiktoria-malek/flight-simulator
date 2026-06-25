@@ -110,7 +110,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if self.auto_click_compute:
             QTimer.singleShot(0, self.__compute_button_clicked)
 
-
     def _handle_plot_double_click(self, event):
         if event is None:
             return
