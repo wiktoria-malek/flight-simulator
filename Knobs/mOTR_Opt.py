@@ -747,6 +747,33 @@ class MOTROptimizer(BaseOptimizer):
     def _extra_csv_columns(self) -> List[str]:
         return _motr_extra_csv_columns(self.cfg)
 
+    def _bo1d_display_y_label(self) -> str:
+        return f"{_objective_label(getattr(self.cfg, 'objective_source', 'Conrad'))} objective"
+
+    def _bo1d_display_direction(self) -> str:
+        return "minimize"
+
+    def _bo1d_display_note(self) -> str:
+        return "Surrogate mean/std are converted from the BO score used internally: score = 1 / objective."
+
+    def _bo1d_display_values_from_records(self, records: List[StepRecord]) -> np.ndarray:
+        values: List[float] = []
+        for rec in list(records or []):
+            dat = dict(getattr(rec, "dat", {}) or {})
+            values.append(_safe_float(dat.get("objective_selected", dat.get("beamsize", np.nan)), default=np.nan))
+        return np.asarray(values, dtype=float)
+
+    def _bo1d_model_to_display(self, mu: np.ndarray, std: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        mu_arr = np.asarray(mu, dtype=float)
+        std_arr = np.asarray(std, dtype=float)
+        safe_mu = np.where(np.isfinite(mu_arr) & (mu_arr > 1e-12), mu_arr, np.nan)
+        disp_mean = np.full(mu_arr.shape, np.nan, dtype=float)
+        disp_std = np.full(std_arr.shape, np.nan, dtype=float)
+        mask = np.isfinite(safe_mu)
+        disp_mean[mask] = 1.0 / safe_mu[mask]
+        disp_std[mask] = std_arr[mask] / np.maximum(safe_mu[mask] ** 2, 1e-18)
+        return disp_mean, disp_std
+
     def _csv_header(self) -> List[str]:
         return (
             ["step", "t_iso"]

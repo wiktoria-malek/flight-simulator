@@ -543,6 +543,7 @@ class Optimizer:
         self._machine_state_init_values: Dict[str, float] = {}
         self._resume_pending_row = dict(resume_pending_row) if isinstance(resume_pending_row, dict) else None
         self._remeasure_current_point_requested = False
+        self._latest_bo1d_trace: Optional[Dict[str, Any]] = None
         self._init_machine_state_tracking()
 
         if warm_start_data:
@@ -947,6 +948,103 @@ class Optimizer:
     def _emit(self, step: int, info: Dict):
         if self.progress_cb:
             self.progress_cb(step, info)
+
+    def _bo1d_display_y_label(self) -> str:
+        return "Modulation"
+
+    def _bo1d_display_direction(self) -> str:
+        return "maximize"
+
+    def _bo1d_display_note(self) -> str:
+        return ""
+
+    def _bo1d_display_values_from_records(self, records: List[StepRecord]) -> np.ndarray:
+        values: List[float] = []
+        for rec in list(records or []):
+            try:
+                values.append(float(rec.y))
+            except Exception:
+                values.append(float("nan"))
+        return np.asarray(values, dtype=float)
+
+    def _bo1d_model_to_display(self, mu: np.ndarray, std: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        return np.asarray(mu, dtype=float), np.asarray(std, dtype=float)
+
+    def _bo1d_plot_grid(self, axis_name: str, lo_axis: float, hi_axis: float, max_points: int = 401) -> np.ndarray:
+        lo_axis = float(lo_axis)
+        hi_axis = float(hi_axis)
+        if (not np.isfinite(lo_axis)) or (not np.isfinite(hi_axis)) or hi_axis < lo_axis:
+            return np.asarray([], dtype=float)
+        if abs(hi_axis - lo_axis) <= 1e-15:
+            return np.asarray([lo_axis], dtype=float)
+
+        step = max(1e-12, self._step_for_param(axis_name))
+        approx_count = int(round((hi_axis - lo_axis) / step)) + 1
+        if 2 <= approx_count <= max_points:
+            grid = lo_axis + np.arange(approx_count, dtype=float) * step
+        else:
+            raw = np.linspace(lo_axis, hi_axis, max_points, dtype=float)
+            grid = np.array([self._quantize_knob(float(v), axis_name) for v in raw], dtype=float)
+        grid = np.unique(np.clip(grid, lo_axis, hi_axis))
+        if grid.size == 0:
+            grid = np.asarray([lo_axis, hi_axis], dtype=float)
+        return np.asarray(grid, dtype=float)
+
+    def _build_bo1d_trace_payload(
+        self,
+        *,
+        axis_name: str,
+        x_grid: np.ndarray,
+        mu: np.ndarray,
+        std: np.ndarray,
+        acq: np.ndarray,
+        chosen_x: float,
+        chosen_acq: float,
+        observed_records: List[StepRecord],
+    ) -> Dict[str, Any]:
+        x_arr = np.asarray(x_grid, dtype=float).reshape(-1)
+        mu_arr = np.asarray(mu, dtype=float).reshape(-1)
+        std_arr = np.asarray(std, dtype=float).reshape(-1)
+        acq_arr = np.asarray(acq, dtype=float).reshape(-1)
+        if x_arr.size == 0 or mu_arr.size != x_arr.size or std_arr.size != x_arr.size or acq_arr.size != x_arr.size:
+            return {}
+
+        mu_disp, std_disp = self._bo1d_model_to_display(mu_arr, std_arr)
+        disp_obs = self._bo1d_display_values_from_records(observed_records)
+
+        x_obs: List[float] = []
+        y_obs: List[float] = []
+        for rec, y_val in zip(list(observed_records or []), disp_obs):
+            try:
+                x_val = float(rec.x.get(axis_name, float("nan")))
+            except Exception:
+                x_val = float("nan")
+            if np.isfinite(x_val) and np.isfinite(float(y_val)):
+                x_obs.append(float(x_val))
+                y_obs.append(float(y_val))
+
+        if np.any(np.isfinite(acq_arr)):
+            chosen_idx = int(np.nanargmax(acq_arr))
+        else:
+            chosen_idx = int(np.argmin(np.abs(x_arr - float(chosen_x))))
+
+        return {
+            "axis": str(axis_name),
+            "x_label": str(axis_name),
+            "y_label": str(self._bo1d_display_y_label()),
+            "direction": str(self._bo1d_display_direction()),
+            "note": str(self._bo1d_display_note()),
+            "acquisition_label": str(getattr(self.cfg, "acquisition", "EI")).upper(),
+            "x_grid": x_arr.tolist(),
+            "y_mean": np.asarray(mu_disp, dtype=float).tolist(),
+            "y_std": np.asarray(std_disp, dtype=float).tolist(),
+            "acquisition": acq_arr.tolist(),
+            "x_obs": x_obs,
+            "y_obs": y_obs,
+            "chosen_x": float(chosen_x),
+            "chosen_acq": float(chosen_acq),
+            "chosen_y_mean": float(mu_disp[chosen_idx]) if 0 <= chosen_idx < mu_disp.size else float("nan"),
+        }
 
     def _bounds_arrays(self) -> Tuple[np.ndarray, np.ndarray]:
         lo = np.array([self.cfg.bounds[p][0] for p in self.cfg.params], float)
@@ -1683,6 +1781,7 @@ class Optimizer:
                 continue
 
         if len(x_hist) < 2:
+            self._latest_bo1d_trace = None
             x_fallback, gf_tag = self._propose_next_GF(
                 axis=axis,
                 cycle_idx=max(0, len(axis_recs)),
@@ -1702,6 +1801,7 @@ class Optimizer:
         try:
             gp.fit(X1, y1)
         except Exception:
+            self._latest_bo1d_trace = None
             x_fallback, gf_tag = self._propose_next_GF(
                 axis=axis,
                 cycle_idx=max(0, len(axis_recs)),
@@ -1720,6 +1820,7 @@ class Optimizer:
         cand_q = np.clip(cand_q, lo_axis, hi_axis)
         cand = np.unique(cand_q)
         if cand.size == 0:
+            self._latest_bo1d_trace = None
             x_fallback, gf_tag = self._propose_next_GF(
                 axis=axis,
                 cycle_idx=max(0, len(axis_recs)),
@@ -1733,6 +1834,25 @@ class Optimizer:
         else:
             acq = acq_ucb(mu, std, beta=self.cfg.ucb_beta)
         best_idx = int(np.argmax(acq))
+        plot_grid = self._bo1d_plot_grid(axis_name, lo_axis, hi_axis)
+        if plot_grid.size > 0:
+            mu_plot, std_plot = gp.predict(plot_grid.reshape(-1, 1))
+            if self.cfg.acquisition.upper() == "EI":
+                acq_plot = acq_ei(mu_plot, std_plot, y_best=float(np.max(y1)), xi=self.cfg.ei_xi)
+            else:
+                acq_plot = acq_ucb(mu_plot, std_plot, beta=self.cfg.ucb_beta)
+            self._latest_bo1d_trace = self._build_bo1d_trace_payload(
+                axis_name=axis_name,
+                x_grid=plot_grid,
+                mu=mu_plot,
+                std=std_plot,
+                acq=acq_plot,
+                chosen_x=float(cand[best_idx]),
+                chosen_acq=float(acq[best_idx]),
+                observed_records=axis_recs,
+            )
+        else:
+            self._latest_bo1d_trace = None
         x = x_base.copy()
         x[axis] = float(cand[best_idx])
         return x, "bo1d"
@@ -1761,6 +1881,29 @@ class Optimizer:
             a = acq_ucb(mu, std, beta=self.cfg.ucb_beta)
 
         x_next = cand[int(np.argmax(a))]
+        if X.shape[1] == 1:
+            axis_name = str(self.cfg.params[0])
+            plot_grid = self._bo1d_plot_grid(axis_name, float(lo[0]), float(hi[0]))
+            if plot_grid.size > 0:
+                mu_plot, std_plot = gp.predict(plot_grid.reshape(-1, 1))
+                if self.cfg.acquisition.upper() == "EI":
+                    acq_plot = acq_ei(mu_plot, std_plot, y_best=float(np.max(y)), xi=self.cfg.ei_xi)
+                else:
+                    acq_plot = acq_ucb(mu_plot, std_plot, beta=self.cfg.ucb_beta)
+                self._latest_bo1d_trace = self._build_bo1d_trace_payload(
+                    axis_name=axis_name,
+                    x_grid=plot_grid,
+                    mu=mu_plot,
+                    std=std_plot,
+                    acq=acq_plot,
+                    chosen_x=float(x_next[0]),
+                    chosen_acq=float(np.max(a)),
+                    observed_records=list(self.records),
+                )
+            else:
+                self._latest_bo1d_trace = None
+        else:
+            self._latest_bo1d_trace = None
         return clamp(x_next, lo, hi), float(np.max(a))
 
     def _propose_next_TRBO(self) -> Tuple[np.ndarray, float]:
@@ -2258,6 +2401,16 @@ class Optimizer:
                                     axis=axis_idx,
                                     base_x=x_fixed,
                                 )
+                                bo1d_trace = dict(self._latest_bo1d_trace or {}) if isinstance(self._latest_bo1d_trace, dict) else {}
+                                if bo1d_trace:
+                                    self._emit(len(self.X), {
+                                        "phase": "acquisition",
+                                        "method": "BO1D",
+                                        "axis": axis_name,
+                                        "step_next": len(self.X) + 1,
+                                        "max_acq": float(bo1d_trace.get("chosen_acq", float("nan"))),
+                                        "bo1d_trace": bo1d_trace,
+                                    })
                         else:
                             if gf_forced_offsets:
                                 offset = float(gf_forced_offsets.pop(0))
@@ -2350,11 +2503,13 @@ class Optimizer:
                     else:
                         x_next, max_acq = self._propose_next_BO()
                         chosen_by = "BO"
+                        bo1d_trace = dict(self._latest_bo1d_trace or {}) if isinstance(self._latest_bo1d_trace, dict) else {}
                         self._emit(len(self.X), {
                             "phase": "acquisition",
                             "method": method,
                             "step_next": len(self.X) + 1,
                             "max_acq": float(max_acq),
+                            "bo1d_trace": bo1d_trace,
                         })
                         if bool(getattr(self.cfg, "bo_stop_on_low_acq", True)):
                             thr = float(getattr(self.cfg, "bo_low_acq_threshold", 1e-4))

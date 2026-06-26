@@ -207,6 +207,7 @@ class MainWindow(QMainWindow):
         self.discarded_rows: List[Dict[str, Any]] = []
         self.resume_discarded_rows: List[Dict[str, Any]] = []
         self.latest_measurement_summary: Dict[str, Any] = {}
+        self.bo1d_trace: Optional[Dict[str, Any]] = None
 
         self._run_selected_knobs: List[str] = []
         self._run_state_channels: List[str] = []
@@ -420,6 +421,12 @@ class MainWindow(QMainWindow):
             3: self.fig.add_subplot(gs[2, 1]),
         }
         plot_layout.addWidget(self.canvas)
+        self.bo1d_fig = Figure(figsize=(10, 5.2), tight_layout=True)
+        self.bo1d_canvas = FigureCanvas(self.bo1d_fig)
+        self.bo1d_ax_obj = self.bo1d_fig.add_subplot(211)
+        self.bo1d_ax_acq = self.bo1d_fig.add_subplot(212, sharex=self.bo1d_ax_obj)
+        self.bo1d_canvas.setVisible(False)
+        plot_layout.addWidget(self.bo1d_canvas)
 
         log_group = QGroupBox("Log")
         layout.addWidget(log_group, stretch=1)
@@ -577,13 +584,6 @@ class MainWindow(QMainWindow):
         measurement_form.addRow("Max retries", self.max_retries)
         measurement_form.addRow("KEK analyzer samples", self.kek_samples)
         measurement_form.addRow("KEK sample interval [s]", self.kek_sample_interval)
-        self.measurement_help_lbl = QLabel(
-            "1 mOTRごとに、select mOTR -> background取得 -> screen挿入 -> "
-            "KEK analyzer PV取得 -> beam image取得、の順で動きます。"
-        )
-        self.measurement_help_lbl.setWordWrap(True)
-        self.measurement_help_lbl.setStyleSheet("color: #5c6670;")
-        measurement_form.addRow("What this means", self.measurement_help_lbl)
 
         cfg_row = QHBoxLayout()
         self.save_cfg_btn = QPushButton("Save config")
@@ -1102,6 +1102,7 @@ class MainWindow(QMainWindow):
         self.discarded_rows = []
         self.resume_discarded_rows = []
         self.latest_measurement_summary = {}
+        self._set_bo1d_trace(None)
         self._redraw_live_plot()
 
     def _prime_live_history(self, warm_start_rows: List[Dict], discarded_rows: Optional[List[Dict]] = None) -> None:
@@ -1113,7 +1114,99 @@ class MainWindow(QMainWindow):
         for item in list(discarded_rows or []):
             dat = dict(item.get("dat", {}) or {})
             self.discarded_rows.append(self._row_from_dat(int(item.get("step", len(self.discarded_rows) + 1)), str(item.get("chosen_by", "warm_start_discarded")), dat))
+        self._set_bo1d_trace(None)
         self._redraw_live_plot()
+
+    def _set_bo1d_trace(self, trace: Optional[Dict[str, Any]]) -> None:
+        self.bo1d_trace = dict(trace or {}) if trace else None
+        visible = bool(self.bo1d_trace and self.bo1d_trace.get("x_grid"))
+        self.bo1d_canvas.setVisible(visible)
+        self._redraw_bo1d_plot()
+
+    def _redraw_bo1d_plot(self) -> None:
+        self.bo1d_ax_obj.clear()
+        self.bo1d_ax_acq.clear()
+        trace = dict(self.bo1d_trace or {})
+        if not trace:
+            self.bo1d_canvas.draw_idle()
+            return
+
+        x_grid = np.asarray(trace.get("x_grid", []), dtype=float)
+        y_mean = np.asarray(trace.get("y_mean", []), dtype=float)
+        y_std = np.asarray(trace.get("y_std", []), dtype=float)
+        acq = np.asarray(trace.get("acquisition", []), dtype=float)
+        x_obs = np.asarray(trace.get("x_obs", []), dtype=float)
+        y_obs = np.asarray(trace.get("y_obs", []), dtype=float)
+        chosen_x = float(trace.get("chosen_x", float("nan")))
+        chosen_acq = float(trace.get("chosen_acq", float("nan")))
+        axis_name = str(trace.get("axis", "Parameter"))
+        y_label = str(trace.get("y_label", "Objective"))
+        acq_label = str(trace.get("acquisition_label", "Acquisition"))
+        direction = str(trace.get("direction", "maximize")).lower()
+        note = str(trace.get("note", "") or "")
+
+        if x_grid.size and y_mean.size == x_grid.size and y_std.size == x_grid.size:
+            lo_band = y_mean - y_std
+            hi_band = y_mean + y_std
+            mask = np.isfinite(x_grid) & np.isfinite(lo_band) & np.isfinite(hi_band)
+            if np.any(mask):
+                self.bo1d_ax_obj.fill_between(
+                    x_grid[mask], lo_band[mask], hi_band[mask],
+                    color="#cfe8ff", alpha=0.65, label="Surrogate ±1σ",
+                )
+            mean_mask = np.isfinite(x_grid) & np.isfinite(y_mean)
+            if np.any(mean_mask):
+                self.bo1d_ax_obj.plot(
+                    x_grid[mean_mask], y_mean[mean_mask],
+                    linestyle="--", linewidth=1.8, color="#1d4ed8", label="Surrogate mean",
+                )
+
+        obs_mask = np.isfinite(x_obs) & np.isfinite(y_obs)
+        if np.any(obs_mask):
+            self.bo1d_ax_obj.plot(
+                x_obs[obs_mask], y_obs[obs_mask],
+                linestyle="None", marker="o", markersize=6,
+                color="#111827", label="Measured points",
+            )
+
+        if np.isfinite(chosen_x):
+            self.bo1d_ax_obj.axvline(chosen_x, color="#b45309", linestyle=":", linewidth=1.6, label="Chosen x")
+            self.bo1d_ax_acq.axvline(chosen_x, color="#b45309", linestyle=":", linewidth=1.6)
+
+        acq_mask = np.isfinite(x_grid) & np.isfinite(acq)
+        if np.any(acq_mask):
+            self.bo1d_ax_acq.plot(
+                x_grid[acq_mask], acq[acq_mask],
+                color="#d97706", linewidth=1.8, label=f"{acq_label} acquisition",
+            )
+        if np.isfinite(chosen_x) and np.isfinite(chosen_acq):
+            self.bo1d_ax_acq.plot(
+                [chosen_x], [chosen_acq],
+                linestyle="None", marker="o", markersize=7,
+                color="#92400e", label="Chosen: max acquisition",
+            )
+
+        goal_text = "higher is better" if direction == "maximize" else "lower is better"
+        self.bo1d_ax_obj.set_title(f"1D BO surrogate for {axis_name} ({goal_text})")
+        self.bo1d_ax_obj.set_ylabel(y_label)
+        self.bo1d_ax_obj.grid(True, alpha=0.3)
+        if note:
+            self.bo1d_ax_obj.text(
+                0.01, 0.98, note,
+                transform=self.bo1d_ax_obj.transAxes,
+                ha="left", va="top", fontsize=8.5, color="#475569",
+            )
+
+        self.bo1d_ax_acq.set_title("Why this point was chosen")
+        self.bo1d_ax_acq.set_xlabel(axis_name)
+        self.bo1d_ax_acq.set_ylabel(acq_label)
+        self.bo1d_ax_acq.grid(True, alpha=0.3)
+
+        if self.bo1d_ax_obj.get_legend_handles_labels()[0]:
+            self.bo1d_ax_obj.legend(loc="best")
+        if self.bo1d_ax_acq.get_legend_handles_labels()[0]:
+            self.bo1d_ax_acq.legend(loc="best")
+        self.bo1d_canvas.draw_idle()
 
     def _refresh_latest_images(self):
         summary = dict(self.latest_measurement_summary or {})
@@ -1474,6 +1567,9 @@ class MainWindow(QMainWindow):
         step = int(payload.get("step", 0))
         info = dict(payload.get("info", {}) or {})
         phase = str(info.get("phase", ""))
+        bo1d_trace = dict(info.get("bo1d_trace", {}) or {})
+        if bo1d_trace:
+            self._set_bo1d_trace(bo1d_trace)
         chosen_by = str(info.get("chosen_by", ""))
         x_map = dict(info.get("x", {}) or {})
 

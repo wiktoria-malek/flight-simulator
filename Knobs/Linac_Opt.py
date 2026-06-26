@@ -558,6 +558,55 @@ class OptimizationWorker(QThread):
     def _emit_progress(self, payload: Dict[str, object]):
         self.progress_signal.emit(dict(payload))
 
+    def _emit_bo1d_trace(
+        self,
+        *,
+        axis_name: str,
+        x_grid: np.ndarray,
+        mu: np.ndarray,
+        std: np.ndarray,
+        acq: np.ndarray,
+        chosen_x: float,
+        chosen_acq: float,
+        x_obs: np.ndarray,
+        y_obs: np.ndarray,
+    ) -> None:
+        x_arr = np.asarray(x_grid, dtype=float).reshape(-1)
+        mu_arr = np.asarray(mu, dtype=float).reshape(-1)
+        std_arr = np.asarray(std, dtype=float).reshape(-1)
+        acq_arr = np.asarray(acq, dtype=float).reshape(-1)
+        x_obs_arr = np.asarray(x_obs, dtype=float).reshape(-1)
+        y_obs_arr = np.asarray(y_obs, dtype=float).reshape(-1)
+        if x_arr.size == 0 or mu_arr.size != x_arr.size or std_arr.size != x_arr.size or acq_arr.size != x_arr.size:
+            return
+
+        note = "BO uses the score shown here."
+        if self.objective_type == DEVELOPER_OBJECTIVE_ICT:
+            note = (
+                f"Score = {self.score_w_ttot:g}*Ttot + "
+                f"{self.score_w_downstream:g}*{self.downstream_ict}"
+            )
+
+        self._emit_progress({
+            "kind": "bo1d_trace",
+            "trace": {
+                "axis": str(axis_name),
+                "x_label": str(axis_name),
+                "y_label": "BO score",
+                "direction": "maximize",
+                "note": note,
+                "acquisition_label": "EI",
+                "x_grid": x_arr.tolist(),
+                "y_mean": mu_arr.tolist(),
+                "y_std": std_arr.tolist(),
+                "acquisition": acq_arr.tolist(),
+                "x_obs": x_obs_arr.tolist(),
+                "y_obs": y_obs_arr.tolist(),
+                "chosen_x": float(chosen_x),
+                "chosen_acq": float(chosen_acq),
+            },
+        })
+
     def _emit_group_state(self, group_key: str, state: str):
         self._emit_progress({
             "kind": "group_state",
@@ -1161,6 +1210,7 @@ class OptimizationWorker(QThread):
         """
         if not self.is_running or len(params) == 0:
             return
+        self._emit_progress({"kind": "bo1d_trace", "trace": {}})
 
         resume_key = self._resume_group_key("GROUP_BO_SIMUL", group_name)
         resume_rows = self._resume_group_rows.get(resume_key, [])
@@ -1541,6 +1591,7 @@ class OptimizationWorker(QThread):
         method = seq_method if str(mode).upper() == "SEQUENTIAL" else "BO"
         log_method = "TERNARY-1D" if method in ("TERNARY", "TERNARY_SEARCH", "BINARY", "BINARY_SEARCH") else "BO-1D"
         self.log_signal.emit(f"[{log_method}] Optimizing {device_label} ({pv_name}) on {len(candidates)} candidates ...")
+        self._emit_progress({"kind": "bo1d_trace", "trace": {}})
 
         # Config knobs (reasonable defaults)
         min_init = int(self.config.get("bo_min_init", 5))  # initial evaluations
@@ -1769,6 +1820,19 @@ class OptimizationWorker(QThread):
             y_best = float(np.max(y_train))
             ei = self._expected_improvement(mu, std, y_best, xi=xi)
             k = int(np.argmax(ei))
+            mu_plot, std_plot = self._gp_posterior(x_train, y_train, domain, length_scale, sigma_f, sigma_n)
+            ei_plot = self._expected_improvement(mu_plot, std_plot, y_best, xi=xi)
+            self._emit_bo1d_trace(
+                axis_name=device_label,
+                x_grid=domain,
+                mu=mu_plot,
+                std=std_plot,
+                acq=ei_plot,
+                chosen_x=float(remaining[k]),
+                chosen_acq=float(ei[k]),
+                x_obs=x_train,
+                y_obs=y_train,
+            )
             if float(ei[k]) < ei_tol:
                 break
 
@@ -1845,6 +1909,24 @@ class OptimizationWorker(QThread):
                     y_best = float(np.max(y_train))
                     ei = self._expected_improvement(mu, std, y_best, xi=xi)
                     k = int(np.argmax(ei))
+                    mu_plot, std_plot = self._gp_posterior(
+                        x_train, y_train, fine,
+                        length_scale=max(fine_step * 3, 1e-6),
+                        sigma_f=sigma_f,
+                        sigma_n=sigma_n,
+                    )
+                    ei_plot = self._expected_improvement(mu_plot, std_plot, y_best, xi=xi)
+                    self._emit_bo1d_trace(
+                        axis_name=device_label,
+                        x_grid=fine,
+                        mu=mu_plot,
+                        std=std_plot,
+                        acq=ei_plot,
+                        chosen_x=float(remaining[k]),
+                        chosen_acq=float(ei[k]),
+                        x_obs=x_train,
+                        y_obs=y_train,
+                    )
                     if float(ei[k]) < ei_tol:
                         break
 
@@ -1899,6 +1981,7 @@ class OptimizationWorker(QThread):
         """
         if not self.is_running:
             return
+        self._emit_progress({"kind": "bo1d_trace", "trace": {}})
 
         # current point
         x0 = []
@@ -2444,6 +2527,7 @@ class MainWindow(QMainWindow):
                 "discarded_eval_index": [],
                 "discarded_ttot": [],
                 "discarded_metric": [],
+                "bo1d_trace": None,
             },
             RUN_PROFILE_DEVELOPER: {
                 "eval_index": [],
@@ -2454,6 +2538,7 @@ class MainWindow(QMainWindow):
                 "discarded_eval_index": [],
                 "discarded_ttot": [],
                 "discarded_metric": [],
+                "bo1d_trace": None,
             },
         }
         self._status_labels: Dict[str, QLabel] = {}
@@ -2488,6 +2573,17 @@ class MainWindow(QMainWindow):
         canvas.setMinimumHeight(340)
         canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         return fig, canvas, ax_ttot, ax_metric
+
+    def _create_bo1d_plot_bundle(self):
+        fig = Figure(figsize=(8.8, 5.0))
+        ax_obj = fig.add_subplot(211)
+        ax_acq = fig.add_subplot(212, sharex=ax_obj)
+        fig.subplots_adjust(left=0.10, right=0.98, top=0.92, bottom=0.12, hspace=0.42)
+        canvas = FigureCanvas(fig)
+        canvas.setMinimumHeight(280)
+        canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+        canvas.setVisible(False)
+        return fig, canvas, ax_obj, ax_acq
 
     def _init_ui(self):
         cw = QWidget()
@@ -2650,6 +2746,8 @@ class MainWindow(QMainWindow):
         log_l = QVBoxLayout(log_group)
         self.eval_fig, self.eval_canvas, self.ax_ttot, self.ax_downstream = self._create_eval_plot_bundle()
         log_l.addWidget(self.eval_canvas, stretch=3)
+        self.bo1d_fig, self.bo1d_canvas, self.bo1d_ax_obj, self.bo1d_ax_acq = self._create_bo1d_plot_bundle()
+        log_l.addWidget(self.bo1d_canvas, stretch=2)
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
         log_l.addWidget(self.txt_log, stretch=2)
@@ -2659,6 +2757,10 @@ class MainWindow(QMainWindow):
             "canvas": self.eval_canvas,
             "ax_ttot": self.ax_ttot,
             "ax_metric": self.ax_downstream,
+            "bo1d_fig": self.bo1d_fig,
+            "bo1d_canvas": self.bo1d_canvas,
+            "bo1d_ax_obj": self.bo1d_ax_obj,
+            "bo1d_ax_acq": self.bo1d_ax_acq,
         }
         self._refresh_eval_plot(RUN_PROFILE_MAIN)
 
@@ -2923,6 +3025,8 @@ class MainWindow(QMainWindow):
         log_l = QVBoxLayout(log_group)
         self.dev_eval_fig, self.dev_eval_canvas, self.dev_ax_ttot, self.dev_ax_metric = self._create_eval_plot_bundle()
         log_l.addWidget(self.dev_eval_canvas, stretch=3)
+        self.dev_bo1d_fig, self.dev_bo1d_canvas, self.dev_bo1d_ax_obj, self.dev_bo1d_ax_acq = self._create_bo1d_plot_bundle()
+        log_l.addWidget(self.dev_bo1d_canvas, stretch=2)
         self.dev_txt_log = QTextEdit()
         self.dev_txt_log.setReadOnly(True)
         log_l.addWidget(self.dev_txt_log, stretch=2)
@@ -2932,6 +3036,10 @@ class MainWindow(QMainWindow):
             "canvas": self.dev_eval_canvas,
             "ax_ttot": self.dev_ax_ttot,
             "ax_metric": self.dev_ax_metric,
+            "bo1d_fig": self.dev_bo1d_fig,
+            "bo1d_canvas": self.dev_bo1d_canvas,
+            "bo1d_ax_obj": self.dev_bo1d_ax_obj,
+            "bo1d_ax_acq": self.dev_bo1d_ax_acq,
         }
         self._refresh_eval_plot(RUN_PROFILE_DEVELOPER)
 
@@ -3606,6 +3714,7 @@ class MainWindow(QMainWindow):
                 "discarded_eval_index": [],
                 "discarded_ttot": [],
                 "discarded_metric": [],
+                "bo1d_trace": None,
             },
         )
         state["eval_index"] = []
@@ -3615,9 +3724,11 @@ class MainWindow(QMainWindow):
         state["discarded_eval_index"] = []
         state["discarded_ttot"] = []
         state["discarded_metric"] = []
+        state["bo1d_trace"] = None
         if metric_label is not None:
             state["metric_label"] = str(metric_label)
         self._refresh_eval_plot(context)
+        self._refresh_bo1d_plot(context)
 
     def _refresh_eval_plot(self, profile: Optional[str] = None):
         context = str(profile or RUN_PROFILE_MAIN).upper()
@@ -3701,6 +3812,103 @@ class MainWindow(QMainWindow):
 
         widgets["canvas"].draw_idle()
 
+    def _refresh_bo1d_plot(self, profile: Optional[str] = None):
+        context = str(profile or RUN_PROFILE_MAIN).upper()
+        widgets = self._plot_widgets.get(context)
+        state = self._plot_state.get(context)
+        if not widgets or not state:
+            return
+
+        canvas = widgets.get("bo1d_canvas")
+        ax_obj = widgets.get("bo1d_ax_obj")
+        ax_acq = widgets.get("bo1d_ax_acq")
+        if canvas is None or ax_obj is None or ax_acq is None:
+            return
+
+        ax_obj.clear()
+        ax_acq.clear()
+        trace = dict(state.get("bo1d_trace") or {})
+        visible = bool(trace and trace.get("x_grid"))
+        canvas.setVisible(visible)
+        if not visible:
+            canvas.draw_idle()
+            return
+
+        x_grid = np.asarray(trace.get("x_grid", []), dtype=float)
+        y_mean = np.asarray(trace.get("y_mean", []), dtype=float)
+        y_std = np.asarray(trace.get("y_std", []), dtype=float)
+        acq = np.asarray(trace.get("acquisition", []), dtype=float)
+        x_obs = np.asarray(trace.get("x_obs", []), dtype=float)
+        y_obs = np.asarray(trace.get("y_obs", []), dtype=float)
+        chosen_x = float(trace.get("chosen_x", float("nan")))
+        chosen_acq = float(trace.get("chosen_acq", float("nan")))
+        axis_name = str(trace.get("axis", "Parameter"))
+        y_label = str(trace.get("y_label", "Score"))
+        acq_label = str(trace.get("acquisition_label", "Acquisition"))
+        note = str(trace.get("note", "") or "")
+
+        if x_grid.size and y_mean.size == x_grid.size and y_std.size == x_grid.size:
+            lo_band = y_mean - y_std
+            hi_band = y_mean + y_std
+            band_mask = np.isfinite(x_grid) & np.isfinite(lo_band) & np.isfinite(hi_band)
+            if np.any(band_mask):
+                ax_obj.fill_between(
+                    x_grid[band_mask], lo_band[band_mask], hi_band[band_mask],
+                    color="#cfe8ff", alpha=0.65, label="Surrogate ±1σ",
+                )
+            mean_mask = np.isfinite(x_grid) & np.isfinite(y_mean)
+            if np.any(mean_mask):
+                ax_obj.plot(
+                    x_grid[mean_mask], y_mean[mean_mask],
+                    linestyle="--", linewidth=1.8, color="#1d4ed8", label="Surrogate mean",
+                )
+
+        obs_mask = np.isfinite(x_obs) & np.isfinite(y_obs)
+        if np.any(obs_mask):
+            ax_obj.plot(
+                x_obs[obs_mask], y_obs[obs_mask],
+                linestyle="None", marker="o", markersize=6,
+                color="#111827", label="Measured points",
+            )
+
+        if np.isfinite(chosen_x):
+            ax_obj.axvline(chosen_x, color="#b45309", linestyle=":", linewidth=1.6, label="Chosen x")
+            ax_acq.axvline(chosen_x, color="#b45309", linestyle=":", linewidth=1.6)
+
+        acq_mask = np.isfinite(x_grid) & np.isfinite(acq)
+        if np.any(acq_mask):
+            ax_acq.plot(
+                x_grid[acq_mask], acq[acq_mask],
+                color="#d97706", linewidth=1.8, label=f"{acq_label} acquisition",
+            )
+        if np.isfinite(chosen_x) and np.isfinite(chosen_acq):
+            ax_acq.plot(
+                [chosen_x], [chosen_acq],
+                linestyle="None", marker="o", markersize=7,
+                color="#92400e", label="Chosen: max acquisition",
+            )
+
+        ax_obj.set_title(f"1D BO surrogate for {axis_name}")
+        ax_obj.set_ylabel(y_label)
+        ax_obj.grid(True, alpha=0.3)
+        if note:
+            ax_obj.text(
+                0.01, 0.98, note,
+                transform=ax_obj.transAxes,
+                ha="left", va="top", fontsize=8.5, color="#475569",
+            )
+
+        ax_acq.set_title("Why this point was chosen")
+        ax_acq.set_xlabel(axis_name)
+        ax_acq.set_ylabel(acq_label)
+        ax_acq.grid(True, alpha=0.3)
+
+        if ax_obj.get_legend_handles_labels()[0]:
+            ax_obj.legend(loc="best")
+        if ax_acq.get_legend_handles_labels()[0]:
+            ax_acq.legend(loc="best")
+        canvas.draw_idle()
+
     def _on_worker_progress(self, payload: dict):
         context = self._run_profile
         kind = str(payload.get("kind", ""))
@@ -3736,6 +3944,25 @@ class MainWindow(QMainWindow):
             self._set_status("Status: FAILED", state="error", profile=context)
             return
 
+        if kind == "bo1d_trace":
+            state = self._plot_state.setdefault(
+                context,
+                {
+                    "eval_index": [],
+                    "ttot": [],
+                    "metric": [],
+                    "metric_label": "DR",
+                    "measurement_ok": [],
+                    "discarded_eval_index": [],
+                    "discarded_ttot": [],
+                    "discarded_metric": [],
+                    "bo1d_trace": None,
+                },
+            )
+            state["bo1d_trace"] = dict(payload.get("trace") or {})
+            self._refresh_bo1d_plot(context)
+            return
+
         if kind == "evaluation":
             self._update_value_labels(dict(payload.get("display_values") or {}))
             state = self._plot_state.setdefault(
@@ -3749,6 +3976,7 @@ class MainWindow(QMainWindow):
                     "discarded_eval_index": [],
                     "discarded_ttot": [],
                     "discarded_metric": [],
+                    "bo1d_trace": None,
                 },
             )
             state["eval_index"].append(int(payload.get("eval_index", len(state["eval_index"]) + 1)))
