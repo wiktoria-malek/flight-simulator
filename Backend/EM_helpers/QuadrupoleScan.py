@@ -162,6 +162,7 @@ class QuadrupoleScan:
                 insert_screen = getattr(self.interface, "insert_screen", None)
                 if callable(insert_screen):
                      insert_screen(screen_name)
+                    time.sleep(10)
                 try:
                     for i, K1 in enumerate(K1_values):
                         while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
@@ -202,7 +203,7 @@ class QuadrupoleScan:
                                 cancel_requested = True
                                 break
                             print("before calling get_screens")
-                            screens_data = self.interface.get_screens([screen_name], move_screen = True)
+                            screens_data = self.interface.get_screens([screen_name], move_screen = False)
                             print("after calling get_screens")
                             idx_map = {name: idx for idx, name in enumerate(screens_data["names"])}
                             idx = idx_map.get(screen_name)
@@ -280,6 +281,7 @@ class QuadrupoleScan:
                     extract_screen = getattr(self.interface, "extract_screen", None)
                     if callable(extract_screen):
                         extract_screen(screen_name)
+                        time.sleep(10)
         finally:
             if steps_requested > 0 and np.isfinite(K1_0):
                 self.interface.set_quadrupoles([quad_name], [float(K1_0)])

@@ -341,16 +341,14 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         if screen_pv_name is None:
             raise ValueError(f"Unknown screen: {screen_name}")
         status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
-        if status==0:
-            PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
+        PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
+
 
     def extract_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
         if screen_pv_name is None:
             raise ValueError(f"Unknown screen: {screen_name}")
-
         PV(f"{screen_pv_name}:Target:WRITE:OUT").put(1)
-        time.sleep(2)
 
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
@@ -704,7 +702,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             otr_id = screen_name.replace('OTR', '')
             hpixel, vpixel = self.get_pixel_calibrations(screen_pv_name)
             status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
-            image = self.acquire_otr_image(screen_pv_name, move_screen=move_screen)
+            image = self.acquire_otr_image(screen_pv_name, move_screen=False)
             x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel,screen_pv_name)
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
