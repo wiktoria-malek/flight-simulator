@@ -648,8 +648,11 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # hack to avoid background subtraction
         command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
         result = subprocess.run(command,shell=True)
+        time.sleep(1)
+        result = subprocess.run(command,shell=True)
+        time.sleep(1)
+        result = subprocess.run(command,shell=True)
         time.sleep(10)
-
         sigx_pv = f"mOTR:analyzer:size:H"
         sigy_pv = f"mOTR:analyzer:size:V"
         sigx = PV(sigx_pv).get()
