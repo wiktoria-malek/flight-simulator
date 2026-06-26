@@ -162,7 +162,7 @@ class QuadrupoleScan:
                 insert_screen = getattr(self.interface, "insert_screen", None)
                 if callable(insert_screen):
                      insert_screen(screen_name)
-                    time.sleep(10)
+                     time.sleep(10)
                 try:
                     for i, K1 in enumerate(K1_values):
                         while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
