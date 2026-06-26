@@ -648,18 +648,30 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         time.sleep(10)
         sigx_pv = f"mOTR:analyzer:size:H"
         sigy_pv = f"mOTR:analyzer:size:V"
-        sigx_prev = PV(sigx_pv).get()
-        sigy_prev = PV(sigy_pv).get()
-        ratio_sigmas_x = PV(sigx_pv).get()/sigx_prev
-        ratio_sigmas_y = PV(sigy_pv).get()/sigy_prev
-        while np.abs(ratio_sigmas_x) > 8 or np.abs(ratio_sigmas_y)>8:
+        sigx_prev = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+        sigy_prev = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+        max_retries = 5
+        for attempt in range(max_retries):
             time.sleep(5)
-            sigx = PV(sigx_pv).get()
-            time.sleep(5)
-            sigy = PV(sigy_pv).get()
-            time.sleep(5)
-            sigx_prev = sigx
-            sigy_prev = sigy
+            sigx_new = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+            sigy_new = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+            if not np.isfinite(sigx_prev) or not np.isfinite(sigy_prev):
+                sigx_prev, sigy_prev = sigx_new, sigy_new
+                continue
+            if sigx_prev <= 0 or sigy_prev <= 0 or sigx_new <= 0 or sigy_new <= 0:
+                sigx_prev, sigy_prev = sigx_new, sigy_new
+                continue
+            change_x = max(sigx_new / sigx_prev, sigx_prev / sigx_new)
+            change_y = max(sigy_new / sigy_prev, sigy_prev / sigy_new)
+            if change_x <= 8 and change_y <= 8:
+                sigx = sigx_new
+                sigy = sigy_new
+                break
+            print("Screen size changed too much between measurements of sigx and sigy. Remeasuring...")
+            sigx_prev, sigy_prev = sigx_new, sigy_new
+        else:
+            sigx = sigx_prev
+            sigy = sigy_prev
 
         print("sigx from precomputed PV: ", sigx)
         print("sigy from precomputed PV: ", sigy)
