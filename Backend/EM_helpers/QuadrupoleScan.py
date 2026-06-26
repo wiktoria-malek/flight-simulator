@@ -178,6 +178,7 @@ class QuadrupoleScan:
                         if steps_requested > 0:
                             print("Before set_quadrupoles")
                             self.interface.set_quadrupoles([quad_name], [float(K1)])
+                            time.sleep(5)
                             print("After set_quadrupoles")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
