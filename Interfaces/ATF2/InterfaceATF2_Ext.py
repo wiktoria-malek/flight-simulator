@@ -83,25 +83,25 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         # Bpms and correctors in beamline order
         sequence = [
-            "MB2X", "ZV1X", "MQF1X", "ZV2X", "MQD2X", "MQF3X", "ZH1X", "ZV3X", "MQF4X",
-            "ZH2X", "MQD5X", "ZV4X", "ZV5X", "MQF6X", "MQF7X", "ZH3X", "MQD8X", "ZV6X",
-            "MQF9X", "ZH4X", "FONTK1", "ZV7X", "FONTP1", "MQD10X", "ZH5X", "MQF11X",
-            "FONTK2", "ZV8X", "FONTP2", "MQD12X", "ZH6X", "MQF13X", "MQD14X", "FONTP3",
-            "ZH7X", "MQF15X", "ZV9X", "MQD16X", "ZH8X", "MQF17X", "ZV10X", "MQD18X","OTR0X",
-            "ZH9X", "MQF19X","OTR1X", "ZV11X", "MQD20X","OTR2X" , "ZH10X", "MQF21X", "OTR3X","IPT1", "IPT2",
-            "IPT3", "IPT4", "MQM16FF", "ZH1FF", "ZV1FF", "MQM15FF", "MQM14FF", "FB2FF",
-            "MQM13FF", "MQM12FF", "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9BFF",
-            "MSF6FF", "MQF9AFF", "MQD8FF", "MQF7FF", "MQD6FF", "MQF5BFF", "MSF5FF",
-            "MQF5AFF", "MQD4BFF", "MSD4FF", "MQD4AFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
-            "MSF1FF", "MQF1FF", "MSD0FF", "MQD0FF", "PREIP", "IPA", "IPB", "IPC", "M-PIP"
+            "MB2X", "ZV1X", "QF1X", "ZV2X", "QD2X", "QF3X", "ZH1X", "ZV3X", "QF4X",
+            "ZH2X", "QD5X", "ZV4X", "ZV5X", "QF6X", "QF7X", "ZH3X", "QD8X", "ZV6X",
+            "QF9X", "ZH4X", "FONTK1", "ZV7X", "FONTP1", "QD10X", "ZH5X", "QF11X",
+            "FONTK2", "ZV8X", "FONTP2", "QD12X", "ZH6X", "QF13X", "QD14X", "FONTP3",
+            "ZH7X", "QF15X", "ZV9X", "QD16X", "ZH8X", "QF17X", "ZV10X", "QD18X","OTR0X",
+            "ZH9X", "QF19X","OTR1X", "ZV11X", "QD20X","OTR2X" , "ZH10X", "QF21X", "OTR3X","IPT1", "IPT2",
+            "IPT3", "IPT4", "QM16FF", "ZH1FF", "ZV1FF", "QM15FF", "QM14FF", "FB2FF",
+            "QM13FF", "QM12FF", "QM11FF", "QD10BFF", "QD10AFF", "QF9BFF",
+            "MSF6FF", "QF9AFF", "QD8FF", "QF7FF", "QD6FF", "QF5BFF", "MSF5FF",
+            "QF5AFF", "QD4BFF", "MSD4FF", "QD4AFF", "QF3FF", "QD2BFF", "QD2AFF",
+            "MSF1FF", "QF1FF", "MSD0FF", "QD0FF", "PREIP", "IPA", "IPB", "IPC", "M-PIP"
         ]
 
         quadrupoles = [
-            "MQF1X", "MQD2X", "MQF3X","MQF4X", "MQD5X", "MQF6X", "MQF7X","MQD8X","MQF9X", "MQD10X",
-            "MQF11X", "MQD12X", "MQF13X", "MQD14X", "MQF15X","MQD16X", "MQF17X","MQD18X","MQF19X",
-            "MQD20X", "MQF21X", "MQM16FF", "MQM15FF", "MQM14FF", "MQM13FF", "MQM12FF", "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9BFF",
-            "MQF9AFF", "MQD8FF", "MQF7FF", "MQD6FF", "MQF5BFF", "MQF5AFF", "MQD4BFF", "MQD4AFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
-            "MQF1FF",  "MQD0FF"
+            "QF1X", "QD2X", "QF3X","QF4X", "QD5X", "QF6X", "QF7X","QD8X","QF9X", "QD10X",
+            "QF11X", "QD12X", "QF13X", "QD14X", "QF15X","QD16X", "QF17X","QD18X","QF19X",
+            "QD20X", "QF21X", "QM16FF", "QM15FF", "QM14FF", "QM13FF", "QM12FF", "QM11FF", "QD10BFF", "QD10AFF", "QF9BFF",
+            "QF9AFF", "QD8FF", "QF7FF", "QD6FF", "QF5BFF", "QF5AFF", "QD4BFF", "QD4AFF", "QF3FF", "QD2BFF", "QD2AFF",
+            "QF1FF",  "QD0FF"
         ]
         self.quadrupoles = list(quadrupoles)
 
@@ -192,7 +192,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         # k_T_per_A : integrated-gradient slope GL/I [T/A]
         # L_m       : magnetic length
-        self.QUAD_CALIB ={"QD18X": {"k_T_per_A": 0.0, "L_m": 0.0}} # TODO with real numbers
         self.mag_ki = None
         mag_ki_library_candidates = []
 
@@ -290,6 +289,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             self.qmag_pv[alias] = self._build_qmag_pv_names(alias)
 
     def _quad_calib(self, name):
+
+        ## to fix, quad calib doesnt exist anymore!!!!
         canonical = self.qmag_alias_to_canonical.get(name, name)
         calib = self.QUAD_CALIB.get(name) or self.QUAD_CALIB.get(canonical)
         if calib is None:
@@ -413,53 +414,61 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
     def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
         current0 = caget(f"{quad_name}:current")
+        # to be changed
+
+    def _quadrupole_current_pv_name(self,name):
+        if name.startswith("M") and name[1:].startswith(("QF", "QD", "QM")):
+            return name[1:]
+        return name
+
+    def _quad_mover_pv_name(self,name):
+        return self.qmag_alias_to_canonical.get(name, name)
 
     def get_quadrupoles(self, names=None, include_pv_names=False):
-        """
-        We need to implement a conversion how current can be
-        converted to K1, something like:
-        k_T_per_A -> prototype of equations is in CLEAR RFT interface
-        """
-        print("get_quadrupoles running")
+        print(" 'get_quadrupoles' running...")
         if names is None:
-            names = self.qmags # quadrupoles names
+            names = self.quadrupoles # quadrupoles names
         if type(names) == str:
             names = [names]
         names = [name for name in names if name in self.quadrupoles]
-
         ides, iact = [], []
         xdes, ydes, rolldes = [], [], []
         xact, yact, rollact = [], [], []
 
         for name in names:
-            pv = self.quadrupoles[name]
-            #canonical = self.qmag_alias_to_canonical.get(name, name)
-            desired_current = self._pv_get(f"{name}:currentWrite", default=np.nan, timeout=0.7)
-            actual_current = self._pv_get(f"{name}:current", default=np.nan, timeout=0.7)
+            print(" 'Getting quadrupoles' PVs ...")
+            current_name = self._quadrupole_current_pv_name(name)
+            mover_name = self._quad_mover_pv_name(name)
+            mover_pv = self.qmag_pv.get(mover_name)
+            if mover_pv is None:
+                mover_pv = self._build_qmag_pv_names(mover_name)
+                self.qmag_pv[mover_name] = mover_pv
+            desired_current = self._pv_get(f"{current_name}:currentWrite", default=np.nan, timeout=0.7)
+            actual_current = self._pv_get(f"{current_name}:current", default=np.nan, timeout=0.7)
             if not np.isfinite(actual_current):
-                actual_current = self._pv_get(f"{name}:currentRead", default=np.nan, timeout=0.7)
+                actual_current = self._pv_get(f"{current_name}:currentRead", default=np.nan, timeout=0.7)
             if not np.isfinite(desired_current):
                 desired_current = actual_current
+
             ides.append(desired_current)
             iact.append(actual_current)
-            xdes.append(self._pv_get(pv["pv_set_x"]))
-            ydes.append(self._pv_get(pv["pv_set_y"]))
-            rolldes.append(self._pv_get(pv["pv_set_roll"]))
-            xact.append(self._pv_get(pv["pv_read_enc_x"]))
-            yact.append(self._pv_get(pv["pv_read_enc_y"]))
-            rollact.append(self._pv_get(pv["pv_read_enc_roll"]))
+            xdes.append(self._pv_get(mover_pv.get("pv_set_x"), default=np.nan))
+            ydes.append(self._pv_get(mover_pv.get("pv_set_y"), default=np.nan))
+            rolldes.append(self._pv_get(mover_pv.get("pv_set_roll"), default=np.nan))
+            xact.append(self._pv_get(mover_pv.get("pv_read_enc_x"), default=np.nan))
+            yact.append(self._pv_get(mover_pv.get("pv_read_enc_y"), default=np.nan))
+            rollact.append(self._pv_get(mover_pv.get("pv_read_enc_roll"), default=np.nan))
 
         ides = np.array(ides, dtype=float)
         iact = np.array(iact, dtype=float)
-        def _safe_current_to_k1(magnet_name, current):
-            try:
-                return self.current_to_k1(magnet_name, current)
-            except Exception as exc:
-                print(f"Could not convert current to K1 for {magnet_name}: {exc}")
-                return np.nan
 
-        bdes = np.array([_safe_current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
-        bact = np.array([_safe_current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
+        try:
+            bdes = np.array([self.current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
+            bact = np.array([self.current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
+        except Exception as exc:
+            print(f"current to K1 conversion failed for quadrupoles {names}: {exc}")
+            bdes = np.array([np.nan for _ in names], dtype=float)
+            bact = np.array([np.nan for _ in names], dtype=float)
 
         data = {
             "names": names,
@@ -489,10 +498,11 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for name, k1 in zip(names, k1_values):
             if name not in self.quadrupoles:
                 raise ValueError(f"Quadrupole '{name}' is not magnet list.")
-            canonical = self.qmag_alias_to_canonical.get(name, name)
-            target_current = self.k1_to_current(name, float(k1))  # A
-            self._pv_put(f"{name}:currentWrite", float(target_current))
-            self._wait_for_magnet_readback(name, float(target_current))
+            current_name = self._quadrupole_current_pv_name(name)
+            print(name)
+            target_current = self.k1_to_current(current_name, float(k1))  # A
+            self._pv_put(f"{current_name}:currentWrite", float(target_current))
+            self._wait_for_magnet_readback(current_name, float(target_current))
 
     """Methods for OTRs from mOTRs_measurement.py"""
 

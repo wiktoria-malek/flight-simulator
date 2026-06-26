@@ -29,16 +29,16 @@ class QuadrupoleScan:
     # 3 screens: no need for scan, but no coupling terms
     # 4+ screens: no need for scan
 
-    def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, bpms=None, reference_screen=None, progress_callback=None):
+    def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, reference_screen=None, progress_callback=None):
         if isinstance(quad_name, str):
             quad_names = [quad_name]
         else:
             quad_names = list(quad_name)
         if len(quad_names) == 0:
             raise ValueError("At least one quadrupole must be provided")
-
         if len(quad_names) == 1:
-            return self._run_single_scan(quad_name=quad_names[0], screens=screens, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, bpms=bpms, reference_screen=reference_screen, progress_callback=progress_callback)
+            print(f"{quad_name} is going to be scanned")
+            return self._run_single_scan(quad_name=quad_names[0], screens=screens, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, reference_screen=reference_screen, progress_callback=progress_callback)
 
         per_quad_sessions = []
         cancelled = False
@@ -68,7 +68,7 @@ class QuadrupoleScan:
 
             try:
                 single_session = self._run_single_scan(quad_name=quad_name, screens=screens, delta_min=delta_min, delta_max=delta_max,
-                    steps=steps, nshots=nshots, bpms=bpms, reference_screen=reference_screen, progress_callback=_wrapped_progress)
+                    steps=steps, nshots=nshots, reference_screen=reference_screen, progress_callback=_wrapped_progress)
 
             except ValueError as e:
                 msg = str(e)
@@ -90,7 +90,6 @@ class QuadrupoleScan:
             "screens": list(screens),
             "reference_screen": reference_screen if reference_screen is not None else (
                 list(screens)[0] if len(list(screens)) > 0 else None),
-            "bpms": list(bpms) if bpms is not None else None,
             "delta_min": float(delta_min),
             "delta_max": float(delta_max),
             "steps": int(steps),
@@ -104,12 +103,8 @@ class QuadrupoleScan:
             "cancelled": bool(cancelled),
         }
 
-    def _run_single_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, bpms = None, reference_screen=None, progress_callback=None):
+    def _run_single_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, reference_screen=None, progress_callback=None):
         screens = list(screens)
-        if bpms is None:
-            bpms = list(self.interface.get_bpms()["names"])
-        else:
-            bpms = list(bpms)
         if len(screens) == 0:
             raise ValueError("At least one screen is required")
         if reference_screen is None:
@@ -135,14 +130,11 @@ class QuadrupoleScan:
         if steps_requested == 0:
             deltas = np.array([0.0], dtype=float)
             K1_values = np.array([K1_0], dtype=float)
-            measurement_mode = "conventional_multi_screen_em"
         else:
             deltas = np.linspace(float(delta_min), float(delta_max), steps_requested)
             K1_values = K1_0 * (1 + deltas)
-            measurement_mode = "quadrupole_scan"
         nsteps_scan = len(K1_values)
         nscreens = len(screens)
-        nbpms = len(bpms)
 
         sigx_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigy_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
@@ -165,7 +157,6 @@ class QuadrupoleScan:
                     time.sleep(0.05)
 
                 setattr(self, "_scan_is_paused", False)
-
                 if getattr(self, "_scan_stop_requested", False):
                     raise KeyboardInterrupt("Scan stopped by user.")
                 if getattr(self, "_cancel", False):
@@ -195,7 +186,9 @@ class QuadrupoleScan:
                         sxy_shots = np.full(nshots, np.nan, dtype=float)
                         # tilt_shots = np.full(nshots, np.nan, dtype=float)
                         state_files = []
+                        print("before calling get_quadrupoles")
                         quad_data = self.interface.get_quadrupoles([quad_name])
+                        print("after calling get_quadrupoles")
                         for j in range(nshots):
                             while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
                                 setattr(self, "_scan_is_paused", True)
@@ -208,7 +201,9 @@ class QuadrupoleScan:
                             if getattr(self, "_cancel", False):
                                 cancel_requested = True
                                 break
+                            print("before calling get_screens")
                             screens_data = self.interface.get_screens([screen_name], move_screen = (j==0))
+                            print("after calling get_screens")
                             idx_map = {name: idx for idx, name in enumerate(screens_data["names"])}
                             idx = idx_map.get(screen_name)
                             if idx is not None:
@@ -296,7 +291,6 @@ class QuadrupoleScan:
             "quadrupoles": [quad_name],
             "screens": screens,
             "reference_screen": reference_screen,
-            "bpms": bpms,
             "K1_0": float(K1_0),
             "sigx_mean": sigx_mean.tolist(),
             "sigy_mean": sigy_mean.tolist(),

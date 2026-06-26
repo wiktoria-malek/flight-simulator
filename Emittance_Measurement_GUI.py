@@ -740,7 +740,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         quad_label = quadrupoles[0] if len(quadrupoles) == 1 else f"multi-quad scan ({len(quadrupoles)} quadrupoles)"
         steps_preview = int(self.steps_settings.value())
         if steps_preview == 0:
-            self.log(f"Running conventional multi-screen EM for {quad_label}...")
+            self.log(f"Gathering screen data, with quadrupole selected = {quad_label}...")
         else:
             self.log(f"Running quadrupole scan for {quad_label}...")
         self.quad_on_plot.blockSignals(True)
@@ -777,7 +777,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self._clear_fit_panel()
         self._set_progress(0)
         try:
-            self.session = self.run_scan(quad_name=quadrupoles, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, screens=screens, reference_screen=screens[0], bpms=[], progress_callback=self._scan_progress_callback)
+            self.session = self.run_scan(quad_name=quadrupoles, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, screens=screens, reference_screen=screens[0], progress_callback=self._scan_progress_callback)
             if steps == 0:
                 self.log("Conventional multi-screen EM finished.")
             else:
@@ -789,7 +789,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
 
         except TypeError:
             self._set_progress(0)
-            QMessageBox.information(self,"Scan error","Error")
+            QMessageBox.information(self,"Scan error","Type Error")
             return
         except Exception as e:
             self._set_progress(0)
@@ -920,7 +920,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
 
         first_screen_position = min(finite_screen_positions)
         last_screen_position = max(finite_screen_positions)
-        all_quadrupoles = list(self.interface.get_quadrupoles().get("names", []))
+        all_quadrupoles = list(getattr(self.interface, "quadrupoles", []))
         quad_order, quad_order_kind = self._get_element_order_values(all_quadrupoles)
 
         if quad_order_kind != screen_order_kind: # S [m] or index
