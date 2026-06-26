@@ -645,6 +645,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
         sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
         # mOTR:analyzer:dispersion:selectedmotr
+        # hack to avoid background subtraction
         command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
         result = subprocess.run(command,shell=True)
         sigx_pv = f"mOTR:analyzer:size:H"
