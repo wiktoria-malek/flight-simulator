@@ -342,7 +342,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             raise ValueError(f"Unknown screen: {screen_name}")
 
         PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
-        time.sleep(2)
+        time.sleep(10)
 
     def extract_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -648,6 +648,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # hack to avoid background subtraction
         command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
         result = subprocess.run(command,shell=True)
+        time.sleep(10)
+
         sigx_pv = f"mOTR:analyzer:size:H"
         sigy_pv = f"mOTR:analyzer:size:V"
         sigx = PV(sigx_pv).get()
