@@ -375,7 +375,7 @@ class OptimizerConfig:
     n_candidates: int = 6000
     n_bootstrap: int = 60
     ridge_fit: float = 1e-4
-    gp_kernel: str = "matern52"
+    gp_kernel: str = "rbf"
     gp_length_scale: float = 1.2
     gp_ard_length_scales: Optional[Dict[str, float]] = None
     gp_signal_var: float = 0.15
@@ -1694,7 +1694,7 @@ class Optimizer:
         y1 = np.asarray(y_hist, float)
         axis_ls = max(1e-6, float(self.cfg.init_sigma.get(axis_name, self._step_for_param(axis_name))))
         gp = SimpleGP(GPParams(
-            kernel="matern32",
+            kernel="rbf",
             length_scale=np.array([axis_ls], dtype=float),
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
@@ -1748,7 +1748,7 @@ class Optimizer:
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
             zscan_axes=self._zscan_axis_indices(),
-            zscan_kernel="matern32",
+            zscan_kernel="rbf",
         ))
         gp.fit(X, y)
 
@@ -1778,7 +1778,7 @@ class Optimizer:
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
             zscan_axes=self._zscan_axis_indices(),
-            zscan_kernel="matern32",
+            zscan_kernel="rbf",
         ))
         gp.fit(X, y)
 

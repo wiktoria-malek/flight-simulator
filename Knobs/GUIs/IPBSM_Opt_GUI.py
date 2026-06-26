@@ -628,8 +628,8 @@ class MainWindow(QMainWindow):
         self.acq_box.setEnabled(False)
 
         self.kernel_box = QComboBox()
-        self.kernel_box.addItems(["matern52", "matern32"])
-        self.kernel_box.setCurrentText("matern52")
+        self.kernel_box.addItems(["rbf", "matern52", "matern32"])
+        self.kernel_box.setCurrentText("rbf")
 
         self.bounds_sigma_mult = QDoubleSpinBox()
         self.bounds_sigma_mult.setRange(0.5, 10.0)
@@ -1457,7 +1457,7 @@ class MainWindow(QMainWindow):
         elif method_name.upper() in {"TRBO", "LQO", "LQF"}:
             method_name = "BO"
         self.method_box.setCurrentText(method_name)
-        self.kernel_box.setCurrentText(cfg.get("gp_kernel", "matern52"))
+        self.kernel_box.setCurrentText(cfg.get("gp_kernel", "rbf"))
         self.acq_box.setCurrentText(cfg.get("acquisition", "EI"))
 
         init_sigma = cfg.get("init_sigma", {})

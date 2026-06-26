@@ -197,12 +197,12 @@ def plot_results(
             x_ref = mu.copy()
         try:
             gp_for_zpair = SimpleGP(GPParams(
-                kernel=getattr(cfg, "gp_kernel", "matern52"),
+                kernel=getattr(cfg, "gp_kernel", "rbf"),
                 length_scale=np.asarray(gp_length_scales, float),
                 signal_var=float(getattr(cfg, "gp_signal_var", 0.15)),
                 noise_var=float(getattr(cfg, "gp_noise_var", 1e-4)),
                 zscan_axes=z_axes,
-                zscan_kernel="matern32",
+                zscan_kernel="rbf",
             ))
             gp_for_zpair.fit(np.asarray(X, float), np.asarray(y, float).reshape(-1))
         except Exception:
@@ -554,7 +554,7 @@ def plot_bo_gp_heatmap(
         except Exception:
             length_scales.append(float(getattr(cfg, "gp_length_scale", 1.0)))
     gp = SimpleGP(GPParams(
-        kernel=getattr(cfg, "gp_kernel", "matern52"),
+        kernel=getattr(cfg, "gp_kernel", "rbf"),
         length_scale=np.asarray(length_scales, float),
         signal_var=float(getattr(cfg, "gp_signal_var", 0.15)),
         noise_var=float(getattr(cfg, "gp_noise_var", 1e-4)),
