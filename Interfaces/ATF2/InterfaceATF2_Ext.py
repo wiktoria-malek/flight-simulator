@@ -652,7 +652,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         sigy_prev = PV(sigy_pv).get()
         ratio_sigmas_x = PV(sigx_pv).get()/sigx_prev
         ratio_sigmas_y = PV(sigy_pv).get()/sigy_prev
-        while np.abs(ratio_sigmas_x) > 0.7 or np.abs(ratio_sigmas_y)>0.7:
+        while np.abs(ratio_sigmas_x) > 8 or np.abs(ratio_sigmas_y)>8:
             time.sleep(5)
             sigx = PV(sigx_pv).get()
             time.sleep(5)
