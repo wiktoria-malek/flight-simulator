@@ -77,6 +77,7 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.01,
                     "em_sigma_unit": "um"
+
                 },
             "bounds":
                 {

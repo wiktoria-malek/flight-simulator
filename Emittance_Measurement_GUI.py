@@ -499,8 +499,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         if session_to_plot is None:
             return
         K1_values = np.asarray(session_to_plot["K1_values"], dtype=float)
-        sigx = np.asarray(session_to_plot["sigx_mean"], dtype=float) *1e3
-        sigy = np.asarray(session_to_plot["sigy_mean"], dtype=float)*1e3
+        sigx = np.asarray(session_to_plot["sigx_mean"], dtype=float)
+        sigy = np.asarray(session_to_plot["sigy_mean"], dtype=float)
         screens = list(session_to_plot["screens"])
         quad_name = session_to_plot.get("quad_name", "-")
         em_sigma_unit=self._get_interface_units()
@@ -517,7 +517,6 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         color_cycle = matplotlib.rcParams['axes.prop_cycle'].by_key().get('color', [])
         if not color_cycle:
             color_cycle = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
-
 
         if self.show_scan_on_all_screens.isChecked():
             screen_indices = list(range(len(screens)))
