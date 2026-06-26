@@ -655,6 +655,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         sigy_pv = f"mOTR:analyzer:size:V"
         sigx = PV(sigx_pv).get()
         sigy = PV(sigy_pv).get()
+        if sigx>1100 or sigy >1000:
+            sigx = PV(sigx_pv).get()
+            sigy = PV(sigy_pv).get()
         print("sigx from precomputed PV: ", sigx)
         print("sigy from precomputed PV: ", sigy)
         # np.average(h[1:], weights=np.sum(i,axis=0)) # andrea's suggestion
