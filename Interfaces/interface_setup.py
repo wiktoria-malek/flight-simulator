@@ -52,7 +52,8 @@ INTERFACE_SETUP = {
                 {
                     "corrector_strength": "T*mm",
                     "bpm_position": "mm",
-                    "sysid_corrector_kick": 0.01
+                    "sysid_corrector_kick": 0.01,
+                    "em_sigma_unit": "um"
                 },
             "bounds":
                 {
@@ -74,7 +75,8 @@ INTERFACE_SETUP = {
                 {
                     "corrector_strength": "T*mm",
                     "bpm_position": "mm",
-                    "sysid_corrector_kick": 0.01
+                    "sysid_corrector_kick": 0.01,
+                    "em_sigma_unit": "um"
                 },
             "bounds":
                 {

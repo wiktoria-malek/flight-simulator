@@ -198,6 +198,28 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self.computing_method_combo.currentTextChanged.connect(self._on_computation_mode_changed)
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
 
+    def _get_interface_initial_settings(self):
+        interface_class_name = self.interface.__class__.__name__
+        interface_module_name = self.interface.__class__.__module__
+
+        for machine_interfaces in INTERFACE_SETUP.values():
+            for interface_defaults in machine_interfaces:
+                if (interface_defaults.get("class_name") == interface_class_name) and (
+                        interface_defaults.get("module") == interface_module_name):
+                    return interface_defaults
+        return None
+
+
+    def _get_interface_units(self):
+        interface_defaults = self._get_interface_initial_settings()
+        if interface_defaults is None:
+            return {}, 0.01, "mm", ""
+        units_settings = interface_defaults.get("units", {})
+        em_sigma_unit = units_settings.get("em_sigma_unit", "mm")
+
+        return em_sigma_unit
+
+
     def _on_computation_mode_changed(self, text):
         self.computation_mode = ComputationMode(text)
         is_linear_mode = self.computation_mode == ComputationMode.LRM
@@ -477,11 +499,11 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         if session_to_plot is None:
             return
         K1_values = np.asarray(session_to_plot["K1_values"], dtype=float)
-        sigx = np.asarray(session_to_plot["sigx_mean"], dtype=float)
-        sigy = np.asarray(session_to_plot["sigy_mean"], dtype=float)
+        sigx = np.asarray(session_to_plot["sigx_mean"], dtype=float) *1e3
+        sigy = np.asarray(session_to_plot["sigy_mean"], dtype=float)*1e3
         screens = list(session_to_plot["screens"])
         quad_name = session_to_plot.get("quad_name", "-")
-
+        em_sigma_unit=self._get_interface_units()
         fig = self.canvas.figure
         fig.clear()
 
@@ -519,8 +541,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         else:
             title = f"Quadrupole scan: {quad_name}"
         ax1.set_title(title)
-        ax1.set_ylabel("sigx [um]")
-        ax2.set_ylabel("sigy [um]")
+        ax1.set_ylabel(f"sigx [{em_sigma_unit}]")
+        ax2.set_ylabel(f"sigy [{em_sigma_unit}]")
         ax2.set_xlabel("K1")
 
         ax1.grid(True, alpha=0.3)
