@@ -163,7 +163,7 @@ QGroupBox#screensGroup::title {
             </item>
             <item>
              <property name="text">
-              <string>RFTrack tracking</string>
+              <string>RF-Track tracking</string>
              </property>
             </item>
            </widget>

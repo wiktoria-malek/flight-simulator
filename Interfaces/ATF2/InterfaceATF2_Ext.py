@@ -633,14 +633,19 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         x_centers = (np.arange(nx, dtype = float) - 0.5 * (nx -1)) * hpixel # middle of the pixel
         y_centers = (np.arange(ny, dtype = float) - 0.5 * (ny -1) ) * vpixel
-
+        print("X_centers: ", x_centers)
+        print("Y_centers: ", y_centers)
         proj_x = np.sum(img, axis = 0)
         proj_y = np.sum(img, axis = 1)
 
         x_mean = float(np.sum(x_centers * proj_x) / total)
         y_mean = float(np.sum(y_centers * proj_y) / total)
+        print("X_mean: ", x_mean)
+        print("Y_mean: ", y_mean)
         sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
         sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
+        print("sigx: ", sigx)
+        print("sigy: ", sigy)
 
         hedges = (np.arange(nx + 1, dtype = float) - 0.5 * nx) * hpixel
         vedges = (np.arange(ny + 1, dtype = float) - 0.5 * ny) * vpixel
