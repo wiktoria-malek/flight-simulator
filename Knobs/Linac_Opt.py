@@ -1276,7 +1276,7 @@ class OptimizationWorker(QThread):
         ei_tol = float(self.config.get("bo_ei_tol", 0.0))
         xi = float(self.config.get("bo_xi", 0.1))
         sigma_f = float(self.config.get("bo_sigma_f", 1.0))
-        sigma_n = float(self.config.get("bo_sigma_n", 1e-1))
+        sigma_n = float(self.config.get("bo_sigma_n", 1e-2))
         uncertainty_rel_tol = float(self.config.get("gbo_uncertainty_rel_tol", 0.05))
         uncertainty_abs_tol_cfg = self.config.get("gbo_uncertainty_abs_tol", None)
 
@@ -1608,7 +1608,7 @@ class OptimizationWorker(QThread):
         x_range = float(candidates[-1] - candidates[0]) if len(candidates) >= 2 else 1.0
         length_scale = float(self.config.get("bo_length_scale", max(x_range / 3.0, 1e-6)))
         sigma_f = float(self.config.get("bo_sigma_f", 1.0))
-        sigma_n = float(self.config.get("bo_sigma_n", 1e-1))
+        sigma_n = float(self.config.get("bo_sigma_n", 1e-2))
         xi = float(self.config.get("bo_xi", 0.0))
 
         X, Y, R = [], [], []  # store evaluated (x, score, EvalResult)
@@ -1772,45 +1772,12 @@ class OptimizationWorker(QThread):
             idx = int(np.argmax(Y))
             return float(X[idx]), float(Y[idx]), R[idx]
 
-        # helper: unimodal bracket shrink (based on evaluated points)
-        def shrink_domain(all_candidates: np.ndarray) -> np.ndarray:
-            if len(X) < 3:
-                return all_candidates
-            xb, yb, _ = current_best()
-            # evaluated points sorted
-            xs = np.array(sorted(set(X)), dtype=float)
-            ys = np.array([Y[X.index(x)] for x in xs], dtype=float)
-            i = int(np.where(xs == xb)[0][0])
-
-            # find nearest left with lower score, and nearest right with lower score
-            xl = all_candidates[0]
-            xr = all_candidates[-1]
-
-            # search left
-            for j in range(i - 1, -1, -1):
-                if ys[j] < yb:
-                    xl = xs[j]
-                    break
-            # search right
-            for j in range(i + 1, len(xs)):
-                if ys[j] < yb:
-                    xr = xs[j]
-                    break
-
-            # Keep a little margin: include one coarse step on each side if possible
-            domain = all_candidates[(all_candidates >= xl) & (all_candidates <= xr)]
-            if domain.size >= 3:
-                return domain
-            return all_candidates
-
-        # 2) BO loop on coarse grid
+        # 2) BO loop on the full candidate grid
         stall = 0
         prev_best_x = None
-        domain = candidates.copy()
 
         while self.is_running and len(X) < max_evals:
-            domain = shrink_domain(domain)
-            remaining = np.array([c for c in domain if c not in set(X)], dtype=float)
+            remaining = np.array([c for c in candidates if c not in set(X)], dtype=float)
             if remaining.size == 0:
                 break
 
@@ -1820,11 +1787,11 @@ class OptimizationWorker(QThread):
             y_best = float(np.max(y_train))
             ei = self._expected_improvement(mu, std, y_best, xi=xi)
             k = int(np.argmax(ei))
-            mu_plot, std_plot = self._gp_posterior(x_train, y_train, domain, length_scale, sigma_f, sigma_n)
+            mu_plot, std_plot = self._gp_posterior(x_train, y_train, candidates, length_scale, sigma_f, sigma_n)
             ei_plot = self._expected_improvement(mu_plot, std_plot, y_best, xi=xi)
             self._emit_bo1d_trace(
                 axis_name=device_label,
-                x_grid=domain,
+                x_grid=candidates,
                 mu=mu_plot,
                 std=std_plot,
                 acq=ei_plot,
@@ -1862,26 +1829,9 @@ class OptimizationWorker(QThread):
             if coarse_step > 0:
                 fine_step = coarse_step / refine_factor
 
-                # local window: from nearest *observed* points around current best (more consistent skirt/bracket)
-                xs_obs = np.array(sorted(set(X)), dtype=float)
-                left_obs = float(candidates[0])
-                right_obs = float(candidates[-1])
-                if xs_obs.size >= 2:
-                    left_candidates = xs_obs[xs_obs < best_x]
-                    right_candidates = xs_obs[xs_obs > best_x]
-                    if left_candidates.size > 0:
-                        left_obs = float(left_candidates.max())
-                    if right_candidates.size > 0:
-                        right_obs = float(right_candidates.min())
-
-                lo = float(np.clip(left_obs, candidates[0], candidates[-1]))
-                hi = float(np.clip(right_obs, candidates[0], candidates[-1]))
-                if hi <= lo:
-                    # fallback (should be rare): ±1 coarse step
-                    lo = float(np.max([candidates[0], best_x - coarse_step]))
-                    hi = float(np.min([candidates[-1], best_x + coarse_step]))
-
-                # create fine candidates (still discrete)
+                # Keep refinement global: re-sample the full original range with a finer step.
+                lo = float(candidates[0])
+                hi = float(candidates[-1])
                 fine = np.arange(lo, hi + fine_step * 0.5, fine_step, dtype=float)
                 fine = np.unique(np.clip(fine, candidates[0], candidates[-1]))
                 fine.sort()
@@ -1891,7 +1841,7 @@ class OptimizationWorker(QThread):
                 max_total = max_evals + refine_budget
 
                 self.log_signal.emit(
-                    f"[BO-1D] Refinement: step {coarse_step:.6g} -> {fine_step:.6g}, window=[{lo:.6g},{hi:.6g}], budget={refine_budget}"
+                    f"[BO-1D] Refinement: global step {coarse_step:.6g} -> {fine_step:.6g}, range=[{lo:.6g},{hi:.6g}], budget={refine_budget}"
                 )
 
                 stall2 = 0
