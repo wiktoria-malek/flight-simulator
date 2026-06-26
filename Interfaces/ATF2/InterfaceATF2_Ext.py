@@ -3,6 +3,7 @@ import numpy as np
 from epics import PV, ca, caget
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 from collections import defaultdict
+import subprocess
 
 class CurrentDropToZeroError(RuntimeError):
     def __init__(self, message, *, target=None, readback=None, magnets=None):
@@ -612,14 +613,13 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         img_reshaped = img_data.reshape(960, 1280)
         return img_reshaped
 
-    def _screen_data_from_image(self, image,hpixel,vpixel):
+    def _screen_data_from_image(self, image,hpixel,vpixel,screen_pv_name):
         if image is None:
             return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1,1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
         img = np.asarray(image, dtype=float)
         img[~np.isfinite(img)] = 0.0
         total = float(np.sum(img)) # intensity
         ny ,nx  = img.shape # rows, columns
-
         if total <= 0.0 or nx == 0 or ny == 0:
             hedges = np.arange(nx + 1, dtype = float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1)
             vedges = np.arange(ny + 1, dtype = float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1)
@@ -644,9 +644,17 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         print("Y_mean: ", y_mean)
         sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
         sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
-        print("sigx: ", sigx)
-        print("sigy: ", sigy)
-
+        # mOTR:analyzer:dispersion:selectedmotr
+        command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
+        result = subprocess.run(command,shell=True)
+        sigx_pv = f"mOTR:analyzer:size:H"
+        sigy_pv = f"mOTR:analyzer:size:V"
+        sigx = PV(sigx_pv).get()
+        sigy = PV(sigy_pv).get()
+        print("sigx from precomputed PV: ", sigx)
+        print("sigy from precomputed PV: ", sigy)
+        # np.average(h[1:], weights=np.sum(i,axis=0)) # andrea's suggestion
+        # mOTR:analyzer:size
         hedges = (np.arange(nx + 1, dtype = float) - 0.5 * nx) * hpixel
         vedges = (np.arange(ny + 1, dtype = float) - 0.5 * ny) * vpixel
 
@@ -691,7 +699,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             hpixel, vpixel = self.get_pixel_calibrations(screen_pv_name)
             status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
             image = self.acquire_otr_image(screen_pv_name, move_screen=move_screen)
-            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel)
+            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel,screen_pv_name)
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             xb_list.append(x_mean)
