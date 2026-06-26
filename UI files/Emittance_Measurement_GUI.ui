@@ -216,7 +216,7 @@ QGroupBox#scanGroup::title {
              <double>10.000000000000000</double>
             </property>
             <property name="value">
-             <double>-0.250000000000000</double>
+             <double>-0.100000000000000</double>
             </property>
            </widget>
           </item>
@@ -289,7 +289,7 @@ QToolButton#delta_min_info_button:hover {
              <double>10.000000000000000</double>
             </property>
             <property name="value">
-             <double>0.250000000000000</double>
+             <double>0.100000000000000</double>
             </property>
            </widget>
           </item>
