@@ -670,7 +670,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
 
-
     def get_screens(self, names=None, move_screen=False):
         print('Reading screens...')
         if isinstance(names, str):
