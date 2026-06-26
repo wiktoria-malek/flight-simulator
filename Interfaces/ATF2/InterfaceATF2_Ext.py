@@ -631,15 +631,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         x_centers = (np.arange(nx, dtype = float) - 0.5 * (nx -1)) * hpixel # middle of the pixel
         y_centers = (np.arange(ny, dtype = float) - 0.5 * (ny -1) ) * vpixel
-        print("X_centers: ", x_centers)
-        print("Y_centers: ", y_centers)
         proj_x = np.sum(img, axis = 0)
         proj_y = np.sum(img, axis = 1)
-
         x_mean = float(np.sum(x_centers * proj_x) / total)
         y_mean = float(np.sum(y_centers * proj_y) / total)
-        print("X_mean: ", x_mean)
-        print("Y_mean: ", y_mean)
         sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
         sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
         # mOTR:analyzer:dispersion:selectedmotr
@@ -653,14 +648,19 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         time.sleep(10)
         sigx_pv = f"mOTR:analyzer:size:H"
         sigy_pv = f"mOTR:analyzer:size:V"
-        sigx = PV(sigx_pv).get()
-        sigy = PV(sigy_pv).get()
-        if sigx>1100 or sigy >1000:
+        sigx_prev = PV(sigx_pv).get()
+        sigy_prev = PV(sigy_pv).get()
+        ratio_sigmas_x = PV(sigx_pv).get()/sigx_prev
+        ratio_sigmas_y = PV(sigy_pv).get()/sigy_prev
+        while np.abs(ratio_sigmas_x) > 0.7 or np.abs(ratio_sigmas_y)>0.7:
             time.sleep(5)
             sigx = PV(sigx_pv).get()
             time.sleep(5)
             sigy = PV(sigy_pv).get()
             time.sleep(5)
+            sigx_prev = sigx
+            sigy_prev = sigy
+
         print("sigx from precomputed PV: ", sigx)
         print("sigy from precomputed PV: ", sigy)
         # np.average(h[1:], weights=np.sum(i,axis=0)) # andrea's suggestion
@@ -871,7 +871,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             des_val = self._pv_get(des_name, default=np.nan, timeout=0.7)
             act_val = self._pv_get(act_name, default=np.nan, timeout=0.7)
             if np.isnan(des_val) or np.isnan(act_val):
-                print(f"[WARN] Corrector PV read failed: {corrector} ({des_name}, {act_name})")
+                print(f"Corrector PV read failed: {corrector} ({des_name}, {act_name})")
             bdes.append(des_val)
             bact.append(act_val)
 
