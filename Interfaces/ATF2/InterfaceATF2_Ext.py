@@ -5,12 +5,14 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 from collections import defaultdict
 import subprocess
 
+
 class CurrentDropToZeroError(RuntimeError):
     def __init__(self, message, *, target=None, readback=None, magnets=None):
         super().__init__(message)
         self.target = dict(target or {})
         self.readback = dict(readback or {})
         self.magnets = list(magnets or [])
+
 
 class MagKiWrapper:
     MODE_K_TO_I = 1
@@ -62,6 +64,7 @@ class MagKiWrapper:
     def k1_to_current(self, name, k1, energy_GeV):
         return self._call(self.MODE_K_TO_I, name, energy_GeV, k_main=k1)["current"]
 
+
 class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext'
@@ -70,8 +73,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.nsamples = nsamples
         self.bpm_sample_interval_s = 0.5
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
-        self.electronmass = 0.51099895 # MeV/c^2
-        self.Pref = 1.2999999e3 # MeV/c, until a PV is specified
+        self.electronmass = 0.51099895  # MeV/c^2
+        self.Pref = 1.2999999e3  # MeV/c, until a PV is specified
         self.screen_names = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
         self.screen_pv_names = {
             'OTR0X': 'mOTR0',
@@ -80,7 +83,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             'OTR3X': 'mOTR3'
         }
         self.bpm_sample_interval_s = 0.5
-        self.screen_image_shape = (960, 1280) # image size = 1280 x 960
+        self.screen_image_shape = (960, 1280)  # image size = 1280 x 960
 
         # Bpms and correctors in beamline order
         sequence = [
@@ -88,8 +91,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "ZH2X", "QD5X", "ZV4X", "ZV5X", "QF6X", "QF7X", "ZH3X", "QD8X", "ZV6X",
             "QF9X", "ZH4X", "FONTK1", "ZV7X", "FONTP1", "QD10X", "ZH5X", "QF11X",
             "FONTK2", "ZV8X", "FONTP2", "QD12X", "ZH6X", "QF13X", "QD14X", "FONTP3",
-            "ZH7X", "QF15X", "ZV9X", "QD16X", "ZH8X", "QF17X", "ZV10X", "QD18X","OTR0X",
-            "ZH9X", "QF19X","OTR1X", "ZV11X", "QD20X","OTR2X" , "ZH10X", "QF21X", "OTR3X","IPT1", "IPT2",
+            "ZH7X", "QF15X", "ZV9X", "QD16X", "ZH8X", "QF17X", "ZV10X", "QD18X", "OTR0X",
+            "ZH9X", "QF19X", "OTR1X", "ZV11X", "QD20X", "OTR2X", "ZH10X", "QF21X", "OTR3X", "IPT1", "IPT2",
             "IPT3", "IPT4", "QM16FF", "ZH1FF", "ZV1FF", "QM15FF", "QM14FF", "FB2FF",
             "QM13FF", "QM12FF", "QM11FF", "QD10BFF", "QD10AFF", "QF9BFF",
             "MSF6FF", "QF9AFF", "QD8FF", "QF7FF", "QD6FF", "QF5BFF", "MSF5FF",
@@ -98,15 +101,16 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         ]
 
         quadrupoles = [
-            "QF1X", "QD2X", "QF3X","QF4X", "QD5X", "QF6X", "QF7X","QD8X","QF9X", "QD10X",
-            "QF11X", "QD12X", "QF13X", "QD14X", "QF15X","QD16X", "QF17X","QD18X","QF19X",
-            "QD20X", "QF21X", "QM16FF", "QM15FF", "QM14FF", "QM13FF", "QM12FF", "QM11FF", "QD10BFF", "QD10AFF", "QF9BFF",
+            "QF1X", "QD2X", "QF3X", "QF4X", "QD5X", "QF6X", "QF7X", "QD8X", "QF9X", "QD10X",
+            "QF11X", "QD12X", "QF13X", "QD14X", "QF15X", "QD16X", "QF17X", "QD18X", "QF19X",
+            "QD20X", "QF21X", "QM16FF", "QM15FF", "QM14FF", "QM13FF", "QM12FF", "QM11FF", "QD10BFF", "QD10AFF",
+            "QF9BFF",
             "QF9AFF", "QD8FF", "QF7FF", "QD6FF", "QF5BFF", "QF5AFF", "QD4BFF", "QD4AFF", "QF3FF", "QD2BFF", "QD2AFF",
-            "QF1FF",  "QD0FF"
+            "QF1FF", "QD0FF"
         ]
         self.quadrupoles = list(quadrupoles)
 
-        screens = ['OTR0X','OTR1X','OTR2X','OTR3X']
+        screens = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
         self.screens = list(screens)
         # ATF2' BPMs Epics names
         # https://atf.kek.jp/atfbin/view/ATF/EPICS_DATABASE
@@ -119,22 +123,28 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "MQM11FF", "MQD10BFF", "MQD10AFF", "MQF9AFF",
             "MQD8FF", "MQF7FF", "MQF5BFF", "MQD4BFF", "MQF3FF", "MQD2BFF", "MQD2AFF",
             "MSF1FF", "MPREIP", "MIPB"
-            ]
+        ]
 
         # keep monitor indexes from MONITOR_INDEX_TO_NAME as the source of truth.
         self.MONITOR_INDEX_TO_NAME = {
             0: "MB1X", 1: "MB2X", 2: "MQF1X", 3: "MQD2X", 4: "MQF3X", 5: "MQF4X", 6: "MQD5X", 7: "MQF6X", 8: "MQF7X",
-            9: "MQD8X", 10: "MQF9X", 11: "MQD10X", 12: "MQF11X", 13: "MQD12X", 14: "MQF13X", 15: "MQD14X", 16: "MQF15X", 17: "MQD16X",
-            18: "MQF17X", 19: "MQD18X", 20: "MQF19X", 21: "MQD20X", 22: "MQF21X", 23: "IPBPM1", 24: "IPBPM2", 25: "nBPM1",
-            26: "nBPM2", 27: "nBPM3", 28: "MQM16FF", 29: "MQM15FF", 30: "MQM14FF", 31: "MFB2FF", 32: "MQM13FF", 33: "MQM12FF",
-            34: "MFB1FF", 35: "MQM11FF", 36: "MQD10BFF", 37: "MQD10AFF", 38: "MQF9BFF", 39: "MSF6FF", 40: "MQF9AFF", 41: "MQD8FF",
-            42: "MQF7FF", 43: "MQD6FF", 44: "MQF5BFF", 45: "MSF5FF", 46: "MQF5AFF", 47: "MQD4BFF", 48: "MSD4FF", 49: "MQD4AFF",
-            50: "MQF3FF", 51: "MQD2BFF", 52: "MQD2AFF", 53: "MSF1FF", 54: "MQF1FF", 55: "MSD0FF", 56: "MQD0FF", 57: "M1&2IP", 58: "MPIP",
+            9: "MQD8X", 10: "MQF9X", 11: "MQD10X", 12: "MQF11X", 13: "MQD12X", 14: "MQF13X", 15: "MQD14X", 16: "MQF15X",
+            17: "MQD16X",
+            18: "MQF17X", 19: "MQD18X", 20: "MQF19X", 21: "MQD20X", 22: "MQF21X", 23: "IPBPM1", 24: "IPBPM2",
+            25: "nBPM1",
+            26: "nBPM2", 27: "nBPM3", 28: "MQM16FF", 29: "MQM15FF", 30: "MQM14FF", 31: "MFB2FF", 32: "MQM13FF",
+            33: "MQM12FF",
+            34: "MFB1FF", 35: "MQM11FF", 36: "MQD10BFF", 37: "MQD10AFF", 38: "MQF9BFF", 39: "MSF6FF", 40: "MQF9AFF",
+            41: "MQD8FF",
+            42: "MQF7FF", 43: "MQD6FF", 44: "MQF5BFF", 45: "MSF5FF", 46: "MQF5AFF", 47: "MQD4BFF", 48: "MSD4FF",
+            49: "MQD4AFF",
+            50: "MQF3FF", 51: "MQD2BFF", 52: "MQD2AFF", 53: "MSF1FF", 54: "MQF1FF", 55: "MSD0FF", 56: "MQD0FF",
+            57: "M1&2IP", 58: "MPIP",
             59: "MDUMP", 60: "ICT1X", 61: "ICTDUMP", 62: "MW1X", 63: "MW1IP", 64: "MPREIP", 65: "MIPA", 66: "MIPB"}
 
         self.sextupoles = ["SF6FF", "SK4FF", "SK3FF", "SF5FF", "SD4FF", "SK2FF", "SK1FF", "SF1FF", "SD0FF"]
-        self.screens = ['OTR0X', 'OTR1X','OTR2X','OTR3X']
-        #self.quadrupoles = ['OTR0X', 'OTR1X','OTR2X','OTR3X']
+        self.screens = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
+        # self.quadrupoles = ['OTR0X', 'OTR1X','OTR2X','OTR3X']
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
@@ -146,13 +156,14 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             print(f'Unknown bpms {bpms_unknown} removed from list')
 
         # Only retain BPMs in config file which are known by Epics
-        sequence_filtered = [element for element in sequence if (element in monitors) or element.lower().startswith('z')]
+        sequence_filtered = [element for element in sequence if
+                             (element in monitors) or element.lower().startswith('z')]
 
         # Subset of BPMs and correctors from the config file
         self.sequence = sequence_filtered
         self.sequence_raw = list(sequence)
         self.movable_magnets = [string for string in self.sequence_raw if string.upper().startswith(('MQ', 'MS'))]
-        #self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
+        # self.bpms = [string for string in self.sequence if not string.lower().startswith('z')]
         self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         self.qmag_alias_to_canonical = {}
         for name in self.movable_magnets:
@@ -170,14 +181,14 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
 
         '''
-        
+
            Sato-san's way:
            BPM order must follow MONITOR_INDEX_TO_NAME, independent from sequence.
-           
+
         '''
         name_to_monitor_index = {name: index for index, name in self.MONITOR_INDEX_TO_NAME.items()}
-        #self.bpms = [element for element in self.sequence if not element.lower().startswith('z') and element in name_to_monitor_index]
-        #self.bpm_indexes = np.array([name_to_monitor_index[name] for name in self.bpms], dtype=int)
+        # self.bpms = [element for element in self.sequence if not element.lower().startswith('z') and element in name_to_monitor_index]
+        # self.bpm_indexes = np.array([name_to_monitor_index[name] for name in self.bpms], dtype=int)
         self.bpm_indexes = np.array(sorted(self.MONITOR_INDEX_TO_NAME.keys()), dtype=int)
         self.bpms = [self.MONITOR_INDEX_TO_NAME[i] for i in self.bpm_indexes]
 
@@ -189,7 +200,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.nominal_laser_intensity = nominal_intensity
         self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
         self.test_laser_intensity = wfs_intensity
-        #PV('RFGun:LaserIntensity1:Read').get()
+        # PV('RFGun:LaserIntensity1:Read').get()
 
         # k_T_per_A : integrated-gradient slope GL/I [T/A]
         # L_m       : magnetic length
@@ -228,24 +239,36 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.datafile = "/atf/data/ipbsm/knob/knob_fringe_result_v2.dat"
 
         self.linear_matrix = {
-            "Ax": {"SD0FF": (-116.5, 0), "SF1FF": (-35.2, 0), "SD4FF": (-37.8, 0), "SF5FF": (0, 0), "SF6FF": (-623.4, 0)},
-            "Ex": {"SD0FF": (-813.0, 0), "SF1FF": (793.5, 0), "SD4FF": (-137.9, 0), "SF5FF": (0, 0), "SF6FF": (1492.9, 0)},
+            "Ax": {"SD0FF": (-116.5, 0), "SF1FF": (-35.2, 0), "SD4FF": (-37.8, 0), "SF5FF": (0, 0),
+                   "SF6FF": (-623.4, 0)},
+            "Ex": {"SD0FF": (-813.0, 0), "SF1FF": (793.5, 0), "SD4FF": (-137.9, 0), "SF5FF": (0, 0),
+                   "SF6FF": (1492.9, 0)},
             "Ay": {"SD0FF": (-98.9, 0), "SF1FF": (-9.6, 0), "SD4FF": (-246.7, 0), "SF5FF": (0, 0), "SF6FF": (120.0, 0)},
-            "Ey": {"SD0FF": (0, 374.1), "SF1FF": (0, -120.0), "SD4FF": (0, -451.3), "SF5FF": (0, 0), "SF6FF": (0, -64.3)},
+            "Ey": {"SD0FF": (0, 374.1), "SF1FF": (0, -120.0), "SD4FF": (0, -451.3), "SF5FF": (0, 0),
+                   "SF6FF": (0, -64.3)},
             "Coup1": {"SD0FF": (0, -100), "SF1FF": (0, 100), "SD4FF": (0, 0), "SF5FF": (0, 0), "SF6FF": (0, 0)},
             "Coup2": {"SD0FF": (0, 107.8), "SF1FF": (0, 4.2), "SD4FF": (0, 152.6), "SF5FF": (0, 0), "SF6FF": (0, 90.4)},
-            "Spare1": {"SD0FF": (-676.0, 0), "SF1FF": (-316.0, 0), "SD4FF": (252.0, 0), "SF5FF": (587.0, 0), "SF6FF": (593.0, 0)},
-            "Spare2": {"SD0FF": (0, 78.0), "SF1FF": (0, 188.0), "SD4FF": (0, -55.0), "SF5FF": (-179.0, 0), "SF6FF": (0, 38.0)},
+            "Spare1": {"SD0FF": (-676.0, 0), "SF1FF": (-316.0, 0), "SD4FF": (252.0, 0), "SF5FF": (587.0, 0),
+                       "SF6FF": (593.0, 0)},
+            "Spare2": {"SD0FF": (0, 78.0), "SF1FF": (0, 188.0), "SD4FF": (0, -55.0), "SF5FF": (-179.0, 0),
+                       "SF6FF": (0, 38.0)},
             "Spare3": {"SD0FF": (0, 0), "SF1FF": (0, 0), "SD4FF": (0, 1), "SF5FF": (0, 0), "SF6FF": (0, 0)},
         }
         self.nonlinear_matrix = {
-            "Y24": {"SK1FF": 0.0, "SK2FF": 0.0, "SK3FF": 0.0, "SK4FF": 0.0, "SD0FF": 0.119, "SF1FF": -0.013, "SD4FF": -0.554, "SF5FF": -0.083, "SF6FF": -0.175},
-            "Y46": {"SK1FF": 0.0, "SK2FF": 0.0, "SK3FF": 0.0, "SK4FF": 0.0, "SD0FF": 0.259, "SF1FF": -0.057, "SD4FF": 1.049, "SF5FF": -0.106, "SF6FF": -0.056},
-            "Y22": {"SK1FF": -1.629, "SK2FF": 0.174, "SK3FF": 1.024, "SK4FF": 2.435, "SD0FF": 0.0, "SF1FF": 0.0, "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
-            "Y26": {"SK1FF": 1.763, "SK2FF": -0.126, "SK3FF": 0.463, "SK4FF": -0.701, "SD0FF": 0.0, "SF1FF": 0.0, "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
-            "Y66": {"SK1FF": 5.571, "SK2FF": -0.207, "SK3FF": -4.668, "SK4FF": -6.673, "SD0FF": 0.0, "SF1FF": 0.0, "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
-            "Y44": {"SK1FF": 0.037, "SK2FF": 1.614, "SK3FF": -0.458, "SK4FF": -0.186, "SD0FF": 0.0, "SF1FF": 0.0, "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
-            "Spare": {"SK1FF": 0.0, "SK2FF": 0.0, "SK3FF": 0.0, "SK4FF": 0.0, "SD0FF": 0.0, "SF1FF": 0.0, "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
+            "Y24": {"SK1FF": 0.0, "SK2FF": 0.0, "SK3FF": 0.0, "SK4FF": 0.0, "SD0FF": 0.119, "SF1FF": -0.013,
+                    "SD4FF": -0.554, "SF5FF": -0.083, "SF6FF": -0.175},
+            "Y46": {"SK1FF": 0.0, "SK2FF": 0.0, "SK3FF": 0.0, "SK4FF": 0.0, "SD0FF": 0.259, "SF1FF": -0.057,
+                    "SD4FF": 1.049, "SF5FF": -0.106, "SF6FF": -0.056},
+            "Y22": {"SK1FF": -1.629, "SK2FF": 0.174, "SK3FF": 1.024, "SK4FF": 2.435, "SD0FF": 0.0, "SF1FF": 0.0,
+                    "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
+            "Y26": {"SK1FF": 1.763, "SK2FF": -0.126, "SK3FF": 0.463, "SK4FF": -0.701, "SD0FF": 0.0, "SF1FF": 0.0,
+                    "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
+            "Y66": {"SK1FF": 5.571, "SK2FF": -0.207, "SK3FF": -4.668, "SK4FF": -6.673, "SD0FF": 0.0, "SF1FF": 0.0,
+                    "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
+            "Y44": {"SK1FF": 0.037, "SK2FF": 1.614, "SK3FF": -0.458, "SK4FF": -0.186, "SD0FF": 0.0, "SF1FF": 0.0,
+                    "SD4FF": 0.0, "SF5FF": 0.0, "SF6FF": 0.0},
+            "Spare": {"SK1FF": 0.0, "SK2FF": 0.0, "SK3FF": 0.0, "SK4FF": 0.0, "SD0FF": 0.0, "SF1FF": 0.0, "SD4FF": 0.0,
+                      "SF5FF": 0.0, "SF6FF": 0.0},
         }
         self.corrector_knob_pvs = {
             "corrector 1": {
@@ -343,7 +366,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
         PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
 
-
     def extract_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
         if screen_pv_name is None:
@@ -364,7 +386,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         columns = lines[star_symbol].lstrip("*").split()
         return lines, columns, dollar_sign
 
-    def  _get_twiss_s_positions(self, names):
+    def _get_twiss_s_positions(self, names):
         names = list(names)
         lines, columns, dollar_sign = self._read_twiss_file()
         try:
@@ -386,7 +408,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return [s_pos.get(name, np.nan) for name in names]
 
     @staticmethod
-    def make_safe_float(value, default = np.nan): #so even if pv returns none, empty array or whatever, interface still works
+    def make_safe_float(value,
+                        default=np.nan):  # so even if pv returns none, empty array or whatever, interface still works
         try:
             if value is None:
                 return float(default)
@@ -397,13 +420,13 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         except Exception:
             return float(default)
 
-    def _valid_pv_value(self, pv_names, default = np.nan):
+    def _valid_pv_value(self, pv_names, default=np.nan):
         for pv_name in pv_names:
             try:
                 value = caget(pv_name)
             except Exception:
                 continue
-            value = self.make_safe_float(value, default = np.nan)
+            value = self.make_safe_float(value, default=np.nan)
             if np.isfinite(value):
                 return value
         return float(default)
@@ -411,25 +434,26 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_movable_magnets_names(self):
         return self.movable_magnets
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0,
+                                        alpha_y0, stop_checker=None, reference_screen=None):
         # from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
         # screens_data =
         # simulated_interface = InterfaceATF2_Ext_RFTrack()
         # simulated_interface.set_quadrupoles()
         pass
 
-    def _quadrupole_current_pv_name(self,name):
+    def _quadrupole_current_pv_name(self, name):
         if name.startswith("M") and name[1:].startswith(("QF", "QD", "QM")):
             return name[1:]
         return name
 
-    def _quad_mover_pv_name(self,name):
+    def _quad_mover_pv_name(self, name):
         return self.qmag_alias_to_canonical.get(name, name)
 
     def get_quadrupoles(self, names=None, include_pv_names=False):
         print(" 'get_quadrupoles' running...")
         if names is None:
-            names = self.quadrupoles # quadrupoles names
+            names = self.quadrupoles  # quadrupoles names
         if type(names) == str:
             names = [names]
         names = [name for name in names if name in self.quadrupoles]
@@ -474,7 +498,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         data = {
             "names": names,
-            "bdes": bdes, # 1/m^2,
+            "bdes": bdes,  # 1/m^2,
             "bact": bact,  # 1/m^2
             "ides": np.array(ides, dtype=float),
             "iact": np.array(iact, dtype=float),
@@ -580,7 +604,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             v_factor = 1.0
         return h_factor, v_factor
 
-    def acquire_otr_image(self, screen_pv_name, move_screen = False):
+    def acquire_otr_image(self, screen_pv_name, move_screen=False):
         """
         It might be super slow.
         1 call of get_screens() will take 8s x number_of_screens
@@ -611,16 +635,16 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         img_reshaped = img_data.reshape(960, 1280)
         return img_reshaped
 
-    def _screen_data_from_image(self, image,hpixel,vpixel,screen_pv_name):
+    def _screen_data_from_image(self, image, hpixel, vpixel, screen_pv_name):
         if image is None:
-            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1,1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
+            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
         img = np.asarray(image, dtype=float)
         img[~np.isfinite(img)] = 0.0
-        total = float(np.sum(img)) # intensity
-        ny ,nx  = img.shape # rows, columns
+        total = float(np.sum(img))  # intensity
+        ny, nx = img.shape  # rows, columns
         if total <= 0.0 or nx == 0 or ny == 0:
-            hedges = np.arange(nx + 1, dtype = float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1)
-            vedges = np.arange(ny + 1, dtype = float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1)
+            hedges = np.arange(nx + 1, dtype=float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1)
+            vedges = np.arange(ny + 1, dtype=float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1)
 
             return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
 
@@ -629,10 +653,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         if not np.isfinite(vpixel) or vpixel <= 0:
             vpixel = 1e-3
 
-        x_centers = (np.arange(nx, dtype = float) - 0.5 * (nx -1)) * hpixel # middle of the pixel
-        y_centers = (np.arange(ny, dtype = float) - 0.5 * (ny -1) ) * vpixel
-        proj_x = np.sum(img, axis = 0)
-        proj_y = np.sum(img, axis = 1)
+        x_centers = (np.arange(nx, dtype=float) - 0.5 * (nx - 1)) * hpixel  # middle of the pixel
+        y_centers = (np.arange(ny, dtype=float) - 0.5 * (ny - 1)) * vpixel
+        proj_x = np.sum(img, axis=0)
+        proj_y = np.sum(img, axis=1)
         x_mean = float(np.sum(x_centers * proj_x) / total)
         y_mean = float(np.sum(y_centers * proj_y) / total)
         sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
@@ -640,45 +664,33 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # mOTR:analyzer:dispersion:selectedmotr
         # hack to avoid background subtraction
         command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
-        result = subprocess.run(command,shell=True)
+        result = subprocess.run(command, shell=True)
         time.sleep(1)
-        result = subprocess.run(command,shell=True)
+        result = subprocess.run(command, shell=True)
         time.sleep(1)
-        result = subprocess.run(command,shell=True)
+        result = subprocess.run(command, shell=True)
         time.sleep(10)
         sigx_pv = f"mOTR:analyzer:size:H"
         sigy_pv = f"mOTR:analyzer:size:V"
-        sigx_prev = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
-        sigy_prev = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
-        max_retries = 5
-        for attempt in range(max_retries):
+        sigx_prev = PV(sigx_pv).get()
+        sigy_prev = PV(sigy_pv).get()
+        ratio_sigmas_x = PV(sigx_pv).get() / sigx_prev
+        ratio_sigmas_y = PV(sigy_pv).get() / sigy_prev
+        while np.abs(ratio_sigmas_x) > 8 or np.abs(ratio_sigmas_y) > 8:
             time.sleep(5)
-            sigx_new = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
-            sigy_new = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
-            if not np.isfinite(sigx_prev) or not np.isfinite(sigy_prev):
-                sigx_prev, sigy_prev = sigx_new, sigy_new
-                continue
-            if sigx_prev <= 0 or sigy_prev <= 0 or sigx_new <= 0 or sigy_new <= 0:
-                sigx_prev, sigy_prev = sigx_new, sigy_new
-                continue
-            change_x = max(sigx_new / sigx_prev, sigx_prev / sigx_new)
-            change_y = max(sigy_new / sigy_prev, sigy_prev / sigy_new)
-            if change_x <= 8 and change_y <= 8:
-                sigx = sigx_new
-                sigy = sigy_new
-                break
-            print("Screen size changed too much between measurements of sigx and sigy. Remeasuring...")
-            sigx_prev, sigy_prev = sigx_new, sigy_new
-        else:
-            sigx = sigx_prev
-            sigy = sigy_prev
+            sigx = PV(sigx_pv).get()
+            time.sleep(5)
+            sigy = PV(sigy_pv).get()
+            time.sleep(5)
+            sigx_prev = sigx
+            sigy_prev = sigy
 
         print("sigx from precomputed PV: ", sigx)
         print("sigy from precomputed PV: ", sigy)
         # np.average(h[1:], weights=np.sum(i,axis=0)) # andrea's suggestion
         # mOTR:analyzer:size
-        hedges = (np.arange(nx + 1, dtype = float) - 0.5 * nx) * hpixel
-        vedges = (np.arange(ny + 1, dtype = float) - 0.5 * ny) * vpixel
+        hedges = (np.arange(nx + 1, dtype=float) - 0.5 * nx) * hpixel
+        vedges = (np.arange(ny + 1, dtype=float) - 0.5 * ny) * vpixel
 
         return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
 
@@ -698,7 +710,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         images = []
         hedges_all = []
         vedges_all = []
-        inout_list = [] # is screen in or out
+        inout_list = []  # is screen in or out
 
         for screen_name in selected_names:
             screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -720,7 +732,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             hpixel, vpixel = self.get_pixel_calibrations(screen_pv_name)
             status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
             image = self.acquire_otr_image(screen_pv_name, move_screen=False)
-            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel,screen_pv_name)
+            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel,
+                                                                                                    vpixel,
+                                                                                                    screen_pv_name)
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             xb_list.append(x_mean)
@@ -745,7 +759,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "hedges": hedges_all,
             "vedges": vedges_all,
             "images": images,
-            "S": np.asarray(s_positions, dtype=float), # "S": np.full(len(selected_names), np.nan)
+            "S": np.asarray(s_positions, dtype=float),  # "S": np.full(len(selected_names), np.nan)
             "inout": np.asarray(inout_list, dtype=float),
         }
         return screens
@@ -780,16 +794,17 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def reset_intensity(self):
         new_laser_intensity = self.nominal_laser_intensity
         print(f'Resetting laser intensity to {new_laser_intensity}...')
-        laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
+        laser_intensity = new_laser_intensity * 100 * 5  # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
         time.sleep(3)
         return self
-    
+
     def get_sequence(self):
         return self.sequence
 
     def get_hcorrectors_names(self):
-        return [string for string in self.corrs if (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
+        return [string for string in self.corrs if
+                (string.lower().startswith('zh')) or (string.lower().startswith('zx'))]
 
     def get_vcorrectors_names(self):
         return [string for string in self.corrs if string.lower().startswith('zv')]
@@ -807,7 +822,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 name_to_index[alias] = name_to_index[canonical]
         return [name_to_index.get(name, np.nan) for name in names]
 
-    def get_target_dispersion(self, names=None): # for DR too
+    def get_target_dispersion(self, names=None):  # for DR too
         if names is None:
             names = self.bpms
         if isinstance(names, str):
@@ -1027,7 +1042,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             pv_des.put(target)
             self._wait_for_magnet_readback(corrector, target)
 
-
     '''
     METHODS FROM SATO-SAN'S REPO:
     '''
@@ -1090,7 +1104,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             pv_des.put(curr_val + current)
         time.sleep(1)
 
-    def apply_qmag_xyroll(self, names, x_um, y_um, roll_m, wait=True, max_attempts=5, attempt_timeout=30.0, settle_dt=0.5, tol_um=15.0):
+    def apply_qmag_xyroll(self, names, x_um, y_um, roll_m, wait=True, max_attempts=5, attempt_timeout=30.0,
+                          settle_dt=0.5, tol_um=15.0):
         if type(names) == str:
             names = [names]
 
@@ -1276,7 +1291,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 "k1": float(q.get("iact", [np.nan])[idx]),
             }
         return out
-
 
     def _normalize_scan_mode_label(self, scan_mode_label):
         text = str(scan_mode_label or "30").strip()
@@ -1474,7 +1488,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "zscan_base_values": {str(knob): float(val) for knob, val in zscan_base_values.items()},
         }
 
-    def restore_knob_origin(self, origin_state, *, pos_tol=15.0, pos_timeout=30.0, current_tol=0.05, current_timeout=15.0, poll=0.05, settle_dt=0.5, use_trim=True, scan_mode_label=None):
+    def restore_knob_origin(self, origin_state, *, pos_tol=15.0, pos_timeout=30.0, current_tol=0.05,
+                            current_timeout=15.0, poll=0.05, settle_dt=0.5, use_trim=True, scan_mode_label=None):
         if not isinstance(origin_state, dict):
             raise ValueError("origin_state must be a dict")
 
@@ -1754,7 +1769,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 settle_dt=settle_dt,
             )
 
-    def _move_zscan_knob_absolute(self, knob_name: str, target_value: float, *, scan_mode_label="30", timeout=30.0, poll=0.05, settle_dt=0.05, busy_seen_grace=0.2):
+    def _move_zscan_knob_absolute(self, knob_name: str, target_value: float, *, scan_mode_label="30", timeout=30.0,
+                                  poll=0.05, settle_dt=0.05, busy_seen_grace=0.2):
         key = str(knob_name)
         if key != self.zscan_knob_name:
             raise KeyError(f"Unknown Z scan knob: {knob_name}")
@@ -1812,7 +1828,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "ict_average": float(save_ict_average),
         }
 
-    def get_ipbsm_full(self, timeout=300, file_wait=330.0, poll=0.1, start_return_timeout=5.0, start_to_finish_wait=1.0):
+    def get_ipbsm_full(self, timeout=300, file_wait=330.0, poll=0.1, start_return_timeout=5.0,
+                       start_to_finish_wait=1.0):
         with self._ipbsm_lock:
             try:
                 prev_mtime = os.path.getmtime(self.datafile)
