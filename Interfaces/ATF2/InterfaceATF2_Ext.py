@@ -73,10 +73,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.Pref = 1.2999999e3 # MeV/c, until a PV is specified
         self.screen_names = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
         self.screen_pv_names = {
-            'OTR0X': 'mOTR1',
-            'OTR1X': 'mOTR2',
-            'OTR2X': 'mOTR3',
-            'OTR3X': 'mOTR4'
+            'OTR0X': 'mOTR0',
+            'OTR1X': 'mOTR1',
+            'OTR2X': 'mOTR2',
+            'OTR3X': 'mOTR3'
         }
         self.bpm_sample_interval_s = 0.5
         self.screen_image_shape = (960, 1280) # image size = 1280 x 960

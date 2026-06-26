@@ -519,8 +519,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         else:
             title = f"Quadrupole scan: {quad_name}"
         ax1.set_title(title)
-        ax1.set_ylabel("sigx")
-        ax2.set_ylabel("sigy")
+        ax1.set_ylabel("sigx [um]")
+        ax2.set_ylabel("sigy [um]")
         ax2.set_xlabel("K1")
 
         ax1.grid(True, alpha=0.3)
