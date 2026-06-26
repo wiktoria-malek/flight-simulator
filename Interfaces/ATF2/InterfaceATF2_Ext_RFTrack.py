@@ -361,7 +361,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return bpms
 
     def get_screens(self, names=None, move_screen=True):
-        #self.log('Reading screens...')
+        self.log('Reading screens...')
         if isinstance(names, str):
             names = [names]  # allows passing a single screen name
         hpixel = 0.001  # mm, horizontal size of a pixel

@@ -375,7 +375,7 @@ QToolButton#delta_max_info_button:hover {
             <item>
              <widget class="QToolButton" name="steps_toolbutton">
               <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of quadrupole scan steps between Delta min and Delta max.&lt;br/&gt;Set to 0 to run conventional multi-screen emittance measurement without scanning the quadrupole. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Number of quadrupole scan steps between Delta min and Delta max.&lt;br/&gt;Set to 0 to run conventional multi-screen emittance measurement without scanning the quadrupole. &lt;/p&gt;&lt;p&gt;Steps == 0 can also be used to gather data from the screens.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#steps_toolbutton {
@@ -1308,6 +1308,37 @@ QGroupBox#fit_results_group::title {
               <height>24</height>
              </size>
             </property>
+            <widget class="QToolButton" name="toolButton_scan">
+             <property name="geometry">
+              <rect>
+               <x>0</x>
+               <y>0</y>
+               <width>24</width>
+               <height>24</height>
+              </rect>
+             </property>
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If steps are set to 0, thi button measures data on the screens and saves them in a chosen directory.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QToolButton#toolButton_scan {
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#toolButton_scan:hover {
+    background-color: #d9d9d9 ;
+}</string>
+             </property>
+             <property name="text">
+              <string>?</string>
+             </property>
+            </widget>
            </widget>
           </item>
           <item>

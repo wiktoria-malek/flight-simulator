@@ -113,19 +113,20 @@ class QuadrupoleScan:
         if steps_requested > 0 and delta_max <= delta_min:
             raise ValueError("delta_max must be larger than delta_min")
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
-        quadrupoles = self.interface.get_quadrupoles([quad_name])
+
+        K1_0 = np.nan
         quad_names = list(getattr(self.interface, "quadrupoles", []))
         if quad_name not in quad_names:
             raise ValueError("Quadrupole name not found in quadrupoles")
-
-        quad_index = quad_names.index(quad_name)
-        K1_0 = float(quadrupoles["bdes"][0])
-        if np.isclose(K1_0, 0.0):
-            raise ValueError("This quadrupole has zero K1_0. You should choose another one.")
+        if steps_requested > 0:
+            quadrupoles = self.interface.get_quadrupoles([quad_name])
+            K1_0 = float(quadrupoles["bdes"][0])
+            if np.isclose(K1_0, 0.0):
+                raise ValueError("This quadrupole has zero K1_0. You should choose another one.")
 
         if steps_requested == 0:
             deltas = np.array([0.0], dtype=float)
-            K1_values = np.array([K1_0], dtype=float)
+            K1_values = np.array([0.0], dtype=float)
         else:
             deltas = np.linspace(float(delta_min), float(delta_max), steps_requested)
             K1_values = K1_0 * (1 + deltas)
@@ -175,23 +176,25 @@ class QuadrupoleScan:
                             cancel_requested = True
                             break
                         if steps_requested > 0:
-                            print("debug0")
+                            print("Before set_quadrupoles")
                             self.interface.set_quadrupoles([quad_name], [float(K1)])
-                            print("debug1")
+                            print("After set_quadrupoles")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
                         sxy_shots = np.full(nshots, np.nan, dtype=float)
                         # tilt_shots = np.full(nshots, np.nan, dtype=float)
                         state_files = []
-                        print("before calling get_quadrupoles")
-                        quad_data = self.interface.get_quadrupoles([quad_name])
-                        print("after calling get_quadrupoles")
+                        if steps_requested > 0:
+                            print("before calling get_quadrupoles")
+                            quad_data = self.interface.get_quadrupoles([quad_name])
+                            print("after calling get_quadrupoles")
+                        else:
+                            quad_data = []
                         for j in range(nshots):
                             while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
                                 setattr(self, "_scan_is_paused", True)
                                 QApplication.processEvents()
                                 time.sleep(0.05)
-
                             setattr(self, "_scan_is_paused", False)
                             if getattr(self, "_scan_stop_requested", False):
                                 raise KeyboardInterrupt("Scan stopped by user.")
@@ -199,7 +202,7 @@ class QuadrupoleScan:
                                 cancel_requested = True
                                 break
                             print("before calling get_screens")
-                            screens_data = self.interface.get_screens([screen_name], move_screen = (j==0))
+                            screens_data = self.interface.get_screens([screen_name], move_screen = True)
                             print("after calling get_screens")
                             idx_map = {name: idx for idx, name in enumerate(screens_data["names"])}
                             idx = idx_map.get(screen_name)

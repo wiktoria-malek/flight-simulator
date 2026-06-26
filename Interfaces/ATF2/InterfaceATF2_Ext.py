@@ -413,8 +413,11 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return self.movable_magnets
 
     def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
-        current0 = caget(f"{quad_name}:current")
-        # to be changed
+        # from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
+        # screens_data =
+        # simulated_interface = InterfaceATF2_Ext_RFTrack()
+        # simulated_interface.set_quadrupoles()
+        pass
 
     def _quadrupole_current_pv_name(self,name):
         if name.startswith("M") and name[1:].startswith(("QF", "QD", "QM")):

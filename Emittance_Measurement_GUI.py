@@ -786,7 +786,6 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
             self._set_progress(0)
             QMessageBox.information(self, "Scan", str(e))
             return
-
         except TypeError:
             self._set_progress(0)
             QMessageBox.information(self,"Scan error","Type Error")
