@@ -160,7 +160,6 @@ class QuadrupoleScan:
                     cancel_requested = True
                     break
                 insert_screen = getattr(self.interface, "insert_screen", None)
-                extract_screen = getattr(self.interface, "extract_screen", None)
                 if callable(insert_screen):
                      insert_screen(screen_name)
                 try:
@@ -278,6 +277,7 @@ class QuadrupoleScan:
                         break
 
                 finally:
+                    extract_screen = getattr(self.interface, "extract_screen", None)
                     if callable(extract_screen):
                         extract_screen(screen_name)
         finally:

@@ -340,9 +340,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         screen_pv_name = self.screen_pv_names.get(screen_name)
         if screen_pv_name is None:
             raise ValueError(f"Unknown screen: {screen_name}")
-
-        PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
-        time.sleep(10)
+        status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
+        if status==0:
+            PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
 
     def extract_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -582,7 +582,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             v_factor = 1.0
         return h_factor, v_factor
 
-    def acquire_otr_image(self, screen_pv_name, move_screen = True):
+    def acquire_otr_image(self, screen_pv_name, move_screen = False):
         """
         It might be super slow.
         1 call of get_screens() will take 8s x number_of_screens
@@ -664,7 +664,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
 
 
-    def get_screens(self, names=None, move_screen=True):
+    def get_screens(self, names=None, move_screen=False):
         print('Reading screens...')
         if isinstance(names, str):
             names = [names]
