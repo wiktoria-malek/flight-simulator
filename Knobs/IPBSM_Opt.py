@@ -1975,14 +1975,21 @@ class Optimizer:
 
                     axis_sigma = max(1e-6, float(self.cfg.init_sigma.get(axis_name, 0.5)))
                     if self._is_zscan_axis(axis_name):
-                        # Z-axis init is now also anchored at x_fixed (current axis value).
-                        # This allows init0 reuse across axis transitions, then probes +/-half-range from that anchor.
-                        z_span = max(1e-6, float(getattr(self.cfg, "zscan_range", axis_sigma)))
-                        axis_init_plan = [
-                            ("init0", 0.0, False),
-                            ("init+", +0.5 * z_span, False),
-                            ("init-", -0.5 * z_span, False),
-                        ]
+                        zscan_method = str(getattr(self.cfg, "zscan_method", "BO") or "BO").upper()
+                        if zscan_method == "GF":
+                            axis_init_plan = [
+                                ("init0", 0.0, False),
+                                ("init+", +axis_sigma, False),
+                                ("init-", -axis_sigma, False),
+                            ]
+                        else:
+                            # For z-scan BO mode, seed the 1D BO with the configured BO range.
+                            z_span = max(1e-6, float(getattr(self.cfg, "zscan_range", axis_sigma)))
+                            axis_init_plan = [
+                                ("init0", 0.0, False),
+                                ("init+", +0.5 * z_span, False),
+                                ("init-", -0.5 * z_span, False),
+                            ]
                     else:
                         axis_init_plan = [
                             ("init0", 0.0, False),

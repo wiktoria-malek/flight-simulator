@@ -654,6 +654,12 @@ class MainWindow(QMainWindow):
         self.zscan_step.setSingleStep(0.0001)
         self.zscan_step.setValue(ZSCAN_DEFAULT_STEP)
 
+        self.zscan_sigma_box = QDoubleSpinBox()
+        self.zscan_sigma_box.setRange(0.0001, 1.0)
+        self.zscan_sigma_box.setDecimals(4)
+        self.zscan_sigma_box.setSingleStep(0.0001)
+        self.zscan_sigma_box.setValue(float(DEFAULT_SIGMAS["Z scan knob"]))
+
         self.output_dir_edit = QLineEdit(str(default_output_base_dir()))
         self.output_dir_browse_btn = QPushButton("Browse...")
 
@@ -764,20 +770,6 @@ class MainWindow(QMainWindow):
         form.addRow("EI stop rule", self.ei_stop_row)
         form.addRow("EI stop guide", self.ei_stop_hint_lbl)
 
-        zscan_cfg_group = QGroupBox("Z Scan Settings")
-        layout.addWidget(zscan_cfg_group)
-        zscan_cfg_layout = QHBoxLayout(zscan_cfg_group)
-        zscan_cfg_layout.setContentsMargins(14, 12, 14, 12)
-        zscan_cfg_layout.addWidget(QLabel("Range (+/-)"))
-        zscan_cfg_layout.addWidget(self.zscan_range)
-        zscan_cfg_layout.addSpacing(12)
-        zscan_cfg_layout.addWidget(QLabel("Step"))
-        zscan_cfg_layout.addWidget(self.zscan_step)
-        zscan_cfg_layout.addSpacing(16)
-        zscan_cfg_hint = QLabel("Visible and editable here for quick tuning.")
-        zscan_cfg_hint.setStyleSheet("color: #5c6670;")
-        zscan_cfg_layout.addWidget(zscan_cfg_hint, stretch=1)
-
         sigma_group = QGroupBox("Representative Sigma Per Axis")
         layout.addWidget(sigma_group)
         sigma_layout = QVBoxLayout(sigma_group)
@@ -806,6 +798,26 @@ class MainWindow(QMainWindow):
             box.setMaximumWidth(120)
             self.sigma_boxes[name] = box
             sigma_form.addRow(f"sigma[{name}]", box)
+
+        zscan_group = QGroupBox("Z Scan Parameter")
+        sigma_layout.addWidget(zscan_group)
+        zscan_param_layout = QGridLayout(zscan_group)
+        zscan_param_layout.setContentsMargins(12, 10, 12, 10)
+        zscan_param_layout.setHorizontalSpacing(10)
+        zscan_param_layout.setVerticalSpacing(6)
+        zscan_param_layout.addWidget(QLabel("Knob"), 0, 0)
+        zscan_param_layout.addWidget(QLabel("Sigma (GF)"), 0, 1)
+        zscan_param_layout.addWidget(QLabel("Range (+/-) (BO)"), 0, 2)
+        zscan_param_layout.addWidget(QLabel("Step"), 0, 3)
+        zscan_param_layout.addWidget(QLabel("Z scan knob"), 1, 0)
+        zscan_param_layout.addWidget(self.zscan_sigma_box, 1, 1)
+        zscan_param_layout.addWidget(self.zscan_range, 1, 2)
+        zscan_param_layout.addWidget(self.zscan_step, 1, 3)
+        self.zscan_param_hint_lbl = QLabel(
+            "GF uses Sigma and Step. BO uses Range(+/-) and Step."
+        )
+        self.zscan_param_hint_lbl.setStyleSheet("color: #5c6670;")
+        zscan_param_layout.addWidget(self.zscan_param_hint_lbl, 2, 0, 1, 4)
 
         corrector_cfg_group = QGroupBox("Corrector Range / Origin")
         layout.addWidget(corrector_cfg_group)
@@ -907,6 +919,7 @@ class MainWindow(QMainWindow):
         self.main_sigma_mode_box.currentTextChanged.connect(self._sync_config_sigma_mode_box)
         self.zscan_method_bo.toggled.connect(self._on_zscan_method_changed)
         self.zscan_method_gf.toggled.connect(self._on_zscan_method_changed)
+        self.zscan_sigma_box.valueChanged.connect(self._refresh_zscan_status_label)
         self.zscan_range.valueChanged.connect(self._refresh_zscan_status_label)
         self.zscan_step.valueChanged.connect(self._refresh_zscan_status_label)
         self.output_dir_browse_btn.clicked.connect(self._browse_output_dir)
@@ -1127,6 +1140,7 @@ class MainWindow(QMainWindow):
     def _on_zscan_method_changed(self) -> None:
         if self.method_box.currentText().upper() == "BO":
             self._set_zscan_method("BO")
+        self._refresh_zscan_status_label()
 
     def _apply_sigma_mode(self, mode: str):
         for name, box in self.sigma_boxes.items():
@@ -1188,10 +1202,12 @@ class MainWindow(QMainWindow):
 
         pos_txt = f"{pos:+.4f}" if np.isfinite(pos) else "n/a"
 
+        sigma = float(self.zscan_sigma_box.value()) if hasattr(self, "zscan_sigma_box") else float(DEFAULT_SIGMAS["Z scan knob"])
         rng = float(self.zscan_range.value()) if hasattr(self, "zscan_range") else float(ZSCAN_DEFAULT_RANGE)
         step = float(self.zscan_step.value()) if hasattr(self, "zscan_step") else float(ZSCAN_DEFAULT_STEP)
+        z_method = "BO" if self.method_box.currentText().upper() == "BO" else self._get_zscan_method()
         self.zscan_status_lbl.setText(
-            f"{axis_name}:({pos_txt})  Range:+/-{rng:.4f}  Step:{step:.4f}"
+            f"{axis_name}:({pos_txt})  Zscan:{z_method}  Sigma:{sigma:.4f}  Range:+/-{rng:.4f}  Step:{step:.4f}"
         )
 
     def _find_resume_origin_file(self, csv_path: Path) -> Optional[Path]:
@@ -1365,19 +1381,27 @@ class MainWindow(QMainWindow):
         if not params:
             raise ValueError("Select at least one knob.")
 
+        zscan_sigma_val = float(self.zscan_sigma_box.value())
         zscan_range_val = float(self.zscan_range.value())
         zscan_step_val = float(self.zscan_step.value())
+        if zscan_sigma_val <= 0.0:
+            raise ValueError("Z scan sigma must be positive.")
         if zscan_range_val <= 0.0:
             raise ValueError("Z scan range must be positive.")
         if zscan_step_val <= 0.0:
             raise ValueError("Z scan step must be positive.")
 
         sigma_map = {}
+        top_method = self.method_box.currentText().upper()
+        zscan_scan_method = "BO" if top_method == "BO" else self._get_zscan_method()
         for p in params:
             if p in self.sigma_boxes:
                 sigma_map[p] = float(self.sigma_boxes[p].value())
             elif p in ZSCAN_KNOBS:
-                sigma_map[p] = max(zscan_step_val, 0.5 * zscan_range_val)
+                if zscan_scan_method == "GF":
+                    sigma_map[p] = float(zscan_sigma_val)
+                else:
+                    sigma_map[p] = max(zscan_step_val, 0.5 * zscan_range_val)
             else:
                 sigma_map[p] = float(DEFAULT_SIGMAS.get(p, 0.5))
         knob_step = float(self.knob_step.value())
@@ -1394,8 +1418,13 @@ class MainWindow(QMainWindow):
                 hi = round(float(self.upper_bound_boxes[p].value()) / axis_step) * axis_step
             elif p in ZSCAN_KNOBS:
                 origin_map[p] = float(DEFAULT_ORIGINS.get(p, 0.0))
-                lo = round((-zscan_range_val) / axis_step) * axis_step
-                hi = round((+zscan_range_val) / axis_step) * axis_step
+                if zscan_scan_method == "BO":
+                    lo = round((-zscan_range_val) / axis_step) * axis_step
+                    hi = round((+zscan_range_val) / axis_step) * axis_step
+                else:
+                    span = half_range_mult * sigma_map[p]
+                    lo = round((-span) / axis_step) * axis_step
+                    hi = round((+span) / axis_step) * axis_step
             else:
                 origin_map[p] = float(DEFAULT_ORIGINS.get(p, 0.0))
                 span = half_range_mult * sigma_map[p]
@@ -1424,7 +1453,7 @@ class MainWindow(QMainWindow):
             knob_step=knob_step,
             param_steps=param_steps,
             zscan_axis_names=list(ZSCAN_KNOBS),
-            zscan_method=("BO" if self.method_box.currentText().upper() == "BO" else self._get_zscan_method()),
+            zscan_method=zscan_scan_method,
             zscan_range=float(zscan_range_val),
             zscan_step=float(zscan_step_val),
             max_steps=int(self.bo_max_steps.value()),
@@ -1465,6 +1494,9 @@ class MainWindow(QMainWindow):
         bounds = cfg.get("bounds", {})
         for name, box in self.sigma_boxes.items():
             box.setValue(float(init_sigma.get(name, DEFAULT_SIGMAS[name])))
+        self.zscan_sigma_box.setValue(
+            float(cfg.get("zscan_sigma", init_sigma.get("Z scan knob", DEFAULT_SIGMAS["Z scan knob"])))
+        )
         self._set_zscan_method(str(cfg.get("zscan_method", "BO")))
         self.zscan_range.setValue(float(cfg.get("zscan_range", ZSCAN_DEFAULT_RANGE)))
         self.zscan_step.setValue(float(cfg.get("zscan_step", ZSCAN_DEFAULT_STEP)))
@@ -2043,6 +2075,7 @@ class MainWindow(QMainWindow):
             return
         payload = asdict(cfg)
         payload["output_base_dir"] = self.output_dir_edit.text().strip()
+        payload["zscan_sigma"] = float(self.zscan_sigma_box.value())
         path, _ = QFileDialog.getSaveFileName(self, "Save config", "", "JSON (*.json)")
         if not path:
             return
