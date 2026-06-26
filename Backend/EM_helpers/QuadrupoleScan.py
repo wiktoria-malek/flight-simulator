@@ -94,8 +94,6 @@ class QuadrupoleScan:
             "delta_max": float(delta_max),
             "steps": int(steps),
             "nsteps_scan": 1 if int(steps) == 0 else int(steps),
-            "measurement_mode": "conventional_multi_screen_em" if int(steps) == 0 else "quadrupole_scan",
-            "is_conventional_em": bool(int(steps) == 0),
             "nshots": int(nshots),
             "per_quad_sessions": per_quad_sessions,
             "completed_quadrupoles": list(completed_quadrupoles),
@@ -112,8 +110,6 @@ class QuadrupoleScan:
         if reference_screen not in screens:
             raise ValueError("reference_screen must be one of the selected screens")
         steps_requested = int(steps)
-        if steps_requested < 0:
-            raise ValueError("steps must be zero or positive")
         if steps_requested > 0 and delta_max <= delta_min:
             raise ValueError("delta_max must be larger than delta_min")
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
@@ -178,9 +174,10 @@ class QuadrupoleScan:
                         if getattr(self, "_cancel", False):
                             cancel_requested = True
                             break
-                        print("debug0")
-                        self.interface.set_quadrupoles([quad_name], [float(K1)])
-                        print("debug1")
+                        if steps_requested > 0:
+                            print("debug0")
+                            self.interface.set_quadrupoles([quad_name], [float(K1)])
+                            print("debug1")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
                         sxy_shots = np.full(nshots, np.nan, dtype=float)
@@ -280,7 +277,8 @@ class QuadrupoleScan:
                     if callable(extract_screen):
                         extract_screen(screen_name)
         finally:
-            self.interface.set_quadrupoles([quad_name], [float(K1_0)])
+            if steps_requested > 0 and np.isfinite(K1_0):
+                self.interface.set_quadrupoles([quad_name], [float(K1_0)])
 
         session = {
             "delta_min": float(delta_min),

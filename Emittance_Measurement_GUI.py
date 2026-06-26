@@ -779,7 +779,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         try:
             self.session = self.run_scan(quad_name=quadrupoles, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, screens=screens, reference_screen=screens[0], progress_callback=self._scan_progress_callback)
             if steps == 0:
-                self.log("Conventional multi-screen EM finished.")
+                self.log("Finished gathering data from the screens.")
             else:
                 self.log("Quadrupole scan finished.")
         except KeyboardInterrupt as e:
