@@ -75,6 +75,8 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
     def __init__(self, nsamples=1):
         self.log = print
         self.nsamples = nsamples
+        sequence = list(LINAC_SEQUENCE)
+        monitors = list(LINAC_MONITORS)
         # Bpms and correctors in beamline order
         # sequence = [
         #     'MB5L', 'MB6L', 'MB7L', 'ZH1L', 'ZV1L', 'MB8L', 'MB9L', 'MB10L',
@@ -132,8 +134,11 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         #self.corrs = [string for string in self.sequence if string.lower().startswith('z')]
         # Index of the selected BPMs in the Epics PV ATF2:monitors
         #self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
-        self.monitors = list(LINAC_MONITORS)
-        self.sequence, self.bpms, self.corrs, self.bpm_indexes = _build_beamline(sequence=LINAC_SEQUENCE, monitors=self.monitors)
+        self.monitors = monitors
+        self.sequence, self.bpms, self.corrs, self.bpm_indexes = _build_beamline(
+            sequence=sequence,
+            monitors=self.monitors,
+        )
 
         # Bunch current monitors
         self.ict_names = [
@@ -428,6 +433,5 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         else:
             out["Ttot"] = float("nan")
         return out
-
 
 
