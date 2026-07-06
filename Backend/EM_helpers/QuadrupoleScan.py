@@ -142,7 +142,7 @@ class QuadrupoleScan:
         sigxy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         #tilt_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         scan_steps = []
-
+        images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
         output_dir = self._get_scan_dir(quad_name)
         cancel_requested = False
 
@@ -210,6 +210,7 @@ class QuadrupoleScan:
                             if idx is not None:
                                 sx_shots[j] = float(screens_data["sigx"][idx])
                                 sy_shots[j] = float(screens_data["sigy"][idx])
+                                images[i][k][j]=np.asarray(screens_data["images"][idx]).tolist()
                                 if "sigxy" in screens_data:
                                     sxy_shots[j] = float(screens_data["sigxy"][idx])
                                 #tilt_shots[j] = float(screens_data["tilt"][idx])
@@ -266,6 +267,7 @@ class QuadrupoleScan:
                             "current_screen": screen_name,
                             "current_screen_index": int(k),
                             "nsteps_scan": int(nsteps_scan),
+                            "images": images,
                         }
 
                         if progress_callback is not None:
@@ -310,6 +312,7 @@ class QuadrupoleScan:
             "states_dir": output_dir,
             "cancelled": bool(cancel_requested),
             "nsteps_scan": int(nsteps_scan),
+            "images": images,
         }
         return session
 

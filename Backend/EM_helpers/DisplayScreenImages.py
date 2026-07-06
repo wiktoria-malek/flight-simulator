@@ -19,6 +19,7 @@ class DisplayScreenImages(QDialog):
         self.setMinimumSize(800, 500)
         self.resize(1000, 650)
         self.setSizeGripEnabled(True)
+        self.session = None
         self.figure = Figure(figsize=(10, 6), constrained_layout=True)
         self.canvas = FigureCanvas(self.figure)
         plot_widget = QWidget(self)
@@ -28,17 +29,60 @@ class DisplayScreenImages(QDialog):
         header = QWidget(self)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.addWidget(QLabel("Screen:", self))
+        self.screen_combobox = QComboBox(self)
+        self.screen_combobox.currentIndexChanged.connect(self._update_screen_image)
+        header_layout.addWidget(self.screen_combobox)
+        header_layout.addWidget(QLabel("Step:", self))
+        self.step_combobox = QComboBox(self)
+        self.step_combobox.currentIndexChanged.connect(self._update_screen_image)
+        header_layout.addWidget(self.step_combobox)
         header_layout.addStretch(1)
         layout = QVBoxLayout(self)
         layout.addWidget(header)
         layout.addWidget(plot_widget)
 
-    def _plot_screen_image(self, sigmas_x, sigmas_y):
-        if sigmas_x is None or sigmas_y is None:
-            print("Missing data to display screen image.")
+    def _plot_screen_image(self, session):
+        self.session = session
+        screens = list(session.get("screens", []))
+        steps = session.get("steps", [])
+        self.screen_combobox.blockSignals(True)
+        self.screen_combobox.clear()
+        self.screen_combobox.addItems([str(s) for s in screens])
+        self.screen_combobox.blockSignals(False)
+
+        self.step_combobox.blockSignals(True)
+        self.step_combobox.clear()
+        if steps == 0:
+            self.step_combobox.addItems(["0"])
+        else:
+            self.step_combobox.addItems([str(s) for s in range(1, steps+1)])
+        self.step_combobox.blockSignals(False)
+        self._update_screen_image()
+
+    def _update_screen_image(self, index=None):
+        if self.session is None:
             return
-        sigmas_x = np.asarray(sigmas_x)
-        sigmas_y = np.asarray(sigmas_y)
+        screen_index = self.screen_combobox.currentIndex()
+        step_index = self.step_combobox.currentIndex()
+        images = self.session.get("images", [])
+        steps = self.session.get("steps", [])
+        images_per_shot = images[step_index][screen_index]
+
+        # images[step][screen][shot]
+        shot_images = images[step_index][screen_index]
+        shot_images = [np.asarray(image, dtype=float) for image in shot_images if image is not None]
+        image = np.nanmean(np.stack(shot_images, axis=0), axis=0)
+
+        fig = self.canvas.figure
+        fig.clear()
+        ax = fig.add_subplot(111)
+        ax.imshow(image.T, origin="lower", aspect="auto", cmap="jet")
+        self.canvas.draw_idle()
+
+
+
+
 
 
 

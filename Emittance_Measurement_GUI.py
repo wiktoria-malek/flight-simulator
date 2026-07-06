@@ -196,7 +196,15 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self._last_scan_status = None
         self.computation_mode = ComputationMode(self.computing_method_combo.currentText())
         self.computing_method_combo.currentTextChanged.connect(self._on_computation_mode_changed)
+        self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
+        self._on_nsteps_scan_changed(self.steps_settings.value())
+
+    def _on_nsteps_scan_changed(self,nsteps_settings):
+        n_scan_steps = nsteps_settings
+        print("The number of scan steps is now", n_scan_steps)
+        is_steps_zero = bool(n_scan_steps == 0)
+        self.quadrupoles_list.setEnabled(not is_steps_zero)
 
     def _get_interface_initial_settings(self):
         interface_class_name = self.interface.__class__.__name__
@@ -227,6 +235,8 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
             self.steps_settings.setValue(0)
         else:
             self.steps_settings.setValue(5)
+            self._on_nsteps_scan_changed(self.steps_settings.value())
+
         widgets_to_disable = [self.xoptSettingsGroup,self.localOptimizationSettingsGroup]
         for widget in widgets_to_disable:
             widget.setEnabled(not is_linear_mode)
@@ -761,7 +771,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         quad_label = quadrupoles[0] if len(quadrupoles) == 1 else f"multi-quad scan ({len(quadrupoles)} quadrupoles)"
         steps_preview = int(self.steps_settings.value())
         if steps_preview == 0:
-            self.log(f"Gathering screen data, with quadrupole selected = {quad_label}...")
+            self.log(f"Gathering screen data...")
         else:
             self.log(f"Running quadrupole scan for {quad_label}...")
         self.quad_on_plot.blockSignals(True)
@@ -804,7 +814,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
             else:
                 self.log("Quadrupole scan finished.")
         except KeyboardInterrupt as e:
-            self._set_progress(0)
+            (self._set_progress(0))
             QMessageBox.information(self, "Scan", str(e))
             return
         except TypeError:
@@ -825,7 +835,6 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         positions = [np.nan] * len(names)
         if not hasattr(self.interface, "_get_elements_positions"):
             return positions
-
         try:
             pos = self.interface._get_elements_positions()
             pos_names = list(pos.get("names", []))
@@ -856,7 +865,6 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
             for quad_session in per_quad:
                 if str(quad_session.get("quad_name", "")).strip() == selected_quad:
                     return quad_session
-
         return per_quad[0]
 
     def _refresh_plot_comboboxes_from_session(self, session):

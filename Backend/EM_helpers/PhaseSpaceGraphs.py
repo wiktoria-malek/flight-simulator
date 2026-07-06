@@ -162,13 +162,7 @@ class PhaseSpaces(QDialog):
                 pass
             ax.set_aspect("equal", adjustable="datalim")
             if not self._is_valid(beta0, alpha0):
-                ax.text(
-                    0.5, 0.5,
-                    "Invalid fitted Twiss",
-                    ha="center",
-                    va="center",
-                    transform=ax.transAxes,
-                )
+                ax.text(0.5, 0.5, "Invalid fitted Twiss", ha="center", va="center", transform=ax.transAxes)
                 return
 
             beta0 = float(beta0)
@@ -313,14 +307,14 @@ class PhaseSpaces(QDialog):
         if sigy.ndim == 2:
             sigy = sigy[0, :]
 
-        emit_x_nom = float(result.get("emit_x_norm", np.nan))
+        emit_x_norm = float(result.get("emit_x_norm", np.nan))
         emit_y_norm = float(result.get("emit_y_norm", np.nan))
 
         if interface is not None and hasattr(interface, "get_beam_factors"):
             gamma_rel, beta_rel = interface.get_beam_factors()
             beta_gamma = float(gamma_rel) * float(beta_rel)
             emit_x_geom = emit_x_norm / beta_gamma
-            emit_y_geom = emit_y / beta_gamma
+            emit_y_geom = emit_y_norm / beta_gamma
 
         tx = transport["x"]
         ty = transport["y"]

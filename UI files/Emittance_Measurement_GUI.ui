@@ -359,7 +359,7 @@ QToolButton#delta_max_info_button:hover {
              <number>100</number>
             </property>
             <property name="value">
-             <number>5</number>
+             <number>0</number>
             </property>
            </widget>
           </item>
