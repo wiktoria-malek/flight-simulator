@@ -73,11 +73,19 @@ class DisplayScreenImages(QDialog):
         shot_images = images[step_index][screen_index]
         shot_images = [np.asarray(image, dtype=float) for image in shot_images if image is not None]
         image = np.nanmean(np.stack(shot_images, axis=0), axis=0)
-
         fig = self.canvas.figure
         fig.clear()
-        ax = fig.add_subplot(111)
+        gridspec=fig.add_gridspec(2,2,width_ratios=(4,1), height_ratios=(1,4), hspace=0.05, wspace=0.05)
+        ax = fig.add_subplot(gridspec[1,0])
+        ax_x = fig.add_subplot(gridspec[0,0],sharex=ax)
+        ax_y = fig.add_subplot(gridspec[1,1],sharey=ax)
         ax.imshow(image.T, origin="lower", aspect="auto", cmap="jet")
+        intensity_x = np.nansum(image, axis=1)
+        intensity_y = np.nansum(image, axis=0)
+        ax_x.plot(intensity_x)
+        ax_y.plot(intensity_y, np.arange(len(intensity_y)))
+        ax_x.tick_params(labelbottom=False)
+        ax_y.tick_params(labelleft=False)
         self.canvas.draw_idle()
 
 
