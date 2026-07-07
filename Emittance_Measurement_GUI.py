@@ -129,7 +129,7 @@ class OptimizationWorker(QObject):
         finally:
             self.done.emit()
 
-class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
+class MainWindow(QMainWindow, QuadrupoleScan):
     def __init__(self, interface, dir_name):
         super().__init__()
         self.interface = interface
@@ -138,6 +138,7 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
         self._load_logo()
+        self.session_database.setText(dir_name)
         self.start_optimization_button.clicked.connect(self._run_optimization)
         self.stop_optimization_button.clicked.connect(self._stop_optimization)
         self.setWindowTitle("Emittance Measurement GUI")
@@ -199,10 +200,10 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
         self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
         self._on_nsteps_scan_changed(self.steps_settings.value())
+        self.load_session_button.clicked.connect(self.load_session_settings_quad_scan)
 
     def _on_nsteps_scan_changed(self,nsteps_settings):
         n_scan_steps = nsteps_settings
-        print("The number of scan steps is now", n_scan_steps)
         is_steps_zero = bool(n_scan_steps == 0)
         self.quadrupoles_list.setEnabled(not is_steps_zero)
 
@@ -1040,7 +1041,11 @@ class MainWindow(QMainWindow, SaveOrLoad, QuadrupoleScan):
     def _show_screen_images(self):
         if self.screen_images is None:
             self.screen_images = DisplayScreenImages(self)
-        self.screen_images._plot_screen_image(session=self.session)
+        if self.session is None:
+            QMessageBox.information(self, "No screen images", "No data to display as screen image.")
+            return
+        else:
+            self.screen_images._plot_screen_image(session=self.session)
         self.screen_images.show()
         self.screen_images.raise_()
         self.screen_images.activateWindow()
@@ -1065,7 +1070,8 @@ if __name__ == "__main__":
     project_name = I.get_name()
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dir_name = os.path.expanduser(f"~/CERN-Flight_Simulator-Data/EM_{project_name}{time_str}")
+    dir_name = f"~/CERN-Flight_Simulator-Data/EM_{I.get_name()}{time_str}_session_settings"
+    dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
     w = MainWindow(I, dir_name)
     w.show()

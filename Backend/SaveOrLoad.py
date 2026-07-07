@@ -93,12 +93,6 @@ class SaveOrLoad():
             for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):
                 it.setSelected(True)
 
-    def _save_correctors(self):
-        self._saving_func(elements_list=self.correctors_list, filename="correctors.txt", saving_name="Save Correctors")
-
-    def _save_bpms(self):
-        self._saving_func(elements_list=self.bpms_list, filename="bpms.txt", saving_name="Save BPMs")
-
     def _load_correctors(self):
         self._loading_func(loading_name="Load Correctors", filename="correctors.txt",elements_list=self.correctors_list)
 
@@ -338,19 +332,13 @@ class SaveOrLoad():
     def save_emittance_measurement_session(self,session):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
         default_dir=os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
-        save_session_dir=os.path.join(default_dir, f"EmittanceMeasurement_{self.interface.get_name()}{time_str}_session")
+        save_session_dir=self.session_database.text()
         os.makedirs(save_session_dir, exist_ok=True)
-
         self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt",saving_name="Save quadrupoles",use_dialog=False, base_dir=save_session_dir)
         self._saving_func(elements_list=self.screens_list, filename="screens.txt",saving_name="Save screens",use_dialog=False, base_dir=save_session_dir)
-
         with open(os.path.join(save_session_dir,"emittance_session.pkl"),"wb") as f: # write in a binary format
             pickle.dump(session,f)
-
-        self.session_database.setText(save_session_dir)
-
         return save_session_dir
-
 
     def load_emittance_measurement_session(self):
         default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))

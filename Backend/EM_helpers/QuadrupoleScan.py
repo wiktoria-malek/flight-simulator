@@ -21,8 +21,9 @@ except ImportError:
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from scipy.optimize import least_squares
+from Backend.SaveOrLoad import SaveOrLoad
 
-class QuadrupoleScan:
+class QuadrupoleScan(SaveOrLoad):
 
     # 1 screen, steps = 0: run scan -> otherwise, we get only one sigma2 value, but we need to fit emit, beta and alpha
     # 2 screens: run scan
@@ -143,7 +144,7 @@ class QuadrupoleScan:
         #tilt_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         scan_steps = []
         images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
-        output_dir = self._get_scan_dir(quad_name)
+        output_dir = self._get_scan_dir(quad_name, steps_requested)
         cancel_requested = False
 
         try:
@@ -217,6 +218,7 @@ class QuadrupoleScan:
                             state_for_scan = State(sextupoles=None, correctors=None, bpms=None,
                                 icts=None, sequence=self.interface.get_sequence(), hcorrectors_names=None,
                                 vcorrectors_names=None, screens=screens_data, quadrupoles=quad_data)
+
                             state_filename = os.path.join(output_dir, f"screen_{k:04d}_step_{i:04d}_shot_{j:04d}.pkl")
                             state_for_scan.save(filename=state_filename)
                             state_files.append(state_filename)
@@ -314,13 +316,20 @@ class QuadrupoleScan:
             "nsteps_scan": int(nsteps_scan),
             "images": images,
         }
+
+        self.save_emittance_measurement_session(session)
         return session
 
-
-    def _get_scan_dir(self,quad_name): # saves state files for each quadrupole
+    def _get_scan_dir(self,quad_name, steps_requested): # saves state files for each quadrupole
+        time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         base_dir=getattr(self,"dir_name",None)
         if not base_dir:
             base_dir=os.path.join(os.getcwd(),"emittance_measurement_session")
-        scan_dir=os.path.join(base_dir,f"states_{quad_name}")
+        base_dir = os.path.expanduser(os.path.expandvars(base_dir))
+
+        if int(steps_requested) == 0:
+            scan_dir = os.path.join(base_dir, f"screens_data_{time_str}")
+        else:
+            scan_dir=os.path.join(base_dir,f"states_{quad_name}_{time_str}")
         os.makedirs(scan_dir,exist_ok=True) # if exists, no error while trying to create a folder
         return scan_dir
