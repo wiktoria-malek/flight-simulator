@@ -79,15 +79,14 @@ INTERFACE_SETUP = {
                     "em_sigma_unit": "mm"
 
                 },
-            "bounds":
-                {
-                    "emit_x_norm": [5.01, 5.2],
-                    "beta_x0": [1.0, 1.2],
-                    "alpha_x0": [-0.8, -0.6],
-                    "emit_y_norm": [0.025, 0.035],
-                    "beta_y0": [10.0, 10.5],
-                    "alpha_y0": [-4.0, -3.5],
-                }
+            "bounds": {
+                "emit_x_norm": [0.5, 15.0],
+                "beta_x0": [0.1, 30.0],
+                "alpha_x0": [-20.0, 20.0],
+                "emit_y_norm": [0.001, 2.0],
+                "beta_y0": [0.1, 80.0],
+                "alpha_y0": [-30.0, 30.0],
+            }
         },
         {
             "display_name": "ATF2 Linac",

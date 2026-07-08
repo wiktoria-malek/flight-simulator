@@ -313,7 +313,7 @@ class QuadrupoleScan(SaveOrLoad):
             "scan_steps": scan_steps,
             "states_dir": output_dir,
             "cancelled": bool(cancel_requested),
-            "nsteps_scan": int(nsteps_scan),
+            "nsteps_scan": int(nsteps_scan), # number of measurements at screens (even if steps=0, nsteps_scan = 1)
             "images": images,
         }
 

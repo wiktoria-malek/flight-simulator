@@ -1,7 +1,7 @@
 import pickle
-
-filename=("/Users/wiktoriamalek/CERN-Flight_Simulator-Data/EmittanceMeasurement_ATF2_Ext_RFT260707103618_session/emittance_session.pkl")
+from pprint import pprint
+filename=("/Users/wiktoriamalek/CERN-Flight_Simulator-Data/EM_Data/EM_ATF2_Ext_RFT20260626_232757/states_QD16X/screen_0001_step_0001_shot_0000.pkl")
 with open(filename, "rb") as pickle_file:
     data = pickle.load(pickle_file)
 
-print(data)
+pprint(data, width=120)

@@ -802,7 +802,9 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                     alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
                 )
 
-                tracked_to_last_screen = self.lattice.track(temp_bunch, start_element, end_element)
+                lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+                tracked_to_last_screen = lattice_view.track(temp_bunch)
+
                 for si, screen_name in enumerate(screens):
                     screen_elem = self.lattice[screen_name]
                     if isinstance(screen_elem, list):

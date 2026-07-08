@@ -30,7 +30,7 @@ from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 class ComputationMode(Enum):
     LRM = "Linear R-response model"
     ML = "Machine learning model"
-    RFT = "RFTrack tracking"
+    RFT = "RF-Track tracking"
 
 class SPositionDelegate(QStyledItemDelegate):
     S_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
         self._on_nsteps_scan_changed(self.steps_settings.value())
-        self.load_session_button.clicked.connect(self.load_session_settings_quad_scan)
+        self.load_session_button.clicked.connect(self.load_emittance_measurement_session)
 
     def _on_nsteps_scan_changed(self,nsteps_settings):
         n_scan_steps = nsteps_settings
@@ -227,7 +227,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         em_sigma_unit = units_settings.get("em_sigma_unit", "mm")
 
         return em_sigma_unit
-
 
     def _on_computation_mode_changed(self, text):
         self.computation_mode = ComputationMode(text)
@@ -610,14 +609,106 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         fig.tight_layout()
         self.canvas.draw()
 
+    def _get_session_data_from_database(self):
+        states = list(getattr(self, "loaded_states_from_scan", []))
+        files = list(getattr(self, "loaded_state_files", []))
+        if not states:
+            return
+        folder = self.session_database.text().strip()
+        quadrupoles, screens = self._get_selection()
+        quad_name = quadrupoles[0]
+
+        steps_requested = int(self.emittance_settings["scan_steps"])
+        delta_min = float(self.emittance_settings["delta_min"])
+        delta_max = float(self.emittance_settings["delta_max"])
+        deltas = np.linspace(delta_min, delta_max, steps_requested)
+        K1_values = np.full(steps_requested, np.nan)
+        for path, state in zip(self.loaded_state_files, self.loaded_states_from_scan):
+            filename = os.path.basename(path)
+            step_i = int(filename.split("_")[3])  # screen_0000_step_0003_shot_0000.pkl -> 0003
+            quad = state.get_quadrupoles()
+            K1_values[step_i] = float(np.ravel(quad["bdes"])[0])
+        K1_0 = float(np.nanmean(K1_values / (1.0 + deltas))) # to be verified
+
+        nsteps_scan = steps_requested
+        nscreens = len(screens)
+        nshots = int(self.emittance_settings["nshots"])
+        sigx_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
+        sigy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
+        sigxy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
+        images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
+
+        for path, state in zip(files, states):
+            filename = os.path.basename(path)
+            parts = filename.replace(".pkl", "").split("_")
+            screen_i = int(parts[1])
+            step_i = int(parts[3])
+            shot_i = int(parts[5])
+            screen_data = state.get_screens()
+            sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0])
+            sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0])
+            sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0])
+            screen_images = state.get_screens().get("images", [])
+            if len(screen_images) > 0:
+                images[step_i][screen_i][shot_i] = np.asarray(screen_images[0]).tolist()
+
+        sigx_mean = np.nanmean(sigx_samples, axis=2)
+        sigy_mean = np.nanmean(sigy_samples, axis=2)
+        sigxy_mean = np.nanmean(sigxy_samples, axis=2)
+        sigx_std = np.nanstd(sigx_samples, axis=2)
+        sigy_std = np.nanstd(sigy_samples, axis=2)
+        sigxy_std = np.nanstd(sigxy_samples, axis=2)
+
+        scan_steps=[]
+        for i in range(steps_requested):
+            state_files = [path for path in files if int(os.path.basename(path).split("_")[3]) == i]
+
+            scan_steps.append({
+                "step_index": int(i),
+                "delta": float(deltas[i]),
+                "K1": float(K1_values[i]),
+                "state_files": state_files,
+            })
+
+        session = {
+            "delta_min": delta_min,
+            "delta_max": delta_max,
+            "steps": steps_requested,
+            "nshots": int(self.emittance_settings["nshots"]),
+            "quad_name": quad_name,
+            "quadrupoles": [quad_name],
+            "screens": screens,
+            "reference_screen": screens[0],
+            "K1_0": float(K1_0),
+            "sigx_mean": sigx_mean.tolist(),
+            "sigy_mean": sigy_mean.tolist(),
+            "sigxy_mean": sigxy_mean.tolist(),
+            "sigx_std": sigx_std.tolist(),
+            "sigy_std": sigy_std.tolist(),
+            "sigxy_std": sigxy_std.tolist(),
+            "deltas": deltas.tolist(),
+            "K1_values": K1_values.tolist(),
+            "scan_steps": scan_steps,
+            "states_dir": folder,
+            "cancelled": False,
+            "nsteps_scan": int(nsteps_scan),
+            "images": images,
+        }
+        return session
+
+
     def _run_optimization(self):
         self.log("Fitting emittance and twiss parameters at scanned quadrupole started...")
         xopt_initial_points = int(self.xopt_initial_points_spin.value())
         xopt_steps = int(self.xopt_steps_spin.value())
         nm_steps = int(self.nm_steps_spin.value())
         if self.session is None:
-            QMessageBox.information(self, "Optimization", "No session.")
-            return
+            data_folder = self.session_database.text().strip()
+            if data_folder and os.path.isdir(data_folder):
+                self.session = self._get_session_data_from_database()
+            if self.session is None:
+                QMessageBox.information(self, "Optimization", "No session.")
+                return
         if self._is_optimizing:
             return
         self._is_optimizing = True
@@ -631,7 +722,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         # session_bad = copy.deepcopy(self.session)
         # session_bad["K1_0"] = self.session["K1_0"] * scale
         # session_bad["K1_values"] = (np.asarray(self.session["K1_values"]) * scale).tolist()
-        # FOR TESTS!!! in order to test again, pass sessios_bad to the worker, instead of self.session
+        # FOR TESTS!!! in order to test again, pass session_bad to the worker, instead of self.session
 
         computing_method = self.computing_method_combo.currentText().strip()
 
