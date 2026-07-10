@@ -33,7 +33,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         super().__init__()
         self.log = print
         #self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
-        self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
+        #self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
+        self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'atf2_full_twiss.tfs')
         self.lattice = rft.Lattice(self.twiss_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
         for s in self.lattice['*OTR*']:
@@ -45,7 +46,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.bpms = [e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [e.get_name() for e in self.lattice.get_correctors()]
         self.screens = [e.get_name() for e in self.lattice.get_screens()]
-        self.quadrupoles = list(dict.fromkeys(e.get_name() for e in self.lattice.get_quadrupoles()))
+        self.quadrupoles = list(dict.fromkeys(self._original_quad_name(e.get_name()) for e in self.lattice.get_quadrupoles()))
         self.sextupoles = self._get_element_names_from_twiss_types({"SEXTUPOLE"})
         self.Pref = 1.2999999e3  # 1.3 GeV/c
         self.nparticles = nparticles
@@ -87,6 +88,22 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                           'QM12FF', 'QM11FF', 'QD10BFF', 'QD10AFF', 'QF9BFF', 'QF9AFF', 'QD8FF', 'QF7FF', 'QD6FF',
                           'QF5BFF', 'QF5AFF', 'QD4BFF', 'QD4AFF', 'QF3FF', 'QD2BFF', 'QD2AFF', 'QF1FF', 'QD0FF']
 
+
+    def _original_quad_name(self, name):
+        return re.sub(r"_[12]$", "", str(name))
+
+    def _map_quadrupoles_names_from_lattice(self, name):
+        name = str(name)
+        elements =  []
+        for quad_name in [name, f"{name}_1", f"{name}_2"]:
+            try:
+                quad_parts = self.lattice[quad_name]
+            except Exception as e:
+                continue
+            if not isinstance(quad_parts, list):
+                quad_parts = [quad_parts]
+            elements.extend(quad_parts) # adding each element of the list, not the whole list as an element
+        return elements
 
     def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
         with open(self.twiss_path, "r") as file:
@@ -239,8 +256,14 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_elements_indices(self, names):
         if isinstance(names, str):
             names = [names]
-        name_to_index = {string: index for index, string in enumerate(self.sequence)}
-        return [name_to_index.get(name, np.nan) for name in names]
+
+        name_to_index = {}
+        for index, element_name in enumerate(self.sequence):
+            name_to_index.setdefault(element_name, index)
+            if str(element_name).upper().startswith("Q"):
+                name_to_index.setdefault(self._original_quad_name(element_name), index)
+
+        return [name_to_index.get(str(name), np.nan) for name in names]
 
     def get_target_dispersion(self, names=None): # for DR too
         if names is None:
@@ -476,14 +499,14 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         bdes = np.zeros(len(self.quadrupoles), dtype=float)
 
         for i, quadrupole_name in enumerate(self.quadrupoles):
-            elements = self.lattice[quadrupole_name]
+            elements = self._map_quadrupoles_names_from_lattice(quadrupole_name)
             if not isinstance(elements, list):
                 elements = [elements]
 
             k1_values = []
             for element in elements:
                 try:
-                    strength = element.get_K1(self.Pref / self.Q)
+                    strength = element.get_K1L(self.Pref / self.Q)*2
                 except Exception:
                     continue
                 if isinstance(strength, (list, tuple, np.ndarray)):
@@ -536,7 +559,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             if name not in self.quadrupoles:
                 raise ValueError(f"Quadrupole {name} not found in RFTrack interface.")
 
-            elements = self.lattice[name]
+            elements = self._map_quadrupoles_names_from_lattice(name)
             if not isinstance(elements, list):
                 elements = [elements]
 
@@ -565,11 +588,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
             values_range = [values_range]
         for quadrupole_name, value in zip(names, values_range):
-            elements = self.lattice[quadrupole_name]
+            elements = self._map_quadrupoles_names_from_lattice(quadrupole_name)
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
-                element.set_K1(self.Pref / self.Q,float(value))
-
+                element.set_K1L(self.Pref / self.Q,float(value/2))
         if track:
         # AS A TEST!
             self.__track_bunch()
@@ -596,29 +618,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 self.lattice[corr].vary_strength(val / 10, 0.0)  # T*mm
             elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val / 10)  # T*mm
-        self.__track_bunch()
-
-
-    def vary_quadrupoles(self, names, delta_values):
-        if not isinstance(names, list):
-            names = [names]
-        if not isinstance(delta_values, (list, tuple, np.ndarray)):
-            delta_values = [delta_values]
-        for quadrupole_name, val in zip(names, delta_values):
-            elements = self.lattice[quadrupole_name]
-            if not isinstance(elements, list):
-                elements = [elements]
-            current_values=[]
-            for element in elements:
-                current=element.get_K1(self.Pref / self.Q)
-                current=float(current[0]) if isinstance(current, (list, tuple,np.ndarray)) else float(current)
-                current_values.append(current)
-            if len(current_values)>1 and not np.allclose(current_values, current_values[0], rtol=0.0, atol=1e-12):
-                self.log(f"Parts of quadrupole {quadrupole_name} have different values")
-            target_value=(current_values[0] if len(current_values)>0 else 0.0) +float(val)
-            for element in elements:
-                element.set_K1(self.Pref / self.Q,target_value)
-
         self.__track_bunch()
 
     def __load_wake_data(self,path,trans_or_long,scale=1):
@@ -713,7 +712,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return {
             "names": all_names,
-            "S": np.array(all_s, dtype=float),
+            #"S": np.array(all_s, dtype=float),
             "L": np.array(all_l, dtype=float),
         }
 
@@ -788,7 +787,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
                 self.set_quadrupoles([quad_name], [float(K1)], track = False)
-                start_element = self.lattice[start_element_name]
+                start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
+                start_element = start_elements[0]
                 if isinstance(start_element, list):
                     start_element = start_element[0]
 

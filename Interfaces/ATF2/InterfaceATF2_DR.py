@@ -11,8 +11,7 @@ def get_quadrupoles(self):
     pass
 def set_quadrupoles(self):
     pass
-def vary_quadrupoles(self, names, corr_vals):
-    pass
+
 '''
 
 class InterfaceATF2_DR(AbstractMachineInterface):

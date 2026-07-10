@@ -386,28 +386,6 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                 self.lattice[corr].vary_strength(0.0, val / 10)
         self.__track_bunch()
 
-    def vary_quadrupoles(self, names, delta_values):
-        if not isinstance(names, list):
-            names = [names]
-        if not isinstance(delta_values, (list, tuple, np.ndarray)):
-            delta_values = [delta_values]
-        for quadrupole_name, val in zip(names, delta_values):
-            elements = self.lattice[quadrupole_name]
-            if not isinstance(elements, list):
-                elements = [elements]
-            current_values=[]
-            for element in elements:
-                current=element.get_K1(self.Pref / self.Q)
-                current=float(current[0]) if isinstance(current, (list, tuple,np.ndarray)) else float(current)
-                current_values.append(current)
-            if len(current_values)>1 and not np.allclose(current_values, current_values[0], rtol=0.0, atol=1e-12):
-                self.log(f"Parts of quadrupole {quadrupole_name} have different values")
-            target_value=(current_values[0] if len(current_values)>0 else 0.0) +float(val)
-            for element in elements:
-                element.set_K1(self.Pref / self.Q,target_value)
-
-        self.__track_bunch()
-
     def align_everything(self):
         self.lattice.align_elements()
         self.__track_bunch()

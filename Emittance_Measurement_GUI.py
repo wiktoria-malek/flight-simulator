@@ -200,7 +200,17 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
         self._on_nsteps_scan_changed(self.steps_settings.value())
-        self.load_session_button.clicked.connect(self.load_emittance_measurement_session)
+        self.load_session_button.clicked.connect(self._load_emittance_measurement_session)
+
+
+    def _load_emittance_measurement_session(self):
+        self.load_emittance_measurement_session()
+        self.session = self._get_session_data_from_database()
+        if self.session is None:
+            QMessageBox.information(self, "Emittance Measurement Session Error", "Session not found.")
+            return
+        self._refresh_plot_comboboxes_from_session(self.session)
+        self._draw_live_scan(self.session)
 
     def _on_nsteps_scan_changed(self,nsteps_settings):
         n_scan_steps = nsteps_settings
@@ -455,8 +465,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_quad_strength.setText(quad_strength_text)
         self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), " mm·mrad"))
         self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), " mm·mrad"))
-        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), " μ·mrad"))
-        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), " μ·mrad"))
+        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), " nm·rad"))
+        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), " nm·rad"))
         self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), " m"))
         self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0")))
         self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), " m"))
@@ -513,7 +523,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         sigy = np.asarray(session_to_plot["sigy_mean"], dtype=float)
         screens = list(session_to_plot["screens"])
         quad_name = session_to_plot.get("quad_name", "-")
-        em_sigma_unit=self._get_interface_units()
+        em_sigma_unit = session_to_plot.get("sigma_unit", self._get_interface_units())
         fig = self.canvas.figure
         fig.clear()
 
@@ -597,8 +607,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             fit_y = np.sqrt(np.maximum(pred_y[:, i], 0.0))
             ax2.plot(K1_values, fit_y, '-', color=fit_color, linewidth=2.0, label=f"{screen} fit")
 
-        ax1.set_ylabel("sigx")
-        ax2.set_ylabel("sigy")
+        unit = self.session.get("sigma_unit", self._get_interface_units())
+        ax1.set_ylabel(f"sigx [{unit}]")
+        ax2.set_ylabel(f"sigy [{unit}]")
         ax2.set_xlabel("K1")
 
         ax1.grid(True, alpha=0.3)
@@ -615,8 +626,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         if not states:
             return
         folder = self.session_database.text().strip()
-        quadrupoles, screens = self._get_selection()
-        quad_name = quadrupoles[0]
 
         steps_requested = int(self.emittance_settings["scan_steps"])
         delta_min = float(self.emittance_settings["delta_min"])
@@ -630,13 +639,21 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             K1_values[step_i] = float(np.ravel(quad["bdes"])[0])
         K1_0 = float(np.nanmean(K1_values / (1.0 + deltas))) # to be verified
 
+
         nsteps_scan = steps_requested
-        nscreens = len(screens)
+        nscreens = int(self.emittance_settings["nscreens"])
+        screens = list(self.emittance_settings.get("screens",[]))
+        quad_name = str(self.emittance_settings.get("quad_name",""))
+        if not screens:
+            _, screens = self._get_selection()
+        screens = screens[:nscreens]
+
         nshots = int(self.emittance_settings["nshots"])
         sigx_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         sigy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         sigxy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
+        print(f"GUI Nshots: {nshots}, GUI Scan steps: {nsteps_scan}")
 
         for path, state in zip(files, states):
             filename = os.path.basename(path)
@@ -645,9 +662,10 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             step_i = int(parts[3])
             shot_i = int(parts[5])
             screen_data = state.get_screens()
-            sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0])
-            sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0])
-            sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0])
+            sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0]) / 1000.0
+            sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0]) / 1000.0
+            sigxy_samples[step_i, screen_i, shot_i] = float(
+                np.ravel(screen_data.get("sigxy", [np.nan]))[0]) / 1_000_000.0
             screen_images = state.get_screens().get("images", [])
             if len(screen_images) > 0:
                 images[step_i][screen_i][shot_i] = np.asarray(screen_images[0]).tolist()
@@ -675,10 +693,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "delta_max": delta_max,
             "steps": steps_requested,
             "nshots": int(self.emittance_settings["nshots"]),
+            "sigma_unit": "mm",
             "quad_name": quad_name,
             "quadrupoles": [quad_name],
             "screens": screens,
-            "reference_screen": screens[0],
+            "reference_screen": screens[0] if screens else "",
             "K1_0": float(K1_0),
             "sigx_mean": sigx_mean.tolist(),
             "sigy_mean": sigy_mean.tolist(),
@@ -694,8 +713,13 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "nsteps_scan": int(nsteps_scan),
             "images": images,
         }
-        return session
 
+        print("K1:", session["K1_values"])
+        print("sigx:", session["sigx_mean"])
+        print("sigy:", session["sigy_mean"])
+        print("unit:", session.get("sigma_unit"))
+
+        return session
 
     def _run_optimization(self):
         self.log("Fitting emittance and twiss parameters at scanned quadrupole started...")
@@ -706,6 +730,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             data_folder = self.session_database.text().strip()
             if data_folder and os.path.isdir(data_folder):
                 self.session = self._get_session_data_from_database()
+                self._refresh_plot_comboboxes_from_session(self.session)
+                self._draw_live_scan(self.session)
             if self.session is None:
                 QMessageBox.information(self, "Optimization", "No session.")
                 return

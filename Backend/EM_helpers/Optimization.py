@@ -574,7 +574,7 @@ class Optimization:
             lhs_samples = qmc.scale(unit_samples, low_bounds, high_bounds)
             lhs_df = pd.DataFrame(lhs_samples, columns=params_order)
             if self.print_M:
-                print(f"Joint Xopt init: {total_initial} Latin Hypercube samples in {len(params_order)}D")
+                print(f"Joint Xopt init: {total_initial} samples in {len(params_order)} degrees of freedom")
             X.evaluate_data(lhs_df)
             update_best_from_data()
 

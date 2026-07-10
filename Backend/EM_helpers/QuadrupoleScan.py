@@ -205,15 +205,20 @@ class QuadrupoleScan(SaveOrLoad):
                                 break
                             print("before calling get_screens")
                             screens_data = self.interface.get_screens([screen_name], move_screen = False)
+                            sigma_scale = 1.0
+                            sigxy_scale = 1.0
+                            if self._get_interface_units() == "um":
+                                sigma_scale = 1.0 / 1000.0
+                                sigxy_scale = 1.0 / 1000000.0
                             print("after calling get_screens")
                             idx_map = {name: idx for idx, name in enumerate(screens_data["names"])}
                             idx = idx_map.get(screen_name)
                             if idx is not None:
-                                sx_shots[j] = float(screens_data["sigx"][idx])
-                                sy_shots[j] = float(screens_data["sigy"][idx])
+                                sx_shots[j] = float(screens_data["sigx"][idx]) * sigma_scale
+                                sy_shots[j] = float(screens_data["sigy"][idx]) * sigma_scale
                                 images[i][k][j]=np.asarray(screens_data["images"][idx]).tolist()
                                 if "sigxy" in screens_data:
-                                    sxy_shots[j] = float(screens_data["sigxy"][idx])
+                                    sxy_shots[j] = float(screens_data["sigxy"][idx]) * sigxy_scale
                                 #tilt_shots[j] = float(screens_data["tilt"][idx])
                             state_for_scan = State(sextupoles=None, correctors=None, bpms=None,
                                 icts=None, sequence=self.interface.get_sequence(), hcorrectors_names=None,
@@ -270,6 +275,7 @@ class QuadrupoleScan(SaveOrLoad):
                             "current_screen_index": int(k),
                             "nsteps_scan": int(nsteps_scan),
                             "images": images,
+                            "sigma_unit": "mm",
                         }
 
                         if progress_callback is not None:
@@ -315,6 +321,7 @@ class QuadrupoleScan(SaveOrLoad):
             "cancelled": bool(cancel_requested),
             "nsteps_scan": int(nsteps_scan), # number of measurements at screens (even if steps=0, nsteps_scan = 1)
             "images": images,
+            "sigma_unit": "mm",
         }
 
         self.save_emittance_measurement_session(session)
