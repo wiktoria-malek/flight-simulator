@@ -58,6 +58,50 @@ class Optimization:
         self._last_completed_output = None
         self._pause_requested = False
 
+    def _calculate_optimalization_errors(self, ls_result, n_params_fallback=None):
+        n_default = int(n_params_fallback) if n_params_fallback is not None else 6
+
+        if ls_result is None:
+            return {
+                "param_errors": np.full(n_default, np.nan),
+                "cov": None,
+                "reduced_chi2_like": np.nan,
+                "chi2_like": np.nan,
+            }
+
+        try:
+            J = np.asarray(ls_result.jac, dtype=float)
+            r = np.asarray(ls_result.fun, dtype=float)
+            p = np.asarray(ls_result.x, dtype=float)
+        except AttributeError:
+            return {
+                "param_errors": np.full(n_default, np.nan),
+                "cov": None,
+                "reduced_chi2_like": np.nan,
+                "chi2_like": np.nan,
+            }
+
+        ndata = len(r)
+        npar = len(p)
+        dof = max(ndata - npar, 1)
+
+        chi2_like = float(np.sum(r ** 2))
+        reduced_chi2_like = chi2_like / dof
+
+        try:
+            cov = np.linalg.pinv(J.T @ J) * reduced_chi2_like
+            param_errors = np.sqrt(np.maximum(np.diag(cov), 0.0))
+        except Exception:
+            cov = None
+            param_errors = np.full(npar, np.nan)
+
+        return {
+            "param_errors": param_errors,
+            "cov": cov,
+            "reduced_chi2_like": reduced_chi2_like,
+            "chi2_like": chi2_like,
+        }
+
     def fit_from_session(self, session, bounds):
         was_pause_requested = bool(self._pause_requested)
         self.clear_stop()
@@ -118,6 +162,7 @@ class Optimization:
         try:
             joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1_values=K1_values,
                                     sigx=sigx, sigx_std=sigx_std, sigy=sigy, sigy_std=sigy_std, bounds = bounds)
+
             fit_x = {
                 "emit": joint_fit["emit_x_geom"],
                 "beta0": joint_fit["beta_x0"],
@@ -195,14 +240,19 @@ class Optimization:
             fit_y = _plane_no_solution("y", sigma2_template_y)
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
+        beta_gamma = (
+            gamma_rel * beta_rel
+            if np.isfinite(gamma_rel) and np.isfinite(beta_rel)
+            else np.nan
+        )
         emit_x_norm = (
-            gamma_rel * beta_rel * fit_x["emit"]
-            if np.isfinite(gamma_rel) and np.isfinite(beta_rel) and np.isfinite(fit_x["emit"])
+            beta_gamma * fit_x["emit"]
+            if np.isfinite(beta_gamma) and np.isfinite(fit_x["emit"])
             else np.nan
         )
         emit_y_norm = (
-            gamma_rel * beta_rel * fit_y["emit"]
-            if np.isfinite(gamma_rel) and np.isfinite(beta_rel) and np.isfinite(fit_y["emit"])
+            beta_gamma * fit_y["emit"]
+            if np.isfinite(beta_gamma) and np.isfinite(fit_y["emit"])
             else np.nan
         )
 
@@ -211,13 +261,36 @@ class Optimization:
 
         stopped = bool(fit_x.get("stopped", False) or fit_y.get("stopped", False) or self._stop_requested)
 
+        err_dict = {}
+        reduced_chi2_like = np.nan
+        chi2_like = np.nan
+        if isinstance(joint_fit, dict):
+            err_dict = dict(joint_fit.get("param_errors") or {})
+            reduced_chi2_like = float(joint_fit.get("reduced_chi2_like", np.nan))
+            chi2_like = float(joint_fit.get("chi2_like", np.nan))
+
+        emit_x_norm_err = float(err_dict.get("emit_x_norm", np.nan))
+        emit_y_norm_err = float(err_dict.get("emit_y_norm", np.nan))
+        beta_x0_err = float(err_dict.get("beta_x0", np.nan))
+        alpha_x0_err = float(err_dict.get("alpha_x0", np.nan))
+        beta_y0_err = float(err_dict.get("beta_y0", np.nan))
+        alpha_y0_err = float(err_dict.get("alpha_y0", np.nan))
+        quad_k1_0_err = float(err_dict.get("quad_k1_0", np.nan))
+
+        if np.isfinite(beta_gamma) and beta_gamma > 0:
+            emit_x_geom_err = emit_x_norm_err / beta_gamma * 1e3 if np.isfinite(emit_x_norm_err) else np.nan
+            emit_y_geom_err = emit_y_norm_err / beta_gamma * 1e3 if np.isfinite(emit_y_norm_err) else np.nan
+        else:
+            emit_x_geom_err = np.nan
+            emit_y_geom_err = np.nan
+
         result = {
             "screen0": screens[0],
             "quad_name": quad_name,
             "emit_x_norm": emit_x_norm,
             "emit_y_norm": emit_y_norm,
-            "emit_x_geom": emit_x_geom * 1e3 , # μm
-            "emit_y_geom": emit_y_geom * 1e3, # μm
+            "emit_x_geom": emit_x_geom * 1e3 , # nm*rad
+            "emit_y_geom": emit_y_geom * 1e3, # nm*rad
             "beta_x0": fit_x["beta0"],
             "alpha_x0": fit_x["alpha0"],
             "beta_y0": fit_y["beta0"],
@@ -247,6 +320,17 @@ class Optimization:
                 else quad_k1_0_readback
             ),
             "quad_k1_0_is_fitted": bool(self.fit_quadrupole_strength),
+            "emit_x_norm_err": emit_x_norm_err,
+            "emit_y_norm_err": emit_y_norm_err,
+            "emit_x_geom_err": emit_x_geom_err,
+            "emit_y_geom_err": emit_y_geom_err,
+            "beta_x0_err": beta_x0_err,
+            "alpha_x0_err": alpha_x0_err,
+            "beta_y0_err": beta_y0_err,
+            "alpha_y0_err": alpha_y0_err,
+            "quad_k1_0_err": quad_k1_0_err,
+            "fit_reduced_chi2_like": reduced_chi2_like,
+            "fit_chi2_like": chi2_like,
         }
 
         output = {
@@ -544,28 +628,8 @@ class Optimization:
                 best_row = row
 
         try:
-
-            # '''
-            # TEST!!!
-            # '''
-            #
-            # # Sanity check: known QD18X parameters
-            # if str(quad_name) == "QD18X":
-            #     truth_cost, _, _ = compute_cost(
-            #         5.2, 1.105221776, -0.7752115812,
-            #         0.03, 10.34240856, -3.739163822,
-            #         quad_k1_0=None,
-            #         allow_stop=False,
-            #     )
-            #     print(f"Truth cost for QD18X = {truth_cost}")
-            #
-            # '''
-            # TEST!!!
-            # '''
-
-
             # X.random_evaluate(total_initial) # for bayesian optimization to suggest better solutions, it needs some data
-            #
+
             # update_best_from_data()
 
             lhs_seed = int(self.rng.integers(0, 2**31 - 1))
@@ -784,6 +848,7 @@ class Optimization:
             return residuals
 
         best_res_ls = None
+        best_res_ls_cost = np.inf
         try:
             for start_idx, x0_try in enumerate(ls_starts):
                 if self.print_M:
@@ -792,10 +857,12 @@ class Optimization:
                     res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=local_max_nfev, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8)
                     p_try = np.asarray(res_try.x, dtype=float)
                     f_try, _, _ = compute_cost(p_try[0], p_try[1], p_try[2], p_try[3], p_try[4], p_try[5], quad_k1_0=(p_try[6] if self.fit_quadrupole_strength else None), allow_stop=False)
+                    if np.isfinite(f_try) and f_try < best_res_ls_cost:
+                        best_res_ls_cost = float(f_try)
+                        best_res_ls = res_try
                     if np.isfinite(f_try) and f_try < ls_best_cost[0]:
                         ls_best_cost[0] = float(f_try)
                         ls_best_params[0] = p_try.copy()
-                        best_res_ls = res_try
                     if self.print_M:
                         print(
                             f"  LS start {start_idx + 1}/{len(ls_starts)} finished: "
@@ -848,4 +915,24 @@ class Optimization:
         solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x, pred2_y=pred2_y, best_row=best_row, best_cost=best_cost_final)
         solution["message"] = "Joint x+y Bayesian optimization + least-squares."
         solution["stopped"] = bool(stopped_during_fit)
+
+        fit_error = self._calculate_optimalization_errors(best_res_ls, n_params_fallback=len(params_order))
+        param_errors = fit_error["param_errors"]
+        if param_errors is None or len(param_errors) != len(params_order):
+            err_dict = {p: np.nan for p in params_order}
+        else:
+            err_dict = {p: float(e) for p, e in zip(params_order, param_errors)}
+
+        solution["param_errors"] = err_dict
+        solution["reduced_chi2_like"] = fit_error["reduced_chi2_like"]
+        solution["chi2_like"] = fit_error["chi2_like"]
+        solution["param_cov"] = fit_error["cov"]
+
+        if self.print_M:
+            print(
+                f"Fit parameter errors (1-sigma): "
+                + ", ".join(f"{k}={v:.4g}" for k, v in err_dict.items())
+                + f", reduced_chi2_like={fit_error['reduced_chi2_like']:.4g}"
+            )
+
         return solution

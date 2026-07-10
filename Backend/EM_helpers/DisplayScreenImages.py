@@ -1,9 +1,9 @@
 try:
     from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QDialog, QLabel, QWidget, QComboBox
+    from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QDialog, QLabel, QWidget, QComboBox, QSizePolicy
 except ImportError:
     from PyQt5.QtCore import Qt
-    from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QDialog, QLabel, QWidget, QComboBox
+    from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QDialog, QLabel, QWidget, QComboBox, QSizePolicy
 import numpy as np
 import matplotlib
 matplotlib.use("QtAgg")
@@ -22,10 +22,13 @@ class DisplayScreenImages(QDialog):
         self.session = None
         self.figure = Figure(figsize=(10, 6), constrained_layout=True)
         self.canvas = FigureCanvas(self.figure)
+        self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         plot_widget = QWidget(self)
+        plot_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         plot_layout = QVBoxLayout(plot_widget)
         plot_layout.setContentsMargins(0, 0, 0, 0)
-        plot_layout.addWidget(self.canvas)
+        plot_layout.setSpacing(0)
+        plot_layout.addWidget(self.canvas, 1)
         header = QWidget(self)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
@@ -39,8 +42,10 @@ class DisplayScreenImages(QDialog):
         header_layout.addWidget(self.step_combobox)
         header_layout.addStretch(1)
         layout = QVBoxLayout(self)
-        layout.addWidget(header)
-        layout.addWidget(plot_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+        layout.addWidget(header, 0)
+        layout.addWidget(plot_widget, 1)
 
     def _plot_screen_image(self, session):
         self.session = session

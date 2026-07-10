@@ -3,7 +3,7 @@ import numpy as np
 from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 
 I = InterfaceATF2_Ext_RFTrack()
-quad_name = "QD18X"
+quad_name = "QF17X"
 quadrupole_data = I.get_quadrupoles([quad_name])
 K1_0 = float(quadrupole_data["bdes"][0])
 deltas = np.linspace(-0.10, 0.10, 5)

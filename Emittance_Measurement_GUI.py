@@ -203,6 +203,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.load_session_button.clicked.connect(self._load_emittance_measurement_session)
 
 
+
     def _load_emittance_measurement_session(self):
         self.load_emittance_measurement_session()
         self.session = self._get_session_data_from_database()
@@ -250,44 +251,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         widgets_to_disable = [self.xoptSettingsGroup,self.localOptimizationSettingsGroup]
         for widget in widgets_to_disable:
             widget.setEnabled(not is_linear_mode)
-
-    def _log_scan_status(self, session_partial, current_step, total_steps):
-        if not isinstance(session_partial, dict):
-            return
-
-        current_step_display = int(current_step)
-        total_steps_display = int(total_steps)
-        if total_steps_display > 0:
-            current_step_display = max(1, min(current_step_display, total_steps_display))
-
-        if session_partial.get("mode") == "multi_quad_scan":
-            current_quad = str(session_partial.get("current_quadrupole", "-")).strip() or "-"
-            quad_idx = int(session_partial.get("current_quadrupole_index", 0)) + 1
-            total_quads = int(session_partial.get("total_quadrupoles", 0))
-            completed = list(session_partial.get("completed_quadrupoles", []))
-            skipped = list(session_partial.get("skipped_quadrupoles", []))
-            skipped_names = [str(item.get("quad_name", "")).strip() for item in skipped if isinstance(item, dict)]
-
-            status = ("multi", current_quad, quad_idx, current_step_display, total_steps_display, tuple(completed), tuple(skipped_names))
-            if status == self._last_scan_status:
-                return
-            self._last_scan_status = status
-            finished_msg = ", ".join(completed) if completed else "none yet"
-            skipped_msg = ", ".join(skipped_names) if skipped_names else "none"
-
-            self.log(
-                f"Scanning quadrupole {quad_idx}/{total_quads}: {current_quad} | "
-                f"step {current_step_display}/{total_steps_display} | "
-                f"finished: {finished_msg} | skipped, because of K1_0 = 0: {skipped_msg}"
-            )
-
-        else:
-            quad_name = str(session_partial.get("quad_name", "-")).strip() or "-"
-            status = ("single", quad_name, current_step_display, total_steps_display)
-            if status == self._last_scan_status:
-                return
-            self._last_scan_status = status
-            self.log(f"Scanning quadrupole {quad_name} | step {current_step_display}/{total_steps_display}")
 
     def _on_show_all_screens_toggled(self, checked):
         self.screen_on_plot.setEnabled(not bool(checked))
@@ -455,22 +418,22 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 return "-"
             if not np.isfinite(value):
                 return "-"
-            return f"{value:.10f}{suffix}"
+            return f"{value:.3f}{suffix}"
 
-        quad_strength_text = fmt_value(result.get("quad_k1_0"), " 1/m²")
+        quad_strength_text = fmt_value(result.get("quad_k1_0"), " 1/m")
         if result.get("quad_k1_0_is_fitted", False) and quad_strength_text != "-":
             quad_strength_text += " (fit)"
         elif quad_strength_text != "-":
             quad_strength_text += " (nominal)"
         self.result_quad_strength.setText(quad_strength_text)
-        self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), " mm·mrad"))
-        self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), " mm·mrad"))
-        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), " nm·rad"))
-        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), " nm·rad"))
-        self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), " m"))
-        self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0")))
-        self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), " m"))
-        self.result_alpha_y0.setText(fmt_value(result.get("alpha_y0")))
+        self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), f" ± {result.get("emit_x_norm_err")} mm·mrad"))
+        self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), f" ± {result.get("emit_y_norm_err")} mm·mrad"))
+        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), f" ± {result.get("emit_x_geom_err")} nm·rad"))
+        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), f" ± {result.get("emit_y_geom_err")} nm·rad"))
+        self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), f" ± {result.get("beta_x0_err")} m"))
+        self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0"),  f" ± {result.get("alpha_x0_err")}"))
+        self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), f" ± {result.get("beta_y0_err")} m"))
+        self.result_alpha_y0.setText(fmt_value(result.get("alpha_y0"),  f" ± {result.get("alpha_y0_err")}"))
         self.result_reference_screen.setText(result["screen0"])
 
     def _reset_canvas(self):
@@ -478,7 +441,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         fig.clear()
         ax = fig.add_subplot(111)
         ax.set_title("Quadrupole scan")
-        ax.set_xlabel("K1")
+        ax.set_xlabel("K1L [1/m]")
         ax.set_ylabel("Beam size")
         ax.grid(True, alpha=0.3)
         self.canvas.draw()
@@ -562,7 +525,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         ax1.set_title(title)
         ax1.set_ylabel(f"sigx [{em_sigma_unit}]")
         ax2.set_ylabel(f"sigy [{em_sigma_unit}]")
-        ax2.set_xlabel("K1")
+        ax2.set_xlabel("K1L [1/m]")
 
         ax1.grid(True, alpha=0.3)
         ax2.grid(True, alpha=0.3)
@@ -610,7 +573,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         unit = self.session.get("sigma_unit", self._get_interface_units())
         ax1.set_ylabel(f"sigx [{unit}]")
         ax2.set_ylabel(f"sigy [{unit}]")
-        ax2.set_xlabel("K1")
+        ax2.set_xlabel("K1L [1/m]")
 
         ax1.grid(True, alpha=0.3)
         ax2.grid(True, alpha=0.3)
@@ -873,7 +836,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         if self._scan_stop_requested:
             raise KeyboardInterrupt("Scan stopped by user.")
         self.session = session_partial
-        self._log_scan_status(session_partial, current_step, total_steps)
         self._draw_live_scan(session_partial)
         if total_steps:
             self._set_progress(100.0 * float(current_step) / float(total_steps))
@@ -1125,32 +1087,25 @@ class MainWindow(QMainWindow, QuadrupoleScan):
     def _show_phase_spaces(self):
         result = None
         reference_name = None
-
         if isinstance(self.session, dict):
             result = self.session.get("optimization_result")
             reference_name = self.session.get("quad_name") or self.session.get("current_quadrupole")
-
         if self.phase_spaces is None:
             self.phase_spaces = PhaseSpaces(self)
-
         screens = []
         session_to_plot = None
         if isinstance(self.session, dict):
             session_to_plot = self._get_session_for_selected_quad(self.session)
             if isinstance(session_to_plot, dict):
                 screens = list(session_to_plot.get("screens", []))
-
         if not isinstance(result, dict):
             QMessageBox.information(self, "Phase Space", "Run the emittance/Twiss optimization first." )
             return
-
         session_to_plot = self._get_session_for_selected_quad(self.session) if isinstance(self.session, dict) else None
-
         if isinstance(session_to_plot, dict) and screens:
             self.phase_spaces.plot_projection_constraints(result, session_to_plot, interface=self.interface)
         else:
             self.phase_spaces.plot_from_result(result, reference_name=reference_name)
-
         self.phase_spaces.show()
         self.phase_spaces.raise_()
         self.phase_spaces.activateWindow()
@@ -1173,7 +1128,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         if self.log_console is None:
             self.log_console=LogConsole(self)
         self.log_console.log(line)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
