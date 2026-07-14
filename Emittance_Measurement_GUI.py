@@ -138,7 +138,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
         self._load_logo()
-        self.load_screens_data_database.setText(dir_name)
+        self.load_session_button.clicked.connect(self.load_scan_and_optimization_settings)
+        self.session_directory.setText(dir_name)
         self.start_optimization_button.clicked.connect(self._run_optimization)
         self.stop_optimization_button.clicked.connect(self._stop_optimization)
         self.setWindowTitle("Emittance Measurement GUI")
@@ -200,12 +201,10 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
         self._on_nsteps_scan_changed(self.steps_settings.value())
-        self.load_screens_data_button.clicked.connect(self._load_emittance_measurement_session)
+        self.load_screens_data_button.clicked.connect(self._load_screens_data)
 
-
-
-    def _load_emittance_measurement_session(self):
-        self.load_emittance_measurement_session()
+    def _load_screens_data(self):
+        self.load_screens_data()
         self.session = self._get_session_data_from_database()
         if self.session is None:
             QMessageBox.information(self, "Emittance Measurement Session Error", "Session not found.")

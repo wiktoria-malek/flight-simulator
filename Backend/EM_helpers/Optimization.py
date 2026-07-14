@@ -571,7 +571,7 @@ class Optimization:
             quad_k1_0 = float(inputs["quad_k1_0"]) if self.fit_quadrupole_strength else None
             try:
                 f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
-                                    float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = True, quad_k1_0 = quad_k1_0)
+                                    float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = False, quad_k1_0 = quad_k1_0)
                 f_real = float(f)
                 f_objective = float(np.log10(max(f_real, 1e-12)))
             except (OptimizationStopped, OptimizationPaused):
@@ -698,8 +698,8 @@ class Optimization:
             solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x_partial, pred2_y=pred2_y_partial, best_row=best_row, best_cost=best_cost)
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
-            raise OptimizationStopped("Optimization stopped.", solution=solution)
-
+            #raise OptimizationStopped("Optimization stopped.", solution=solution)
+            return solution
         pred2_x, pred2_y = predict_sigma2_from_fit_params(
             emit_x_norm_best, beta_x0_best, alpha_x0_best,
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
@@ -908,7 +908,8 @@ class Optimization:
             solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x_p, pred2_y=pred2_y_p, best_row=best_row, best_cost=best_cost_final)
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
-            raise OptimizationStopped("Optimization stopped.", solution=solution)
+            #raise OptimizationStopped("Optimization stopped.", solution=solution)
+            return solution
 
         pred2_x, pred2_y = predict_sigma2_from_fit_params(p_final[0], p_final[1], p_final[2], p_final[3], p_final[4], p_final[5], quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None), allow_stop=True)
 

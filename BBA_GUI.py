@@ -99,7 +99,6 @@ class BpmWeightsDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
-
 class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Restoration_Logic, QM_mode_helpers):
     def __init__(self, interface, dir_name, nominal_state=None, start_state=None):
         super().__init__()
