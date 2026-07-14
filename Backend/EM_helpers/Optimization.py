@@ -564,24 +564,18 @@ class Optimization:
             return 0.5 * (cost_x + cost_y), pred2_x, pred2_y
 
         def evaluate(inputs):
-            if self._stop_requested:
-                raise OptimizationStopped("Optimization stopped.")
-            if self._pause_requested:
-                raise OptimizationPaused("Optimization paused.")
+            if self._stop_requested or self._pause_requested:
+                return {"f": 12.0, "cost_real": 1e12}
             quad_k1_0 = float(inputs["quad_k1_0"]) if self.fit_quadrupole_strength else None
             try:
                 f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
                                     float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = False, quad_k1_0 = quad_k1_0)
                 f_real = float(f)
                 f_objective = float(np.log10(max(f_real, 1e-12)))
-            except (OptimizationStopped, OptimizationPaused):
-                raise
+
             except Exception as e:
                 if self.print_M:
-                    print(
-                        "Joint fit evaluation failed, assigning large cost: "
-                        f"{type(e).__name__}: {e}"
-                    )
+                    print(f"Joint fit evaluation failed, assigning large cost: {type(e).__name__}: {e}")
                 return {"f": 12.0, "cost_real": 1e12}
 
             if self.print_M:
@@ -659,6 +653,9 @@ class Optimization:
 
                 X.step()
                 update_best_from_data()
+                if self._stop_requested or self._pause_requested:
+                    stopped_during_fit = True
+                    break
 
         except OptimizationStopped:
             if best_row is not None:
