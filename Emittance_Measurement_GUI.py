@@ -138,7 +138,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
         self._load_logo()
-        self.session_database.setText(dir_name)
+        self.load_screens_data_database.setText(dir_name)
         self.start_optimization_button.clicked.connect(self._run_optimization)
         self.stop_optimization_button.clicked.connect(self._stop_optimization)
         self.setWindowTitle("Emittance Measurement GUI")
@@ -200,7 +200,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
         self._on_nsteps_scan_changed(self.steps_settings.value())
-        self.load_session_button.clicked.connect(self._load_emittance_measurement_session)
+        self.load_screens_data_button.clicked.connect(self._load_emittance_measurement_session)
 
 
 
@@ -588,7 +588,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         files = list(getattr(self, "loaded_state_files", []))
         if not states:
             return
-        folder = self.session_database.text().strip()
+        folder = self.load_screens_data_database.text().strip()
 
         steps_requested = int(self.emittance_settings["scan_steps"])
         delta_min = float(self.emittance_settings["delta_min"])
@@ -627,8 +627,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             screen_data = state.get_screens()
             sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0]) / 1000.0
             sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0]) / 1000.0
-            sigxy_samples[step_i, screen_i, shot_i] = float(
-                np.ravel(screen_data.get("sigxy", [np.nan]))[0]) / 1_000_000.0
+            sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0]) / 1000.0
             screen_images = state.get_screens().get("images", [])
             if len(screen_images) > 0:
                 images[step_i][screen_i][shot_i] = np.asarray(screen_images[0]).tolist()
@@ -690,7 +689,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         xopt_steps = int(self.xopt_steps_spin.value())
         nm_steps = int(self.nm_steps_spin.value())
         if self.session is None:
-            data_folder = self.session_database.text().strip()
+            data_folder = self.load_screens_data_database.text().strip()
             if data_folder and os.path.isdir(data_folder):
                 self.session = self._get_session_data_from_database()
                 self._refresh_plot_comboboxes_from_session(self.session)

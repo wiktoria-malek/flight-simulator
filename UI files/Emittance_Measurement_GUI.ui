@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1546</width>
-    <height>855</height>
+    <width>1530</width>
+    <height>888</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -723,14 +723,14 @@ QGroupBox#actionsGroup::title {
 }</string>
          </property>
          <property name="title">
-          <string>Session</string>
+          <string>Databases</string>
          </property>
          <layout class="QGridLayout" name="gridActions">
           <property name="spacing">
            <number>12</number>
           </property>
           <item row="3" column="4">
-           <widget class="QPushButton" name="load_session_button">
+           <widget class="QPushButton" name="load_screens_data_button">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -745,17 +745,47 @@ QGroupBox#actionsGroup::title {
           <item row="3" column="0">
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>Load session settings</string>
+             <string>Screens data directory</string>
             </property>
            </widget>
           </item>
           <item row="3" column="1" colspan="3">
-           <widget class="QLineEdit" name="session_database">
+           <widget class="QLineEdit" name="load_screens_data_database">
             <property name="minimumSize">
              <size>
               <width>420</width>
               <height>0</height>
              </size>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Session directory</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1" colspan="3">
+           <widget class="QLineEdit" name="session_directory">
+            <property name="minimumSize">
+             <size>
+              <width>420</width>
+              <height>0</height>
+             </size>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="4">
+           <widget class="QPushButton" name="load_session_button">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>...</string>
             </property>
            </widget>
           </item>
@@ -774,18 +804,17 @@ QGroupBox#actionsGroup::title {
     </item>
     <item>
      <widget class="QTabWidget" name="tabs">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>200</height>
-       </size>
-      </property>
-      <!-- Removed maximumSize property -->
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
         <horstretch>1</horstretch>
         <verstretch>1</verstretch>
        </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>200</height>
+       </size>
       </property>
       <property name="styleSheet">
        <string notr="true">QTabWidget#tabs {

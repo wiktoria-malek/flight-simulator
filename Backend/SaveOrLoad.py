@@ -199,7 +199,7 @@ class SaveOrLoad():
         folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
         if not folder:
             return
-        self.session_database.setText(folder)
+        self.load_screens_data_database.setText(folder)
         quad_selected = None
         screens = []
         folder_base_name = os.path.basename(os.path.normpath(folder))
@@ -320,7 +320,7 @@ class SaveOrLoad():
             if "is_fit_quad_strength_checked" in self.emittance_settings: self.fit_quadrupole_strength_checkbox.setChecked(
                 bool(self.emittance_settings["is_fit_quad_strength_checked"]))
 
-        QMessageBox.information(self.session_database, "Data directory selected", "Loaded session")
+        QMessageBox.information(self.load_screens_data_database, "Data directory selected", "Loaded session")
 
 
         return self.loaded_states_from_scan
@@ -431,7 +431,7 @@ class SaveOrLoad():
                 self.max_vertical_current_spinbox.setValue(settings["max_vertical_range"])
 
     def save_emittance_measurement_session(self, session=None, initial_points_xopt=None, xopt_steps=None, ls_steps=None, is_fit_quad_strength_checked=None):
-        save_session_dir = self.session_database.text()
+        save_session_dir = self.load_screens_data_database.text()
         os.makedirs(save_session_dir, exist_ok=True)
         self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt", saving_name="Save quadrupoles", use_dialog=False, base_dir=save_session_dir)
         self._saving_func(elements_list=self.screens_list, filename="screens.txt", saving_name="Save screens", use_dialog=False, base_dir=save_session_dir)
@@ -452,7 +452,7 @@ class SaveOrLoad():
                 "delta_max": session["delta_max"],
                 "scan_steps": session["steps"],
                 "nshots": session["nshots"],
-                "data_session": self.session_database.text(),
+                "data_session": self.load_screens_data_database.text(),
                 "quad_name": session["quad_name"],
                 "screens": session["screens"],
                 "nscreens": session["nscreens"],

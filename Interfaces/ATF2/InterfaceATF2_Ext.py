@@ -664,14 +664,14 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             change_x = max(sigx_new / sigx_prev, sigx_prev / sigx_new)
             change_y = max(sigy_new / sigy_prev, sigy_prev / sigy_new)
             if change_x <= 8 and change_y <= 8:
-                sigx = sigx_new
-                sigy = sigy_new
+                sigx = sigx_new / 1000.0
+                sigy = sigy_new / 1000.0
                 break
             print("Screen size changed too much between measurements of sigx and sigy. Remeasuring...")
             sigx_prev, sigy_prev = sigx_new, sigy_new
         else:
-            sigx = sigx_prev
-            sigy = sigy_prev
+            sigx = sigx_prev / 1000.0 if np.isfinite(sigx_prev) else sigx
+            sigy = sigy_prev / 1000.0 if np.isfinite(sigy_prev) else sigy
 
         print("sigx from precomputed PV: ", sigx)
         print("sigy from precomputed PV: ", sigy)
@@ -717,7 +717,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 continue
 
             otr_id = screen_name.replace('OTR', '')
-            hpixel, vpixel = self.get_pixel_calibrations(screen_pv_name)
+            hpixel_um, vpixel_um = self.get_pixel_calibrations(screen_pv_name)
+            hpixel = hpixel_um / 1000.0
+            vpixel = vpixel_um / 1000.0
             status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
             image = self.acquire_otr_image(screen_pv_name, move_screen=False)
             x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel,screen_pv_name)
@@ -735,15 +737,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         screens = {
             "names": selected_names,
-            "hpixel": np.asarray(hpixel_list, dtype=float),
-            "vpixel": np.asarray(vpixel_list, dtype=float),
-            "x": np.asarray(xb_list, dtype=float),
-            "y": np.asarray(yb_list, dtype=float),
-            "sigx": np.asarray(sigx_list, dtype=float),
-            "sigy": np.asarray(sigy_list, dtype=float),
+            "hpixel": np.asarray(hpixel_list, dtype=float), # mm/pixel
+            "vpixel": np.asarray(vpixel_list, dtype=float), # mm/pixel
+            "x": np.asarray(xb_list, dtype=float), # mm
+            "y": np.asarray(yb_list, dtype=float), # mm
+            "sigx": np.asarray(sigx_list, dtype=float), # mm
+            "sigy": np.asarray(sigy_list, dtype=float), # mm
             "sum": np.asarray(sum_list, dtype=float),
-            "hedges": hedges_all,
-            "vedges": vedges_all,
+            "hedges": hedges_all, # mm
+            "vedges": vedges_all, # mm
             "images": images,
             "S": np.asarray(s_positions, dtype=float), # "S": np.full(len(selected_names), np.nan)
             "inout": np.asarray(inout_list, dtype=float),

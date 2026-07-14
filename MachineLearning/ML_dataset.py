@@ -110,7 +110,8 @@ def append_dataset(quad_name, screens, interface, k1_relative_change, n_samples,
 
     X = np.concatenate([existing["X"], new["X"]])
     Y = np.concatenate([existing["Y"], new["Y"]])
-
+    existing.close()
+    new.close()
     np.savez(
         existing_file,
         X=X,

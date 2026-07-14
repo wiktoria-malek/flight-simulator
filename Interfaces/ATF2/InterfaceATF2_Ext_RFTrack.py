@@ -12,7 +12,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 # emit x 5.2
 # beta x 6.305152438
 # alpha x -4.494292895
-
 # emit y 0.03
 # beta y 6.190329503
 # alpha y 2.576336962
@@ -21,10 +20,18 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 # emit x 5.2
 # beta x 1.105221776
 # alpha x -0.7752115812
-
 # emit y 0.03
 # beta y 10.34240856
 # alpha y -3.739163822
+
+# For QF17X end:
+#     "emit_x": 5.2,
+#     "beta_x0": 4.626710278,
+#     "alpha_x0": 2.388942054 ,
+#     "emit_y": 0.03,
+#     "beta_y0": 0.708738623,
+#     "alpha_y0": -0.3997186189,
+
 
     def get_name(self):
         return 'ATF2_Ext_RFT'
