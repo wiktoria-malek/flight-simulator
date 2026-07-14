@@ -101,14 +101,58 @@ def build_k1_set(rng, K1_nominal, relative_k_change, number_of_k1_per_twiss_set,
             relative_values[-1] = delta_max
     return K1_nominal * (1.0 + relative_values)
 
-def generate_dataset(quad_name, screens, interface, k1_relative_change, n_samples, output_file, log_callback, progress_callback, stop_checker):
+
+def append_dataset(quad_name, screens, interface, k1_relative_change, n_samples, existing_file, new_bounds):
+    existing = np.load(existing_file, allow_pickle=True)
+    tmp_file = Path(existing_file).with_name("tmp_dataset.npz")
+    generate_dataset(quad_name=quad_name, screens=screens, interface=interface, k1_relative_change=k1_relative_change, n_samples=n_samples, output_file=tmp_file, log_callback=print, progress_callback=None, stop_checker=None, new_bounds=new_bounds)
+    new = np.load(tmp_file, allow_pickle=True)
+
+    X = np.concatenate([existing["X"], new["X"]])
+    Y = np.concatenate([existing["Y"], new["Y"]])
+
+    np.savez(
+        existing_file,
+        X=X,
+        Y=Y,
+        param_names=existing["param_names"],
+        sigma_names=existing["sigma_names"],
+        screens=existing["screens"],
+        quad_name=existing["quad_name"],
+        reference_screen=existing["reference_screen"],
+        K1_relative_change=existing["K1_relative_change"],
+        bounds=existing["bounds"],
+        bounds_names=existing["bounds_names"],
+        interface_class_name=existing["interface_class_name"],
+        interface_module=existing["interface_module"],
+        K1_nominal=existing["K1_nominal"],
+        n_requested_samples=len(X),
+        n_twiss_combinations=len(X) // int(existing["n_k1_per_twiss_set"]),
+        n_k1_per_twiss_set=existing["n_k1_per_twiss_set"],
+    )
+
+    tmp_file.unlink()
+
+    return {
+        "old_rows": int(len(existing["X"])),
+        "new_rows": int(len(new["X"])),
+        "total_rows": int(len(X)),
+        "output_file": str(existing_file),
+    }
+
+def generate_dataset(quad_name, screens, interface, k1_relative_change, n_samples, output_file, log_callback, progress_callback, stop_checker, new_bounds = None):
     rng = np.random.default_rng(RANDOM_SEED)
     log = log_callback if callable(log_callback) else print
     n_samples = int(n_samples)
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     K1_nominal = get_nominal_K1(interface, quad_name)
-    bounds = _get_interface_bounds(interface)
+
+    if new_bounds is not None:
+        bounds = dict(new_bounds)
+        log = log_callback if callable(log_callback) else print
+    else:
+        bounds = _get_interface_bounds(interface)
 
     n_k1_per_twiss_set = min(N_K1_PER_TWISS, max(1, n_samples))
     n_twiss_combinations = max(1, int(np.ceil(n_samples / n_k1_per_twiss_set)))

@@ -314,10 +314,9 @@ class SaveOrLoad():
             if "delta_max" in self.emittance_settings: self.delta_max_scan.setValue(float(self.emittance_settings["delta_max"]))
             if "scan_steps" in self.emittance_settings: self.steps_settings.setValue(float(self.emittance_settings["scan_steps"]))
             if "nshots" in self.emittance_settings: self.meas_per_step.setValue(float(self.emittance_settings["nshots"]))
-            if "initial_points_xopt" in self.emittance_settings: self.xopt_initial_points_spin.setValue(
-                float(self.emittance_settings["initial_points_xopt"]))
-            if "xopt_steps" in self.emittance_settings: self.xopt_steps_spin.setValue(float(self.emittance_settings["xopt_steps"]))
-            if "ls_steps" in self.emittance_settings: self.nm_steps_spin.setValue(float(self.emittance_settings["ls_steps"]))
+            if "initial_points_xopt" in self.emittance_settings: self.xopt_initial_points_spin.setValue(int(self.emittance_settings["initial_points_xopt"]))
+            if "xopt_steps" in self.emittance_settings: self.xopt_steps_spin.setValue(int(self.emittance_settings["xopt_steps"]))
+            if "ls_steps" in self.emittance_settings: self.nm_steps_spin.setValue(int(self.emittance_settings["ls_steps"]))
             if "is_fit_quad_strength_checked" in self.emittance_settings: self.fit_quadrupole_strength_checkbox.setChecked(
                 bool(self.emittance_settings["is_fit_quad_strength_checked"]))
 
@@ -431,33 +430,47 @@ class SaveOrLoad():
             if "max_vertical_range" in settings:
                 self.max_vertical_current_spinbox.setValue(settings["max_vertical_range"])
 
-    def save_emittance_measurement_session(self,session, delta_min, delta_max, scan_steps, nshots, initial_points_xopt, xopt_steps, ls_steps, is_fit_quad_strength_checked):
-        time_str = datetime.now().strftime("%y%m%d%H%M%S")
-        default_dir=os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
-        save_session_dir=self.session_database.text()
+    def save_emittance_measurement_session(self, session=None, initial_points_xopt=None, xopt_steps=None, ls_steps=None, is_fit_quad_strength_checked=None):
+        save_session_dir = self.session_database.text()
         os.makedirs(save_session_dir, exist_ok=True)
-        self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt",saving_name="Save quadrupoles",use_dialog=False, base_dir=save_session_dir)
-        self._saving_func(elements_list=self.screens_list, filename="screens.txt",saving_name="Save screens",use_dialog=False, base_dir=save_session_dir)
-        quadrupoles, screens = self._get_selection()
-        quad_name = quadrupoles[0] if quadrupoles else None
-        self.emittance_settings = {
-            "delta_min": delta_min,
-            "delta_max": delta_max,
-            "scan_steps": scan_steps,
-            "nshots": nshots,
-            "initial_points_xopt": initial_points_xopt,
-            "xopt_steps": xopt_steps,
-            "ls_steps": ls_steps,
-            "is_fit_quad_strength_checked": is_fit_quad_strength_checked,
-            "data_session": self.session_database.text(),
-            "quad_name": quad_name,
-            "screens": screens,
-            "nscreens": len(screens),
-        }
+        self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt", saving_name="Save quadrupoles", use_dialog=False, base_dir=save_session_dir)
+        self._saving_func(elements_list=self.screens_list, filename="screens.txt", saving_name="Save screens", use_dialog=False, base_dir=save_session_dir)
+        settings_path = os.path.join(save_session_dir, "emittance_settings.json")
 
-        with open(os.path.join(save_session_dir, "emittance_settings.json"), "w") as f:
+        if os.path.isfile(settings_path):
+            try:
+                with open(settings_path, "r") as f:
+                    self.emittance_settings = json.load(f)
+            except Exception:
+                self.emittance_settings = {}
+        else:
+            self.emittance_settings = {}
+
+        if session is not None:
+            self.emittance_settings.update({
+                "delta_min": session["delta_min"],
+                "delta_max": session["delta_max"],
+                "scan_steps": session["steps"],
+                "nshots": session["nshots"],
+                "data_session": self.session_database.text(),
+                "quad_name": session["quad_name"],
+                "screens": session["screens"],
+                "nscreens": session["nscreens"],
+                "reference_screen": session.get("reference_screen"),
+                "K1_0": session.get("K1_0"),
+                "K1_values": session.get("K1_values"),
+                "sigma_unit": session.get("sigma_unit", "mm"),
+            })
+        if initial_points_xopt is not None:
+            self.emittance_settings["initial_points_xopt"] = int(initial_points_xopt)
+        if xopt_steps is not None:
+            self.emittance_settings["xopt_steps"] = int(xopt_steps)
+        if ls_steps is not None:
+            self.emittance_settings["ls_steps"] = int(ls_steps)
+        if is_fit_quad_strength_checked is not None:
+            self.emittance_settings["is_fit_quad_strength_checked"] = bool(is_fit_quad_strength_checked)
+        with open(settings_path, "w") as f:
             json.dump(self.emittance_settings, f, indent=2)
-
         return save_session_dir
 
     def save_session_settings_qm_correction(self, w1, w2, w3, specific_bpm, rcond, iters, gain, beta, max_horizontal_range, max_vertical_range, is_triangular, bpm_weights, response, is_jitter_subtraction_checked):

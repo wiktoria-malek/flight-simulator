@@ -23,10 +23,10 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 def screens_folder_name(screens):
-    screens = [str(screen).strip() for screen in (screens or []) if str(screen).strip()]
-    if not screens:
+    #screens = [str(screen).strip() for screen in (screens or []) if str(screen).strip()]
+    #if not screens:
         return "all_screens"
-    return "_".join(screens)
+    #return "_".join(screens)
 
 def get_ml_model_file(machine_name, quad_name, screens):
     current_file = Path(__file__).resolve()
@@ -48,18 +48,20 @@ except Exception:
     pass
 
 class NeuralNetwork(nn.Module):
+
     def __init__(self, n_inputs, n_outputs):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_inputs, 256),
-            nn.LayerNorm(256),
+            nn.Linear(n_inputs, 128),
+            nn.LayerNorm(128),
             nn.SiLU(),
-            nn.Linear(256, 256),
+            nn.Dropout(0.05),
+            nn.Linear(128, 128),
             nn.SiLU(),
-            nn.Linear(256, 128),
-            nn.SiLU(),
+            nn.Dropout(0.05),
             nn.Linear(128, 64),
             nn.SiLU(),
+            #nn.Dropout(0.05),
             nn.Linear(64, n_outputs),
         )
 
@@ -84,8 +86,8 @@ class TrainModel:
         self.batch_size = 256 # packets with 128 samples at the same time
         self.max_epochs = 2000 # maximum numbers of iterations though the dataset
         self.learning_rate = 1e-3 # size of a step during learning
-        self.weight_decay = 1e-5 # small penalty for too big weights of a neural network
-        self.patience = 120 # if through 120 epochs result doesn't get better, triggers early stopping
+        self.weight_decay = 1e-3 # small penalty for too big weights of a neural network
+        self.patience = 30 # if through 120 epochs result doesn't get better, triggers early stopping
         self.log_callback = log_callback
         self.progress_callback = progress_callback
         self.stop_checker = stop_checker
@@ -173,9 +175,11 @@ class TrainModel:
         self.y_scaler = StandardScaler()
         X_train = self.x_scaler.fit_transform(X_train_raw)
         X_test = self.x_scaler.transform(X_test_raw)
-        Y_train = self.y_scaler.fit_transform(Y_train_raw)
-        Y_test = self.y_scaler.transform(Y_test_raw)
-
+        Y_train_log = np.log(np.maximum(Y_train_raw, 1e-30))
+        Y_test_log = np.log(np.maximum(Y_test_raw, 1e-30))
+        self.y_scaler = StandardScaler()
+        Y_train = self.y_scaler.fit_transform(Y_train_log)
+        Y_test = self.y_scaler.transform(Y_test_log)
         device = self.get_device()
         self.model = NeuralNetwork(X_train.shape[1], Y_train.shape[1]).float().to(device) # chooses gpu or cpu
                                                                                     # X_train.shape[1] = 7
@@ -300,7 +304,10 @@ class TrainModel:
             raise RuntimeError(
                 f"ML model returned NaN or Inf. Y_scaled.shape={Y_scaled.shape}, Model file={self.model_file}."
             )
-        return self.y_scaler.inverse_transform(Y_scaled) # unscales
+        Y_log = self.y_scaler.inverse_transform(Y_scaled) # unscales
+        Y = np.exp(Y_log)
+
+        return Y
 
     def save_model(self):
         if self.model is None or self.x_scaler is None or self.y_scaler is None:
@@ -411,7 +418,7 @@ class MLInterface:
 if __name__ == "__main__":
     trainer = TrainModel(
         machine_name="ATF2",
-        quad_name="QD18X",
+        quad_name="QF17X",
         screens=["OTR0X", "OTR1X", "OTR2X", "OTR3X"],
     )
     trainer.train()

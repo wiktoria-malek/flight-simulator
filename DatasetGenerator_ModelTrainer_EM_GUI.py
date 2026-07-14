@@ -19,7 +19,7 @@ except ImportError:
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 from Backend.SaveOrLoad import SaveOrLoad
-from MachineLearning.ML_dataset import generate_dataset, _get_interface_initial_settings
+from MachineLearning.ML_dataset import generate_dataset, _get_interface_initial_settings, append_dataset
 from MachineLearning.ML_train import TrainModel
 
 class SPositionDelegate(QStyledItemDelegate):
@@ -85,11 +85,25 @@ class DatasetGeneratorWorker(QObject):
 
     def run(self):
         try:
-            result = generate_dataset(quad_name=self.quad_name, screens=self.screens, interface = self.interface,
-                                      k1_relative_change=self.k1_relative_change,
-                                      n_samples = self.n_samples, output_file = self.output_file,
-                                      log_callback = self._emit_log, progress_callback = self._emit_progress,
-                                      stop_checker = self._should_stop)
+            new_bounds = {
+                "emit_x_norm": [5,11.0],
+                "beta_x0": [3.0, 9.0],
+                "alpha_x0": [-4.0, -1.0],
+                "emit_y_norm": [0.1, 0.6],
+                "beta_y0": [0.1, 1.5],
+                "alpha_y0": [-1.0, 1.0],
+            }
+            # normal dataset generation
+            # result = generate_dataset(quad_name=self.quad_name, screens=self.screens, interface = self.interface,
+            #                           k1_relative_change=self.k1_relative_change,
+            #                           n_samples = self.n_samples, output_file = self.output_file,
+            #                           log_callback = self._emit_log, progress_callback = self._emit_progress,
+            #                           stop_checker = self._should_stop)
+
+            # appending new dataset
+            self._emit_log(f"Appending to dataset: {self.output_file}")
+            result = append_dataset(quad_name = self.quad_name, screens = self.screens, interface = self.interface, k1_relative_change = self.k1_relative_change, n_samples = self.n_samples, existing_file=self.output_file, new_bounds=new_bounds)
+
 
             self.finished.emit(result)
 

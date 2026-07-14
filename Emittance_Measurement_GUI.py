@@ -762,6 +762,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.session["optimization_pred_y"] = pred_y.tolist()
         self._update_fit_panel(result)
         self._plot_fit_overlay(pred_x, pred_y, result)
+        self.save_emittance_measurement_session(initial_points_xopt=int(self.xopt_initial_points_spin.value()), xopt_steps=int(self.xopt_steps_spin.value()), ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()))
         self._set_progress(100)
 
         elapsed = time.perf_counter() - self._optimization_t0
@@ -817,11 +818,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._set_progress(0)
         self._optimization_paused = False
         if message == "Optimization stopped.":
-            QMessageBox.information(
-                self,
-                "Optimization stopped",
-                "Optimization was stopped before any solution was found."
-            )
+            QMessageBox.information(self, "Optimization stopped", "Optimization was stopped before any solution was found.")
             self.log("Optimization was stopped before any solution was found.")
         else:
             QMessageBox.information(self, "Optimization", message)
@@ -897,9 +894,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             (self._set_progress(0))
             QMessageBox.information(self, "Scan", str(e))
             return
-        except TypeError:
+        except TypeError as e:
             self._set_progress(0)
-            QMessageBox.information(self,"Scan error","Type Error")
+            QMessageBox.information(self,"Scan error",f"Type Error: {e}")
             return
         except Exception as e:
             self._set_progress(0)

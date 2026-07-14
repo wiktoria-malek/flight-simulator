@@ -322,6 +322,7 @@ class QuadrupoleScan(SaveOrLoad):
             "nsteps_scan": int(nsteps_scan), # number of measurements at screens (even if steps=0, nsteps_scan = 1)
             "images": images,
             "sigma_unit": "mm",
+            "nscreens": len(screens),
         }
 
         self.save_emittance_measurement_session(session)

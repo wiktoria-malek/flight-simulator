@@ -15,7 +15,7 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout">
-    <item stretch="0">
+    <item>
      <widget class="QGroupBox" name="leftGroup">
       <property name="styleSheet">
        <string notr="true">QGroupBox#leftGroup {
@@ -772,7 +772,7 @@ QGroupBox#actionsGroup::title {
       </layout>
      </widget>
     </item>
-    <item stretch="1">
+    <item>
      <widget class="QTabWidget" name="tabs">
       <property name="minimumSize">
        <size>
@@ -812,7 +812,7 @@ QTabWidget#tabs::title {
         <string/>
        </attribute>
        <layout class="QVBoxLayout" name="scanVBox">
-        <item stretch="0">
+        <item>
          <layout class="QHBoxLayout" name="plotSelectorsHBox">
           <item>
            <widget class="QLabel" name="labelQuadPlot">
@@ -846,9 +846,9 @@ QTabWidget#tabs::title {
           </item>
          </layout>
         </item>
-        <item stretch="1">
+        <item>
          <layout class="QHBoxLayout" name="plotAndResultsHBox">
-          <item stretch="1">
+          <item>
            <widget class="QWidget" name="plotPlaceholder" native="true">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -864,7 +864,7 @@ QTabWidget#tabs::title {
             </property>
            </widget>
           </item>
-          <item stretch="0">
+          <item>
            <widget class="QGroupBox" name="fit_results_wrapper_group">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -1308,7 +1308,7 @@ QGroupBox#fit_results_group::title {
           </item>
          </layout>
         </item>
-        <item stretch="0">
+        <item>
          <layout class="QHBoxLayout" name="startStopHBox">
           <property name="spacing">
            <number>6</number>
@@ -1382,7 +1382,7 @@ QToolButton#toolButton_scan:hover {
           </item>
          </layout>
         </item>
-        <item stretch="0">
+        <item>
          <layout class="QHBoxLayout" name="startStopHBox_opt">
           <property name="spacing">
            <number>6</number>
@@ -1464,7 +1464,7 @@ QToolButton#ToolTip_opt:hover {
           </item>
          </layout>
         </item>
-        <item stretch="0">
+        <item>
          <layout class="QHBoxLayout" name="pause_and_resume_HBox">
           <item>
            <widget class="QPushButton" name="pause_button">
