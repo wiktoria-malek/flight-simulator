@@ -474,14 +474,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def _read_bpm_plane(self, bpm, plane):
         plane = plane.lower()
-        candidates = [
-            f'{bpm}/Acquisition#{plane}',
-            f'{bpm}/Acquisition#{plane}Position',
-            f'{bpm}/Acquisition#{plane}position',
-            f'{bpm}/Acquisition#position{plane.upper()}',
-            f'{bpm}/Acquisition#pos{plane.upper()}',
-        ]
-        return self._valid_japc_value(candidates, default=np.nan)
+        return self.japc.getParam(f"{bpm}/Acquisition#{plane}")
 
     def _read_bpm_intensity(self, bpm):
         candidates = [
