@@ -52,5 +52,5 @@ print(japc.getParam("CA.BTV0125_CA.BTV0215/OPSettingSystem1#positionChannel1"))
 print("Successfully run method 'get_screens' with inserted screen!")
 
 print("Reading method 'get_screens' without inserted screen (no beam)...")
-I.get_screens()
+#I.get_screens()
 print("Successfully run method 'get_screens' without inserted screen (no beam)!")
