@@ -44,7 +44,9 @@ print("Methods to test reading screens.")
 print("Reading method 'get_screens' with inserted screen...")
 #I.get_screens()
 print("Last image reading...")
-print(japc.getParam("CA.BTV0125.DigiCam/LastImage#image2D"))
+#pixelCalSet1 or 2
+#print(japc.getParam("CA.BTV0125.DigiCam/LastImage#image2D"))
+print(japc.getParam("CA.BTV0125_CA.BTV0215/OPSettingSystem1#positionChannel1"))
 
 
 print("Successfully run method 'get_screens' with inserted screen!")

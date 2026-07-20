@@ -562,12 +562,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "vpixel": np.asarray(vpixel_list, dtype=float),
             "x": np.asarray(xb_list, dtype=float),
             "y": np.asarray(yb_list, dtype=float),
-            "sigx": np.asarray(sigx_list, dtype=float),
+            "sigx": np.asarray(sigx_list, dtype=float), # we need to get that from the image
             "sigy": np.asarray(sigy_list, dtype=float),
             "sum": np.asarray(sum_list, dtype=float),
-            "hedges": hedges_all,
+            "hedges": hedges_all, #imagePositionSet1 i think its an array
             "vedges": vedges_all,
-            "images": images,
+            "images": images, #image2D
+            #
             "S": np.asarray(s_positions, dtype=float),
             "inout": np.asarray(inout_list, dtype=float),
         }
