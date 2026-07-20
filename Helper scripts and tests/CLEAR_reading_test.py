@@ -13,7 +13,7 @@ import pyjapc
 
 I = CLEAR_real_machine()
 
-
+japc = pyjapc.PyJapc("SCT.USER.ALL", incaAcceleratorName="CTF")
 print("Methods to test Orbit Measurement.")
 # print("Reading method 'get_state'...")
 # I.get_state()
@@ -23,7 +23,7 @@ print("Methods to test Orbit Measurement.")
 #bpms = I.get_bpms(names=["CA.BPM0530H-AS"])
 #correctors = I.get_correctors(names=[""])
 print("Here you go...")
-print(self.japc.getParam("CA.DHG0130/SettingPPM#current"))
+print(japc.getParam("CA.DHG0130/SettingPPM#current"))
 state = State(correctors=correctors)
 #orbit = state.get_orbit()
 print("Successfully run method 'get_orbit'!")
