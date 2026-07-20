@@ -14,7 +14,7 @@ import pyjapc
 I = CLEAR_real_machine()
 
 japc = pyjapc.PyJapc("", incaAcceleratorName="CTF")
-print("Methods to test Orbit Measurement.")
+#print("Methods to test Orbit Measurement.")
 # print("Reading method 'get_state'...")
 # I.get_state()
 # print("Successfully run method 'get_state'!")
@@ -22,18 +22,18 @@ print("Methods to test Orbit Measurement.")
 #print("Reading method 'get_orbit'...")
 #bpms = I.get_bpms(names=["CA.BPM0530H-AS"])
 #correctors = I.get_correctors(names=[""])
-print("Here you go...")
-#print(japc.getParam("CA.DHG0130/SettingPPM#current")) # this works!, A
-print(japc.getParam("CA.DHG0130/Status"))
+# print("Here you go...")
+# #print(japc.getParam("CA.DHG0130/SettingPPM#current")) # this works!, A
+# print(japc.getParam("CA.DHG0130/Status"))
 
-state = State(correctors=correctors)
-#orbit = state.get_orbit()
-print("Successfully run method 'get_orbit'!")
-
-print("Reading method 'get_correctors'...")
-I.get_correctors()
-print("Successfully run method 'get_correctors'!")
+# state = State(correctors=correctors)
+# #orbit = state.get_orbit()
+# print("Successfully run method 'get_orbit'!")
 #
+# print("Reading method 'get_correctors'...")
+# I.get_correctors()
+# print("Successfully run method 'get_correctors'!")
+# #
 # print("Reading method 'get_bpms'...")
 # I.get_bpms()
 # print("Successfully run method 'get_bpms'!")
@@ -42,7 +42,11 @@ print("Successfully run method 'get_correctors'!")
 
 print("Methods to test reading screens.")
 print("Reading method 'get_screens' with inserted screen...")
-I.get_screens()
+#I.get_screens()
+print("Last image reading...")
+print(japc.getParam("CA.BTV0125.DigiCam/LastImage#image2D"))
+
+
 print("Successfully run method 'get_screens' with inserted screen!")
 
 print("Reading method 'get_screens' without inserted screen (no beam)...")
