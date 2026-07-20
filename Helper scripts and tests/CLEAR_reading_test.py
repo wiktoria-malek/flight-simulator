@@ -24,7 +24,7 @@ print("Methods to test Orbit Measurement.")
 #correctors = I.get_correctors(names=[""])
 print("Here you go...")
 #print(japc.getParam("CA.DHG0130/SettingPPM#current")) # this works!, A
-print(japc.getParam("CA.DHG0130/"))
+print(japc.getParam("CA.DHG0130/Status"))
 
 state = State(correctors=correctors)
 #orbit = state.get_orbit()
