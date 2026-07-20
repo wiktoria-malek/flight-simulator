@@ -13,7 +13,7 @@ import pyjapc
 
 I = CLEAR_real_machine()
 
-japc = pyjapc.PyJapc("SCT.USER.ALL", incaAcceleratorName="CTF")
+japc = pyjapc.PyJapc("", incaAcceleratorName="CTF")
 print("Methods to test Orbit Measurement.")
 # print("Reading method 'get_state'...")
 # I.get_state()
