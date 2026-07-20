@@ -23,8 +23,8 @@ print("Methods to test Orbit Measurement.")
 #bpms = I.get_bpms(names=["CA.BPM0530H-AS"])
 #correctors = I.get_correctors(names=[""])
 print("Here you go...")
-#print(japc.getParam("CA.DHG0130/SettingPPM#current")) # this works!
-print(japc.getParam("CA.DHG0130/SettingPPM"))
+#print(japc.getParam("CA.DHG0130/SettingPPM#current")) # this works!, A
+print(japc.getParam("CA.DHG0130"))
 
 state = State(correctors=correctors)
 #orbit = state.get_orbit()
