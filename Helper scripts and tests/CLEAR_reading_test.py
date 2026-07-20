@@ -20,6 +20,7 @@ print("Methods to test Orbit Measurement.")
 # print("Successfully run method 'get_state'!")
 
 print("Reading method 'get_orbit'...")
+bpms = I.get_bpms()
 state = State(bpms=bpms, correctors=correctors)
 orbit = state.get_orbit()
 print("Successfully run method 'get_orbit'!")
