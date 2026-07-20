@@ -644,6 +644,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
     def get_correctors(self, names=None):
+        #{corr_name}/SettingPPM#current
         self.log("Reading correctors' strengths...")
         selected_names = self.corrs if names is None else ([names] if isinstance(names, str) else list(names))
 
