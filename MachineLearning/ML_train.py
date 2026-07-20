@@ -418,7 +418,7 @@ class MLInterface:
 if __name__ == "__main__":
     trainer = TrainModel(
         machine_name="ATF2",
-        quad_name="QF17X",
+        quad_name="QD18X",
         screens=["OTR0X", "OTR1X", "OTR2X", "OTR3X"],
     )
     trainer.train()

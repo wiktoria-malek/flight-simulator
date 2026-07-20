@@ -71,7 +71,7 @@ class Optimization:
 
         try:
             J = np.asarray(ls_result.jac, dtype=float)
-            r = np.asarray(ls_result.fun, dtype=float)
+            r = np.asarray(ls_result.fun, dtype=float) # residual sigma^2 pred - sigma^2 meas
             p = np.asarray(ls_result.x, dtype=float)
         except AttributeError:
             return {
@@ -81,14 +81,20 @@ class Optimization:
                 "chi2_like": np.nan,
             }
 
-        ndata = len(r)
-        npar = len(p)
-        dof = max(ndata - npar, 1)
+        ndata = len(r) # number of measurements
+        npar = len(p) # number of parameters
+        dof = max(ndata - npar, 1) # degrees of freedom
 
-        chi2_like = float(np.sum(r ** 2))
-        reduced_chi2_like = chi2_like / dof
+        chi2_like = float(np.sum(r ** 2)) # the smaller, the better the model
+        reduced_chi2_like = chi2_like / dof # average error per 1 measurement
 
         try:
+            """
+            Cov = s^2 * (J.T * J )^(-1)
+            s^2 = sum(r_i^2)/(N - p)
+            on diagonal line of cov matrix are variances of parameters
+            """
+
             cov = np.linalg.pinv(J.T @ J) * reduced_chi2_like
             param_errors = np.sqrt(np.maximum(np.diag(cov), 0.0))
         except Exception:

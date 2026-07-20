@@ -23,7 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 OUTPUT_FILE = PROJECT_ROOT / "MachineLearning" / "EM_dataset.npz"
 N_SAMPLES = 2000
 RANDOM_SEED = 2137
-
+CHECKPOINT_ROWS = 1000
 PARAMETER_NAMES = [
     "emit_x_norm",
     "beta_x0",
@@ -35,6 +35,32 @@ PARAMETER_NAMES = [
 ]
 
 N_K1_PER_TWISS = 7
+
+def _save_dataset_checkpoint(output_file, X, Y, twiss_group_ids, screens, quad_name, k1_relative_change, bounds, interface, K1_nominal, n_samples, n_twiss_combinations, n_k1_per_twiss_set):
+    output_file = Path(output_file)
+    tmp_file = Path(output_file).with_name("tmp_dataset.npz")
+    np.savez(
+        tmp_file,
+        X=np.asarray(X, dtype=float),
+        Y=np.asarray(Y, dtype=float),
+        twiss_group_ids=np.asarray(twiss_group_ids, dtype=int),
+        param_names=np.array(PARAMETER_NAMES),
+        sigma_names=np.array([f"sigx2_{screen}" for screen in screens] + [f"sigy2_{screen}" for screen in screens]),
+        screens=np.array(screens),
+        quad_name=np.array(quad_name),
+        reference_screen=np.array(screens[0]),
+        K1_relative_change=np.array(k1_relative_change, dtype=float),
+        bounds=np.array([bounds[name] for name in PARAMETER_NAMES[:-1]], dtype=float),
+        bounds_names=np.array(PARAMETER_NAMES[:-1]),
+        interface_class_name=np.array(interface.__class__.__name__),
+        interface_module=np.array(interface.__class__.__module__),
+        K1_nominal=np.array(K1_nominal, dtype=float),
+        n_requested_samples=np.array(n_samples, dtype=int),
+        n_twiss_combinations=np.array(n_twiss_combinations, dtype=int),
+        n_k1_per_twiss_set=np.array(n_k1_per_twiss_set, dtype=int),
+    )
+    tmp_file.replace(output_file)
+
 
 def _get_interface_initial_settings(interface):
     interface_class_name = interface.__class__.__name__
@@ -110,8 +136,7 @@ def append_dataset(quad_name, screens, interface, k1_relative_change, n_samples,
 
     X = np.concatenate([existing["X"], new["X"]])
     Y = np.concatenate([existing["Y"], new["Y"]])
-    existing.close()
-    new.close()
+
     np.savez(
         existing_file,
         X=X,
@@ -142,6 +167,7 @@ def append_dataset(quad_name, screens, interface, k1_relative_change, n_samples,
     }
 
 def generate_dataset(quad_name, screens, interface, k1_relative_change, n_samples, output_file, log_callback, progress_callback, stop_checker, new_bounds = None):
+
     rng = np.random.default_rng(RANDOM_SEED)
     log = log_callback if callable(log_callback) else print
     n_samples = int(n_samples)
@@ -171,6 +197,7 @@ def generate_dataset(quad_name, screens, interface, k1_relative_change, n_sample
     Y = []
     failed = 0
     processed_rows = 0
+    last_checkpoint_rows = 0
     t0 = time.perf_counter()
 
     for twiss_combination in range(n_twiss_combinations):
@@ -210,6 +237,30 @@ def generate_dataset(quad_name, screens, interface, k1_relative_change, n_sample
                 twiss_group_ids.append(int(twiss_combination))
                 processed_rows += 1
 
+                if processed_rows - last_checkpoint_rows >= CHECKPOINT_ROWS:
+                    _save_dataset_checkpoint(
+                        output_file=output_file,
+                        X=X,
+                        Y=Y,
+                        twiss_group_ids=twiss_group_ids,
+                        screens=screens,
+                        quad_name=quad_name,
+                        k1_relative_change=k1_relative_change,
+                        bounds=bounds,
+                        interface=interface,
+                        K1_nominal=K1_nominal,
+                        n_samples=n_samples,
+                        n_twiss_combinations=n_twiss_combinations,
+                        n_k1_per_twiss_set=n_k1_per_twiss_set,
+                    )
+
+                    last_checkpoint_rows = processed_rows
+
+                    log(
+                        f"Checkpoint saved: "
+                        f"{processed_rows} valid rows going to {output_file}"
+                    )
+
         except Exception as e:
             failed += 1
             log(f"Twiss combination {twiss_combination+1} failed due to {e}")
@@ -230,32 +281,20 @@ def generate_dataset(quad_name, screens, interface, k1_relative_change, n_sample
     if X.size == 0 or Y.size == 0:
         raise RuntimeError("X and Y are empty")
 
-    np.savez(
-        output_file,
+    _save_dataset_checkpoint(
+        output_file=output_file,
         X=X,
         Y=Y,
-        param_names=np.array([
-            "emit_x_norm",
-            "beta_x0",
-            "alpha_x0",
-            "emit_y_norm",
-            "beta_y0",
-            "alpha_y0",
-            "K1",
-        ]),
-        sigma_names=np.array([f"sigx2_{screen}" for screen in screens] + [f"sigy2_{screen}" for screen in screens]),
-        screens=np.array(screens),
-        quad_name=np.array(quad_name),
-        reference_screen=np.array(screens[0]),
-        K1_relative_change=np.array(k1_relative_change, dtype=float),
-        bounds=np.array([bounds[name] for name in PARAMETER_NAMES[:-1]], dtype=float),
-        bounds_names=np.array(PARAMETER_NAMES[:-1]),
-        interface_class_name=np.array(interface.__class__.__name__),
-        interface_module=np.array(interface.__class__.__module__),
-        K1_nominal=np.array(K1_nominal, dtype=float),
-        n_requested_samples = np.array(n_samples, dtype=int),
-        n_twiss_combinations = np.array(n_twiss_combinations, dtype=int),
-        n_k1_per_twiss_set = np.array(n_k1_per_twiss_set, dtype=int),
+        twiss_group_ids=twiss_group_ids,
+        screens=screens,
+        quad_name=quad_name,
+        k1_relative_change=k1_relative_change,
+        bounds=bounds,
+        interface=interface,
+        K1_nominal=K1_nominal,
+        n_samples=n_samples,
+        n_twiss_combinations=n_twiss_combinations,
+        n_k1_per_twiss_set=n_k1_per_twiss_set,
     )
 
     log("Done.")

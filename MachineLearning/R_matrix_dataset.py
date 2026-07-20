@@ -1,15 +1,14 @@
 import sys, time
 from pathlib import Path
-from Interfaces.interface_setup import INTERFACE_SETUP
-import numpy as np
-
 THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = THIS_FILE.parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+from Interfaces.interface_setup import INTERFACE_SETUP
+import numpy as np
 
-OUTPUT_FILE = PROJECT_ROOT / "MachineLearning" / "R_matrix_dataset_fixedK1.npz"
-N_SAMPLES = 2000
+OUTPUT_FILE = PROJECT_ROOT / "MachineLearning" / "ATF2" / "QD18X"/ "Linear_Response_dataset.npz"
+N_SAMPLES = 5000
 RANDOM_SEED = 2137
 
 PARAMETER_NAMES = [
@@ -185,24 +184,14 @@ def generate_dataset(quad_name, screens, interface, k1_relative_change, n_sample
 
 def main():
     from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
-
-    interface = InterfaceATF2_Ext_RFTrack(nparticles=1000)
-
-    quad_name = "QD18X"
-    screens = list(interface.get_screens()["names"])
-
+    interface = InterfaceATF2_Ext_RFTrack()
+    quad_name = "QF17X"
+    screens = list(getattr(interface, "screens", []))
     print("Generating R-matrix fixed-K1 dataset")
 
-    generate_dataset(
-        quad_name=quad_name,
-        screens=screens,
-        interface=interface,
-        k1_relative_change=(0.0, 0.0),
-        n_samples=N_SAMPLES,
-        output_file=OUTPUT_FILE,
-        log_callback=print,
-        progress_callback=None,
-        stop_checker=None,
+    generate_dataset(quad_name=quad_name, screens=screens, interface=interface,
+        k1_relative_change=(0.0, 0.0), n_samples=N_SAMPLES, output_file=OUTPUT_FILE,
+        log_callback=print, progress_callback=None, stop_checker=None,
     )
 
 

@@ -192,13 +192,16 @@ class SaveOrLoad():
         with open(os.path.join(save_session_dir, "correction_matrices.pkl"), "wb") as f:
             pickle.dump(correction_matrices, f)
 
-    def load_screens_data(self):
-        default_dir = f"~/CERN-Flight_Simulator-Data/"
-        default_dir = os.path.expanduser(os.path.expandvars(default_dir))
-        os.makedirs(default_dir, exist_ok=True)
-        folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
-        if not folder:
-            return
+    def load_screens_data(self, folder=None):
+        if folder is None:
+            default_dir = f"~/CERN-Flight_Simulator-Data/"
+            default_dir = os.path.expanduser(os.path.expandvars(default_dir))
+            os.makedirs(default_dir, exist_ok=True)
+            folder = QFileDialog.getExistingDirectory(self, "Select database", default_dir)
+            if not folder:
+                return
+        else:
+            folder = folder
         self.load_screens_data_database.setText(folder)
         quad_selected = None
         screens = []
@@ -291,7 +294,6 @@ class SaveOrLoad():
 
         return self.loaded_states_from_scan
 
-
     def load_scan_and_optimization_settings(self):
         default_dir = f"~/CERN-Flight_Simulator-Data/"
         default_dir = os.path.expanduser(os.path.expandvars(default_dir))
@@ -300,8 +302,12 @@ class SaveOrLoad():
         if not folder:
             return
         quad_selected = None
-        self.load_session_button.setText(folder)
-
+        self.session_directory.setText(folder)
+        for name in os.listdir(folder):
+            if name.startswith("states_"):
+                screens_data_path = os.path.join(folder, name)
+                print(folder, name)
+                self.loaded_states_from_scan = self.load_screens_data(screens_data_path)
         # load quadrupoles
         quad_txt = os.path.join(folder, "quadrupoles.txt")
         if os.path.isfile(quad_txt):
@@ -314,23 +320,30 @@ class SaveOrLoad():
         if os.path.isfile(screens_txt):
             self._loading_func(elements_list=self.screens_list, filename="screens.txt", loading_name="Load Screens", use_dialog=False, base_dir=folder)
 
-        with open(emittance_settings_path, "r") as f:
-            self.emittance_settings = json.load(f)
+        try:
+            with open(emittance_settings_path, "r") as f:
+                self.emittance_settings = json.load(f)
+            if "delta_min" in self.emittance_settings: self.delta_min_scan.setValue(
+                float(self.emittance_settings["delta_min"]))
+            if "delta_max" in self.emittance_settings: self.delta_max_scan.setValue(
+                float(self.emittance_settings["delta_max"]))
+            if "scan_steps" in self.emittance_settings: self.steps_settings.setValue(
+                int(self.emittance_settings["scan_steps"]))
+            if "nshots" in self.emittance_settings: self.meas_per_step.setValue(int(self.emittance_settings["nshots"]))
+            if "initial_points_xopt" in self.emittance_settings: self.xopt_initial_points_spin.setValue(
+                int(self.emittance_settings["initial_points_xopt"]))
+            if "xopt_steps" in self.emittance_settings: self.xopt_steps_spin.setValue(
+                int(self.emittance_settings["xopt_steps"]))
+            if "ls_steps" in self.emittance_settings: self.nm_steps_spin.setValue(
+                int(self.emittance_settings["ls_steps"]))
+            if "is_fit_quad_strength_checked" in self.emittance_settings: self.fit_quadrupole_strength_checkbox.setChecked(
+                bool(self.emittance_settings["is_fit_quad_strength_checked"]))
 
+            QMessageBox.information(self.load_session_button, "Data directory selected", "Loaded session")
 
-        if "delta_min" in self.emittance_settings: self.delta_min_scan.setValue(float(self.emittance_settings["delta_min"]))
-        if "delta_max" in self.emittance_settings: self.delta_max_scan.setValue(float(self.emittance_settings["delta_max"]))
-        if "scan_steps" in self.emittance_settings: self.steps_settings.setValue(float(self.emittance_settings["scan_steps"]))
-        if "nshots" in self.emittance_settings: self.meas_per_step.setValue(float(self.emittance_settings["nshots"]))
-        if "initial_points_xopt" in self.emittance_settings: self.xopt_initial_points_spin.setValue(int(self.emittance_settings["initial_points_xopt"]))
-        if "xopt_steps" in self.emittance_settings: self.xopt_steps_spin.setValue(int(self.emittance_settings["xopt_steps"]))
-        if "ls_steps" in self.emittance_settings: self.nm_steps_spin.setValue(int(self.emittance_settings["ls_steps"]))
-        if "is_fit_quad_strength_checked" in self.emittance_settings: self.fit_quadrupole_strength_checkbox.setChecked(
-            bool(self.emittance_settings["is_fit_quad_strength_checked"]))
-
-        QMessageBox.information(self.load_session_button, "Data directory selected", "Loaded session")
-
-
+        except:
+            QMessageBox.warning(self, "Load session settings.", "Screens datafiles should be loaded above. This is a place for session settings directory.")
+            return
 
     def load_session_settings(self):
         default_dir = f"~/CERN-Flight_Simulator-Data/"

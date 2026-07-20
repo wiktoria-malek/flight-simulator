@@ -343,7 +343,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
         PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
 
-
     def extract_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
         if screen_pv_name is None:

@@ -146,6 +146,7 @@ class QuadrupoleScan(SaveOrLoad):
         images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
         output_dir = self._get_scan_dir(quad_name, steps_requested)
         cancel_requested = False
+        self.load_screens_data_database.setText(output_dir)
 
         try:
             for k, screen_name in enumerate(screens):

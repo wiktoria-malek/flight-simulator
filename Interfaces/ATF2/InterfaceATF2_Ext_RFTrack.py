@@ -8,30 +8,29 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 # from .knobs import KnobSystem
 class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
-# For OTR0X:
-# emit x 5.2
-# beta x 6.305152438
-# alpha x -4.494292895
-# emit y 0.03
-# beta y 6.190329503
-# alpha y 2.576336962
-
 # For QD18X end:
 # emit x 5.2
-# beta x 1.105221776
-# alpha x -0.7752115812
+# beta x 1.661025619
+# alpha x -2.142952966
 # emit y 0.03
-# beta y 10.34240856
-# alpha y -3.739163822
+# beta y 10.4249046
+# alpha y 3.181594115
 
-# For QF17X end:
+# For QF17Xv:
 #     "emit_x": 5.2,
-#     "beta_x0": 4.626710278,
-#     "alpha_x0": 2.388942054 ,
+#     "beta_x0": 4.868043658,
+#     "alpha_x0": 0.001450331482 ,
 #     "emit_y": 0.03,
-#     "beta_y0": 0.708738623,
-#     "alpha_y0": -0.3997186189,
+#     "beta_y0": 0.6796808288 ,
+#     "alpha_y0": 0.1019908616 ,
 
+# For QD16X end:
+#     "emit_x": 5.2,
+#     "beta_x0": 0.920270374,
+#     "alpha_x0": -0.5756879401 ,
+#     "emit_y": 0.03,
+#     "beta_y0": 5.215595754,
+#     "alpha_y0": 2.942907679,
 
     def get_name(self):
         return 'ATF2_Ext_RFT'

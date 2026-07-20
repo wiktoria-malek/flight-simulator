@@ -237,17 +237,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         except Exception:
             return float(default)
 
-    def _valid_japc_value(self, param_names, default=np.nan):
-        for param_name in param_names:
-            try:
-                value = self.japc.getParam(param_name)
-            except Exception:
-                continue
-            value = self.make_safe_float(value, default=np.nan)
-            if np.isfinite(value):
-                return value
-        return float(default)
-
     def change_energy(self):
         self.log('Function change_energy needs implementation.')
         return 0.0
@@ -349,7 +338,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         try:
             self.japc.setSelector('')
             return self.japc.getParam(f'{japc_camera}.DigiCam/Setting')
-        except Exception:
+        except Exception as e:
+            print(e)
             return None
 
     def _read_screen_h_matrix(self, screen_name):
@@ -362,12 +352,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def _read_screen_status(self, screen_name):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        candidates = [
-            f'{japc_camera}/Acquisition#screenIn',
-            f'{japc_camera}/Status#screenIn',
-            f'{japc_camera}/Status#position',
-        ]
-        return self._valid_japc_value(candidates, default=np.nan)
+        address = f'{japc_camera}/Acquisition#screenIn'
+        value = self.japc.getParam(address)
+        return value
 
     def _acquire_screen_image(self, screen_name):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
@@ -375,13 +362,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         selector = camera_config.get('japc_selector', '')
         try:
             self.japc.setSelector(selector)
-            try:
-                image = self.japc.getParam(f'{japc_camera}.DigiCam/LastImage#image2D')
-            except Exception:
-                try:
-                    image = self.japc.getParam(f'{japc_camera}.DigiCam/ExtractionImage')
-                except Exception:
-                    image = self.japc.getParam(f'{japc_camera}/Image')
+            image = self.japc.getParam(f'{japc_camera}.DigiCam/LastImage#image2D')
         except Exception as exc:
             self.log(f'Could not read image from {screen_name}: {exc}')
             return None
@@ -415,8 +396,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         try:
             if setting.get('imageROIEnable'):
                 x0, y0, dx, dy = setting['imageROI']
-                return np.array([x0, x0 + dx, y0, y0 + dy], dtype=int)
-            _, _, width, height = setting['imageWindow']
+                return np.array([x0, x0 + dx, y0, y0 + dy], dtype=int) # left and right edge of x, the same for y
+            _, _, width, height = setting['imageWindow'] # if not enabled, takes the whole screen image
             return np.array([0, width, 0, height], dtype=int)
         except Exception:
             return np.array([0, image_shape[1], 0, image_shape[0]], dtype=int)
@@ -434,12 +415,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
         if not np.isfinite(peak) or peak <= 0:
             return None
 
-        mask = work >= threshold_fraction * peak
+        mask = work >= threshold_fraction * peak # if the most intense pixel has a value of 1000, then, takes values from 200 up, assuming that for example, threshold is 0.2
         ys, xs = np.where(mask)
         if xs.size == 0 or ys.size == 0:
             return None
 
         ny, nx = work.shape
+        # calculates a smaller rectangle, to isolate the beam from the rest + 20
         x0 = max(0, int(xs.min()) - margin)
         x1 = min(nx, int(xs.max()) + margin + 1)
         y0 = max(0, int(ys.min()) - margin)
@@ -453,8 +435,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         img = np.asarray(image, dtype=float).copy()
         img[~np.isfinite(img)] = 0.0
-        img = img - np.nanmin(img)
-        total = float(np.sum(img))
+        img = img - np.nanmin(img) # lowest values are treated as background, so subtracts lowest value from every cell
+        total = float(np.sum(img)) # intensity
         ny, nx = img.shape
 
         if total <= 0.0 or nx == 0 or ny == 0:
@@ -467,13 +449,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
         if not np.isfinite(vpixel) or vpixel <= 0:
             vpixel = 1.0
 
-        x_centers = (np.arange(nx, dtype=float) - 0.5 * (nx - 1)) * hpixel
+        x_centers = (np.arange(nx, dtype=float) - 0.5 * (nx - 1)) * hpixel # subtracts centre of the image, multiplies by the pixel size and therefore its a position with resect to centre of the image
         y_centers = (np.arange(ny, dtype=float) - 0.5 * (ny - 1)) * vpixel
 
-        proj_x = np.sum(img, axis=0)
-        proj_y = np.sum(img, axis=1)
+        proj_x = np.sum(img, axis=0) # sum of intensity in each column
+        proj_y = np.sum(img, axis=1) # sum of intensity in each row
 
-        x_mean = float(np.sum(x_centers * proj_x) / total)
+        x_mean = float(np.sum(x_centers * proj_x) / total) # center of intensity of the image
         y_mean = float(np.sum(y_centers * proj_y) / total)
         sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
         sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
@@ -510,6 +492,19 @@ class CLEAR_real_machine(AbstractMachineInterface):
         value = self._valid_japc_value(candidates, default=np.nan)
         return value if np.isfinite(value) else 1.0
 
+    # def insert_screen(self, screen_name):
+    #     screen_pv_name = self.screen_pv_names.get(screen_name)
+    #     if screen_pv_name is None:
+    #         raise ValueError(f"Unknown screen: {screen_name}")
+    #     status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
+    #     PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
+    #
+    # def extract_screen(self, screen_name):
+    #     screen_pv_name = self.screen_pv_names.get(screen_name)
+    #     if screen_pv_name is None:
+    #         raise ValueError(f"Unknown screen: {screen_name}")
+    #     PV(f"{screen_pv_name}:Target:WRITE:OUT").put(1)
+
     def get_screens(self, names=None):
         self.log('Reading screens...')
 
@@ -532,23 +527,24 @@ class CLEAR_real_machine(AbstractMachineInterface):
         inout_list = []
 
         for screen_name in selected_names:
-            camera_config = self.screen_config.get(screen_name, {})
+            camera_config = self.screen_config.get(screen_name, {}) # gets pixel size and resolutino
             hpixel = float(camera_config.get('s_x_res', np.nan))
             vpixel = float(camera_config.get('s_y_res', np.nan))
 
-            status = self._read_screen_status(screen_name)
-            setting = self._read_screen_setting(screen_name)
+            status = self._read_screen_status(screen_name) # is screen inserted or extracted?
+            setting = self._read_screen_setting(screen_name) # reads settings of the screen
             image = self._acquire_screen_image(screen_name)
             if image is not None:
-                roi = self._roi_from_setting(setting, image.shape)
+                # Region Of Interest
+                roi = self._roi_from_setting(setting, image.shape) # instead of analyzing the whole picture, gets the relevant area, with the beam on it
                 x0, x1, y0, y1 = roi
-                x0 = max(0, min(int(x0), image.shape[1]))
+                x0 = max(0, min(int(x0), image.shape[1])) # if roi is out of the image, it gets clipped
                 x1 = max(x0, min(int(x1), image.shape[1]))
                 y0 = max(0, min(int(y0), image.shape[0]))
                 y1 = max(y0, min(int(y1), image.shape[0]))
                 image = image[y0:y1, x0:x1]
 
-                auto_roi = self._auto_aoi_from_image(image)
+                auto_roi = self._auto_aoi_from_image(image) # only pure beam spot
                 if auto_roi is not None:
                     ax0, ax1, ay0, ay1 = auto_roi
                     image = image[ay0:ay1, ax0:ax1]
@@ -557,13 +553,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
-            xb_list.append(x_mean)
+            xb_list.append(x_mean) # x_mean is a center of the beam
             yb_list.append(y_mean)
             sigx_list.append(sigx)
             sigy_list.append(sigy)
-            sum_list.append(total)
+            sum_list.append(total) # sum of all pixels -> intensity
             images.append(image)
-            hedges_all.append(hedges)
+            hedges_all.append(hedges) # pixel coordinates
             vedges_all.append(vedges)
             inout_list.append(status)
 

@@ -15,18 +15,10 @@ class LinearResponse:
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
         if coefficients_path is None:
-            coefficients_path = os.path.join(
-                project_root,
-                "MachineLearning",
-                "R_matrix_recovered_coefficients.npz",
-            )
+            coefficients_path = os.path.join(project_root, "MachineLearning", "ATF2", "QD18X", "Linear_Response_coefficients.npz")
 
         if dataset_path is None:
-            dataset_path = os.path.join(
-                project_root,
-                "MachineLearning",
-                "R_matrix_dataset_fixedK1.npz",
-            )
+            dataset_path = os.path.join(project_root, "MachineLearning", "ATF2", "QD18X", "Linear_Response_dataset.npz")
 
         self.coefficients_path = coefficients_path
         self.dataset_path = dataset_path
@@ -37,10 +29,7 @@ class LinearResponse:
             self.fit_coefficients_from_R_dataset(self.dataset_path)
             self.save_coefficients(self.coefficients_path)
         else:
-            raise FileNotFoundError(
-                "Linear response data not found. Expected either "
-                f"{self.coefficients_path} or {self.dataset_path}."
-            )
+            raise FileNotFoundError(f"Linear response data not found. Expected either {self.coefficients_path} or {self.dataset_path}.")
 
     def _load_coefficients(self, path):
         data = np.load(path, allow_pickle=True)
@@ -52,12 +41,7 @@ class LinearResponse:
         if path is None:
             path = self.coefficients_path
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        np.savez(
-            path,
-            screens=np.asarray(self.screens),
-            Rx_fit=self.Rx,
-            Ry_fit=self.Ry,
-        )
+        np.savez(path, screens=np.asarray(self.screens), Rx_fit=self.Rx, Ry_fit=self.Ry)
 
     def fit_coefficients_from_R_dataset(self, dataset_path=None):
         if dataset_path is None:
@@ -86,8 +70,6 @@ class LinearResponse:
         #         sigy_screen3,
         #     ]
         # ]
-
-
 
         O = np.asarray(dataset["Y"], dtype=float) # response on screens, sigma**2
         self.screens = [str(s) for s in dataset["screens"]]
