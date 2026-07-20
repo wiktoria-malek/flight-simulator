@@ -40,17 +40,19 @@ japc = pyjapc.PyJapc("", incaAcceleratorName="CTF")
 # print("Orbit Measurement is able to run.")
 
 
-print("Methods to test reading screens.")
-print("Reading method 'get_screens' with inserted screen...")
-#I.get_screens()
-print("Last image reading...")
-#pixelCalSet1 or 2
-#print(japc.getParam("CA.BTV0125.DigiCam/LastImage#image2D"))
-print(japc.getParam("CA.BTV0390_CAS.BTV0420/OPSettingSystem1#positionChannel1"))
+# print("Methods to test reading screens.")
+# print("Reading method 'get_screens' with inserted screen...")
+# #I.get_screens()
+# print("Last image reading...")
+# #pixelCalSet1 or 2
+# #print(japc.getParam("CA.BTV0125.DigiCam/LastImage#image2D"))
+# print(japc.getParam("CA.BTV0390_CAS.BTV0420/OPSettingSystem1#positionChannel1")) # anything else than 0 meanssscreen is in
+#
+# # 0 out, 1 in
+# print("Successfully run method 'get_screens' with inserted screen!")
+#
+# print("Reading method 'get_screens' without inserted screen (no beam)...")
+# #I.get_screens()
+# print("Successfully run method 'get_screens' without inserted screen (no beam)!")
 
-
-print("Successfully run method 'get_screens' with inserted screen!")
-
-print("Reading method 'get_screens' without inserted screen (no beam)...")
-#I.get_screens()
-print("Successfully run method 'get_screens' without inserted screen (no beam)!")
+print(japc.getParam("CA.QFD0350/SettingPPM#current")) # this works!, A
