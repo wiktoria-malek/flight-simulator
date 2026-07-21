@@ -59,7 +59,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BEAM/Acquisition#energy',
         ]
 
-        self.context = ""
+        self.context = "SCT.USER.ALL"
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 

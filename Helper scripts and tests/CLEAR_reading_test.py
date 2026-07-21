@@ -10,7 +10,7 @@ from Interfaces.CLEAR.InterfaceCLEAR import CLEAR_real_machine
 
 I = CLEAR_real_machine()
 
-japc = pyjapc.PyJapc("", incaAcceleratorName="CTF")
+japc = pyjapc.PyJapc("SCT.USER.ALL", incaAcceleratorName="CTF")
 # # print("Methods to test Orbit Measurement.")
 # # state = State(correctors=correctors)
 # # print("Reading method 'get_orbit'...")
