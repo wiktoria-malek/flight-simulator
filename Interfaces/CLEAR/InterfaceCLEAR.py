@@ -1,6 +1,6 @@
 import sys, time, math, os
 import numpy as np
-import pyjapc
+import pyda, pyda_japc
 
 try:
     from Interfaces.CLEAR import config
@@ -24,18 +24,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 198 # MeV/c
-        self.energy_param = [
-            'CA.BEAM/Acquisition#momentum',
-            'CA.BEAM/Acquisition#energy',
-        ]
-        self.laser_attenuator_set_param = 'CA.GUN-ATTN/CMD#requestedPosition'
         self.laser_attenuator_readback = [
             'CA.GUN-ATTN/AQN#actualPosition',
             'CA.GUN-ATTN/CMD#requestedPosition',
         ]
         self.laser_attenuator_min = 0.0
-        self.laser_attenuator_max = 3000.0
-        self.laser_motor_attenuator_set_param = 'CTF2Motor2B/Setting#targetPosition'
+        self.laser_attenuator_max = 3.0
         self.laser_motor_attenuator_readback = [
             'CTF2Motor2B/Acquisition#position',
             'CTF2Motor2B/Acquisition#actualPosition',
@@ -60,8 +54,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'UVBEAM2': 'CO.TOSL.101.UVBEAM2_Acq_Pos/AcquisitionBoolean#value',
         }
 
+        self.energy_param = [
+            'CA.BEAM/Acquisition#momentum',
+            'CA.BEAM/Acquisition#energy',
+        ]
+
+        self.context = ""
         self.log = print
-        self.japc = pyjapc.PyJapc("SCT.USER.ALL", incaAcceleratorName="CTF")
+        self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 
         # Bpms and correctors in beamline order
         sequence = [
@@ -104,16 +104,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.DHJ0840', 'CA.DVJ0840',
         ]
 
-        self.corrector_set_params = {name: f'{name}/SettingPPM#current' for name in correctors}
-        self.corrector_get_params = {name: f'{name}/Acquisition#currentAverage' for name in correctors}
+        self.corrector_set_params = {name: f'{name}/SettingPPM' for name in correctors}
+        self.corrector_get_params = {name: f'{name}/Acquisition' for name in correctors}
 
         self.sextupoles = []
-        self.quadrupoles = [
-            'CA.QFD0350', 'CA.QDD0355', 'CA.QFD0360', 'CA.QFD0510',
-            'CA.QDD0515', 'CA.QFD0520', 'CA.QFD0760', 'CA.QDD0765',
-            'CA.QFD0770', 'CA.QDD0870', 'CA.QFD0880',
-        ]
-
+        self.quadrupoles = list(config.quad_names)
         monitors_from_sequence = [element for element in sequence if element in monitors]
         bpm_ok = all(bpm in monitors for bpm in monitors_from_sequence)
         if not bpm_ok:
@@ -130,7 +125,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.screen_names = list(config.cameras.keys())
         self.screens = self.screen_names
         self.screen_config = config.cameras
-        self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
+        self.bpm_indexes = [index for index, string in enumerate(sequence) if string in self.bpms]
 
         # Bunch current monitors
         self.ict_names = [
@@ -146,8 +141,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "Gun_BCM": "CA.SABCM01/Samples#samples",
             "Vesper_BCM": "CA.SABPMCAL-SIS5-2/Samples#samples",
         }
-
-        self.bcm_gain_param = "CA.BCM01GAIN/Setting#enumValue"
 
         self.bcm_sensitivity = {
             "6dB": 2.085,
@@ -170,15 +163,15 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def get_beam_factors(self):
         pref = self.Pref
-        for param in self.energy_param:
-            try:
-                value = self.japc.getParam(param)
-                value = self.make_safe_float(value, default=np.nan)
-                if np.isfinite(value) and value > 0:
-                    pref = value
-                    break
-            except Exception:
-                pass
+        try:
+            data = self.client.get("CA.BEAM/Acquisition").data
+        except Exception as e:
+            data={}
+        for field in ("momentum", "energy"):
+            value = self.make_safe_float(data.get(field), default = np.nan)
+            if np.isfinite(value) and value > 0:
+                pref = value
+                break
         gamma_rel = np.sqrt((pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
         return gamma_rel, beta_rel
@@ -244,75 +237,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def reset_energy(self):
         self.log('Function reset_energy needs implementation.')
 
-    def _intensity_to_attenuator_position(self, value):
-        value = float(value)
-        if 0.0 <= value <= 1.0:
-            value = self.laser_attenuator_min + value * (self.laser_attenuator_max - self.laser_attenuator_min)
-        return float(np.clip(value, self.laser_attenuator_min, self.laser_attenuator_max))
-
-    def get_laser_attenuator_position(self):
-        value = self._valid_japc_value(self.laser_attenuator_readback, default=np.nan)
-        return value / 1e3 if np.isfinite(value) else np.nan
-
-    def set_laser_attenuator_position(self, position):
-        position = self._intensity_to_attenuator_position(position)
-        command_position = position * 1e3
-        self.log(f'Setting CLEAR gun attenuator to {position:.3f} ksteps ({command_position:.0f} steps)...')
-        self.japc.setParam(self.laser_attenuator_set_param, float(command_position))
-        time.sleep(1)
-        return position
-
-    def get_laser_motor_attenuator_position(self):
-        return self._valid_japc_value(self.laser_motor_attenuator_readback, default=np.nan)
-
-    def set_laser_motor_attenuator_position(self, position):
-        position = float(np.clip(float(position), 0.0, 3000.0))
-        self.log(f'Setting CLEAR motor attenuator to {position:.1f} steps...')
-        self.japc.setParam(self.laser_motor_attenuator_set_param, position)
-        time.sleep(1)
-        return position
-
-    def set_uv_attenuator_position(self, attenuator_name, position):
-        if attenuator_name not in self.uv_attenuator_params:
-            raise ValueError(f'Unknown UV attenuator {attenuator_name}. Expected one of {list(self.uv_attenuator_params)}')
-        min_pos, max_pos = self.uv_attenuator_ranges.get(attenuator_name, (-np.inf, np.inf))
-        position = float(np.clip(float(position), min_pos, max_pos))
-        self.log(f'Setting {attenuator_name} to {position:.1f}...')
-        self.japc.setParam(self.uv_attenuator_params[attenuator_name], position)
-        time.sleep(1)
-        return position
-
-    def set_uv_attenuator_percent(self, attenuator_name, percent):
-        if attenuator_name not in self.uv_attenuator_ranges:
-            raise ValueError(f'Unknown UV attenuator {attenuator_name}. Expected one of {list(self.uv_attenuator_ranges)}')
-        min_pos, max_pos = self.uv_attenuator_ranges[attenuator_name]
-        percent = float(np.clip(float(percent), 0.0, 100.0))
-        position = min_pos + (max_pos - min_pos) * percent / 100.0
-        return self.set_uv_attenuator_position(attenuator_name, position)
-
-    def set_shutter(self, shutter_name, open_shutter=True):
-        if shutter_name not in self.shutter_set_params:
-            raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_set_params)}')
-        self.japc.setParam(self.shutter_set_params[shutter_name], bool(open_shutter))
-        time.sleep(0.5)
-        return bool(open_shutter)
-
-    def get_shutter(self, shutter_name):
-        if shutter_name not in self.shutter_readback_params:
-            raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_readback_params)}')
-        value = self._valid_japc_value([self.shutter_readback_params[shutter_name]], default=np.nan)
-        if not np.isfinite(value):
-            return np.nan
-        return bool(value)
-
     def change_intensity(self):
-        target_position = self.set_laser_attenuator_position(self.test_laser_intensity)
-        self.log(f'CLEAR test intensity set through gun attenuator: {target_position:.3f} ksteps')
+        target_position = self.set_laser_motor_attenuator_position(self.test_laser_intensity)
+        self.log(f'CLEAR test intensity set through motor attenuator: {target_position:.3f} ksteps')
         return self
 
     def reset_intensity(self):
-        target_position = self.set_laser_attenuator_position(self.nominal_laser_intensity)
-        self.log(f'CLEAR nominal intensity restored through gun attenuator: {target_position:.3f} ksteps')
+        target_position = self.set_laser_motor_attenuator_position(self.nominal_laser_intensity)
+        self.log(f'CLEAR nominal intensity restored through motor attenuator: {target_position:.3f} ksteps')
         return self
 
     def get_sequence(self):
@@ -330,39 +262,20 @@ class CLEAR_real_machine(AbstractMachineInterface):
         name_to_index = {string: index for index, string in enumerate(self.sequence)}
         return [name_to_index.get(name, np.nan) for name in names]
 
-    def log_messages(self, console):
-        self.log = console or print
-
-    def _read_screen_setting(self, screen_name):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        try:
-            self.japc.setSelector('')
-            return self.japc.getParam(f'{japc_camera}.DigiCam/Setting')
-        except Exception as e:
-            print(e)
-            return None
-
-    def _read_screen_h_matrix(self, screen_name):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        try:
-            self.japc.setSelector('')
-            return self.japc.getParam(f'{japc_camera}Settings/Settings#h_matrix')
-        except Exception:
-            return None
-
     def _read_screen_status(self, screen_name):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        address = f'{japc_camera}/Acquisition#screenIn'
-        value = self.japc.getParam(address)
-        return value
+        try:
+            address = f'{japc_camera}/Acquisition'
+            return self.client.get(address, context=self.context).data['screenIn']
+        except Exception:
+            return np.nan
 
     def _acquire_screen_image(self, screen_name):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
         camera_config = self.screen_config.get(screen_name, {})
-        selector = camera_config.get('japc_selector', '')
+        selector = camera_config.get('japc_selector', self.context)
         try:
-            self.japc.setSelector(selector)
-            image = self.japc.getParam(f'{japc_camera}.DigiCam/LastImage#image2D')
+            image = self.client.get(f'{japc_camera}.DigiCam/LastImage', context=selector).data['image2D']
         except Exception as exc:
             self.log(f'Could not read image from {screen_name}: {exc}')
             return None
@@ -375,115 +288,193 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def set_screen_camera_on(self, screen_name, on=True):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.japc.setParam(f'{japc_camera}/Setting#cameraSwitch', int(bool(on)))
+        self.client.set(f'{japc_camera}.DigiCam/Setting', {"cameraSwitch": int(bool(on))})
 
     def set_screen_filter(self, screen_name, filter_value):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.japc.setParam(f'{japc_camera}/Setting#filterSelect', filter_value)
+        self.client.set(f'{japc_camera}.DigiCam/Setting', {"filterSelect": filter_value})
 
     def set_screen_video_gain(self, screen_name, gain_value):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.japc.setParam(f'{japc_camera}/Setting#videoGain', gain_value)
+        self.client.set(f'{japc_camera}.DigiCam/Setting', {"videoGain": gain_value})
 
     def set_screen_select(self, screen_name, screen_value):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.japc.setParam(f'{japc_camera}/Setting#screenSelect', screen_value)
+        self.client.set(f'{japc_camera}.DigiCam/Setting', {"screenSelect": screen_value})
 
-    @staticmethod
-    def _roi_from_setting(setting, image_shape):
-        if setting is None:
-            return np.array([0, image_shape[1], 0, image_shape[0]], dtype=int)
-        try:
-            if setting.get('imageROIEnable'):
-                x0, y0, dx, dy = setting['imageROI']
-                return np.array([x0, x0 + dx, y0, y0 + dy], dtype=int) # left and right edge of x, the same for y
-            _, _, width, height = setting['imageWindow'] # if not enabled, takes the whole screen image
-            return np.array([0, width, 0, height], dtype=int)
-        except Exception:
-            return np.array([0, image_shape[1], 0, image_shape[0]], dtype=int)
+    def get_icts(self, names=None):
+        self.log("Reading ict's...")
+        if names is None:
+            names = self.ict_names
+        if isinstance(names, str):
+            names = [names]
+        charge = []
+        for name in names:
+            property_address, field = name.rsplit("#", 1)
+            try:
+                value = self.client.get(property_address, context=self.context).data[field]
+            except Exception:
+                value = np.nan
+            charge.append(self.make_safe_float(value))
+        return {
+            "names": list(names),
+            "charge": np.asarray(charge, dtype=float),
+        }
 
-    @staticmethod
-    def _auto_aoi_from_image(image, threshold_fraction=0.2, margin=20):
-        img = np.asarray(image, dtype=float)
-        if img.size == 0 or not np.any(np.isfinite(img)):
-            return None
+    def get_correctors(self, names=None):
+        #{corr_name}/SettingPPM#current
+        self.log("Reading correctors' strengths...")
+        selected_names = self.corrs if names is None else ([names] if isinstance(names, str) else list(names))
 
-        work = img.copy()
-        work[~np.isfinite(work)] = 0.0
-        work = work - np.nanmin(work)
-        peak = np.nanmax(work)
-        if not np.isfinite(peak) or peak <= 0:
-            return None
+        bdes, bact = [], []
+        for corrector in selected_names:
+            setting_data = self.client.get(self.corrector_set_params[corrector]).data
+            acquisition_data = self.client.get(self.corrector_get_params[corrector]).data
+            bdes.append(setting_data['current'])
+            bact.append(acquisition_data['currentAverage'])
 
-        mask = work >= threshold_fraction * peak # if the most intense pixel has a value of 1000, then, takes values from 200 up, assuming that for example, threshold is 0.2
-        ys, xs = np.where(mask)
-        if xs.size == 0 or ys.size == 0:
-            return None
+        return {
+            "names": list(selected_names),
+            "bdes": np.asarray(bdes, dtype=float),
+            "bact": np.asarray(bact, dtype=float),
+        }
 
-        ny, nx = work.shape
-        # calculates a smaller rectangle, to isolate the beam from the rest + 20
-        x0 = max(0, int(xs.min()) - margin)
-        x1 = min(nx, int(xs.max()) + margin + 1)
-        y0 = max(0, int(ys.min()) - margin)
-        y1 = min(ny, int(ys.max()) + margin + 1)
-        return x0, x1, y0, y1
+    def get_bpms(self, names=None):
+        self.log('Reading bpms...')
+        selected_names = self.bpms if names is None else ([names] if isinstance(names, str) else list(names))
 
-    @staticmethod
-    def _screen_data_from_image(image, hpixel, vpixel):
-        if image is None:
-            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
+        x, y, tmit = [], [], []
+        for sample in range(self.nsamples):
+            self.log(f'Sample = {sample}')
+            x_sample, y_sample, tmit_sample = [], [], []
+            for bpm in selected_names:
+                x_sample.append(self._read_bpm_plane(bpm, 'x'))
+                y_sample.append(self._read_bpm_plane(bpm, 'y'))
+                tmit_sample.append(self._read_bpm_intensity(bpm))
+            x.append(x_sample)
+            y.append(y_sample)
+            tmit.append(tmit_sample)
+            time.sleep(1)
 
-        img = np.asarray(image, dtype=float).copy()
-        img[~np.isfinite(img)] = 0.0
-        img = img - np.nanmin(img) # lowest values are treated as background, so subtracts lowest value from every cell
-        total = float(np.sum(img)) # intensity
-        ny, nx = img.shape
+        return {
+            "names": list(selected_names),
+            "x": np.asarray(x, dtype=float),
+            "y": np.asarray(y, dtype=float),
+            "tmit": np.asarray(tmit, dtype=float),
+        }
 
-        if total <= 0.0 or nx == 0 or ny == 0:
-            hedges = np.arange(nx + 1, dtype=float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1.0)
-            vedges = np.arange(ny + 1, dtype=float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1.0)
-            return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
 
-        if not np.isfinite(hpixel) or hpixel <= 0:
-            hpixel = 1.0
-        if not np.isfinite(vpixel) or vpixel <= 0:
-            vpixel = 1.0
+    def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
+        readback_param = self.corrector_get_params[corrector]
+        t0 = time.perf_counter()
+        last_value = np.nan
+        while time.perf_counter() - t0 < timeout:
+            try:
+                data = self.client.get(readback_param).data
+                last_value = self.make_safe_float(data.get('currentAverage'), default=np.nan)
+            except Exception:
+                last_value = np.nan
 
-        x_centers = (np.arange(nx, dtype=float) - 0.5 * (nx - 1)) * hpixel # subtracts centre of the image, multiplies by the pixel size and therefore its a position with resect to centre of the image
-        y_centers = (np.arange(ny, dtype=float) - 0.5 * (ny - 1)) * vpixel
+            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
+                return True
+            time.sleep(poll_interval)
+        self.log(
+            f'Warning: {readback_param} did not reach target {float(target):.6g} '
+            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
+        )
+        return False
 
-        proj_x = np.sum(img, axis=0) # sum of intensity in each column
-        proj_y = np.sum(img, axis=1) # sum of intensity in each row
+    def set_correctors(self, names, corr_vals):
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
+        if len(names) != len(corr_vals):
+            self.log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
+            return
+        for corrector, corr_val in zip(names, corr_vals):
+            target = float(corr_val)
+            self.client.set(self.corrector_set_params[corrector], {'current': target})
+            self._wait_for_corrector_readback(corrector, target)
 
-        x_mean = float(np.sum(x_centers * proj_x) / total) # center of intensity of the image
-        y_mean = float(np.sum(y_centers * proj_y) / total)
-        sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
-        sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
+    def vary_correctors(self, names, corr_vals):
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
+            corr_vals = [corr_vals]
+        if len(names) != len(corr_vals):
+            self.log('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
+            return
+        current = self.get_correctors(names)['bdes']
+        target = current + np.asarray(corr_vals, dtype=float)
+        self.set_correctors(names, target)
 
-        hedges = (np.arange(nx + 1, dtype=float) - 0.5 * nx) * hpixel
-        vedges = (np.arange(ny + 1, dtype=float) - 0.5 * ny) * vpixel
-        return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
+    def get_quadrupoles(self, names=None):
+        if names is None:
+            names = self.quadrupoles
+        if isinstance(names, str):
+            names = [names]
 
-    def _read_bcm_scope(self, scope_name):
-        try:
-            data = self.japc.getParam(f"{scope_name}/Acquisition")
-            signal = np.asarray(data["value"], dtype=float) * data["sensitivity"] + data["offset"]
-            return float(np.mean(signal[20:60]))
-        except Exception:
-            return np.nan
+        bdes = []
+        bact = []
+
+        for quadrupole in names:
+            set_address = self.quad_set_params[quadrupole]
+            set_property, set_field = set_address.rsplit("#", 1)
+
+            get_address = self.quad_get_params[quadrupole]
+            get_property, get_field = get_address.rsplit("#", 1)
+
+            try:
+                set_value = self.client.get(set_property, context=self.context).data[set_field]
+            except Exception:
+                set_value = np.nan
+            try:
+                get_value = self.client.get(get_property, context=self.context).data[get_field]
+            except Exception:
+                get_value = np.nan
+
+            bdes.append(self.make_safe_float(set_value))
+            bact.append(self.make_safe_float(get_value))
+
+        return {
+            "names": list(names),
+            "bdes": np.asarray(bdes, dtype=float),
+            "bact": np.asarray(bact, dtype=float),
+        }
+
+    def set_quadrupoles(self, names, values):
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(values, (list, tuple, np.ndarray)):
+            values = [values]
+        if len(names) != len(values):
+            raise ValueError(f"len(names)={len(names)} != len(values)={len(values)}")
+
+        for quadrupole, value in zip(names, values):
+            address = self.quad_set_params[quadrupole]
+            property_address, field = address.rsplit("#", 1)
+            self.client.set(property_address, {field: float(value)}, context=self.context)
+
+        time.sleep(1)
 
     def _read_bpm_plane(self, bpm, plane):
         plane = plane.lower()
-        return self.japc.getParam(f"{bpm}/Acquisition#{plane}")
+        try:
+            data = self.client.get(f"{bpm}/Acquisition", context=self.context).data
+            return self.make_safe_float(data.get(plane), default=np.nan)
+        except Exception:
+            return np.nan
 
     def _read_bpm_intensity(self, bpm):
-        candidates = [
-            f'{bpm}/Acquisition#intensity',
-            f'{bpm}/Acquisition#sum',
-            f'{bpm}/Acquisition#charge',
-        ]
-        value = self._valid_japc_value(candidates, default=np.nan)
-        return value if np.isfinite(value) else 1.0
+        try:
+            data = self.client.get(f"{bpm}/Acquisition", context=self.context).data
+        except Exception:
+            return np.nan
+        for field in ("intensity", "sum", "charge"):
+            if field in data:
+                return self.make_safe_float(data[field], default=np.nan)
+        return np.nan
 
     # def insert_screen(self, screen_name):
     #     screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -609,10 +600,190 @@ class CLEAR_real_machine(AbstractMachineInterface):
             target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
+
+    @staticmethod
+    def _screen_data_from_image(image, hpixel, vpixel):
+        if image is None:
+            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
+
+        img = np.asarray(image, dtype=float).copy()
+        img[~np.isfinite(img)] = 0.0
+        img = img - np.nanmin(img) # lowest values are treated as background, so subtracts lowest value from every cell
+        total = float(np.sum(img)) # intensity
+        ny, nx = img.shape
+
+        if total <= 0.0 or nx == 0 or ny == 0:
+            hedges = np.arange(nx + 1, dtype=float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1.0)
+            vedges = np.arange(ny + 1, dtype=float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1.0)
+            return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
+
+        if not np.isfinite(hpixel) or hpixel <= 0:
+            hpixel = 1.0
+        if not np.isfinite(vpixel) or vpixel <= 0:
+            vpixel = 1.0
+
+        x_centers = (np.arange(nx, dtype=float) - 0.5 * (nx - 1)) * hpixel # subtracts centre of the image, multiplies by the pixel size and therefore its a position with resect to centre of the image
+        y_centers = (np.arange(ny, dtype=float) - 0.5 * (ny - 1)) * vpixel
+
+        proj_x = np.sum(img, axis=0) # sum of intensity in each column
+        proj_y = np.sum(img, axis=1) # sum of intensity in each row
+
+        x_mean = float(np.sum(x_centers * proj_x) / total) # center of intensity of the image
+        y_mean = float(np.sum(y_centers * proj_y) / total)
+        sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
+        sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
+
+        hedges = (np.arange(nx + 1, dtype=float) - 0.5 * nx) * hpixel
+        vedges = (np.arange(ny + 1, dtype=float) - 0.5 * ny) * vpixel
+        return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
+
+    def log_messages(self, console):
+        self.log = console or print
+
+    def _read_screen_setting(self, screen_name):
+        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
+        try:
+            return self.client.get(f'{japc_camera}.DigiCam/Setting', context = self.context).data
+        except Exception as e:
+            print(e)
+            return None
+
+    def _read_screen_h_matrix(self, screen_name):
+        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
+        try:
+            return self.client.get(f'{japc_camera}.Settings/Settings', context=self.context).data['h_matrix']
+        except Exception:
+            return None
+
+
+    @staticmethod
+    def _roi_from_setting(setting, image_shape):
+        if setting is None:
+            return np.array([0, image_shape[1], 0, image_shape[0]], dtype=int)
+        try:
+            if setting.get('imageROIEnable'):
+                x0, y0, dx, dy = setting['imageROI']
+                return np.array([x0, x0 + dx, y0, y0 + dy], dtype=int) # left and right edge of x, the same for y
+            _, _, width, height = setting['imageWindow'] # if not enabled, takes the whole screen image
+            return np.array([0, width, 0, height], dtype=int)
+        except Exception:
+            return np.array([0, image_shape[1], 0, image_shape[0]], dtype=int)
+
+    @staticmethod
+    def _auto_aoi_from_image(image, threshold_fraction=0.2, margin=20):
+        img = np.asarray(image, dtype=float)
+        if img.size == 0 or not np.any(np.isfinite(img)):
+            return None
+
+        work = img.copy()
+        work[~np.isfinite(work)] = 0.0
+        work = work - np.nanmin(work)
+        peak = np.nanmax(work)
+        if not np.isfinite(peak) or peak <= 0:
+            return None
+
+        mask = work >= threshold_fraction * peak # if the most intense pixel has a value of 1000, then, takes values from 200 up, assuming that for example, threshold is 0.2
+        ys, xs = np.where(mask)
+        if xs.size == 0 or ys.size == 0:
+            return None
+
+        ny, nx = work.shape
+        # calculates a smaller rectangle, to isolate the beam from the rest + 20
+        x0 = max(0, int(xs.min()) - margin)
+        x1 = min(nx, int(xs.max()) + margin + 1)
+        y0 = max(0, int(ys.min()) - margin)
+        y1 = min(ny, int(ys.max()) + margin + 1)
+        return x0, x1, y0, y1
+
+    def _intensity_to_attenuator_position(self, value):
+        return float(np.clip(float(value), self.laser_attenuator_min, self.laser_attenuator_max))
+
+    def get_laser_attenuator_position(self):
+        for address in self.laser_attenuator_readback:
+            property_address, field = address.rsplit('#', 1)
+            try:
+                value = self.client.get(property_address, context = self.context).data[field]
+                value = self.make_safe_float(value)
+                if np.isfinite(value):
+                    return value/1e3
+            except Exception:
+                pass
+        return np.nan
+
+    def set_laser_motor_attenuator_position(self, position):
+        position = float(np.clip(float(position), 0.0, 3.0))
+        command_position = position * 1e3
+        self.log(f'Setting CLEAR motor attenuator to {position:.3f} ksteps, ({command_position:.0f} steps)...')
+        self.client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context)
+        time.sleep(1)
+        return position
+
+    def get_laser_motor_attenuator_position(self):
+        for address in self.laser_motor_attenuator_readback:
+            property_address, field = address.rsplit('#', 1)
+            try:
+                value = self.client.get(property_address, context = self.context).data[field]
+                value = self.make_safe_float(value)
+                if np.isfinite(value):
+                    return value/1e3
+            except Exception:
+                pass
+        return np.nan
+
+    def set_uv_attenuator_position(self, attenuator_name, position):
+        if attenuator_name not in self.uv_attenuator_params:
+            raise ValueError(f'Unknown UV attenuator {attenuator_name}. Expected one of {list(self.uv_attenuator_params)}')
+        min_pos, max_pos = self.uv_attenuator_ranges.get(attenuator_name, (-np.inf, np.inf))
+        position = float(np.clip(float(position), min_pos, max_pos))
+        self.log(f'Setting {attenuator_name} to {position:.1f}...')
+        property_address, field = (self.uv_attenuator_params[attenuator_name].rsplit('#', 1))
+        self.client.set(property_address, {field: position}, context=self.context)
+        time.sleep(1)
+        return position
+
+    def set_uv_attenuator_percent(self, attenuator_name, percent):
+        if attenuator_name not in self.uv_attenuator_ranges:
+            raise ValueError(f'Unknown UV attenuator {attenuator_name}. Expected one of {list(self.uv_attenuator_ranges)}')
+        min_pos, max_pos = self.uv_attenuator_ranges[attenuator_name]
+        percent = float(np.clip(float(percent), 0.0, 100.0))
+        position = min_pos + (max_pos - min_pos) * percent / 100.0
+        return self.set_uv_attenuator_position(attenuator_name, position)
+
+    def set_shutter(self, shutter_name, open_shutter=True):
+        if shutter_name not in self.shutter_set_params:
+            raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_set_params)}')
+
+        property_address, field = self.shutter_set_params[shutter_name].rsplit('#', 1)
+        self.client.set(property_address, {field: bool(open_shutter)}, context = self.context)
+        time.sleep(0.5)
+        return bool(open_shutter)
+
+    def get_shutter(self, shutter_name):
+        if shutter_name not in self.shutter_readback_params:
+            raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_readback_params)}')
+
+        address = self.shutter_readback_params[shutter_name]
+        property_address, field = address.rsplit('#', 1)
+        try:
+            value = self.client.get(property_address, context = self.context).data[field]
+        except Exception:
+            return np.nan
+        return bool(value)
+
+    def _read_bcm_scope(self, scope_name):
+        try:
+            data = self.client.get(f"{scope_name}/Acquisition").data
+            signal = np.asarray(data["value"], dtype=float) * data["sensitivity"] + data["offset"]
+            return float(np.mean(signal[20:60]))
+        except Exception:
+            return np.nan
+
     def _read_bcm_charge(self, bcm_name):
         try:
-            samples = self.japc.getParam(self.bcm_sample_params[bcm_name])
-            gain = self.japc.getParam(self.bcm_gain_param)
+            sample_address = self.bcm_sample_params[bcm_name]
+            property_address, field = sample_address.rsplit("#", 1)
+            samples = self.client.get(property_address, context=self.context).data[field]
+            gain = self.client.get("CA.BCM01GAIN/Setting").data["enumValue"]
 
             samples = np.asarray(samples, dtype=float) / 1000.0
             waveform = samples.reshape(samples.shape[0], -1)[0] if samples.ndim > 1 else samples
@@ -624,139 +795,3 @@ class CLEAR_real_machine(AbstractMachineInterface):
         except Exception:
             return np.nan
 
-    def get_icts(self, names=None):
-        self.log("Reading ict's...")
-
-        if names is None:
-            names = self.ict_names
-        if isinstance(names, str):
-            names = [names]
-
-        charge = []
-        for name in names:
-            if name in self.bcm_sample_params:
-                charge.append(self._read_bcm_charge(name))
-            else:
-                charge.append(self._valid_japc_value([name], default=np.nan))
-
-        return {
-            "names": list(names),
-            "charge": np.asarray(charge, dtype=float),
-        }
-
-    def get_correctors(self, names=None):
-        #{corr_name}/SettingPPM#current
-        self.log("Reading correctors' strengths...")
-        selected_names = self.corrs if names is None else ([names] if isinstance(names, str) else list(names))
-
-        bdes, bact = [], []
-        for corrector in selected_names:
-            bdes.append(self._valid_japc_value([self.corrector_set_params[corrector]], default=np.nan))
-            bact.append(self._valid_japc_value([self.corrector_get_params[corrector]], default=np.nan))
-
-        return {
-            "names": list(selected_names),
-            "bdes": np.asarray(bdes, dtype=float),
-            "bact": np.asarray(bact, dtype=float),
-        }
-
-    def get_bpms(self, names=None):
-        self.log('Reading bpms...')
-        selected_names = self.bpms if names is None else ([names] if isinstance(names, str) else list(names))
-
-        x, y, tmit = [], [], []
-        for sample in range(self.nsamples):
-            self.log(f'Sample = {sample}')
-            x_sample, y_sample, tmit_sample = [], [], []
-            for bpm in selected_names:
-                x_sample.append(self._read_bpm_plane(bpm, 'x'))
-                y_sample.append(self._read_bpm_plane(bpm, 'y'))
-                tmit_sample.append(self._read_bpm_intensity(bpm))
-            x.append(x_sample)
-            y.append(y_sample)
-            tmit.append(tmit_sample)
-            time.sleep(1)
-
-        return {
-            "names": list(selected_names),
-            "x": np.asarray(x, dtype=float),
-            "y": np.asarray(y, dtype=float),
-            "tmit": np.asarray(tmit, dtype=float),
-        }
-
-
-    def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
-        readback_param = self.corrector_get_params[corrector]
-        t0 = time.perf_counter()
-        last_value = np.nan
-
-        while time.perf_counter() - t0 < timeout:
-            try:
-                last_value = self.make_safe_float(self.japc.getParam(readback_param), default=np.nan)
-            except Exception:
-                last_value = np.nan
-
-            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
-                return True
-
-            time.sleep(poll_interval)
-
-        self.log(
-            f'Warning: {readback_param} did not reach target {float(target):.6g} '
-            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
-        )
-        return False
-
-    def set_correctors(self, names, corr_vals):
-        if isinstance(names, str):
-            names = [names]
-        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
-            corr_vals = [corr_vals]
-        if len(names) != len(corr_vals):
-            self.log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
-            return
-        for corrector, corr_val in zip(names, corr_vals):
-            target = float(corr_val)
-            self.japc.setParam(self.corrector_set_params[corrector], target)
-            self._wait_for_corrector_readback(corrector, target)
-
-    def vary_correctors(self, names, corr_vals):
-        if isinstance(names, str):
-            names = [names]
-        if not isinstance(corr_vals, (list, tuple, np.ndarray)):
-            corr_vals = [corr_vals]
-        if len(names) != len(corr_vals):
-            self.log('Error: len(names) != len(corr_vals) in vary_correctors(names, corr_vals)')
-            return
-        current = self.get_correctors(names)['bdes']
-        target = current + np.asarray(corr_vals, dtype=float)
-        self.set_correctors(names, target)
-
-    def get_quadrupoles(self, names=None):
-        if names is None:
-            names = self.quadrupoles
-        if isinstance(names, str):
-            names = [names]
-
-        bdes, bact = [], []
-
-        for quadrupole in names:
-            bdes.append(self._valid_japc_value([self.quad_set_params[quadrupole]], default=np.nan))
-            bact.append(self._valid_japc_value([self.quad_get_params[quadrupole]], default=np.nan))
-
-        return {
-            "names": list(names),
-            "bdes": np.asarray(bdes, dtype=float),
-            "bact": np.asarray(bact, dtype=float),
-        }
-
-    def set_quadrupoles(self, names, values):
-        if isinstance(names, str):
-            names = [names]
-        if not isinstance(values, (list, tuple, np.ndarray)):
-            values = [values]
-
-        for quadrupole, value in zip(names, values):
-            self.japc.setParam(self.quad_set_params[quadrupole], float(value))
-
-        time.sleep(1)

@@ -92,7 +92,7 @@ INTERFACE_SETUP = {
 
             # "bounds": {  # QD18X entrance
             #     "emit_x_norm": [5.0, 9.0],
-            #     "beta_x0": [0.5, 2.5],
+            #     "beta_x0": [0.5, 5.0],
             #     "alpha_x0": [-2.5, 1.0],
             #     "emit_y_norm": [0.1, 0.4],
             #     "beta_y0": [5.0, 16.0],

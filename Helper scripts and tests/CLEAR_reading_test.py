@@ -55,4 +55,4 @@ japc = pyjapc.PyJapc("", incaAcceleratorName="CTF")
 # #I.get_screens()
 # print("Successfully run method 'get_screens' without inserted screen (no beam)!")
 
-print(japc.getParam("CA.QFD0350/SettingPPM#current")) # this works!, A
+#print(japc.getParam("CA.QFD0350/SettingPPM#current")) # this works!, A
