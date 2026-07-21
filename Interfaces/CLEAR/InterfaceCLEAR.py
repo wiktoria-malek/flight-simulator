@@ -59,7 +59,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BEAM/Acquisition#energy',
         ]
 
-        self.context = "SCT.USER.ALL"
+        self.context = "SCT.USER.SETUP"
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 
@@ -333,8 +333,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         bdes, bact = [], []
         for corrector in selected_names:
-            setting_data = self.client.get(self.corrector_set_params[corrector]).data
-            acquisition_data = self.client.get(self.corrector_get_params[corrector]).data
+            setting_data = self.client.get(self.corrector_set_params[corrector],context = self.context).data
+            acquisition_data = self.client.get(self.corrector_get_params[corrector], context = self.context).data
             bdes.append(setting_data['current'])
             bact.append(acquisition_data['currentAverage'])
 
@@ -399,7 +399,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return
         for corrector, corr_val in zip(names, corr_vals):
             target = float(corr_val)
-            self.client.set(self.corrector_set_params[corrector], {'current': target})
+            self.client.set(self.corrector_set_params[corrector], context=self.context, {'current': target})
             self._wait_for_corrector_readback(corrector, target)
 
     def vary_correctors(self, names, corr_vals):
