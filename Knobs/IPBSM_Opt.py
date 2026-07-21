@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import json
+import sys
 import time
 import math
 import csv
@@ -13,6 +14,13 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 
 import time
 import numpy as np
+
+_KNOBS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _KNOBS_DIR.parent
+for _path in (str(_KNOBS_DIR), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 from Interfaces.ATF2.InterfaceATF2_Ext import InterfaceATF2_Ext
 from Interfaces.ATF2.InterfaceATF2_Ext import CurrentDropToZeroError
 
@@ -310,15 +318,26 @@ class EPICSIPBSMController:
     def get_ipbsm_full(self) -> Dict[str, Any]:
         return self.interface.get_ipbsm_full()
 
-from ipbsm_opt_math import (
-    GPParams,
-    GaussianFitResult,
-    SimpleGP,
-    acq_ei,
-    acq_ucb,
-    bootstrap_fit,
-    fit_gaussian_from_samples,
-)
+try:
+    from .ipbsm_opt_math import (
+        GPParams,
+        GaussianFitResult,
+        SimpleGP,
+        acq_ei,
+        acq_ucb,
+        bootstrap_fit,
+        fit_gaussian_from_samples,
+    )
+except ImportError:
+    from ipbsm_opt_math import (
+        GPParams,
+        GaussianFitResult,
+        SimpleGP,
+        acq_ei,
+        acq_ucb,
+        bootstrap_fit,
+        fit_gaussian_from_samples,
+    )
 
 # ----------------------------
 # Optimizer
@@ -356,7 +375,7 @@ class OptimizerConfig:
     n_candidates: int = 6000
     n_bootstrap: int = 60
     ridge_fit: float = 1e-4
-    gp_kernel: str = "matern52"
+    gp_kernel: str = "rbf"
     gp_length_scale: float = 1.2
     gp_ard_length_scales: Optional[Dict[str, float]] = None
     gp_signal_var: float = 0.15
@@ -491,6 +510,7 @@ class Optimizer:
         stop_flag: Optional[StopFlag] = None,
         pause_hook: Optional[Callable[[Dict[str, Any]], bool]] = None,
         warm_start_data: Optional[List[Dict[str, Any]]] = None,
+        resume_pending_row: Optional[Dict[str, Any]] = None,
     ):
         self.controller = controller
         self.cfg = config
@@ -521,6 +541,9 @@ class Optimizer:
         self._average_pause_ratio = min(1.0, max(0.0, ratio))
         self._machine_state_channels: List[str] = []
         self._machine_state_init_values: Dict[str, float] = {}
+        self._resume_pending_row = dict(resume_pending_row) if isinstance(resume_pending_row, dict) else None
+        self._remeasure_current_point_requested = False
+        self._latest_bo1d_trace: Optional[Dict[str, Any]] = None
         self._init_machine_state_tracking()
 
         if warm_start_data:
@@ -532,6 +555,14 @@ class Optimizer:
 
     def request_manual_pause(self) -> None:
         self._manual_pause_requested = True
+
+    def request_remeasure_current_point(self) -> None:
+        self._remeasure_current_point_requested = True
+
+    def _consume_remeasure_current_point_request(self) -> bool:
+        requested = bool(self._remeasure_current_point_requested)
+        self._remeasure_current_point_requested = False
+        return requested
 
     def _save_config(self):
         cfg_path = self.out_dir / "config.json"
@@ -743,21 +774,10 @@ class Optimizer:
                 self._attach_machine_state_to_record(rec)
                 w.writerow(self._csv_row_for_record(rec))
 
-    def _format_autoscan_filename(self, rec: StepRecord) -> str:
-        t_iso = str(getattr(rec, "t_iso", "") or "")
-        digits = "".join(ch for ch in t_iso if ch.isdigit())
-        if len(digits) >= 14:
-            stamp = f"{digits[:8]}_{digits[8:14]}"
-        else:
-            stamp = self.run_tag.replace("-", "_")
-        return f"AutoScan_{stamp}_s{int(rec.step):03d}.binary"
-
     def _gf_file_tag(self) -> str:
         digits = "".join(ch for ch in self.run_tag if ch.isdigit())
         if len(digits) >= 14:
-            return f"{digits[2:8]}_{digits[8:14]}"
-        if len(self.run_tag) >= 2:
-            return self.run_tag[2:].replace("-", "_")
+            return f"{digits[:8]}_{digits[8:14]}"
         return self.run_tag.replace("-", "_")
 
     def _gf_axis_name_from_chosen_by(self, chosen_by: str) -> str:
@@ -777,12 +797,10 @@ class Optimizer:
         return f"{axis_name} {mode_label} scan [Auto Scan]"
 
     def _gf_dat_file_stem(self, axis_name: str, mode_label: str) -> str:
-        # Keep edge underscores so "[Auto Scan]" naturally becomes "__Auto_Scan_".
-        title_text = self._gf_dat_title_text(axis_name=axis_name, mode_label=mode_label)
-        stem = "".join(ch if ch.isalnum() else "_" for ch in title_text)
-        if any(ch.isalnum() for ch in stem):
-            return stem
-        return f"{self._gf_axis_file_label(axis_name)}_{mode_label}_scan__Auto_Scan_"
+        axis_label = self._gf_axis_file_label(axis_name)
+        mode_text = "".join(ch if ch.isalnum() else "_" for ch in str(mode_label)).strip("_")
+        mode_tag = mode_text or "mode"
+        return f"{axis_label}_{mode_tag}_auto_scan"
 
     def _gf_dat_export_paths(self, axis_names: Optional[List[str]] = None) -> List[str]:
         if not self._is_sequential_method():
@@ -835,7 +853,7 @@ class Optimizer:
                     mod_err = float(rec.y_err)
                     beamsize = float(dat.get("beamsize", float("nan")))
                     ebeamsize = float(dat.get("ebeamsize", float("nan")))
-                    row_filename = self._format_autoscan_filename(rec)
+                    row_filename = str(dat.get("filename", "") or "")
 
                     def _fmt(val: float, ndig: int) -> str:
                         if not np.isfinite(val):
@@ -876,10 +894,157 @@ class Optimizer:
             self.yerr.append(float(rec.y_err))
             self._last_dat = dict(rec.dat)
 
+    def _measure_resume_pending_row(self) -> None:
+        if not self._resume_pending_row:
+            return
+
+        item = dict(self._resume_pending_row)
+        x_map_raw = item.get("x", {})
+        if not isinstance(x_map_raw, dict):
+            self._resume_pending_row = None
+            return
+
+        x = {p: float(x_map_raw[p]) for p in self.cfg.params}
+        x_vec = np.array([x[p] for p in self.cfg.params], float)
+        chosen_by = str(item.get("chosen_by", "resume_remeasure"))
+        step = len(self.records) + 1
+        xq = self._x_dict(self._quantize_x_vec(x_vec))
+
+        self._emit(step, {
+            "phase": "warn",
+            "reason": "resume_last_point_discarded",
+            "message": "Discarding the last resume point and re-measuring it.",
+            "chosen_by": chosen_by,
+            "x": xq,
+        })
+
+        y, yerr = self._measure_at(x_vec, chosen_by=chosen_by, force_remeasure=True)
+        x_vec_q = self._quantize_x_vec(x_vec)
+        self.X.append(x_vec_q.copy())
+        self.y.append(float(y))
+        self.yerr.append(float(yerr))
+        rec = StepRecord(
+            step=len(self.records) + 1,
+            t_iso=_dt.datetime.now().isoformat(timespec="seconds"),
+            x=self._x_dict(x_vec_q),
+            y=float(y),
+            y_err=float(yerr),
+            chosen_by=chosen_by,
+            dat=dict(self._last_dat),
+        )
+        self._log_step(rec)
+        self._emit(rec.step, {
+            "phase": "resume_remeasure",
+            "chosen_by": chosen_by,
+            "x": rec.x,
+            "y": float(y),
+            "y_err": float(yerr),
+            "best_y": float(np.max(self.y)) if self.y else float(y),
+            "average": float(rec.dat.get("average", float("nan"))),
+        })
+        self._resume_pending_row = None
+
 
     def _emit(self, step: int, info: Dict):
         if self.progress_cb:
             self.progress_cb(step, info)
+
+    def _bo1d_display_y_label(self) -> str:
+        return "Modulation"
+
+    def _bo1d_display_direction(self) -> str:
+        return "maximize"
+
+    def _bo1d_display_note(self) -> str:
+        return ""
+
+    def _bo1d_display_values_from_records(self, records: List[StepRecord]) -> np.ndarray:
+        values: List[float] = []
+        for rec in list(records or []):
+            try:
+                values.append(float(rec.y))
+            except Exception:
+                values.append(float("nan"))
+        return np.asarray(values, dtype=float)
+
+    def _bo1d_model_to_display(self, mu: np.ndarray, std: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        return np.asarray(mu, dtype=float), np.asarray(std, dtype=float)
+
+    def _bo1d_plot_grid(self, axis_name: str, lo_axis: float, hi_axis: float, max_points: int = 401) -> np.ndarray:
+        lo_axis = float(lo_axis)
+        hi_axis = float(hi_axis)
+        if (not np.isfinite(lo_axis)) or (not np.isfinite(hi_axis)) or hi_axis < lo_axis:
+            return np.asarray([], dtype=float)
+        if abs(hi_axis - lo_axis) <= 1e-15:
+            return np.asarray([lo_axis], dtype=float)
+
+        step = max(1e-12, self._step_for_param(axis_name))
+        approx_count = int(round((hi_axis - lo_axis) / step)) + 1
+        if 2 <= approx_count <= max_points:
+            grid = lo_axis + np.arange(approx_count, dtype=float) * step
+        else:
+            raw = np.linspace(lo_axis, hi_axis, max_points, dtype=float)
+            grid = np.array([self._quantize_knob(float(v), axis_name) for v in raw], dtype=float)
+        grid = np.unique(np.clip(grid, lo_axis, hi_axis))
+        if grid.size == 0:
+            grid = np.asarray([lo_axis, hi_axis], dtype=float)
+        return np.asarray(grid, dtype=float)
+
+    def _build_bo1d_trace_payload(
+        self,
+        *,
+        axis_name: str,
+        x_grid: np.ndarray,
+        mu: np.ndarray,
+        std: np.ndarray,
+        acq: np.ndarray,
+        chosen_x: float,
+        chosen_acq: float,
+        observed_records: List[StepRecord],
+    ) -> Dict[str, Any]:
+        x_arr = np.asarray(x_grid, dtype=float).reshape(-1)
+        mu_arr = np.asarray(mu, dtype=float).reshape(-1)
+        std_arr = np.asarray(std, dtype=float).reshape(-1)
+        acq_arr = np.asarray(acq, dtype=float).reshape(-1)
+        if x_arr.size == 0 or mu_arr.size != x_arr.size or std_arr.size != x_arr.size or acq_arr.size != x_arr.size:
+            return {}
+
+        mu_disp, std_disp = self._bo1d_model_to_display(mu_arr, std_arr)
+        disp_obs = self._bo1d_display_values_from_records(observed_records)
+
+        x_obs: List[float] = []
+        y_obs: List[float] = []
+        for rec, y_val in zip(list(observed_records or []), disp_obs):
+            try:
+                x_val = float(rec.x.get(axis_name, float("nan")))
+            except Exception:
+                x_val = float("nan")
+            if np.isfinite(x_val) and np.isfinite(float(y_val)):
+                x_obs.append(float(x_val))
+                y_obs.append(float(y_val))
+
+        if np.any(np.isfinite(acq_arr)):
+            chosen_idx = int(np.nanargmax(acq_arr))
+        else:
+            chosen_idx = int(np.argmin(np.abs(x_arr - float(chosen_x))))
+
+        return {
+            "axis": str(axis_name),
+            "x_label": str(axis_name),
+            "y_label": str(self._bo1d_display_y_label()),
+            "direction": str(self._bo1d_display_direction()),
+            "note": str(self._bo1d_display_note()),
+            "acquisition_label": str(getattr(self.cfg, "acquisition", "EI")).upper(),
+            "x_grid": x_arr.tolist(),
+            "y_mean": np.asarray(mu_disp, dtype=float).tolist(),
+            "y_std": np.asarray(std_disp, dtype=float).tolist(),
+            "acquisition": acq_arr.tolist(),
+            "x_obs": x_obs,
+            "y_obs": y_obs,
+            "chosen_x": float(chosen_x),
+            "chosen_acq": float(chosen_acq),
+            "chosen_y_mean": float(mu_disp[chosen_idx]) if 0 <= chosen_idx < mu_disp.size else float("nan"),
+        }
 
     def _bounds_arrays(self) -> Tuple[np.ndarray, np.ndarray]:
         lo = np.array([self.cfg.bounds[p][0] for p in self.cfg.params], float)
@@ -1184,7 +1349,7 @@ class Optimizer:
             "next_axis_idx": next_axis_idx,
         }
 
-    def _measure_at(self, x_vec: np.ndarray, chosen_by: str) -> Tuple[float, float]:
+    def _measure_at(self, x_vec: np.ndarray, chosen_by: str, force_remeasure: bool = False) -> Tuple[float, float]:
         # Quantize knobs to hardware-like step and clamp
         lo, hi = self._bounds_arrays()
         self._last_measure_reused = False
@@ -1202,7 +1367,7 @@ class Optimizer:
         })
 
         # Reuse previously measured point (skip PV IO) if exactly same quantized setpoint.
-        if len(self.X) > 0:
+        if (not force_remeasure) and len(self.X) > 0:
             X_prev = np.asarray(self.X, float)
             steps = self._step_array()
             X_prev_q = np.round(X_prev / steps.reshape(1, -1)) * steps.reshape(1, -1)
@@ -1230,129 +1395,151 @@ class Optimizer:
                 return y, yerr
 
         while True:
-            try:
-                self.controller.apply_knobs(self._x_dict(xq))
-                break
-            except CurrentDropToZeroError as exc:
-                payload = {
-                    "reason": "current_drop_to_zero",
-                    "step": meas_idx,
-                    "x": self._x_dict(xq),
-                    "magnets": list(getattr(exc, "magnets", [])),
-                    "target": dict(getattr(exc, "target", {})),
-                    "readback": dict(getattr(exc, "readback", {})),
-                    "message": str(exc),
-                }
-                should_continue = True
-                if self.pause_hook is not None:
-                    should_continue = bool(self.pause_hook(payload))
-                if not should_continue:
-                    self.stop_flag.request_stop()
-                    raise GracefulStopRequested("current_drop_to_zero") from exc
-            except Exception as exc:
-                payload = {
-                    "reason": "operation_error",
-                    "operation": "apply_knobs",
-                    "step": meas_idx,
-                    "x": self._x_dict(xq),
-                    "message": str(exc),
-                    "error_type": exc.__class__.__name__,
-                }
-                should_continue = True
-                if self.pause_hook is not None:
-                    should_continue = bool(self.pause_hook(payload))
-                if not should_continue:
-                    self.stop_flag.request_stop()
-                    raise GracefulStopRequested("apply_knobs_error") from exc
-
-        while True:
-            try:
-                dat_raw: Dict[str, Any] = {}
-                if hasattr(self.controller, "get_ipbsm_full"):
-                    dat_raw = self.controller.get_ipbsm_full()
-                else:
-                    y0, yerr0 = self.controller.get_ipbsm()
-                    dat_raw = {"modulation": y0, "error": yerr0}
-                break
-            except Exception as exc:
-                payload = {
-                    "reason": "operation_error",
-                    "operation": "get_ipbsm",
-                    "step": meas_idx,
-                    "x": self._x_dict(xq),
-                    "message": str(exc),
-                    "error_type": exc.__class__.__name__,
-                }
-                should_continue = True
-                if self.pause_hook is not None:
-                    should_continue = bool(self.pause_hook(payload))
-                if not should_continue:
-                    self.stop_flag.request_stop()
-                    raise GracefulStopRequested("get_ipbsm_error") from exc
-
-        def _f(v: Any) -> float:
-            try:
-                return float(v)
-            except Exception:
-                return float("nan")
-
-        dat = {
-            "modulation": _f(dat_raw.get("modulation", float("nan"))),
-            "error": abs(_f(dat_raw.get("error", float("nan")))),
-            "beamsize": _f(dat_raw.get("beamsize", float("nan"))),
-            "ebeamsize": _f(dat_raw.get("ebeamsize", float("nan"))),
-            "average": _f(dat_raw.get("average", float("nan"))),
-            "phase": _f(dat_raw.get("phase", float("nan"))),
-            "filename": str(dat_raw.get("filename", "")),
-            "ict_average": _f(dat_raw.get("ict_average", float("nan"))),
-        }
-        self._last_dat = dat
-
-        y = float(dat["modulation"])
-        yerr = float(dat["error"])
-
-        avg = dat["average"]
-        if np.isfinite(avg):
-            if self._average_baseline is None:
-                self._average_baseline = float(avg)
-            else:
-                threshold = self._average_pause_ratio * self._average_baseline
-                if avg < threshold:
+            while True:
+                try:
+                    self.controller.apply_knobs(self._x_dict(xq))
+                    break
+                except CurrentDropToZeroError as exc:
                     payload = {
-                        "reason": "average_below_threshold",
+                        "reason": "current_drop_to_zero",
                         "step": meas_idx,
-                        "average": float(avg),
-                        "baseline_average": float(self._average_baseline),
-                        "threshold_average": float(threshold),
-                        "ratio": float(avg / self._average_baseline) if self._average_baseline else float("nan"),
+                        "x": self._x_dict(xq),
+                        "magnets": list(getattr(exc, "magnets", [])),
+                        "target": dict(getattr(exc, "target", {})),
+                        "readback": dict(getattr(exc, "readback", {})),
+                        "message": str(exc),
                     }
                     should_continue = True
                     if self.pause_hook is not None:
                         should_continue = bool(self.pause_hook(payload))
                     if not should_continue:
                         self.stop_flag.request_stop()
+                        raise GracefulStopRequested("current_drop_to_zero") from exc
+                except Exception as exc:
+                    payload = {
+                        "reason": "operation_error",
+                        "operation": "apply_knobs",
+                        "step": meas_idx,
+                        "x": self._x_dict(xq),
+                        "message": str(exc),
+                        "error_type": exc.__class__.__name__,
+                    }
+                    should_continue = True
+                    if self.pause_hook is not None:
+                        should_continue = bool(self.pause_hook(payload))
+                    if not should_continue:
+                        self.stop_flag.request_stop()
+                        raise GracefulStopRequested("apply_knobs_error") from exc
 
-        best = max([float(y)] + [float(v) for v in self.y]) if self.y else float(y)
-        print(f"[MEAS] i={meas_idx} by={chosen_by}   y={float(y):.6f} ± {float(yerr):.6f}  best={best:.6f}")
+            while True:
+                try:
+                    dat_raw: Dict[str, Any] = {}
+                    if hasattr(self.controller, "get_ipbsm_full"):
+                        dat_raw = self.controller.get_ipbsm_full()
+                    else:
+                        y0, yerr0 = self.controller.get_ipbsm()
+                        dat_raw = {"modulation": y0, "error": yerr0}
+                    break
+                except Exception as exc:
+                    payload = {
+                        "reason": "operation_error",
+                        "operation": "get_ipbsm",
+                        "step": meas_idx,
+                        "x": self._x_dict(xq),
+                        "message": str(exc),
+                        "error_type": exc.__class__.__name__,
+                    }
+                    should_continue = True
+                    if self.pause_hook is not None:
+                        should_continue = bool(self.pause_hook(payload))
+                    if not should_continue:
+                        self.stop_flag.request_stop()
+                        raise GracefulStopRequested("get_ipbsm_error") from exc
 
-        # Manual pause request from GUI: stop only after current measurement has completed.
-        if self._manual_pause_requested:
-            self._manual_pause_requested = False
-            payload = {
-                "reason": "manual_pause",
-                "step": meas_idx,
-                "x": self._x_dict(xq),
-                "y": float(y),
-                "y_err": float(yerr),
-                "best_y": float(best),
+            def _f(v: Any) -> float:
+                try:
+                    return float(v)
+                except Exception:
+                    return float("nan")
+
+            dat = {
+                "modulation": _f(dat_raw.get("modulation", float("nan"))),
+                "error": abs(_f(dat_raw.get("error", float("nan")))),
+                "beamsize": _f(dat_raw.get("beamsize", float("nan"))),
+                "ebeamsize": _f(dat_raw.get("ebeamsize", float("nan"))),
+                "average": _f(dat_raw.get("average", float("nan"))),
+                "phase": _f(dat_raw.get("phase", float("nan"))),
+                "filename": str(dat_raw.get("filename", "")),
+                "ict_average": _f(dat_raw.get("ict_average", float("nan"))),
             }
-            should_continue = True
-            if self.pause_hook is not None:
-                should_continue = bool(self.pause_hook(payload))
-            if not should_continue:
-                self.stop_flag.request_stop()
+            self._last_dat = dat
 
-        return float(y), float(yerr)
+            y = float(dat["modulation"])
+            yerr = float(dat["error"])
+            avg = dat["average"]
+            best = max([float(y)] + [float(v) for v in self.y]) if self.y else float(y)
+
+            discard_reason = ""
+            threshold = float("nan")
+            if np.isfinite(avg):
+                if self._average_baseline is None:
+                    self._average_baseline = float(avg)
+                else:
+                    threshold = self._average_pause_ratio * self._average_baseline
+                    if avg < threshold:
+                        payload = {
+                            "reason": "average_below_threshold",
+                            "step": meas_idx,
+                            "average": float(avg),
+                            "baseline_average": float(self._average_baseline),
+                            "threshold_average": float(threshold),
+                            "ratio": float(avg / self._average_baseline) if self._average_baseline else float("nan"),
+                        }
+                        should_continue = True
+                        if self.pause_hook is not None:
+                            should_continue = bool(self.pause_hook(payload))
+                        if not should_continue:
+                            self.stop_flag.request_stop()
+                        elif self._consume_remeasure_current_point_request():
+                            discard_reason = "average_warning_resume"
+                            self._manual_pause_requested = False
+
+            print(f"[MEAS] i={meas_idx} by={chosen_by}   y={float(y):.6f} ± {float(yerr):.6f}  best={best:.6f}")
+
+            # Manual pause request from GUI: stop only after current measurement has completed.
+            if (not discard_reason) and self._manual_pause_requested:
+                self._manual_pause_requested = False
+                payload = {
+                    "reason": "manual_pause",
+                    "step": meas_idx,
+                    "x": self._x_dict(xq),
+                    "y": float(y),
+                    "y_err": float(yerr),
+                    "best_y": float(best),
+                }
+                should_continue = True
+                if self.pause_hook is not None:
+                    should_continue = bool(self.pause_hook(payload))
+                if not should_continue:
+                    self.stop_flag.request_stop()
+                elif self._consume_remeasure_current_point_request():
+                    discard_reason = "manual_pause_resume"
+
+            if discard_reason:
+                self._emit(meas_idx, {
+                    "phase": "discarded_measurement",
+                    "reason": discard_reason,
+                    "chosen_by": chosen_by,
+                    "x": self._x_dict(xq),
+                    "y": float(y),
+                    "y_err": float(yerr),
+                    "best_y": float(best),
+                    "average": float(avg),
+                    "threshold_average": float(threshold),
+                })
+                continue
+
+            return float(y), float(yerr)
 
     def _random_point(self) -> np.ndarray:
         lo, hi = self._bounds_arrays()
@@ -1594,6 +1781,7 @@ class Optimizer:
                 continue
 
         if len(x_hist) < 2:
+            self._latest_bo1d_trace = None
             x_fallback, gf_tag = self._propose_next_GF(
                 axis=axis,
                 cycle_idx=max(0, len(axis_recs)),
@@ -1605,7 +1793,7 @@ class Optimizer:
         y1 = np.asarray(y_hist, float)
         axis_ls = max(1e-6, float(self.cfg.init_sigma.get(axis_name, self._step_for_param(axis_name))))
         gp = SimpleGP(GPParams(
-            kernel="matern32",
+            kernel="rbf",
             length_scale=np.array([axis_ls], dtype=float),
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
@@ -1613,6 +1801,7 @@ class Optimizer:
         try:
             gp.fit(X1, y1)
         except Exception:
+            self._latest_bo1d_trace = None
             x_fallback, gf_tag = self._propose_next_GF(
                 axis=axis,
                 cycle_idx=max(0, len(axis_recs)),
@@ -1631,6 +1820,7 @@ class Optimizer:
         cand_q = np.clip(cand_q, lo_axis, hi_axis)
         cand = np.unique(cand_q)
         if cand.size == 0:
+            self._latest_bo1d_trace = None
             x_fallback, gf_tag = self._propose_next_GF(
                 axis=axis,
                 cycle_idx=max(0, len(axis_recs)),
@@ -1644,6 +1834,25 @@ class Optimizer:
         else:
             acq = acq_ucb(mu, std, beta=self.cfg.ucb_beta)
         best_idx = int(np.argmax(acq))
+        plot_grid = self._bo1d_plot_grid(axis_name, lo_axis, hi_axis)
+        if plot_grid.size > 0:
+            mu_plot, std_plot = gp.predict(plot_grid.reshape(-1, 1))
+            if self.cfg.acquisition.upper() == "EI":
+                acq_plot = acq_ei(mu_plot, std_plot, y_best=float(np.max(y1)), xi=self.cfg.ei_xi)
+            else:
+                acq_plot = acq_ucb(mu_plot, std_plot, beta=self.cfg.ucb_beta)
+            self._latest_bo1d_trace = self._build_bo1d_trace_payload(
+                axis_name=axis_name,
+                x_grid=plot_grid,
+                mu=mu_plot,
+                std=std_plot,
+                acq=acq_plot,
+                chosen_x=float(cand[best_idx]),
+                chosen_acq=float(acq[best_idx]),
+                observed_records=axis_recs,
+            )
+        else:
+            self._latest_bo1d_trace = None
         x = x_base.copy()
         x[axis] = float(cand[best_idx])
         return x, "bo1d"
@@ -1659,7 +1868,7 @@ class Optimizer:
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
             zscan_axes=self._zscan_axis_indices(),
-            zscan_kernel="matern32",
+            zscan_kernel="rbf",
         ))
         gp.fit(X, y)
 
@@ -1672,6 +1881,29 @@ class Optimizer:
             a = acq_ucb(mu, std, beta=self.cfg.ucb_beta)
 
         x_next = cand[int(np.argmax(a))]
+        if X.shape[1] == 1:
+            axis_name = str(self.cfg.params[0])
+            plot_grid = self._bo1d_plot_grid(axis_name, float(lo[0]), float(hi[0]))
+            if plot_grid.size > 0:
+                mu_plot, std_plot = gp.predict(plot_grid.reshape(-1, 1))
+                if self.cfg.acquisition.upper() == "EI":
+                    acq_plot = acq_ei(mu_plot, std_plot, y_best=float(np.max(y)), xi=self.cfg.ei_xi)
+                else:
+                    acq_plot = acq_ucb(mu_plot, std_plot, beta=self.cfg.ucb_beta)
+                self._latest_bo1d_trace = self._build_bo1d_trace_payload(
+                    axis_name=axis_name,
+                    x_grid=plot_grid,
+                    mu=mu_plot,
+                    std=std_plot,
+                    acq=acq_plot,
+                    chosen_x=float(x_next[0]),
+                    chosen_acq=float(np.max(a)),
+                    observed_records=list(self.records),
+                )
+            else:
+                self._latest_bo1d_trace = None
+        else:
+            self._latest_bo1d_trace = None
         return clamp(x_next, lo, hi), float(np.max(a))
 
     def _propose_next_TRBO(self) -> Tuple[np.ndarray, float]:
@@ -1689,7 +1921,7 @@ class Optimizer:
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
             zscan_axes=self._zscan_axis_indices(),
-            zscan_kernel="matern32",
+            zscan_kernel="rbf",
         ))
         gp.fit(X, y)
 
@@ -1785,6 +2017,8 @@ class Optimizer:
         gf_final_x: Dict[str, float] = {}
         gf_final_y: float = float("nan")
         try:
+            self._measure_resume_pending_row()
+
             # Initialize (structured first, then random fill)
             init_pts = []
             if self.cfg.init_strategy == "structured":
@@ -1884,14 +2118,21 @@ class Optimizer:
 
                     axis_sigma = max(1e-6, float(self.cfg.init_sigma.get(axis_name, 0.5)))
                     if self._is_zscan_axis(axis_name):
-                        # Z-axis init is now also anchored at x_fixed (current axis value).
-                        # This allows init0 reuse across axis transitions, then probes +/-half-range from that anchor.
-                        z_span = max(1e-6, float(getattr(self.cfg, "zscan_range", axis_sigma)))
-                        axis_init_plan = [
-                            ("init0", 0.0, False),
-                            ("init+", +0.5 * z_span, False),
-                            ("init-", -0.5 * z_span, False),
-                        ]
+                        zscan_method = str(getattr(self.cfg, "zscan_method", "BO") or "BO").upper()
+                        if zscan_method == "GF":
+                            axis_init_plan = [
+                                ("init0", 0.0, False),
+                                ("init+", +axis_sigma, False),
+                                ("init-", -axis_sigma, False),
+                            ]
+                        else:
+                            # For z-scan BO mode, seed the 1D BO with the configured BO range.
+                            z_span = max(1e-6, float(getattr(self.cfg, "zscan_range", axis_sigma)))
+                            axis_init_plan = [
+                                ("init0", 0.0, False),
+                                ("init+", +0.5 * z_span, False),
+                                ("init-", -0.5 * z_span, False),
+                            ]
                     else:
                         axis_init_plan = [
                             ("init0", 0.0, False),
@@ -2160,6 +2401,16 @@ class Optimizer:
                                     axis=axis_idx,
                                     base_x=x_fixed,
                                 )
+                                bo1d_trace = dict(self._latest_bo1d_trace or {}) if isinstance(self._latest_bo1d_trace, dict) else {}
+                                if bo1d_trace:
+                                    self._emit(len(self.X), {
+                                        "phase": "acquisition",
+                                        "method": "BO1D",
+                                        "axis": axis_name,
+                                        "step_next": len(self.X) + 1,
+                                        "max_acq": float(bo1d_trace.get("chosen_acq", float("nan"))),
+                                        "bo1d_trace": bo1d_trace,
+                                    })
                         else:
                             if gf_forced_offsets:
                                 offset = float(gf_forced_offsets.pop(0))
@@ -2252,11 +2503,13 @@ class Optimizer:
                     else:
                         x_next, max_acq = self._propose_next_BO()
                         chosen_by = "BO"
+                        bo1d_trace = dict(self._latest_bo1d_trace or {}) if isinstance(self._latest_bo1d_trace, dict) else {}
                         self._emit(len(self.X), {
                             "phase": "acquisition",
                             "method": method,
                             "step_next": len(self.X) + 1,
                             "max_acq": float(max_acq),
+                            "bo1d_trace": bo1d_trace,
                         })
                         if bool(getattr(self.cfg, "bo_stop_on_low_acq", True)):
                             thr = float(getattr(self.cfg, "bo_low_acq_threshold", 1e-4))
@@ -2384,4 +2637,7 @@ class Optimizer:
 
         return out
 
-from ipbsm_opt_plotting import build_gf_axiswise_fit, plot_bo_gp_heatmap, plot_results
+try:
+    from .ipbsm_opt_plotting import build_gf_axiswise_fit, plot_bo_gp_heatmap, plot_results
+except ImportError:
+    from ipbsm_opt_plotting import build_gf_axiswise_fit, plot_bo_gp_heatmap, plot_results
