@@ -104,6 +104,15 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.DHJ0840', 'CA.DVJ0840',
         ]
 
+        self.screen_status_params = {
+            "CA.BTV0390L": "CA.BTV0390_CAS.BTV0420/OPSettingSystem1#positionChannel1",
+            "CA.BTV0390H": "CA.BTV0390_CAS.BTV0420/OPSettingSystem1#positionChannel1",
+            "CA.BTV0620":  "CAS.BTV0440_CA.BTV0620/OPSettingSystem2#positionChannel2",
+            "CA.BTV0730":  "CA.BTV0730_CA.BTV0800/OPSettingSystem1#positionChannel1",
+            "CA.BTV0810":  "CA.BTV0805_CA.BTV0810/OPSettingSystem2#positionChannel2",
+            "CA.BTV0910":  "CA.BTV0910_CAS.BTV0930/OPSettingSystem1#positionChannel1",
+        }
+
         self.corrector_set_params = {name: f'{name}/SettingPPM' for name in correctors}
         self.corrector_get_params = {name: f'{name}/Acquisition' for name in correctors}
 
@@ -263,28 +272,24 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return [name_to_index.get(name, np.nan) for name in names]
 
     def _read_screen_status(self, screen_name):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
         try:
-            address = f'{japc_camera}/Acquisition'
-            return self.client.get(address, context=self.context).data['screenIn']
-        except Exception:
+            address = self.screen_status_params[screen_name]
+            property_address, field = address.rsplit("#", 1)
+            value = self.client.get(property_address, context=self.context).data[field]
+            return self.make_safe_float(value)
+        except Exception as exc:
+            self.log(f"Could not read screen status for {screen_name}: {exc}")
             return np.nan
 
-    def _acquire_screen_image(self, screen_name):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
+    def _acquire_screen_data(self, screen_name):
+        japc_camera = self.screen_config.get(screen_name, {}).get("japc_name", screen_name.rstrip("LH"))
         camera_config = self.screen_config.get(screen_name, {})
-        selector = camera_config.get('japc_selector', self.context)
+        selector = camera_config.get("japc_selector", self.context)
         try:
-            image = self.client.get(f'{japc_camera}.DigiCam/LastImage', context=selector).data['image2D']
+            return self.client.get(f"{japc_camera}.DigiCam/LastImage", context=selector).data
         except Exception as exc:
-            self.log(f'Could not read image from {screen_name}: {exc}')
+            self.log(f"Could not read camera data from {screen_name}. Reason: {exc}")
             return None
-        if image is None:
-            return None
-        image = np.asarray(image, dtype=float)
-        if image.size == 0:
-            return None
-        return image
 
     def set_screen_camera_on(self, screen_name, on=True):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
@@ -514,26 +519,44 @@ class CLEAR_real_machine(AbstractMachineInterface):
             camera_config = self.screen_config.get(screen_name, {}) # gets pixel size and resolutino
             hpixel = float(camera_config.get('s_x_res', np.nan))
             vpixel = float(camera_config.get('s_y_res', np.nan))
-
             status = self._read_screen_status(screen_name) # is screen inserted or extracted?
-            setting = self._read_screen_setting(screen_name) # reads settings of the screen
-            image = self._acquire_screen_image(screen_name)
-            if image is not None:
-                # Region Of Interest
-                roi = self._roi_from_setting(setting, image.shape) # instead of analyzing the whole picture, gets the relevant area, with the beam on it
-                x0, x1, y0, y1 = roi
-                x0 = max(0, min(int(x0), image.shape[1])) # if roi is out of the image, it gets clipped
-                x1 = max(x0, min(int(x1), image.shape[1]))
-                y0 = max(0, min(int(y0), image.shape[0]))
-                y1 = max(y0, min(int(y1), image.shape[0]))
-                image = image[y0:y1, x0:x1]
-
-                auto_roi = self._auto_aoi_from_image(image) # only pure beam spot
-                if auto_roi is not None:
-                    ax0, ax1, ay0, ay1 = auto_roi
-                    image = image[ay0:ay1, ax0:ax1]
-
-            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel)
+            camera_data = self._acquire_screen_data(screen_name)
+            if camera_data is None:
+                x_mean = np.nan
+                y_mean = np.nan
+                sigx = np.nan
+                sigy = np.nan
+                total = 0.0
+                image = np.zeros((1,1))
+                hedges = np.array([0.0, 1.0])
+                vedges = np.array([0.0, 1.0])
+            else:
+                image = np.asarray(camera_data["image2D"], dtype=float)
+                proj_x = np.asarray(camera_data["projDataSet1"], dtype=float)
+                proj_y = np.asarray(camera_data["projDataSet2"], dtype=float)
+                x_positions = np.asarray(camera_data["imagePositionSet1"], dtype=float)
+                y_positions = np.asarray(camera_data["imagePositionSet2"], dtype=float)
+                proj_x = np.nan_to_num(proj_x, nan = 0.0)
+                proj_y = np.nan_to_num(proj_y, nan = 0.0)
+                proj_x = proj_x - np.min(proj_x)
+                proj_y = proj_y - np.min(proj_y)
+                total_x = float(np.sum(proj_x))
+                total_y = float(np.sum(proj_y))
+                total = float(np.nansum(image))
+                if total_x > 0.0:
+                    x_mean = float(np.sum(x_positions * proj_x) / total_x)
+                    sigx = float(np.sqrt(np.sum((x_positions - x_mean) ** 2 * proj_x) / total_x))
+                else:
+                    x_mean = np.nan
+                    sigx = np.nan
+                if total_y > 0.0:
+                    y_mean = float(np.sum(y_positions * proj_y) / total_y)
+                    sigy = float(np.sqrt(np.sum((y_positions - y_mean) ** 2 * proj_y) / total_y))
+                else:
+                    y_mean = np.nan
+                    sigy = np.nan
+                hedges = x_positions
+                vedges = y_positions
 
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
@@ -549,8 +572,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         return {
             "names": list(selected_names),
-            "hpixel": np.asarray(hpixel_list, dtype=float),
-            "vpixel": np.asarray(vpixel_list, dtype=float),
+            "hpixel": np.asarray(hpixel_list, dtype=float), # mm
+            "vpixel": np.asarray(vpixel_list, dtype=float), # mm
             "x": np.asarray(xb_list, dtype=float),
             "y": np.asarray(yb_list, dtype=float),
             "sigx": np.asarray(sigx_list, dtype=float), # we need to get that from the image
@@ -559,11 +582,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "hedges": hedges_all, #imagePositionSet1 i think its an array
             "vedges": vedges_all,
             "images": images, #image2D
-            #
             "S": np.asarray(s_positions, dtype=float),
             "inout": np.asarray(inout_list, dtype=float),
         }
-
 
     def get_target_dispersion(self, names=None):
         if names is None:
