@@ -348,15 +348,28 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def get_bpms(self, names=None):
         self.log('Reading bpms...')
         selected_names = self.bpms if names is None else ([names] if isinstance(names, str) else list(names))
-
         x, y, tmit = [], [], []
+
         for sample in range(self.nsamples):
             self.log(f'Sample = {sample}')
             x_sample, y_sample, tmit_sample = [], [], []
             for bpm in selected_names:
-                x_sample.append(self._read_bpm_plane(bpm, 'x'))
-                y_sample.append(self._read_bpm_plane(bpm, 'y'))
-                tmit_sample.append(self._read_bpm_intensity(bpm))
+                hsamples = self.client.get(f"{bpm}H-SA/SamplesFromTrigger", context = self.context_acquisition).data
+                vsamples = self.client.get(f"{bpm}V-SA/SamplesFromTrigger", context=self.context_acquisition).data
+                ssamples = self.client.get(f"{bpm}S-SA/SamplesFromTrigger", context=self.context_acquisition).data
+                h = np.asarray(hsamples["samples"], dtype=float).ravel()
+                v = np.asarray(vsamples["samples"], dtype=float).ravel()
+                s = np.asarray(ssamples["samples"], dtype=float).ravel()
+                s_sum = np.sum(s)
+                if abs(s_sum)>1e-12:
+                    Hpos = np.sum(h) / s_sum
+                    Vpos = np.sum(v) / s_sum
+                else:
+                    Hpos = np.nan
+                    Vpos = np.nan
+                x_sample.append(Hpos)
+                y_sample.append(Vpos)
+                tmit_sample.append(s_sum)
             x.append(x_sample)
             y.append(y_sample)
             tmit.append(tmit_sample)
@@ -463,24 +476,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             self.client.set(property_address, {field: float(value)}, context=self.context_empty)
 
         time.sleep(1)
-
-    def _read_bpm_plane(self, bpm, plane):
-        plane = plane.lower()
-        try:
-            data = self.client.get(f"{bpm}/Acquisition", context=self.context_acquisition).data
-            return self.make_safe_float(data.get(plane), default=np.nan)
-        except Exception:
-            return np.nan
-
-    def _read_bpm_intensity(self, bpm):
-        try:
-            data = self.client.get(f"{bpm}/Acquisition", context=self.context_acquisition).data
-        except Exception:
-            return np.nan
-        for field in ("intensity", "sum", "charge"):
-            if field in data:
-                return self.make_safe_float(data[field], default=np.nan)
-        return np.nan
 
     # def insert_screen(self, screen_name):
     #     screen_pv_name = self.screen_pv_names.get(screen_name)

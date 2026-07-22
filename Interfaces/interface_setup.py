@@ -79,25 +79,24 @@ INTERFACE_SETUP = {
                     "em_sigma_unit": "mm"
 
                 },
+                    # "bounds": {   # QF17X RF-Track validation
+                    #     "emit_x_norm": [3.5, 8.0],
+                    #     "beta_x0": [2.0, 8.0],
+                    #     "alpha_x0": [-2.0, 2.0],
+                    #     "emit_y_norm": [0.01, 0.5],
+                    #     "beta_y0": [0.2, 1.2],
+                    #     "alpha_y0": [-1.0, 1.0],
+                    # }
 
-            "bounds": { # QF17X entrance
-                "emit_x_norm": [5, 9.0],
-                "beta_x0": [3.0, 9.0],
-                "alpha_x0": [-4.0, -1.0],
-                "emit_y_norm": [0.1, 0.4],
-                "beta_y0": [0.1, 1.5],
-                "alpha_y0": [-1.0, 1.0],
+
+            "bounds": {  # QD18X entrance
+                "emit_x_norm": [5.0, 9.0],
+                "beta_x0": [0.5, 5.0],
+                "alpha_x0": [-2.5, 1.0],
+                "emit_y_norm": [0.01, 0.4],
+                "beta_y0": [5.0, 16.0],
+                "alpha_y0": [-6.0, -2.0],
             }
-
-
-            # "bounds": {  # QD18X entrance
-            #     "emit_x_norm": [5.0, 9.0],
-            #     "beta_x0": [0.5, 5.0],
-            #     "alpha_x0": [-2.5, 1.0],
-            #     "emit_y_norm": [0.1, 0.4],
-            #     "beta_y0": [5.0, 16.0],
-            #     "alpha_y0": [-6.0, -2.0],
-            # }
 
             # "bounds": { # QD16X
             #     "emit_x_norm": [5.0, 9.0],

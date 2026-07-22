@@ -145,7 +145,7 @@ class TrainModel:
             self.quad_name = str(data["quad_name"])
 
         finite = np.all(np.isfinite(X), axis=1) & np.all(np.isfinite(Y), axis=1) # deletes samples with nan, -inf, +inf
-        n_k1_per_twiss_set = int(np.asarray(data["n_k1_per_twiss_set"]).item())
+        n_k1_per_twiss_set = 7
         groups = np.arange(X.shape[0],dtype = int) // max(1, n_k1_per_twiss_set)
         X = X[finite]
         Y = Y[finite]
@@ -418,7 +418,7 @@ class MLInterface:
 if __name__ == "__main__":
     trainer = TrainModel(
         machine_name="ATF2",
-        quad_name="QD18X",
+        quad_name="QD16X",
         screens=["OTR0X", "OTR1X", "OTR2X", "OTR3X"],
     )
     trainer.train()
