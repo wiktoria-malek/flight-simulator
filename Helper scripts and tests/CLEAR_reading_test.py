@@ -88,7 +88,6 @@ print(f"y_positions.shape = {y_positions.shape}")
 inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context_empty).data["positionChannel1"]
 print(f"inout from PyDa = {inout}")
 
-
 print("================================================================================")
 print("Testing screen CA.BTV0390L, reading its values directly from interface, using get_screens method... ")
 result = I.get_screens(names=["CA.BTV0390L"])
@@ -102,6 +101,54 @@ print(f"sigy from get_screens:  {result['sigy']}")
 print(f"sum from get_screens: {result['sum']}")
 print(f"images from get_screens: {result['images']}")
 print(f"inout from get_screens: {result['inout']}")
+"""================================="""
+
+
+"""================================="""
+
+"""Test of one BPM and method get_bpms"""
+
+print("Testing BPM CA.BPM0530H-SA, reading its values directly from japc/pyda... ")
+bpm = "CA.BPM0530"
+hsamples = client.get(f"{bpm}H-SA/SamplesFromTrigger", context = context_empty).data
+vsamples = client.get(f"{bpm}V-SA/SamplesFromTrigger", context = context_empty).data
+Ssamples = client.get(f"{bpm}S-SA/SamplesFromTrigger", context = context_empty).data
+
+print(hsamples.keys())
+print("================================================================================")
+
+print(vsamples.keys())
+print("================================================================================")
+
+print(Ssamples.keys())
+# print(f"{bpm}H-SA/SamplesFromTrigger = {hsamples}")
+
+# print(f"{bpm}H-SA/SamplesFromTrigger = {vsamples}")
+
+# print(f"{bpm}S-SA/SamplesFromTrigger = {Ssamples}")
+
+# Hpos = sum(hsamples)/sum(Ssamples)
+# Vpos = sum(vsamples)/sum(Ssamples)
+
+
+
+
+
+
+
+
+
+
+
+
+# print("================================================================================")
+# print("Testing BPM CA.BPM0530, reading its values directly from interface, using get_bpms method... ")
+#
+# result = I.get_bpms(names=["CA.BPM0530"])
+# print(f"names from method get_bpms: {result['names']}")
+# print(f"bdes  from method get_bpms: {result['bdes']}")
+# print(f"bact  from method get_bpms: {result['bact']}")
+
 """================================="""
 
 # # print("Methods to test Orbit Measurement.")
