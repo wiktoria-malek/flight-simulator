@@ -375,7 +375,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
-                data = self.client.get(readback_param).data
+                data = self.client.get(readback_param, context=self.context).data
                 last_value = self.make_safe_float(data.get('currentAverage'), default=np.nan)
             except Exception:
                 last_value = np.nan
@@ -399,7 +399,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return
         for corrector, corr_val in zip(names, corr_vals):
             target = float(corr_val)
-            self.client.set(self.corrector_set_params[corrector], context=self.context, {'current': target})
+            self.client.set(self.corrector_set_params[corrector], {'current': target}, context=self.context)
             self._wait_for_corrector_readback(corrector, target)
 
     def vary_correctors(self, names, corr_vals):
