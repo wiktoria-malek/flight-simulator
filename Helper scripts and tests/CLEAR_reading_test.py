@@ -12,19 +12,20 @@ from Interfaces.CLEAR.InterfaceCLEAR import CLEAR_real_machine
 I = CLEAR_real_machine()
 
 client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
-context = "SCT.USER.SETUP"
+context_acquisition = "SCT.USER.SETUP"
+context_empty = ""
 
 """Test of one quadrupole and method get_quadrupoles"""
 
 print("Testing quadrupole CA.QFD0350, reading its values directly from japc/pyda... ")
 quadrupole = "CA.QFD0350"
-setting = client.get(f"{quadrupole}/SettingPPM", context=context).data["current"]
+setting = client.get(f"{quadrupole}/SettingPPM", context=context_empty).data["current"]
 print(f"{quadrupole}/SettingPPM#current = {setting}")
 
-acquisition = client.get(f"{quadrupole}/Acquisition", context = context).data["currentAverage"]
+acquisition = client.get(f"{quadrupole}/Acquisition", context = context_acquisition).data["currentAverage"]
 print(f"{quadrupole}/Acquisition#currentAverage = {acquisition}")
 
-status = client.get(f"{quadrupole}/Status", context = context).data
+status = client.get(f"{quadrupole}/Status", context = "").data
 print(f"{quadrupole}/Status = {status}")
 print("================================================================================")
 print("Testing quadrupole CA.QFD0350, reading its values directly from interface, using get_quadrupoles method... ")
@@ -40,13 +41,13 @@ print(f"bact  from method get_quadrupoles: {result['bact']}")
 
 print("Testing corrector CA.DHG0130, reading its values directly from japc/pyda... ")
 corrector = "CA.DHG0130"
-setting = client.get(f"{corrector}/SettingPPM", context = context).data["current"]
+setting = client.get(f"{corrector}/SettingPPM", context = context_empty).data["current"]
 print(f"{corrector}/SettingPPM#current = {setting}")
 
-acquisition = client.get(f"{corrector}/Acquisition", context = context).data["currentAverage"]
+acquisition = client.get(f"{corrector}/Acquisition", context = context_acquisition).data["currentAverage"]
 print(f"{corrector}/Acquisition#currentAverage = {acquisition}")
 
-status = client.get(f"{corrector}/Status", context = context).data
+status = client.get(f"{corrector}/Status", context = context_empty).data
 print(f"{corrector}/Status = {status}")
 print("================================================================================")
 print("Testing corrector CA.DHG0130, reading its values directly from interface, using get_correctors method... ")
@@ -61,7 +62,7 @@ print(f"bact  from method get_correctors: {result['bact']}")
 """Test of one screen and method get_screens"""
 
 print("Testing screen CA.BTV0390L, reading its values directly from japc/pyda... ")
-camera = client.get("CA.BTV0390.DigiCam/LastImage", context=context).data
+camera = client.get("CA.BTV0390.DigiCam/LastImage", context=context_empty).data
 
 image = camera["image2D"]
 print(f"image from PyDa = {image}")
@@ -84,7 +85,7 @@ print(f"x_positions.shape = {x_positions.shape}")
 y_positions = camera["imagePositionSet2"]
 print(f"y_positions.shape = {y_positions.shape}")
 
-inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context).data["positionChannel1"]
+inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context_empty).data["positionChannel1"]
 print(f"inout from PyDa = {inout}")
 
 

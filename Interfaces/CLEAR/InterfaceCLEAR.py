@@ -59,7 +59,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BEAM/Acquisition#energy',
         ]
 
-        self.context = "SCT.USER.SETUP"
+        self.context_acquisition = "SCT.USER.SETUP"
+        self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 
@@ -275,7 +276,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         try:
             address = self.screen_status_params[screen_name]
             property_address, field = address.rsplit("#", 1)
-            value = self.client.get(property_address, context=self.context).data[field]
+            value = self.client.get(property_address, context=self.context_empty).data[field]
             return self.make_safe_float(value)
         except Exception as exc:
             self.log(f"Could not read screen status for {screen_name}: {exc}")
@@ -284,7 +285,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def _acquire_screen_data(self, screen_name):
         japc_camera = self.screen_config.get(screen_name, {}).get("japc_name", screen_name.rstrip("LH"))
         camera_config = self.screen_config.get(screen_name, {})
-        selector = camera_config.get("japc_selector", self.context)
+        selector = camera_config.get("japc_selector", self.context_empty)
         try:
             return self.client.get(f"{japc_camera}.DigiCam/LastImage", context=selector).data
         except Exception as exc:
@@ -317,7 +318,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for name in names:
             property_address, field = name.rsplit("#", 1)
             try:
-                value = self.client.get(property_address, context=self.context).data[field]
+                value = self.client.get(property_address, context=self.context_empty).data[field]
             except Exception:
                 value = np.nan
             charge.append(self.make_safe_float(value))
@@ -333,8 +334,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         bdes, bact = [], []
         for corrector in selected_names:
-            setting_data = self.client.get(self.corrector_set_params[corrector],context = self.context).data
-            acquisition_data = self.client.get(self.corrector_get_params[corrector], context = self.context).data
+            setting_data = self.client.get(self.corrector_set_params[corrector],context = self.context_empty).data
+            acquisition_data = self.client.get(self.corrector_get_params[corrector], context = self.context_acquisition).data
             bdes.append(setting_data['current'])
             bact.append(acquisition_data['currentAverage'])
 
@@ -375,7 +376,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
-                data = self.client.get(readback_param, context=self.context).data
+                data = self.client.get(readback_param, context=self.context_acquisition).data
                 last_value = self.make_safe_float(data.get('currentAverage'), default=np.nan)
             except Exception:
                 last_value = np.nan
@@ -399,7 +400,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return
         for corrector, corr_val in zip(names, corr_vals):
             target = float(corr_val)
-            self.client.set(self.corrector_set_params[corrector], {'current': target}, context=self.context)
+            self.client.set(self.corrector_set_params[corrector], {'current': target}, context=self.context_empty)
             self._wait_for_corrector_readback(corrector, target)
 
     def vary_correctors(self, names, corr_vals):
@@ -431,11 +432,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
             get_property, get_field = get_address.rsplit("#", 1)
 
             try:
-                set_value = self.client.get(set_property, context=self.context).data[set_field]
+                set_value = self.client.get(set_property, context=self.context_empty).data[set_field]
             except Exception:
                 set_value = np.nan
             try:
-                get_value = self.client.get(get_property, context=self.context).data[get_field]
+                get_value = self.client.get(get_property, context=self.context_acquisition).data[get_field]
             except Exception:
                 get_value = np.nan
 
@@ -459,21 +460,21 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for quadrupole, value in zip(names, values):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
-            self.client.set(property_address, {field: float(value)}, context=self.context)
+            self.client.set(property_address, {field: float(value)}, context=self.context_empty)
 
         time.sleep(1)
 
     def _read_bpm_plane(self, bpm, plane):
         plane = plane.lower()
         try:
-            data = self.client.get(f"{bpm}/Acquisition", context=self.context).data
+            data = self.client.get(f"{bpm}/Acquisition", context=self.context_acquisition).data
             return self.make_safe_float(data.get(plane), default=np.nan)
         except Exception:
             return np.nan
 
     def _read_bpm_intensity(self, bpm):
         try:
-            data = self.client.get(f"{bpm}/Acquisition", context=self.context).data
+            data = self.client.get(f"{bpm}/Acquisition", context=self.context_acquisition).data
         except Exception:
             return np.nan
         for field in ("intensity", "sum", "charge"):
@@ -664,7 +665,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def _read_screen_setting(self, screen_name):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
         try:
-            return self.client.get(f'{japc_camera}.DigiCam/Setting', context = self.context).data
+            return self.client.get(f'{japc_camera}.DigiCam/Setting', context = self.context_empty).data
         except Exception as e:
             print(e)
             return None
@@ -672,7 +673,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def _read_screen_h_matrix(self, screen_name):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
         try:
-            return self.client.get(f'{japc_camera}.Settings/Settings', context=self.context).data['h_matrix']
+            return self.client.get(f'{japc_camera}.Settings/Settings', context=self.context_empty).data['h_matrix']
         except Exception:
             return None
 
@@ -723,7 +724,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for address in self.laser_attenuator_readback:
             property_address, field = address.rsplit('#', 1)
             try:
-                value = self.client.get(property_address, context = self.context).data[field]
+                value = self.client.get(property_address, context = self.context_empty).data[field]
                 value = self.make_safe_float(value)
                 if np.isfinite(value):
                     return value/1e3
@@ -735,7 +736,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         position = float(np.clip(float(position), 0.0, 3.0))
         command_position = position * 1e3
         self.log(f'Setting CLEAR motor attenuator to {position:.3f} ksteps, ({command_position:.0f} steps)...')
-        self.client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context)
+        self.client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context_empty)
         time.sleep(1)
         return position
 
@@ -743,7 +744,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for address in self.laser_motor_attenuator_readback:
             property_address, field = address.rsplit('#', 1)
             try:
-                value = self.client.get(property_address, context = self.context).data[field]
+                value = self.client.get(property_address, context = self.context_empty).data[field]
                 value = self.make_safe_float(value)
                 if np.isfinite(value):
                     return value/1e3
@@ -758,7 +759,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         position = float(np.clip(float(position), min_pos, max_pos))
         self.log(f'Setting {attenuator_name} to {position:.1f}...')
         property_address, field = (self.uv_attenuator_params[attenuator_name].rsplit('#', 1))
-        self.client.set(property_address, {field: position}, context=self.context)
+        self.client.set(property_address, {field: position}, context=self.context_empty)
         time.sleep(1)
         return position
 
@@ -773,20 +774,18 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def set_shutter(self, shutter_name, open_shutter=True):
         if shutter_name not in self.shutter_set_params:
             raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_set_params)}')
-
         property_address, field = self.shutter_set_params[shutter_name].rsplit('#', 1)
-        self.client.set(property_address, {field: bool(open_shutter)}, context = self.context)
+        self.client.set(property_address, {field: bool(open_shutter)}, context = self.context_empty)
         time.sleep(0.5)
         return bool(open_shutter)
 
     def get_shutter(self, shutter_name):
         if shutter_name not in self.shutter_readback_params:
             raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_readback_params)}')
-
         address = self.shutter_readback_params[shutter_name]
         property_address, field = address.rsplit('#', 1)
         try:
-            value = self.client.get(property_address, context = self.context).data[field]
+            value = self.client.get(property_address, context = self.context_empty).data[field]
         except Exception:
             return np.nan
         return bool(value)
@@ -803,7 +802,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         try:
             sample_address = self.bcm_sample_params[bcm_name]
             property_address, field = sample_address.rsplit("#", 1)
-            samples = self.client.get(property_address, context=self.context).data[field]
+            samples = self.client.get(property_address, context=self.context_empty).data[field]
             gain = self.client.get("CA.BCM01GAIN/Setting").data["enumValue"]
 
             samples = np.asarray(samples, dtype=float) / 1000.0
