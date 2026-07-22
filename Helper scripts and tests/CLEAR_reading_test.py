@@ -110,9 +110,9 @@ print(f"inout from get_screens: {result['inout']}")
 
 print("Testing BPM CA.BPM0530H-SA, reading its values directly from japc/pyda... ")
 bpm = "CA.BPM0530"
-hsamples = client.get(f"{bpm}H-SA/SamplesFromTrigger", context = context_empty).data
-vsamples = client.get(f"{bpm}V-SA/SamplesFromTrigger", context = context_empty).data
-Ssamples = client.get(f"{bpm}S-SA/SamplesFromTrigger", context = context_empty).data
+hsamples = client.get(f"{bpm}H-SA/SamplesFromTrigger", context = context_acquisition).data
+vsamples = client.get(f"{bpm}V-SA/SamplesFromTrigger", context = context_acquisition).data
+Ssamples = client.get(f"{bpm}S-SA/SamplesFromTrigger", context = context_acquisition).data
 
 print(hsamples.keys())
 print("================================================================================")
