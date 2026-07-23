@@ -36,7 +36,8 @@ print(f"names from method get_quadrupoles: {result['names']}")
 print(f"bdes  from method get_quadrupoles: {result['bdes']}")
 print(f"bact  from method get_quadrupoles: {result['bact']}")
 
-"""================================="""
+print("================================================================================")
+
 
 """Test of one corrector and method get_correctors"""
 
@@ -58,7 +59,8 @@ print(f"names from method get_correctors: {result['names']}")
 print(f"bdes  from method get_correctors: {result['bdes']}")
 print(f"bact  from method get_correctors: {result['bact']}")
 
-"""================================="""
+print("================================================================================")
+
 
 """Test of one screen and method get_screens"""
 
@@ -102,10 +104,7 @@ print(f"sigy from get_screens:  {result['sigy']}")
 print(f"sum from get_screens: {result['sum']}")
 print(f"images from get_screens: {result['images']}")
 print(f"inout from get_screens: {result['inout']}")
-"""================================="""
-
-
-"""================================="""
+print("================================================================================")
 
 """Test of one BPM and method get_bpms"""
 
@@ -133,7 +132,6 @@ plt.plot(h, label="H")
 plt.plot(v, label="V")
 plt.plot(s, label="S")
 plt.legend()
-plt.figure()
 plt.show()
 
 print("================================================================================")
@@ -143,17 +141,7 @@ print(f"names from get_bpms: {result['names']}")
 print(f"x from get_bpms: {result['x']}")
 print(f"y from get_bpms: {result['y']}")
 print(f"tmit from get_bpms: {result['tmit']}")
-"""================================="""
-
-
-
-
-
-
-
-
-
-
+print("================================================================================")
 
 
 
@@ -165,7 +153,6 @@ print(f"tmit from get_bpms: {result['tmit']}")
 # print(f"bdes  from method get_bpms: {result['bdes']}")
 # print(f"bact  from method get_bpms: {result['bact']}")
 
-"""================================="""
 
 # # print("Methods to test Orbit Measurement.")
 # # state = State(correctors=correctors)

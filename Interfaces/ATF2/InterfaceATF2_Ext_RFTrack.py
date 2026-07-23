@@ -35,7 +35,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
-    def __init__(self, population=2e10, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
+    def __init__(self, population=2e10, bg_shots = 0.0,  jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
         #self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
@@ -71,6 +71,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.qmag_ydes = {name: 0.0 for name in self.quadrupoles}
         self.qmag_rolldes = {name: 0.0 for name in self.quadrupoles}
         #self.qm_list = [s for s in self.interface.get_sequence() if str(s).upper().startswith("Q")]
+        self.bg_shots = int(bg_shots)
 
         # ----------------------------
         # Knobs (linear / nonlinear)

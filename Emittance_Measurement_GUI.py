@@ -130,7 +130,7 @@ class OptimizationWorker(QObject):
             self.done.emit()
 
 class MainWindow(QMainWindow, QuadrupoleScan):
-    def __init__(self, interface, dir_name):
+    def __init__(self, interface, dir_name, bg_shots = 10):
         super().__init__()
         self.interface = interface
         self.dir_name = dir_name
@@ -202,6 +202,12 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._on_computation_mode_changed(self.computing_method_combo.currentText())
         self._on_nsteps_scan_changed(self.steps_settings.value())
         self.load_screens_data_button.clicked.connect(self._load_screens_data)
+        self.background_shots.setValue(bg_shots)
+        self.interface.bg_shots = int(self.background_shots.value())
+        self.background_shots.valueChanged.connect(self._on_bg_shots_changed)
+
+    def _on_bg_shots_changed(self, value):
+        self.interface.bg_shots = max(0, int(value))
 
     def _load_screens_data(self):
         self.load_screens_data()
@@ -624,9 +630,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             step_i = int(parts[3])
             shot_i = int(parts[5])
             screen_data = state.get_screens()
-            sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0]) #/ 1000.0
-            sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0]) #/ 1000.0
-            sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0]) #/ 1000.0
+            sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0]) / 1000.0
+            sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0]) / 1000.0
+            sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0]) / 1000.0
             screen_images = state.get_screens().get("images", [])
             if len(screen_images) > 0:
                 images[step_i][screen_i][shot_i] = np.asarray(screen_images[0]).tolist()
@@ -1134,11 +1140,14 @@ if __name__ == "__main__":
 
     I = dialog
     project_name = I.get_name()
+    bg_shots = 10
+    if "RFT" in project_name:
+        bg_shots = 0
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     dir_name = f"~/CERN-Flight_Simulator-Data/EM_{I.get_name()}{time_str}_session_settings"
     dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
-    w = MainWindow(I, dir_name)
+    w = MainWindow(I, dir_name, bg_shots)
     w.show()
     sys.exit(app.exec())

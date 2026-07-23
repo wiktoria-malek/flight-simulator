@@ -153,8 +153,8 @@ def acquire_otr_image(otr_id_str, min_total_intensity=135000, max_retries=3):
         bg_frames.append(bg_data.reshape(960, 1280).astype(np.float64))
     bg_img = np.median(bg_frames, axis=0)
     
-  #  print(" -> Capturing BACKGROUND image...")
-   # image_acquire_pv.put(1) 
+    #  print(" -> Capturing BACKGROUND image...")
+    # image_acquire_pv.put(1)
     #time.sleep(3) 
     #bg_data = image_data_pv.get() 
     #image_acquire_pv.put(0) 

@@ -66,7 +66,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_name(self):
         return 'ATF2_Ext'
 
-    def __init__(self, nsamples=10, nominal_intensity=0.15, wfs_intensity=0.1):
+    def __init__(self, bg_shots=10.0, nsamples=10, nominal_intensity=0.15, wfs_intensity=0.1):
         self.nsamples = nsamples
         self.bpm_sample_interval_s = 0.5
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
@@ -288,6 +288,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for alias in self.qmag_alias_to_canonical.keys():
             # Use the alias itself for mover PVs (e.g. QM16FF:MAG:DES:X).
             self.qmag_pv[alias] = self._build_qmag_pv_names(alias)
+
+        self.bg_shots = int(bg_shots)
 
     def _quad_calib(self, name):
 
@@ -579,15 +581,19 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             v_factor = 1.0
         return h_factor, v_factor
 
-    def acquire_otr_image(self, screen_pv_name, move_screen = False):
+    def acquire_otr_image(self, screen_pv_name, min_total_intensity=135000, max_retries=3):
         """
         It might be super slow.
         1 call of get_screens() will take 8s x number_of_screens
         So, for 4 screens it's 32 seconds.
         EM GUI calls get_screens() multiple times, every K1 change.
+
+        Acquires an OTR image with background subtraction.
+        Takes the background once, then loops the beam acquisition if the
+        total integrated intensity is below min_total_intensity.
         """
 
-        print(f"Acquiring data for {screen_pv_name}...")
+        print(f"Acquiring Background and Beam for {screen_pv_name}...")
         pv_in_name = f'{screen_pv_name}:Target:WRITE:IN'
         pv_out_name = f'{screen_pv_name}:Target:WRITE:OUT'
         pv_img_data_name = f'{screen_pv_name}:IMAGE:ArrayData'
@@ -596,19 +602,53 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         otr_out_pv = PV(pv_out_name)
         image_data_pv = PV(pv_img_data_name)
         image_acquire_pv = PV(pv_acquire_name)
-        if move_screen:
-            otr_in_pv.put(1)
-            print("Inserting the screen...")
-            time.sleep(5)
-        image_acquire_pv.put(1)
-        time.sleep(3)
-        img_data = image_data_pv.get()
-        image_acquire_pv.put(0)
-        if move_screen:
+        bg_frames = []
+
+        if self.bg_shots == 0:
+            self.log(" -> Retracting screen to ensure clean insert...")
             otr_out_pv.put(1)
-            print("Extracting the screen...")
-        img_reshaped = img_data.reshape(960, 1280)
-        return img_reshaped
+            time.sleep(5)
+            bg_img = np.zeros((960, 1280), dtype = float)
+        else:
+            self.log(" -> Retracting screen for background...")
+            otr_out_pv.put(1)
+            time.sleep(5)
+            for i in range(self.bg_shots):
+                image_acquire_pv.put(1)
+                time.sleep(1)
+                bg_data = image_data_pv.get()
+                image_acquire_pv.put(0)
+                bg_frames.append(bg_data.reshape(960, 1280).astype(np.float64))
+            bg_img = np.median(bg_frames, axis=0)
+
+        print(" -> Inserting screen for beam...")
+        otr_in_pv.put(1)
+        time.sleep(5)
+
+        subtracted_img = None
+        for attempt in range(1, max_retries + 1):
+            beam_frames = []
+            for i in range(5):
+                image_acquire_pv.put(1)
+                time.sleep(3)
+                beam_data = image_data_pv.get()
+                image_acquire_pv.put(0)
+                beam_frames.append(beam_data.reshape(960, 1280).astype(np.float64))
+            beam_img = np.median(beam_frames, axis=0)
+            subtracted_img = beam_img - bg_img
+            subtracted_img[subtracted_img < 0] = 0
+            tot_intensity = np.sum(subtracted_img)
+            if tot_intensity >= min_total_intensity:
+                break
+            else:
+                print(f" -> WARNING: Total intensity too low ({tot_intensity:,.0f} < threshold of {min_total_intensity:,.0f}).")
+                if attempt < max_retries:
+                    print(" -> Retaking beam image (keeping screen inserted)...\n")
+                else:
+                    print(" -> Max retries reached. Proceeding with the empty/low-intensity frame.")
+        print(" -> Retracting screen...")
+        otr_out_pv.put(1)
+        return subtracted_img, bg_img, beam_img
 
     def _screen_data_from_image(self, image,hpixel,vpixel,screen_pv_name):
         if image is None:
@@ -634,8 +674,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         proj_y = np.sum(img, axis = 1)
         x_mean = float(np.sum(x_centers * proj_x) / total)
         y_mean = float(np.sum(y_centers * proj_y) / total)
-        sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
-        sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
+
         # mOTR:analyzer:dispersion:selectedmotr
         # hack to avoid background subtraction
         command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
@@ -647,39 +686,49 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         time.sleep(10)
         sigx_pv = f"mOTR:analyzer:size:H"
         sigy_pv = f"mOTR:analyzer:size:V"
-        sigx_prev = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
-        sigy_prev = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
-        max_retries = 5
-        for attempt in range(max_retries):
-            time.sleep(5)
-            sigx_new = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
-            sigy_new = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
-            if not np.isfinite(sigx_prev) or not np.isfinite(sigy_prev):
-                sigx_prev, sigy_prev = sigx_new, sigy_new
-                continue
-            if sigx_prev <= 0 or sigy_prev <= 0 or sigx_new <= 0 or sigy_new <= 0:
-                sigx_prev, sigy_prev = sigx_new, sigy_new
-                continue
-            change_x = max(sigx_new / sigx_prev, sigx_prev / sigx_new)
-            change_y = max(sigy_new / sigy_prev, sigy_prev / sigy_new)
-            if change_x <= 8 and change_y <= 8:
-                sigx = sigx_new / 1000.0
-                sigy = sigy_new / 1000.0
-                break
-            print("Screen size changed too much between measurements of sigx and sigy. Remeasuring...")
-            sigx_prev, sigy_prev = sigx_new, sigy_new
-        else:
-            sigx = sigx_prev / 1000.0 if np.isfinite(sigx_prev) else sigx
-            sigy = sigy_prev / 1000.0 if np.isfinite(sigy_prev) else sigy
+        sigx_pv_value = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+        sigy_pv_value = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
 
-        print("sigx from precomputed PV: ", sigx)
-        print("sigy from precomputed PV: ", sigy)
+        sigx_from_image = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0))) # mm
+        sigy_from_image = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0))) # mm
+        '''
+        Logic commented is for reading sigx and sigy from precomputed PVs, not from image analysis.
+        '''
+        # sigx_prev = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+        # sigy_prev = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+        # max_retries = 5
+        # for attempt in range(max_retries):
+        #     time.sleep(5)
+        #     sigx_new = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+        #     sigy_new = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+        #     if not np.isfinite(sigx_prev) or not np.isfinite(sigy_prev):
+        #         sigx_prev, sigy_prev = sigx_new, sigy_new
+        #         continue
+        #     if sigx_prev <= 0 or sigy_prev <= 0 or sigx_new <= 0 or sigy_new <= 0:
+        #         sigx_prev, sigy_prev = sigx_new, sigy_new
+        #         continue
+        #     change_x = max(sigx_new / sigx_prev, sigx_prev / sigx_new)
+        #     change_y = max(sigy_new / sigy_prev, sigy_prev / sigy_new)
+        #     if change_x <= 8 and change_y <= 8:
+        #         sigx = sigx_new / 1000.0
+        #         sigy = sigy_new / 1000.0
+        #         break
+        #     print("Screen size changed too much between measurements of sigx and sigy. Remeasuring...")
+        #     sigx_prev, sigy_prev = sigx_new, sigy_new
+        # else:
+        #     sigx = sigx_prev / 1000.0 if np.isfinite(sigx_prev) else sigx
+        #     sigy = sigy_prev / 1000.0 if np.isfinite(sigy_prev) else sigy
+
+        print("sigx from precomputed PV: ", sigx_pv_value)
+        print("sigy from precomputed PV: ", sigy_pv_value)
+        print("sigx from image analysis: ", sigx_from_image)
+        print("sigy from image analysis: ", sigy_from_image)
         # np.average(h[1:], weights=np.sum(i,axis=0)) # andrea's suggestion
         # mOTR:analyzer:size
         hedges = (np.arange(nx + 1, dtype = float) - 0.5 * nx) * hpixel
         vedges = (np.arange(ny + 1, dtype = float) - 0.5 * ny) * vpixel
 
-        return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
+        return x_mean, y_mean, sigx_from_image, sigy_from_image, total, img, hedges, vedges
 
     def get_screens(self, names=None, move_screen=False):
         print('Reading screens...')
@@ -695,6 +744,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         sigy_list = []
         sum_list = []
         images = []
+        background_images = []
+        beam_images = []
         hedges_all = []
         vedges_all = []
         inout_list = [] # is screen in or out
@@ -710,6 +761,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 sigy_list.append(np.nan)
                 sum_list.append(0.0)
                 images.append(np.zeros((1, 1)))
+                background_images.append(np.zeros((1, 1)))
+                beam_images.append(np.zeros((1, 1)))
                 hedges_all.append(np.array([0.0, 1.0]))
                 vedges_all.append(np.array([0.0, 1.0]))
                 inout_list.append(np.nan)
@@ -720,8 +773,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             hpixel = hpixel_um / 1000.0
             vpixel = vpixel_um / 1000.0
             status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
-            image = self.acquire_otr_image(screen_pv_name, move_screen=False)
-            x_mean, y_mean, sigx, sigy, total, image, hedges, vedges = self._screen_data_from_image(image, hpixel, vpixel,screen_pv_name)
+
+            subtracted_img, bg_img, beam_img = self.acquire_otr_image(screen_pv_name)
+            x_mean, y_mean, sigx, sigy, total, subtracted_img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel,screen_pv_name)
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             xb_list.append(x_mean)
@@ -729,7 +783,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             sigx_list.append(sigx)
             sigy_list.append(sigy)
             sum_list.append(total)
-            images.append(image)
+            images.append(subtracted_img)
+            background_images.append(bg_img)
+            beam_images.append(beam_img)
             hedges_all.append(hedges)
             vedges_all.append(vedges)
             inout_list.append(status)
@@ -746,6 +802,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "hedges": hedges_all, # mm
             "vedges": vedges_all, # mm
             "images": images,
+            "background_images": background_images,
+            "beam_images": beam_images,
             "S": np.asarray(s_positions, dtype=float), # "S": np.full(len(selected_names), np.nan)
             "inout": np.asarray(inout_list, dtype=float),
         }
