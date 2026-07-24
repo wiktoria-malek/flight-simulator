@@ -222,6 +222,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         n_scan_steps = nsteps_settings
         is_steps_zero = bool(n_scan_steps == 0)
         self.quadrupoles_list.setEnabled(not is_steps_zero)
+        if is_steps_zero:
+            self.start_button_scan.setText("ACQUIRE SCREEN DATA")
+        else:
+            self.start_button_scan.setText("START SCAN")
+
 
     def _get_interface_initial_settings(self):
         interface_class_name = self.interface.__class__.__name__

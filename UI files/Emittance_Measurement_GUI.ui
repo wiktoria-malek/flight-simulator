@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1865</width>
-    <height>888</height>
+    <height>860</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -1444,7 +1444,7 @@ QToolButton#toolButton_scan:hover {
              <string notr="true">background-color: red; color: white;</string>
             </property>
             <property name="text">
-             <string>START SCAN OR CAPTURE SCREEN DATA</string>
+             <string>START SCAN</string>
             </property>
            </widget>
           </item>
