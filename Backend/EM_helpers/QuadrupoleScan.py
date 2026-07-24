@@ -31,6 +31,9 @@ class QuadrupoleScan(SaveOrLoad):
     # 4+ screens: no need for scan
 
     def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, reference_screen=None, progress_callback=None):
+        steps = int(steps)
+        if steps == 0:
+            return self._run_single_scan(quad_name = None, screens=screens, delta_min=0.0, delta_max=0.0, steps = 0, nshots = nshots, reference_screen=reference_screen, progress_callback=progress_callback)
         if isinstance(quad_name, str):
             quad_names = [quad_name]
         else:
@@ -94,6 +97,7 @@ class QuadrupoleScan(SaveOrLoad):
             "delta_min": float(delta_min),
             "delta_max": float(delta_max),
             "steps": int(steps),
+            "is_quad_scan": bool(int(steps) > 0),
             "nsteps_scan": 1 if int(steps) == 0 else int(steps),
             "nshots": int(nshots),
             "per_quad_sessions": per_quad_sessions,
@@ -117,15 +121,15 @@ class QuadrupoleScan(SaveOrLoad):
 
         K1_0 = np.nan
         quad_names = list(getattr(self.interface, "quadrupoles", []))
-        if quad_name not in quad_names:
-            raise ValueError("Quadrupole name not found in quadrupoles")
         if steps_requested > 0:
+            if quad_name not in quad_names:
+                raise ValueError("Quadrupole name not found in quadrupoles")
             quadrupoles = self.interface.get_quadrupoles([quad_name])
             K1_0 = float(quadrupoles["bdes"][0])
             if np.isclose(K1_0, 0.0):
-                raise ValueError("This quadrupole has zero K1_0. You should choose another one.")
-
+                raise ValueError("The quadrupole has zero K1_0. You should choose another one.")
         if steps_requested == 0:
+            K1_0 = 0.0
             deltas = np.array([0.0], dtype=float)
             K1_values = np.array([0.0], dtype=float)
         else:
@@ -253,9 +257,10 @@ class QuadrupoleScan(SaveOrLoad):
                             "delta_min": float(delta_min),
                             "delta_max": float(delta_max),
                             "steps": int(steps_requested),
+                            "is_quad_scan": bool(steps_requested>0),
                             "nshots": int(nshots),
-                            "quad_name": quad_name,
-                            "quadrupoles": [quad_name],
+                            "quad_name": quad_name if steps_requested > 0 else None,
+                            "quadrupoles": [quad_name] if steps_requested>0 else [],
                             "screens": screens,
                             "reference_screen": reference_screen,
                             "K1_0": float(K1_0),
@@ -301,9 +306,10 @@ class QuadrupoleScan(SaveOrLoad):
             "delta_min": float(delta_min),
             "delta_max": float(delta_max),
             "steps": int(steps_requested),
+            "is_quad_scan": bool(steps_requested > 0),
             "nshots": int(nshots),
-            "quad_name": quad_name,
-            "quadrupoles": [quad_name],
+            "quad_name": quad_name if steps_requested > 0 else None,
+            "quadrupoles": [quad_name] if steps_requested > 0 else [],
             "screens": screens,
             "reference_screen": reference_screen,
             "K1_0": float(K1_0),

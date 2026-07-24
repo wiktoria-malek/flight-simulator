@@ -241,7 +241,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             return {}, 0.01, "mm", ""
         units_settings = interface_defaults.get("units", {})
         em_sigma_unit = units_settings.get("em_sigma_unit", "mm")
-
         return em_sigma_unit
 
     def _on_computation_mode_changed(self, text):
@@ -595,23 +594,30 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             return
         folder = self.load_screens_data_database.text().strip()
 
+        is_quad_scan = bool(self.emittance_settings.get("is_quad_scan", True))
         steps_requested = int(self.emittance_settings["scan_steps"])
-        delta_min = float(self.emittance_settings["delta_min"])
-        delta_max = float(self.emittance_settings["delta_max"])
-        deltas = np.linspace(delta_min, delta_max, steps_requested)
-        K1_values = np.full(steps_requested, np.nan)
-        for path, state in zip(self.loaded_state_files, self.loaded_states_from_scan):
-            filename = os.path.basename(path)
-            step_i = int(filename.split("_")[3])  # screen_0000_step_0003_shot_0000.pkl -> 0003
-            quad = state.get_quadrupoles()
-            K1_values[step_i] = float(np.ravel(quad["bdes"])[0])
-        K1_0 = float(np.nanmean(K1_values / (1.0 + deltas))) # to be verified
 
+        if is_quad_scan:
+            delta_min = float(self.emittance_settings["delta_min"])
+            delta_max = float(self.emittance_settings["delta_max"])
+            deltas = np.linspace(delta_min, delta_max, steps_requested)
+            K1_values = np.full(steps_requested, np.nan)
+            for path, state in zip(self.loaded_state_files, self.loaded_states_from_scan):
+                filename = os.path.basename(path)
+                step_i = int(filename.split("_")[3])  # screen_0000_step_0003_shot_0000.pkl -> 0003
+                quad = state.get_quadrupoles()
+                K1_values[step_i] = float(np.ravel(quad["bdes"])[0])
+            K1_0 = float(np.nanmean(K1_values / (1.0 + deltas))) # to be verified
+            nsteps_scan = steps_requested
 
-        nsteps_scan = steps_requested
+        else:
+            delta_min, delta_max, K1_0, nsteps_scan = 0.0, 0.0, 0.0, 1
+            deltas = np.array([0.0])
+            K1_values = np.array([0.0])
+
         nscreens = int(self.emittance_settings["nscreens"])
         screens = list(self.emittance_settings.get("screens",[]))
-        quad_name = str(self.emittance_settings.get("quad_name",""))
+        quad_name = self.emittance_settings.get("quad_name")
         if not screens:
             _, screens = self._get_selection()
         screens = screens[:nscreens]
@@ -645,7 +651,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         sigxy_std = np.nanstd(sigxy_samples, axis=2)
 
         scan_steps=[]
-        for i in range(steps_requested):
+        for i in range(nsteps_scan):
             state_files = [path for path in files if int(os.path.basename(path).split("_")[3]) == i]
 
             scan_steps.append({
@@ -658,11 +664,12 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         session = {
             "delta_min": delta_min,
             "delta_max": delta_max,
+            "is_quad_scan": is_quad_scan,
             "steps": steps_requested,
             "nshots": int(self.emittance_settings["nshots"]),
             "sigma_unit": "mm",
             "quad_name": quad_name,
-            "quadrupoles": [quad_name],
+            "quadrupoles": [quad_name] if quad_name and is_quad_scan else [],
             "screens": screens,
             "reference_screen": screens[0] if screens else "",
             "K1_0": float(K1_0),
