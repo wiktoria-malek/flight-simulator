@@ -78,16 +78,18 @@ class OptimizationWorker(QObject):
     progress = pyqtSignal(str, int, int)
     info = pyqtSignal(str)
 
-    def __init__(self, interface, session, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False, computing_method = "Linear R-response model"):
+    def __init__(self, interface, session, selected_screens = None, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False, computing_method = "Linear R-response model"):
         super().__init__()
         self.interface = interface
         self.session = session
+        self.selected_screens = list(selected_screens or [])
         self.n_starts = n_starts
         self.xopt_initial_points = xopt_initial_points
         self.xopt_steps = xopt_steps
         self.nm_steps = nm_steps
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
         self.computing_method = computing_method
+
 
     def _emit_progress(self, phase, current, total):
         self.progress.emit(str(phase), int(current), int(total))
@@ -109,18 +111,41 @@ class OptimizationWorker(QObject):
             return {}
         return dict(interface_defaults.get("bounds", {}))
 
+    def _cut_session_to_detected_devices(self):
+        if self.session is None:
+            return None
+        selected_screens = self.selected_screens
+        if not selected_screens:
+            raise ValueError("Select at least one screen")
+        session_screens = list(self.session.get("screens", []))
+        selected_indices = [session_screens.index(screen) for screen in selected_screens if screen in session_screens]
+        if not selected_indices:
+            raise ValueError("None of the selected screens are present in the loaded session data.")
+
+        cut_session = dict(self.session)
+        cut_session["screens"] = [session_screens[i] for i in selected_indices]
+
+        for key in ("sigx_mean", "sigy_mean", "sigxy_mean", "sigx_std", "sigy_std", "sigxy_std", "images"):
+            if key not in self.session: continue
+            values = np.asarray(self.session[key], dtype=float)
+            cut_session[key] = values[:, selected_indices, ...].tolist()
+        cut_session["nscreens"] = len(selected_indices)
+        reference_screen = cut_session.get("reference_screen")
+        if reference_screen not in cut_session["screens"]:
+            cut_session["reference_screen"] = cut_session["screens"][0]
+        return cut_session
+
     def run(self):
         try:
             interface_defaults = self._get_interface_initial_settings() or {}
             machine_name = str(interface_defaults.get("machine_name", ""))
             bounds = self._get_interface_bounds()
-
+            session_for_opt = self._cut_session_to_detected_devices()
             tool = EmittanceComputingEngineSelector.create(method=self.computing_method, interface=self.interface,
-                session=self.session, machine_name=machine_name, info_callback=self.info.emit, n_starts=self.n_starts,
+                session=session_for_opt, machine_name=machine_name, info_callback=self.info.emit, n_starts=self.n_starts,
                 xopt_initial_points=self.xopt_initial_points, xopt_steps=self.xopt_steps, nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength, progress_callback=self._emit_progress)
-
             self.optimizer_ready.emit(tool)
-            output = tool.fit_from_session(self.session, bounds=bounds)
+            output = tool.fit_from_session(session_for_opt, bounds=bounds)
             self.finished.emit(output)
 
         except Exception as e:
@@ -227,7 +252,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         else:
             self.start_button_scan.setText("START SCAN")
 
-
     def _get_interface_initial_settings(self):
         interface_class_name = self.interface.__class__.__name__
         interface_module_name = self.interface.__class__.__module__
@@ -238,7 +262,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                         interface_defaults.get("module") == interface_module_name):
                     return interface_defaults
         return None
-
 
     def _get_interface_units(self):
         interface_defaults = self._get_interface_initial_settings()
@@ -730,8 +753,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         # FOR TESTS!!! in order to test again, pass session_bad to the worker, instead of self.session
 
         computing_method = self.computing_method_combo.currentText().strip()
-
-        worker = OptimizationWorker(self.interface, self.session, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), computing_method=computing_method)
+        _, selected_screens = self._get_selection()
+        worker = OptimizationWorker(self.interface, self.session, selected_screens = selected_screens, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), computing_method=computing_method)
         worker.info.connect(self.log)
 
         worker.moveToThread(thread)

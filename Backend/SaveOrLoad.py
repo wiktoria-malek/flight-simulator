@@ -240,16 +240,18 @@ class SaveOrLoad():
                 print(f"Couldn't load {state_file}, because {e}")
         print(f"Loaded {len(self.loaded_states_from_scan)} states")
 
-        screens_list_from_interface = list(getattr(self.interface, "screens", []))
-        screens = []
-        screen_indices = []
-        for path in self.loaded_state_files:
+        screens_by_index = {}
+        for path, state in zip(self.loaded_state_files, self.loaded_states_from_scan):
             filename = os.path.basename(path)
             parts = filename.replace(".pkl", "").split("_")
             screen_i = int(parts[1]) # screen_0000_step_0003_shot_0001.pkl -> 0000
-            if screen_i not in screen_indices:
-                screen_indices.append(screen_i)
-        screens = [screens_list_from_interface[screen_i] for screen_i in sorted(screen_indices)]
+            if screen_i in screens_by_index: continue
+            screen_data = state.get_screens()
+            state_screen_names = list(screen_data.get("names", []))
+            if state_screen_names:
+                screens_by_index[screen_i] = str(state_screen_names[0])
+
+        screens = [screens_by_index[index] for index in sorted(screens_by_index)]
         self.screens_list.clearSelection()
         for screen in screens:
             for it in self.screens_list.findItems(screen, Qt.MatchFlag.MatchExactly):
