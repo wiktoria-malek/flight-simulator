@@ -341,7 +341,6 @@ class SaveOrLoad():
         try:
             with open(emittance_settings_path, "r") as f:
                 self.emittance_settings = json.load(f)
-
             if "is_quad_scan" not in self.emittance_settings:
                 data_folder_name = os.path.basename(os.path.normpath(screens_data_path))
                 self.emittance_settings["is_quad_scan"] = not data_folder_name.startswith("screens_data")
@@ -360,10 +359,19 @@ class SaveOrLoad():
                 int(self.emittance_settings["ls_steps"]))
             if "is_fit_quad_strength_checked" in self.emittance_settings: self.fit_quadrupole_strength_checkbox.setChecked(
                 bool(self.emittance_settings["is_fit_quad_strength_checked"]))
+
+            self.session = self._get_session_data_from_database()
+            self._refresh_plot_comboboxes_from_session(self.session)
+            self._draw_live_scan(self.session)
+            self.delta_min_scan.setEnabled(False)
+            self.delta_max_scan.setEnabled(False)
+            self.steps_settings.setEnabled(False)
+            self.meas_per_step.setEnabled(False)
+            self.quadrupoles_list.setEnabled(False)
             QMessageBox.information(self.load_session_button, "Data directory selected", "Loaded session")
 
-        except:
-            QMessageBox.warning(self, "Load session settings.", "Screens datafiles should be loaded above. This is a place for session settings directory.")
+        except Exception as e:
+            QMessageBox.warning(self, "Load session settings.", f"Screens datafiles should be loaded above. This is a place for session settings directory.{e}")
             return
 
     def load_session_settings(self):

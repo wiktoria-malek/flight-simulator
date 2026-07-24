@@ -246,11 +246,7 @@ class Optimization:
             fit_y = _plane_no_solution("y", sigma2_template_y)
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
-        beta_gamma = (
-            gamma_rel * beta_rel
-            if np.isfinite(gamma_rel) and np.isfinite(beta_rel)
-            else np.nan
-        )
+        beta_gamma = (gamma_rel * beta_rel if np.isfinite(gamma_rel) and np.isfinite(beta_rel) else np.nan)
         emit_x_norm = (
             beta_gamma * fit_x["emit"]
             if np.isfinite(beta_gamma) and np.isfinite(fit_x["emit"])
@@ -343,7 +339,9 @@ class Optimization:
             "result": result,
             "pred_x": fit_x["pred"],
             "pred_y": fit_y["pred"],
+            "screens": list(session.get("screens", [])),
         }
+
         self.best_out_so_far = output
         self._last_completed_output = output
         self._pause_requested = False
@@ -713,15 +711,7 @@ class Optimization:
         run_local_ls = local_max_nfev > 0
 
         if not run_local_ls:
-            solution = self._build_joint_partial_output(
-                screens=screens,
-                sigma2_x=sig_x2,
-                sigma2_y=sig_y2,
-                pred2_x=pred2_x,
-                pred2_y=pred2_y,
-                best_row=best_row,
-                best_cost=best_cost,
-            )
+            solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x, pred2_y=pred2_y, best_row=best_row, best_cost=best_cost)
             solution["message"] = "Joint x+y Xopt only. No least squares."
             solution["stopped"] = bool(stopped_during_fit)
             return solution

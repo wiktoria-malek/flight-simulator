@@ -242,6 +242,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             return
         self._refresh_plot_comboboxes_from_session(self.session)
         self._draw_live_scan(self.session)
+        self.delta_min_scan.setEnabled(False)
+        self.delta_max_scan.setEnabled(False)
+        self.steps_settings.setEnabled(False)
+        self.meas_per_step.setEnabled(False)
+        self.quadrupoles_list.setEnabled(False)
 
     def _on_nsteps_scan_changed(self,nsteps_settings):
         n_scan_steps = nsteps_settings
@@ -567,15 +572,22 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         fig.tight_layout()
         self.canvas.draw()
 
-    def _plot_fit_overlay(self, pred_x, pred_y, result=None):
+    def _plot_fit_overlay(self, pred_x, pred_y, result=None, screens=None):
         if self.session is None:
             return
+        session_screens = list(self.session.get("screens", []))
+        if screens is None:
+            screens = session_screens
+        else:
+            screens = [screen for screen in screens if screen in session_screens]
+        pred_x = np.asarray(pred_x, dtype=float)
+        pred_y = np.asarray(pred_y, dtype=float)
+        n_screens = min(len(screens), pred_x.shape[1], pred_y.shape[1])
+        screens = screens[:n_screens]
 
         K1_values = np.asarray(self.session["K1_values"], dtype=float)
         sigx = np.asarray(self.session["sigx_mean"], dtype=float)
         sigy = np.asarray(self.session["sigy_mean"], dtype=float)
-        screens = list(self.session["screens"])
-
         fig = self.canvas.figure
         fig.clear()
 
@@ -587,22 +599,26 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212, sharex=ax1)
 
-        color_cycle = matplotlib.rcParams['axes.prop_cycle'].by_key().get('color', [])
+        color_cycle = (matplotlib.rcParams["axes.prop_cycle"].by_key().get("color", []))
+
         if not color_cycle:
-            color_cycle = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
+            color_cycle = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9"]
 
-        for i, screen in enumerate(screens):
-            base_color = color_cycle[i % len(color_cycle)]
+        for prediction_i, screen in enumerate(screens):
+            session_i = session_screens.index(screen)
+
+            base_color = color_cycle[prediction_i % len(color_cycle)]
             fit_color = lighten_color(base_color, amount=0.45)
+            ax1.plot(K1_values, sigx[:, session_i], "o", color=base_color, label=f"{screen} data")
+            fit_x = np.sqrt(np.maximum(pred_x[:, prediction_i], 0.0))
+            ax1.plot(K1_values, fit_x, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
+            ax2.plot(K1_values, sigy[:, session_i], "o", color=base_color, label=f"{screen} data")
 
-            ax1.plot(K1_values, sigx[:, i], 'o', color=base_color, label=f"{screen} data")
-            fit_x = np.sqrt(np.maximum(pred_x[:, i], 0.0))
-            ax1.plot(K1_values, fit_x, '-', color=fit_color, linewidth=2.0, label=f"{screen} fit")
-            ax2.plot(K1_values, sigy[:, i], 'o', color=base_color, label=f"{screen} data")
-            fit_y = np.sqrt(np.maximum(pred_y[:, i], 0.0))
-            ax2.plot(K1_values, fit_y, '-', color=fit_color, linewidth=2.0, label=f"{screen} fit")
+            fit_y = np.sqrt(np.maximum(pred_y[:, prediction_i], 0.0))
+            ax2.plot(K1_values, fit_y, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
 
         unit = self.session.get("sigma_unit", self._get_interface_units())
+
         ax1.set_ylabel(f"sigx [{unit}]")
         ax2.set_ylabel(f"sigy [{unit}]")
         ax2.set_xlabel("K1L [1/m]")
@@ -791,16 +807,15 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
     def _on_optimization_output(self, output):
         self._set_progress(85)
-
         result = output["result"]
         pred_x = np.asarray(output["pred_x"], dtype=float)
         pred_y = np.asarray(output["pred_y"], dtype=float)
-
+        optimization_screens = list(output.get("screens", self.session.get("screens", [])))
         self.session["optimization_result"] = result
         self.session["optimization_pred_x"] = pred_x.tolist()
         self.session["optimization_pred_y"] = pred_y.tolist()
         self._update_fit_panel(result)
-        self._plot_fit_overlay(pred_x, pred_y, result)
+        self._plot_fit_overlay(pred_x, pred_y, result, screens = optimization_screens)
         self.save_emittance_measurement_session(initial_points_xopt=int(self.xopt_initial_points_spin.value()), xopt_steps=int(self.xopt_steps_spin.value()), ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()))
         self._set_progress(100)
 
