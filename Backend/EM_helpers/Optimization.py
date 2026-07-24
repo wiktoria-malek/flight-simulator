@@ -58,45 +58,64 @@ class Optimization:
         self._last_completed_output = None
         self._pause_requested = False
 
-    def _calculate_optimalization_errors(self, ls_result, n_params_fallback=None):
-        n_default = int(n_params_fallback) if n_params_fallback is not None else 6
+    def _calculate_optimalization_errors(self, ls_result, n_params=None):
+        """
+        Estimates how sure the model is, e.g. if the minimum region is big, then you can change the emittance
+        by several percent and the cost will be the same -> not sure what emittance is, and the cost is big.
+
+        If the minimum region found is narrow, then if you move the e.g. emittance value by small percent,
+        the cost grows by a lot. -> it means that the error is small and value is well estimated.
+        """
+        n_default = int(n_params) if n_params is not None else 6
 
         if ls_result is None:
             return {
-                "param_errors": np.full(n_default, np.nan),
+                "param_errors": np.full(n_default, None),
                 "cov": None,
-                "reduced_chi2_like": np.nan,
-                "chi2_like": np.nan,
+                "reduced_chi2": np.nan,
+                "chi2": np.nan,
             }
 
         try:
-            J = np.asarray(ls_result.jac, dtype=float)
-            r = np.asarray(ls_result.fun, dtype=float) # residual sigma^2 pred - sigma^2 meas
-            p = np.asarray(ls_result.x, dtype=float)
+            J = np.asarray(ls_result.jac, dtype=float) # that's the information about how narrow the minimum region is, it's an array with derivatives
+            r = np.asarray(ls_result.fun, dtype=float) # residual sigma^2 predicted - sigma^2 meas
+            p = np.asarray(ls_result.x, dtype=float) # best set of parameters that least squares have found after Xopt
         except AttributeError:
             return {
                 "param_errors": np.full(n_default, np.nan),
                 "cov": None,
-                "reduced_chi2_like": np.nan,
-                "chi2_like": np.nan,
+                "reduced_chi2": np.nan,
+                "chi2": np.nan,
             }
 
         ndata = len(r) # number of measurements
         npar = len(p) # number of parameters
         dof = max(ndata - npar, 1) # degrees of freedom
 
-        chi2_like = float(np.sum(r ** 2)) # the smaller, the better the model
-        reduced_chi2_like = chi2_like / dof # average error per 1 measurement
+        """
+        Sum of the residuals:
+        """
+        chi2 = float(np.sum(r ** 2)) # the smaller, the better the model, the bigger, the worse
+        reduced_chi2 = chi2 / dof # average error per 1 measurement
 
         try:
             """
             Cov = s^2 * (J.T * J )^(-1)
             s^2 = sum(r_i^2)/(N - p)
-            on diagonal line of cov matrix are variances of parameters
+            on diagonal line of cov matrix are variances of parameters: => calculating the relative difference to the average value for every measurement, making it squared, then taking the average of those values. For this method is means, taking it from J.
+            e.g. |0.04   0.01  -0.02|   0   0   0               |
+                 |0.01   0.25   0.03|   0   0   0               |  => var(emit_x) = 0.04, var(beta_x) = 0.25, var(alpha_x) = 0.16, other elements indicate coupling
+                 |-0.02  0.03   0.16|   0   0   0               |
+                 |  0     0       0     
+                 |   0     0       0     other values, for y plane
+                 |  0     0       0
+                 std of those are the errors, so np.sqrt(emit_x = 0.04) = 0.2 is the estimated error
             """
-
-            cov = np.linalg.pinv(J.T @ J) * reduced_chi2_like
+            # J.T * J tells how steep is the minimum function. If it's narrow, then the result is big. If the wide, J.T * J is small. That's also why we need to multiply by reduced_chi2
+            cov = np.linalg.pinv(J.T @ J) * reduced_chi2 # if you invert it, it becomes the opposite. Narrow region -> small cov matrix -> small errors; Wide region -? big cov matrix -> big errors;
             param_errors = np.sqrt(np.maximum(np.diag(cov), 0.0))
+            print("Covariance matrix:")
+            print(cov)
         except Exception:
             cov = None
             param_errors = np.full(npar, np.nan)
@@ -104,8 +123,8 @@ class Optimization:
         return {
             "param_errors": param_errors,
             "cov": cov,
-            "reduced_chi2_like": reduced_chi2_like,
-            "chi2_like": chi2_like,
+            "reduced_chi2": reduced_chi2,
+            "chi2": chi2,
         }
 
     def fit_from_session(self, session, bounds):
@@ -264,20 +283,20 @@ class Optimization:
         stopped = bool(fit_x.get("stopped", False) or fit_y.get("stopped", False) or self._stop_requested)
 
         err_dict = {}
-        reduced_chi2_like = np.nan
-        chi2_like = np.nan
+        reduced_chi2 = np.nan
+        chi2 = np.nan
         if isinstance(joint_fit, dict):
             err_dict = dict(joint_fit.get("param_errors") or {})
-            reduced_chi2_like = float(joint_fit.get("reduced_chi2_like", np.nan))
-            chi2_like = float(joint_fit.get("chi2_like", np.nan))
+            reduced_chi2 = float(joint_fit.get("reduced_chi2", np.nan))
+            chi2 = float(joint_fit.get("chi2", np.nan))
 
-        emit_x_norm_err = float(err_dict.get("emit_x_norm", np.nan))
-        emit_y_norm_err = float(err_dict.get("emit_y_norm", np.nan))
-        beta_x0_err = float(err_dict.get("beta_x0", np.nan))
-        alpha_x0_err = float(err_dict.get("alpha_x0", np.nan))
-        beta_y0_err = float(err_dict.get("beta_y0", np.nan))
-        alpha_y0_err = float(err_dict.get("alpha_y0", np.nan))
-        quad_k1_0_err = float(err_dict.get("quad_k1_0", np.nan))
+        emit_x_norm_err = float(err_dict.get("emit_x_norm", None))
+        emit_y_norm_err = float(err_dict.get("emit_y_norm", None))
+        beta_x0_err = float(err_dict.get("beta_x0", None))
+        alpha_x0_err = float(err_dict.get("alpha_x0", None))
+        beta_y0_err = float(err_dict.get("beta_y0", None))
+        alpha_y0_err = float(err_dict.get("alpha_y0", None))
+        quad_k1_0_err = float(err_dict.get("quad_k1_0", None))
 
         if np.isfinite(beta_gamma) and beta_gamma > 0:
             emit_x_geom_err = emit_x_norm_err / beta_gamma * 1e3 if np.isfinite(emit_x_norm_err) else np.nan
@@ -331,8 +350,8 @@ class Optimization:
             "beta_y0_err": beta_y0_err,
             "alpha_y0_err": alpha_y0_err,
             "quad_k1_0_err": quad_k1_0_err,
-            "fit_reduced_chi2_like": reduced_chi2_like,
-            "fit_chi2_like": chi2_like,
+            "fit_reduced_chi2": reduced_chi2,
+            "fit_chi2": chi2,
         }
 
         output = {
@@ -910,7 +929,7 @@ class Optimization:
         solution["message"] = "Joint x+y Bayesian optimization + least-squares."
         solution["stopped"] = bool(stopped_during_fit)
 
-        fit_error = self._calculate_optimalization_errors(best_res_ls, n_params_fallback=len(params_order))
+        fit_error = self._calculate_optimalization_errors(best_res_ls, n_params=len(params_order))
         param_errors = fit_error["param_errors"]
         if param_errors is None or len(param_errors) != len(params_order):
             err_dict = {p: np.nan for p in params_order}
@@ -918,15 +937,15 @@ class Optimization:
             err_dict = {p: float(e) for p, e in zip(params_order, param_errors)}
 
         solution["param_errors"] = err_dict
-        solution["reduced_chi2_like"] = fit_error["reduced_chi2_like"]
-        solution["chi2_like"] = fit_error["chi2_like"]
+        solution["reduced_chi2"] = fit_error["reduced_chi2"]
+        solution["chi2"] = fit_error["chi2"]
         solution["param_cov"] = fit_error["cov"]
 
         if self.print_M:
             print(
                 f"Fit parameter errors (1-sigma): "
                 + ", ".join(f"{k}={v:.4g}" for k, v in err_dict.items())
-                + f", reduced_chi2_like={fit_error['reduced_chi2_like']:.4g}"
+                + f", reduced_chi2={fit_error['reduced_chi2']:.4g}"
             )
 
         return solution

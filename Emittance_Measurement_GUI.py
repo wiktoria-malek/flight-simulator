@@ -473,6 +473,16 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_alpha_y0.setText(fmt_value(result.get("alpha_y0"),  f" ± {result.get("alpha_y0_err")}"))
         self.result_reference_screen.setText(result["screen0"])
 
+        print("Errors of the fit:")
+        print("Error of emit_x_norm: ", result.get("emit_x_norm_err"))
+        print("Error of emit_y_norm: ", result.get("emit_y_norm_err"))
+        print("Error of emit_x_geom: ", result.get("emit_x_geom_err"))
+        print("Error of emit_y_geom: ", result.get("emit_y_geom_err"))
+        print("Error of beta_x0_err: ", result.get("beta_x0_err"))
+        print("Error of alpha_x0_err: ", result.get("alpha_x0_err"))
+        print("Error of alpha_y0_err: ", result.get("alpha_y0_err"))
+
+
     def _reset_canvas(self):
         fig = self.canvas.figure
         fig.clear()
