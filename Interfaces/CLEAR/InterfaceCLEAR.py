@@ -403,7 +403,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         )
         return False
 
-    def _wait_for_quadrupole_readback(self, quadrupole_path, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
+    def _wait_for_quadrupole_readback(self, readback_value, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
