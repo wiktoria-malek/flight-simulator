@@ -16,8 +16,6 @@ client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
 
-
-
 """Test of one screen and method get_screens"""
 
 print("Testing screen CA.BTV0390L, reading its values directly from japc/pyda... ")

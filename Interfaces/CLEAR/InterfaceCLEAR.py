@@ -1,6 +1,9 @@
+from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral
 import sys, time, math, os
 import numpy as np
 import pyda, pyda_japc
+from scipy.integrate import trapezoid
+from enum import Enum
 try:
     from Interfaces.CLEAR import config
     try:
@@ -15,12 +18,47 @@ except ImportError:
         clear_lattice = None
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
+class BPMsMode(Enum):
+    """
+    Acquire and process the horizontal (H) and vertical (V) BPM signals.
+
+    Parameters
+    ----------
+    BPM : str
+        BPM name: "BPM0530", "BPM0595", "BPM0690", "BPM0820", "BPM0890".
+    mode : str
+        - "peak"
+            Return the peak value of the raw signal.
+        - "baseline_peak"
+            Return the peak value after baseline correction.
+        - "integral"
+            Return the integral of the baseline-corrected signal.
+        - "integral_window"
+            Return the integral of the baseline-corrected signal over the
+            specified integration window, [min=0, max=730]. If not specified,
+            running with default window.
+        - "integral_threshold"
+            Return the integral of the baseline-corrected signal between the
+            5% peak threshold crossings.
+    plot : optional
+        Display processing plots.
+    Returns
+    -------
+    H, V
+        Processed H and V values.
+    """
+    peak = "peak"
+    baseline_peak = "baseline_peak"
+    integral = "integral"
+    integral_window = "integral_window"
+    integral_threshold = "integral_threshold"
 
 class CLEAR_real_machine(AbstractMachineInterface):
     def get_name(self):
         return 'CLEAR'
 
     def __init__(self, nsamples=1, nominal_intensity=1.5, wfs_intensity=1.0):
+        self.bpm_mode = BPMsMode.peak
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 198 # MeV/c
@@ -346,10 +384,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
     def get_bpms(self, names=None):
+        window = (260, 360)
         self.log('Reading bpms...')
         selected_names = self.bpms if names is None else ([names] if isinstance(names, str) else list(names))
         x, y, tmit = [], [], []
-
+        mode = self.bpm_mode
         for sample in range(self.nsamples):
             self.log(f'Sample = {sample}')
             x_sample, y_sample, tmit_sample = [], [], []
@@ -357,18 +396,44 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 hsamples = self.client.get(f"{bpm}H-SA/SamplesFromTrigger", context = self.context_acquisition).data
                 vsamples = self.client.get(f"{bpm}V-SA/SamplesFromTrigger", context=self.context_acquisition).data
                 ssamples = self.client.get(f"{bpm}S-SA/SamplesFromTrigger", context=self.context_acquisition).data
-                h = np.asarray(hsamples["samples"], dtype=float).ravel()
-                v = np.asarray(vsamples["samples"], dtype=float).ravel()
-                s = np.asarray(ssamples["samples"], dtype=float).ravel()
-                s_sum = np.sum(s)
-                if abs(s_sum)>1e-12:
-                    Hpos = np.sum(h) / s_sum
-                    Vpos = np.sum(v) / s_sum
+                H_samples = np.asarray(hsamples["samples"], dtype=float).ravel()
+                V_samples = np.asarray(vsamples["samples"], dtype=float).ravel()
+                S_samples = np.asarray(ssamples["samples"], dtype=float).ravel()
+                H_b_samples = baseline_correct(H_samples)
+                V_b_samples = baseline_correct(V_samples)
+                s_sum = np.sum(S_samples)
+                if mode == BPMsMode.peak: # Find peak (largest magnitude, keeping the sign)
+                    H, H_idx = find_peak(H_samples)
+                    V, V_idx = find_peak(V_samples)
+                    # plot_peak([H_samples, V_samples], [H_idx, V_idx], [H, V], ["H", "V"], BPM)
+
+                elif mode == BPMsMode.baseline_peak: # Find peak on baseline corrected signal (largest magnitude, keeping the sign)
+                    H, H_idx = find_peak(H_b_samples)
+                    V, V_idx = find_peak(V_b_samples)
+                    # plot_peak([H_b_samples, V_b_samples], [H_idx, V_idx], [H, V], ["H", "V"], BPM, )
+
+                elif mode == BPMsMode.integral: # Integration of full BPM signal with baseline correction
+                    H = trapezoid(H_b_samples)
+                    V = trapezoid(V_b_samples)
+                    # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM)
+
+                elif mode == BPMsMode.integral_window: # Integration of fixed window BPM signal with baseline correction
+                    window_start, window_end = window
+                    H = trapezoid(H_b_samples[window_start:window_end])
+                    V = trapezoid(V_b_samples[window_start:window_end])
+                    # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM, starts=[window_start, window_start], ends=[window_end, window_end], )
+
+                elif mode == BPMsMode.integral_threshold: # Integration between 5% of the peak threshold region with baseline correction
+                    H, H_start, H_end, H_peak_idx = threshold_integral(H_b_samples)
+                    V, V_start, V_end, V_peak_idx = threshold_integral(V_b_samples)
+                    # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM, starts=[H_start, V_start], ends=[H_end, V_end], )
+
                 else:
-                    Hpos = np.nan
-                    Vpos = np.nan
-                x_sample.append(Hpos)
-                y_sample.append(Vpos)
+                    raise ValueError(
+                        f"Unknown mode '{mode}'. " "Choose from: 'peak', 'baseline_peak', " "'integral', 'integral_window', 'integral_threshold'.")
+
+                x_sample.append(H)
+                y_sample.append(V)
                 tmit_sample.append(s_sum)
             x.append(x_sample)
             y.append(y_sample)
@@ -381,7 +446,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "y": np.asarray(y, dtype=float),
             "tmit": np.asarray(tmit, dtype=float),
         }
-
 
     def _wait_for_corrector_readback(self, corrector, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
         readback_param = self.corrector_get_params[corrector]
@@ -407,7 +471,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
-
             try:
                 last_value = self.client.get(readback_value, context = self.context_acquisition).data["currentAverage"]
             except Exception as e:
@@ -496,18 +559,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
             acq_path = f"{quadrupole}/Acquisition"
             self._wait_for_quadrupole_readback(acq_path, value)
 
-    # def insert_screen(self, screen_name):
-    #     screen_pv_name = self.screen_pv_names.get(screen_name)
-    #     if screen_pv_name is None:
-    #         raise ValueError(f"Unknown screen: {screen_name}")
-    #     status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
-    #     PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
-    #
-    # def extract_screen(self, screen_name):
-    #     screen_pv_name = self.screen_pv_names.get(screen_name)
-    #     if screen_pv_name is None:
-    #         raise ValueError(f"Unknown screen: {screen_name}")
-    #     PV(f"{screen_pv_name}:Target:WRITE:OUT").put(1)
+    def insert_screen(self, screen_name):
+        pass
+
+    def extract_screen(self, screen_name):
+        pass
 
     def get_screens(self, names=None):
         self.log('Reading screens...')
