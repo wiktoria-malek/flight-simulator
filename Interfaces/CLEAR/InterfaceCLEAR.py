@@ -473,7 +473,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for quadrupole, value in zip(names, values):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
-            self.client.set(property_address, {field: float(value)})
+            self.client.set(property_address, data={field: value})
 
         time.sleep(1)
 
