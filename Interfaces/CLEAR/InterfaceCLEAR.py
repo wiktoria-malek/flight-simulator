@@ -383,8 +383,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
 
-    def _wait_for_magnet_readback(self, magnet, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
-        readback_param = self.magnet_get_params[magnet]
+    def _wait_for_corrector_readback(self, corrector, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
+        readback_param = self.corrector_get_params[corrector]
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
@@ -403,6 +403,25 @@ class CLEAR_real_machine(AbstractMachineInterface):
         )
         return False
 
+    def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
+        readback_param = self.quadrupole_get_params[quadrupole]
+        t0 = time.perf_counter()
+        last_value = np.nan
+        while time.perf_counter() - t0 < timeout:
+            try:
+                data = self.client.get(readback_param, context=self.context_acquisition).data
+                last_value = self.make_safe_float(data.get('currentAverage'), default=np.nan)
+            except Exception:
+                last_value = np.nan
+
+            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
+                return True
+            time.sleep(poll_interval)
+        self.log(
+            f'Warning: {readback_param} did not reach target {float(target):.6g} '
+            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
+        )
+        return False
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
@@ -475,7 +494,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
             self.client.set(property_address, data={field: value})
-            self._wait_for_magnet_readback(property_address, value)
+            self._wait_for_quadrupole_readback(property_address, value)
         time.sleep(5)
 
     # def insert_screen(self, screen_name):
