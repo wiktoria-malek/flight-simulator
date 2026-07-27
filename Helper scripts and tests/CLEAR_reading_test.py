@@ -22,7 +22,6 @@ print("Testing quadrupole CA.QFD0350, reading its values directly from japc/pyda
 quadrupole = "CA.QFD0350"
 setting = client.get(f"{quadrupole}/SettingPPM", context=context_empty).data["current"]
 print(f"{quadrupole}/SettingPPM#current = {setting}")
-setting = client.set(f"{quadrupole}/SettingPPM#current", 0.0)
 client.set(f"{quadrupole}/SettingPPM", {current: float(0.0)}, context=self.context_empty)
 setting2 = client.get(f"{quadrupole}/SettingPPM", context=context_empty).data["current"]
 print(f"{quadrupole}/SettingPPM#current = {setting2}")
