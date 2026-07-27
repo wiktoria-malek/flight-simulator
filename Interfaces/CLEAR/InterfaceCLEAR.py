@@ -404,14 +404,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return False
 
     def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
-        readback_param= f'{quadrupole}/Acquisition',
+        readback_param= f'{quadrupole}/SettingPPM',
         field = "current"
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
                 data = self.client.get(readback_param, context=self.context_acquisition).data[field]
-                last_value = self.make_safe_float(data.get('currentAverage'), default=np.nan)
+                last_value = self.make_safe_float(data.get('current'), default=np.nan)
             except Exception:
                 last_value = np.nan
 
