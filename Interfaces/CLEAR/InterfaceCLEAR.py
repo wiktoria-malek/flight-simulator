@@ -415,7 +415,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             target = corr_val
             self.client.set(self.corrector_set_params[corrector], data={'current': target})
             self._wait_for_corrector_readback(corrector, target)
-
+        # put a tolerance, bwecause it will never exactly be the value
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
