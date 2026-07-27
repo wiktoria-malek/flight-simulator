@@ -411,7 +411,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         while time.perf_counter() - t0 < timeout:
             try:
                 data = self.client.get(readback_param, context=self.context_acquisition).data[field]
-                last_value = self.make_safe_float(data.get('current'), default=np.nan)
+                last_value = data
                 print(last_value)
             except Exception:
                 last_value = np.nan
