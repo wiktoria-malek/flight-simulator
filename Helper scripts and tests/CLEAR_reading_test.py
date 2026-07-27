@@ -59,6 +59,7 @@ context_empty = ""
 
 print("Testing corrector CA.DHG0130, reading its values directly from japc/pyda... ")
 corrector = "CA.DHG0130"
+
 setting = client.get(f"{corrector}/SettingPPM", context = context_empty).data["current"]
 print(f"{corrector}/SettingPPM#current = {setting}")
 # client.set(f"{correctore}/SettingPPM", data={"current": 5.0})
