@@ -409,8 +409,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
-                last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
+                #last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
+                last_value = self.client.get(readback_value, context=self.context_acquisition).data["currentAverage"]
                 print("It's the try:...")
+
             except Exception:
                 print("It's the Exception:...")
                 last_value = np.nan
@@ -422,6 +424,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             f'Warning: {readback_value} did not reach target {float(target):.6g} '
             f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
         )
+
         return False
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
