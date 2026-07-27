@@ -410,7 +410,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         while time.perf_counter() - t0 < timeout:
 
             #last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
-            last_value = self.client.get(readback_value).data["currentAverage"]
+            last_value = self.client.get(readback_value).data["current"]
             print("It's the try:...")
 
             # except Exception as e:
