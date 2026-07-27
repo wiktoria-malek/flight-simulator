@@ -62,7 +62,7 @@ corrector = "CA.DHG0130"
 
 setting = client.get(f"{corrector}/SettingPPM", context = context_empty).data["current"]
 print(f"{corrector}/SettingPPM#current = {setting}")
-client.set(f"{correctore}/SettingPPM", data={"current": 0.0})
+client.set(f"{corrector}/SettingPPM", data={"current": 0.0})
 time.sleep(5)
 print(f"{corrector}/SettingPPM#current = {setting}")
 
