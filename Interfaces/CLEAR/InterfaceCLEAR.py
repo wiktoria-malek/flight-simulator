@@ -383,7 +383,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
 
-    def _wait_for_corrector_readback(self, corrector, target, tolerance=1e-4, timeout=1.0, poll_interval=0.05):
+    def _wait_for_corrector_readback(self, corrector, target, tolerance= 5e-3, timeout=1.0, poll_interval=0.05):
         readback_param = self.corrector_get_params[corrector]
         t0 = time.perf_counter()
         last_value = np.nan
