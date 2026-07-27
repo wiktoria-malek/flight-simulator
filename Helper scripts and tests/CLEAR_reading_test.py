@@ -57,25 +57,25 @@ context_empty = ""
 
 """Test of one corrector and method get_correctors"""
 
-print("Testing corrector CA.DHG0130, reading its values directly from japc/pyda... ")
-corrector = "CA.DVG0130"
+print("Testing corrector CA.DVG0130, reading its values directly from japc/pyda... ")
+#corrector = "CA.DVG0130"
 
-setting = client.get(f"{corrector}/SettingPPM", context = context_empty).data["current"]
-print(f"{corrector}/SettingPPM#current = {setting}")
-client.set(f"{corrector}/SettingPPM", data={"current": 0.0})
-time.sleep(5)
-print(f"{corrector}/SettingPPM#current = {setting}")
+# setting = client.get(f"{corrector}/SettingPPM", context = context_empty).data["current"]
+# print(f"{corrector}/SettingPPM#current = {setting}")
+# client.set(f"{corrector}/SettingPPM", data={"current": 0.0})
+# time.sleep(5)
+# print(f"{corrector}/SettingPPM#current = {setting}")
+#
+#
+# acquisition = client.get(f"{corrector}/Acquisition", context = context_acquisition).data["currentAverage"]
+# print(f"{corrector}/Acquisition#currentAverage = {acquisition}")
+#
+# status = client.get(f"{corrector}/Status", context = context_empty).data
+# print(f"{corrector}/Status = {status}")
+# print("================================================================================")
+# print("Testing corrector CA.DHG0130, reading its values directly from interface, using get_correctors method... ")
 
-
-acquisition = client.get(f"{corrector}/Acquisition", context = context_acquisition).data["currentAverage"]
-print(f"{corrector}/Acquisition#currentAverage = {acquisition}")
-
-status = client.get(f"{corrector}/Status", context = context_empty).data
-print(f"{corrector}/Status = {status}")
-print("================================================================================")
-print("Testing corrector CA.DHG0130, reading its values directly from interface, using get_correctors method... ")
-
-result = I.get_correctors(names=["CA.DVG0130"])
+result = I.get_correctors(names=["CA.DHG0130","CA.DVG0130" ])
 time.sleep(5)
 print(f"names from method get_correctors: {result['names']}")
 print(f"bdes  from method get_correctors: {result['bdes']}")
