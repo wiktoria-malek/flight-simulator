@@ -26,6 +26,8 @@ client.set(f"{quadrupole}/SettingPPM", data={"current": 5.0})
 setting2 = client.get(f"{quadrupole}/SettingPPM", context=context_empty).data["current"]
 print(f"{quadrupole}/SettingPPM#current = {setting2}")
 client.set(f"{quadrupole}/SettingPPM", data={"current": 10.699})
+setting2 = client.get(f"{quadrupole}/SettingPPM", context=context_empty).data["current"]
+print(f"{quadrupole}/SettingPPM#current = {setting2}")
 
 
 acquisition = client.get(f"{quadrupole}/Acquisition", context = context_acquisition).data["currentAverage"]
