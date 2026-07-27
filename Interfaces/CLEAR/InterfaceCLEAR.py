@@ -408,13 +408,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
 
-            #last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
-            last_value = self.client.get(readback_value, context = self.context_acquisition).data["currentAverage"]
-            print("It's the try:...")
-
-            # except Exception as e:
-            #     print(f"It's the Exception because {e}:...")
-            #     last_value = np.nan
+            try:
+                last_value = self.client.get(readback_value, context = self.context_acquisition).data["currentAverage"]
+            except Exception as e:
+                last_value = np.nan
 
             if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
                 return True
@@ -495,7 +492,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for quadrupole, value in zip(names, values):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
-            #self.client.set(property_address, data={field: value})
+            self.client.set(property_address, data={field: value})
             acq_path = f"{quadrupole}/Acquisition"
             self._wait_for_quadrupole_readback(acq_path, value)
 
