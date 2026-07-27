@@ -409,11 +409,15 @@ class CLEAR_real_machine(AbstractMachineInterface):
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
+                last_value = self.client.get(readback_value, context=self.context_empty).data["current"]
+                print(last_value)
+            except Exception:
+                last_value = np.nan
+            try:
                 last_value = self.client.get(readback_value, context=self.context_acquisition).data["current"]
                 print(last_value)
             except Exception:
                 last_value = np.nan
-
             if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
                 return True
             time.sleep(poll_interval)
