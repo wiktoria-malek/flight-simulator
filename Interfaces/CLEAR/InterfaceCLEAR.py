@@ -410,7 +410,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
         while time.perf_counter() - t0 < timeout:
             try:
                 last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
+                print("It's the try:...")
             except Exception:
+                print("It's the Exception:...")
                 last_value = np.nan
 
             if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
@@ -491,7 +493,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for quadrupole, value in zip(names, values):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
-            self.client.set(property_address, data={field: value})
+            #self.client.set(property_address, data={field: value})
             self._wait_for_quadrupole_readback(property_address, value)
 
     # def insert_screen(self, screen_name):
