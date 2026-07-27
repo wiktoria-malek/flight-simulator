@@ -475,7 +475,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             property_address, field = address.rsplit("#", 1)
             self.client.set(property_address, data={field: value})
 
-        time.sleep(1)
+        time.sleep(5)
 
     # def insert_screen(self, screen_name):
     #     screen_pv_name = self.screen_pv_names.get(screen_name)
