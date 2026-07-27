@@ -84,9 +84,9 @@ print(f"bact  from method get_correctors: {result['bact']}")
 # result2 = I.set_correctors(names=["CA.DHG0130", "CA.DVG0130"], corr_vals = [0.46, -0.81])
 result2 = I.set_correctors(names=["CA.DHG0130", "CA.DVG0130"], corr_vals = [0.0, -0.1])
 time.sleep(5)
-print(f"names from method get_correctors: {result['names']}")
-print(f"bdes  from method get_correctors: {result['bdes']}")
-print(f"bact  from method get_correctors: {result['bact']}")
+print(f"names from method get_correctors: {result2['names']}")
+print(f"bdes  from method get_correctors: {result2['bdes']}")
+print(f"bact  from method get_correctors: {result2['bact']}")
 
 
 
