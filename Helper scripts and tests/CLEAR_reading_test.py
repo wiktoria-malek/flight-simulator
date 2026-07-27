@@ -22,12 +22,18 @@ print("Testing quadrupole CA.QFD0350, reading its values directly from japc/pyda
 quadrupole = "CA.QFD0350"
 setting = client.get(f"{quadrupole}/SettingPPM", context=context_empty).data["current"]
 print(f"{quadrupole}/SettingPPM#current = {setting}")
+#setting = client.set(f"{quadrupole}/SettingPPM#current", 0.)
+
+
 
 acquisition = client.get(f"{quadrupole}/Acquisition", context = context_acquisition).data["currentAverage"]
 print(f"{quadrupole}/Acquisition#currentAverage = {acquisition}")
 
 status = client.get(f"{quadrupole}/Status", context = "").data
 print(f"{quadrupole}/Status = {status}")
+
+
+
 print("================================================================================")
 print("Testing quadrupole CA.QFD0350, reading its values directly from interface, using get_quadrupoles method... ")
 
@@ -93,7 +99,7 @@ print(f"inout from PyDa = {inout}")
 
 print("================================================================================")
 print("Testing screen CA.BTV0390L, reading its values directly from interface, using get_screens method... ")
-result = I.get_screens(names=["CA.BTV0390L"])
+result = I.get_screens(names=["CA.BTV0390_CAS.BTV0420"])
 print(f"names from get_screens: {result['names']}")
 print(f"hpixel from get_screens: {result['hpixel']}")
 print(f"vpixel from get_screens: {result['vpixel']}")

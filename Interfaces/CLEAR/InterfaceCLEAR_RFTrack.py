@@ -157,6 +157,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         survey_path = os.path.join(os.path.dirname(__file__), "clear.survey0_filtered.tfs")
         self.lattice, self.element_descriptions, self.start, self.end = self.__build(filename=survey_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
+        self.lattice.set_tt_nsteps(0)
         self.log = print
         elements_in_lattice=list(self.lattice['*'])
         names_all=list(self.element_descriptions.keys())
@@ -231,7 +232,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles)
         self.P0 = rft.Bunch6d_QR(rft.electronmass, population,  1, self.Pref, T, self.nparticles)
 
-    def get_screens(self, names=None):
+    def get_screens(self, names=None, move_screen=True):
         if isinstance(names, str):
             names = [names]
 

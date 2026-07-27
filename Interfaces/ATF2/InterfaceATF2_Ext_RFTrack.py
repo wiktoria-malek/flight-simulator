@@ -42,6 +42,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         #self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'atf2_full_twiss.tfs')
         self.lattice = rft.Lattice(self.twiss_path)
+        self.lattice.set_tt_nsteps(0)
         self.lattice.set_bpm_resolution(bpm_resolution)
         for s in self.lattice['*OTR*']:
             screen = rft.Screen()

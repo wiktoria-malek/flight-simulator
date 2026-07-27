@@ -290,13 +290,13 @@ class Optimization:
             reduced_chi2 = float(joint_fit.get("reduced_chi2", np.nan))
             chi2 = float(joint_fit.get("chi2", np.nan))
 
-        emit_x_norm_err = float(err_dict.get("emit_x_norm", None))
-        emit_y_norm_err = float(err_dict.get("emit_y_norm", None))
-        beta_x0_err = float(err_dict.get("beta_x0", None))
-        alpha_x0_err = float(err_dict.get("alpha_x0", None))
-        beta_y0_err = float(err_dict.get("beta_y0", None))
-        alpha_y0_err = float(err_dict.get("alpha_y0", None))
-        quad_k1_0_err = float(err_dict.get("quad_k1_0", None))
+        emit_x_norm_err = float(err_dict.get("emit_x_norm", np.nan))
+        emit_y_norm_err = float(err_dict.get("emit_y_norm", np.nan))
+        beta_x0_err = float(err_dict.get("beta_x0", np.nan))
+        alpha_x0_err = float(err_dict.get("alpha_x0", np.nan))
+        beta_y0_err = float(err_dict.get("beta_y0", np.nan))
+        alpha_y0_err = float(err_dict.get("alpha_y0", np.nan))
+        quad_k1_0_err = float(err_dict.get("quad_k1_0", np.nan))
 
         if np.isfinite(beta_gamma) and beta_gamma > 0:
             emit_x_geom_err = emit_x_norm_err / beta_gamma * 1e3 if np.isfinite(emit_x_norm_err) else np.nan

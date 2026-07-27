@@ -230,6 +230,10 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.background_shots.setValue(bg_shots)
         self.interface.bg_shots = int(self.background_shots.value())
         self.background_shots.valueChanged.connect(self._on_bg_shots_changed)
+        self.show_beamline.clicked.connect(self._show_beamline)
+
+    def _show_beamline(self):
+        pass
 
     def _on_bg_shots_changed(self, value):
         self.interface.bg_shots = max(0, int(value))
@@ -690,9 +694,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             step_i = int(parts[3])
             shot_i = int(parts[5])
             screen_data = state.get_screens()
-            sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0]) / 1000.0
-            sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0]) / 1000.0
-            sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0]) / 1000.0
+            sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0]) #/ 1000.0
+            sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0]) #/ 1000.0
+            sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0]) #/ 1000.0
             screen_images = state.get_screens().get("images", [])
             if len(screen_images) > 0:
                 images[step_i][screen_i][shot_i] = np.asarray(screen_images[0]).tolist()
