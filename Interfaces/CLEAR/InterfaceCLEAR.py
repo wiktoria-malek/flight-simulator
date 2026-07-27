@@ -408,19 +408,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
-            # try:
-            #     last_value = self.client.get(readback_value, context=self.context_empty).data["current"]
-            #     print(last_value)
-            # except Exception:
-            #     try:
-            #         last_value = self.client.get(readback_value, context=self.context_acquisition).data["current"]
-            #         print(last_value)
-            #     except Exception:
-            #         last_value = np.nan
-
             try:
                 last_value = self.client.get(readback_value).data["current"]
-                print(last_value)
             except Exception:
                 last_value = np.nan
 
@@ -505,7 +494,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             property_address, field = address.rsplit("#", 1)
             self.client.set(property_address, data={field: value})
             self._wait_for_quadrupole_readback(property_address, value)
-        time.sleep(5)
 
     # def insert_screen(self, screen_name):
     #     screen_pv_name = self.screen_pv_names.get(screen_name)
