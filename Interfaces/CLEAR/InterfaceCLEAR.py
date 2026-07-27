@@ -1,9 +1,20 @@
 import sys, time, math, os
 import numpy as np
 import pyda, pyda_japc
-from Interfaces.CLEAR.Setup_files import config
-from Interfaces.CLEAR.Setup_files import clear_lattice
+try:
+    from Interfaces.CLEAR import config
+    try:
+        from Interfaces.CLEAR import clear_lattice
+    except Exception:
+        clear_lattice = None
+except ImportError:
+    import config
+    try:
+        import clear_lattice
+    except Exception:
+        clear_lattice = None
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
+
 
 class CLEAR_real_machine(AbstractMachineInterface):
     def get_name(self):
