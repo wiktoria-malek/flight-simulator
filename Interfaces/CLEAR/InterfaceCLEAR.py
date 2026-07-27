@@ -404,11 +404,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return False
 
     def _wait_for_quadrupole_readback(self, quadrupole_path, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
+        readback_value = f"{quadrupole_path}#current"
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
-                data = self.client.get(quadrupole_path, context=self.context_acquisition).data["current"]
+                data = self.client.get(readback_value, context=self.context_acquisition)
                 last_value = data
                 print(last_value)
             except Exception:
@@ -418,7 +419,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 return True
             time.sleep(poll_interval)
         self.log(
-            f'Warning: {quadrupole_path} did not reach target {float(target):.6g} '
+            f'Warning: {readback_value} did not reach target {float(target):.6g} '
             f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
         )
         return False
