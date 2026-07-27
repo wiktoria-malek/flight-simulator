@@ -55,9 +55,10 @@ context_empty = ""
 # print("================================================================================")
 
 
-"""Test of one corrector and method get_correctors"""
+# """Test of one corrector and method get_correctors"""
+#
+# print("Testing corrector CA.DVG0130, reading its values directly from japc/pyda... ")
 
-print("Testing corrector CA.DVG0130, reading its values directly from japc/pyda... ")
 #corrector = "CA.DVG0130"
 
 # setting = client.get(f"{corrector}/SettingPPM", context = context_empty).data["current"]
@@ -80,7 +81,8 @@ time.sleep(5)
 print(f"names from method get_correctors: {result['names']}")
 print(f"bdes  from method get_correctors: {result['bdes']}")
 print(f"bact  from method get_correctors: {result['bact']}")
-result2 = I.set_correctors(names=["CA.DHG0130", "CA.DVG0130"], corr_vals = [0.46, -0.81])
+# result2 = I.set_correctors(names=["CA.DHG0130", "CA.DVG0130"], corr_vals = [0.46, -0.81])
+result2 = I.set_correctors(names=["CA.DHG0130", "CA.DVG0130"], corr_vals = [0.0, -0.1])
 time.sleep(5)
 print(f"names from method get_correctors: {result['names']}")
 print(f"bdes  from method get_correctors: {result['bdes']}")
