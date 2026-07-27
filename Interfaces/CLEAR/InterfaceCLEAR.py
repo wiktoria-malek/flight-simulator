@@ -409,7 +409,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
-                last_value = self.client.get(readback_value).data["current"]
+                last_value = self.make_safe_float(self.client.get(readback_value).data["current"])
             except Exception:
                 last_value = np.nan
 
@@ -433,7 +433,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             target = corr_val
             self.client.set(self.corrector_set_params[corrector], data={'current': target})
             self._wait_for_magnet_readback(corrector, target)
-
 
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):
