@@ -409,7 +409,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
             try:
-                last_value = self.make_safe_float(self.client.get(readback_value).data["current"])
+                last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
             except Exception:
                 last_value = np.nan
 
