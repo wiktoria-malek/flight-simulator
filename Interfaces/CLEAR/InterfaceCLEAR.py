@@ -413,7 +413,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return
         for corrector, corr_val in zip(names, corr_vals):
             target = float(corr_val)
-            self.client.set(self.corrector_set_params[corrector], {'current': target}, context=self.context_empty)
+            self.client.set(self.corrector_set_params[corrector], {'current': target})
             self._wait_for_corrector_readback(corrector, target)
 
     def vary_correctors(self, names, corr_vals):
