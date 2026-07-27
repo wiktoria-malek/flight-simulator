@@ -86,10 +86,6 @@ result2 = I.get_correctors(names=["CA.DHG0130","CA.DVG0130" ])
 print(f"names from method get_correctors: {result2['names']}")
 print(f"bdes  from method get_correctors: {result2['bdes']}")
 print(f"bact  from method get_correctors: {result2['bact']}")
-
-
-
-
 print("================================================================================")
 
 #
