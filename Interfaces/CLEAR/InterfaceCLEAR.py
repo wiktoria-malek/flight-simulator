@@ -404,13 +404,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return False
 
     def _wait_for_quadrupole_readback(self, quadrupole_path, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
-        readback_value = quadrupole_path
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
 
             #last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
-            last_value = self.client.get(readback_value).data["current"]
+            last_value = self.client.get(readback_value, context = self.context_acquisition).data["currentAverage"]
             print("It's the try:...")
 
             # except Exception as e:
@@ -497,7 +496,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
             #self.client.set(property_address, data={field: value})
-            self._wait_for_quadrupole_readback(property_address, value)
+            acq_path = f"{quadrupole}/Acquisition"
+            self._wait_for_quadrupole_readback(acq_path, value)
 
     # def insert_screen(self, screen_name):
     #     screen_pv_name = self.screen_pv_names.get(screen_name)
