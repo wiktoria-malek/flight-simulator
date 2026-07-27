@@ -408,14 +408,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
         t0 = time.perf_counter()
         last_value = np.nan
         while time.perf_counter() - t0 < timeout:
-            try:
-                #last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
-                last_value = self.client.get(readback_value).data["currentAverage"]
-                print("It's the try:...")
 
-            except Exception:
-                print("It's the Exception:...")
-                last_value = np.nan
+            #last_value = self.make_safe_float(self.client.get(readback_value).data["currentAverage"])
+            last_value = self.client.get(readback_value).data["currentAverage"]
+            print("It's the try:...")
+
+            # except Exception as e:
+            #     print(f"It's the Exception because {e}:...")
+            #     last_value = np.nan
 
             if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
                 return True
