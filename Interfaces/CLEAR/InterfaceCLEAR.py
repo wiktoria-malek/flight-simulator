@@ -691,7 +691,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return
         else:
             self.log(f"Extracting {screen_name}...")
-            self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"info['get_set_field']": 0})  # 0, meaning EXTRACT the screen
+            self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 0})  # 0, meaning EXTRACT the screen
             self.log(f"Extracted {screen_name}!")
 
     def get_screens(self, names=None):

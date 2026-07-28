@@ -69,7 +69,7 @@ print(r2) # prints : ['Screen OUT', 'Screen IN']
 print("================================================================================")
 
 print("Testing inserting the screen using the interface method...")
-I.insert_screen("CS.BTV0305")
+I.extract_screen("CS.BTV0305")
 time.sleep(10)
 
 
