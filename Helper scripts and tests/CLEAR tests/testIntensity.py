@@ -31,15 +31,10 @@ context_empty = ""
 # print(steps_readback_position_max)
 
 
-print("Calling change_energy...")
-I.change_energy()
-# print("Called change_energy. Starting to reset...")
-# I.reset_energy()
-# print("Called reset_energy.")
+print("Calling change_intensity...")
+I.change_intensity()
+print("Called change_intensity. Starting to reset...")
+# I.reset_intensity()
+# print("Called reset_intensity.")
 
-
-# print("Calling change_intensity...")
-# I.change_intensity()
-# print("Called change_intensity...")
-#
 
