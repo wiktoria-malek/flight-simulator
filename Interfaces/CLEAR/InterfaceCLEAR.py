@@ -58,6 +58,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return 'CLEAR'
 
     def __init__(self, nsamples=1, nominal_intensity=1.5, wfs_intensity=1.0):
+        # would be nice to call here functions that do _read_intensity_nominal and energy
+        # at the constructor, so that we dont lose time during operations like change_energy/intensity to read them
+        self.steps_readback_position = 0.0
         self.energy_readback = 0.0
         self.bpm_mode = BPMsMode.peak
         self.nsamples = nsamples
@@ -302,13 +305,22 @@ class CLEAR_real_machine(AbstractMachineInterface):
         print(f"Energy has been reset to {self.energy_readback}...")
 
     def change_intensity(self):
-        steps_readback = self.client.get('CO.TOWB.102.UVATT2/Setting')
+        self.steps_readback_position = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
+        self.steps_readback_position_min = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
+        self.steps_readback_position_max =self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
         print(f'Changing intensity to ...')
-        new_laser_intensity = self.nominal_laser_intensity
+        nominal_settings_steps = self.steps_readback_position
+        N_steps = 100 # to be verified!
+        new_laser_settings = nominal_settings_steps - N_steps
+        self.log(f"The new laser settings will be set to {new_laser_settings}... Nominal value is {self.steps_readback_position}.")
+        #self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": new_laser_settings})
+        self.log(f"The new laser settings has been set to {new_laser_settings}. Nominal value was {self.steps_readback_position}.")
         return self
 
     def reset_intensity(self):
-        return self
+        print(f"Resetting intensity to {self.steps_readback_position}...")
+        # self.client.set('CO.TOWB.102.UVATT2/Setting', data = {"position" : self.steps_readback_position})
+        print(f"Intensity steps has been reset to {self.steps_readback_position}...")
 
     def get_sequence(self):
         return self.sequence
