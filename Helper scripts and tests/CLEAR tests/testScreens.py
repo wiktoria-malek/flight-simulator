@@ -66,10 +66,12 @@ context_empty = ""
 
 
 r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
-print(r.value) # screen out -> value=0
-         # screen in -> value - 1
+print(r.value) # prints just a value
+                # screen out -> value=0
+                # screen in -> value - 1
+print("=================================")
 r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
-print(r2) # prints :
+print(r2) # prints : ['Screen OUT', 'Screen IN']
 
 # client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":1})
 # r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
