@@ -296,9 +296,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
         new_energy = 0.9 * self.energy_readback # as a test!
         self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
         self.log(f"Value after changing energy: {new_energy}")
-        #time.sleep(10)
-        #self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] #changes value globally
-
+        time.sleep(10)
+        self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
+        print(self.energy_readback)
         return self.energy_readback
 
     def reset_energy(self):
