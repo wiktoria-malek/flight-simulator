@@ -207,10 +207,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
         self.quad_status_params = dict(zip(config.quad_names, config.current_status_params))
         self.twiss_path = None
-        self.cam_props = CamList() # Load camera configuration from assets/cameras.json
+        self.cam_props = self.CamList() # Load camera configuration from assets/cameras.json
         self.camList = list(self.cam_props.keys())
 
-    def CamList():
+    def CamList(self):
         _JSON_PATH = os.path.join(os.path.dirname(__file__), 'cameras.json')
         """Return the full device configuration dict (keyed by BTV device name)."""
         with open(_JSON_PATH) as f:
@@ -567,11 +567,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             acq_path = f"{quadrupole}/Acquisition"
             self._wait_for_quadrupole_readback(acq_path, value)
 
-    def get_cam_list(self):
-        with open(self.camera_json_path) as f:
-            data = json.load(f)
-        return data['devices']
-
     def _get_screen_movement_info(self, screen_name):
         btv_key = screen_name.rstrip("LH")
         cam = self.cam_props.get(btv_key)
@@ -589,7 +584,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
         screen_props["system"] = int(screen_props["ctrl_fields"].get("system", 1))
-        screen_props["has_custom_screen_mover"] = isinstance(screen_props["screenMoverDevice"], str)
+        screen_props["has_custom_screen_mover"] = isinstance(screen_props["screen_mover_device"], str)
 
         if screen_props["system"] == 1:
             screen_props["set_prop"] = 'OPSettingSystem1#positionChannel1'
@@ -604,7 +599,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             screen_props["description_field"] = 'dcm3DriverNames'
 
         else:
-            screen_props["set_prop"] = screen_props["set_prop"] = screen_props["field"] = screen_props["description_field"] = None
+            screen_props["set_prop"] = screen_props["get_prop"] = screen_props["field"] = screen_props["description_field"] = None
 
         return screen_props
 
@@ -621,13 +616,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 positions_path = int(self.client.get(f"{screen_props['screen_mover_device']}/Acquisition", context=self.context_empty).data["position"])
             except Exception as e:
                 self.log(f"Error: {e}")
+                return None
             # Build reverse map: integer value → label
             setpoints = screen_props["screen_mover_fields"].get("setpoints", {})
             reversed_map = {v: k for k, v in setpoints.items()}
             return reversed_map.get(positions_path, str(positions_path))
         try:
             value = self.client.get(f"{screen_props["btvdevice"]}/{screen_props["get_prop"]}", context=self.context_empty).data[screen_props["get_field"]]
-            index = int(val.value if hasattr(val, "value") else val)
+            index = int(value.value if hasattr(val, "value") else val)
         except Exception as e:
             self.log(f"Error: {e}")
             return None
@@ -649,10 +645,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
             value = setpoints[label]
             device = screen_props["screen_mover_device"]
             mover_type = screen_props["screen_mover_type"]
-            if mover_type == "StepMotorVME":
+            if mover_type == "BStepMotorVME":
                 self.client.set(f"{device}/Move", data={"mode": 2, "value": value, "units": 2})
             elif mover_type == "NewFocusPicomotor":
-                self.async_set(self.screenMoverDevice + '/Setting#position', int(setpoints[label]))
                 self.client.set(f"{device}/Setting#position", data={"position": value})
             else: raise RuntimeError(f"Unknown mover type: {mover_type}")
             self.log(f"Moved {screen_name} to position {label}")
@@ -666,7 +661,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return label
 
     def insert_screen(self, screen_name):
-        return self._move_screen(screen_name, "in")
+        return self._move_screen(screen_name, "screen")
 
     def extract_screen(self, screen_name):
         return self._move_screen(screen_name, "out")
