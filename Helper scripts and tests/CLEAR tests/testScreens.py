@@ -7,10 +7,10 @@ while (not (project_root_path / "Interfaces").exists() and project_root_path.par
     project_root_path = project_root_path.parent
 sys.path.insert(0, str(project_root_path))
 os.chdir(project_root_path)
-#from Interfaces.CLEAR.InterfaceCLEAR import CLEAR_real_machine
+from Interfaces.CLEAR.InterfaceCLEAR import CLEAR_real_machine
 import matplotlib.pyplot as plt
 
-#I = CLEAR_real_machine()
+I = CLEAR_real_machine()
 
 client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 context_acquisition = "SCT.USER.SETUP"
@@ -58,13 +58,6 @@ context_empty = ""
 # print(f"sum from get_screens: {result['sum']}")
 # print(f"images from get_screens: {result['images']}")
 # print(f"inout from get_screens: {result['inout']}")
-# print("================================================================================")
-
-# print("Testing inserting the screen...")
-# I.insert_screen("CS.BTV0305")
-# time.sleep(10)
-
-
 r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
 print(r.value) # prints just a value
                 # screen out -> value=0
@@ -72,6 +65,15 @@ print(r.value) # prints just a value
 print("=================================")
 r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 print(r2) # prints : ['Screen OUT', 'Screen IN']
+
+print("================================================================================")
+
+print("Testing inserting the screen using the interface method...")
+I.insert_screen("CS.BTV0305")
+time.sleep(10)
+
+
+
 
 # client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":1})
 # r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
