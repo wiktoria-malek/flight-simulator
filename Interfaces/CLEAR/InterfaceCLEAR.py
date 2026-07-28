@@ -604,8 +604,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return screen_props
 
     def _screen_position_label(self, screen_props):
-        if screen_props["has_custom_screen_mover"]: return [str(k) for k in screen_props["screen_mover_fields"].get("setpoints", {})]
-        description_data = self.client.get(f"{screen_props['btvdevice']}/Description", context=self.context_empty).data[screen_props["description_field"]]
+        if screen_props["has_custom_screen_mover"]:
+            return [str(k) for k in screen_props["screen_mover_fields"].get("setpoints", {})]
+        else:
+            description_data = self.client.get(f"{screen_props['btvdevice']}/Description", context=self.context_empty).data[screen_props["description_field"]]
         return [str(value).strip() for value in list(description_data) if str(value).strip()]
 
     def _get_screen_position(self, screen_name):
@@ -664,7 +666,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def insert_screen(self, screen_name):
         #return self._move_screen(screen_name, 1)
-        return self._move_screen(screen_name, "in")
+        return self._move_screen(screen_name, "Screen IN")
 
     def extract_screen(self, screen_name):
         #return self._move_screen(screen_name, 0)

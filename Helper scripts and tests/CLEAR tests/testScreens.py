@@ -60,11 +60,15 @@ context_empty = ""
 # print(f"inout from get_screens: {result['inout']}")
 # print("================================================================================")
 
-print("Testing inserting the screen...")
-I.insert_screen("CS.BTV0305")
-time.sleep(10)
+# print("Testing inserting the screen...")
+# I.insert_screen("CS.BTV0305")
+# time.sleep(10)
 
-# check the delta time, should be l;ess than 1s
+r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
+print(r)
+#client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context_empty)
+
+# check the delta time, should be less than 1s
 
 
 
