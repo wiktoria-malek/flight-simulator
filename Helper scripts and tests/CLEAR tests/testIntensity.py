@@ -18,8 +18,15 @@ context_empty = ""
 
 
 steps_readback = client.get('CO.TOWB.102.UVATT2/Setting')
+
 # prints:
-print(steps_readback)
+# position_min
+# position_max
+# position
+
+print(steps_readback.position)
+print(steps_readback.position_min)
+print(steps_readback.position_max)
 
 
 
