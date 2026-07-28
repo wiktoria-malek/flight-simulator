@@ -24,3 +24,5 @@ context_empty = ""
 energy_readback = I.change_energy()
 print(energy_readback)
 
+I.reset_energy()
+

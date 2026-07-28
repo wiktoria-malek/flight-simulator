@@ -58,6 +58,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return 'CLEAR'
 
     def __init__(self, nsamples=1, nominal_intensity=1.5, wfs_intensity=1.0):
+        self.energy_readback = 0.0
         self.bpm_mode = BPMsMode.peak
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
@@ -287,14 +288,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return float(default)
 
     def change_energy(self):
-        energy_readback =self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
-        #print(energy_readback)
-        # energy_readback =self.client.get('CK.LL-MKS15/Setting')
-        #self.log('Function change_energy needs implementation.')
+        self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] #changes value globally
+        # to be seen
+        # self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : 0.9*energy_readback})
         return energy_readback
 
     def reset_energy(self):
-        self.log('Function reset_energy needs implementation.')
+        print(f"Resetting energy to {self.energy_readback}...")
+
 
     def change_intensity(self):
         steps_readback = self.client.get('CO.TOWB.102.UVATT2/Setting')  # we'll
