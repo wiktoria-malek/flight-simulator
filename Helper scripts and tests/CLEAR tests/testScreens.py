@@ -70,7 +70,7 @@ print(r.value) # screen out -> value=0
 r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 print(r2)
 
-client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":0})
+client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":1})
 r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 print(r3)
 
