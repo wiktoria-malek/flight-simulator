@@ -634,8 +634,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         screen_position_labels = self._screen_position_label(screen_props)
         requested_movement_type = requested_position.lower()
         labels = [_labels.lower() for _labels in screen_position_labels]
-        if requested_movement_type in labels: index = labels.index(requested_movement_type)
-        else: index = None
+        # if requested_movement_type in labels:
+        index = labels.index(requested_movement_type)
+        # else:
+        #     index = None
         label = labels[index]
         
         if screen_props["has_custom_screen_mover"]:
@@ -665,16 +667,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def extract_screen(self, screen_name):
         return self._move_screen(screen_name, "out")
-
-
-
-
-
-
-
-
-
-
 
     def get_screens(self, names=None):
         self.log('Reading screens...')

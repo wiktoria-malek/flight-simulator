@@ -64,6 +64,8 @@ print("Testing inserting the screen...")
 I.insert_screen("CS.BTV0305")
 time.sleep(10)
 
+# check the delta time, should be l;ess than 1s
+
 
 
 
