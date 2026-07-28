@@ -17,8 +17,9 @@ context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
 
 
-# laser_readback =client.get('CK.LL-MKS11/Setting')
-laser_readback =client.get('CK.LL-MKS15/Setting')
+steps_readback = client.get('CO.TOWB.102.UVATT2/Setting')
+# prints:
+print(steps_readback)
 
-#PhaseSh_Sp to be checked but it's probably what we want to change
-print(laser_readback)
+
+

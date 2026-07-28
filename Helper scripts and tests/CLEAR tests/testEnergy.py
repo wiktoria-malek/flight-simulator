@@ -18,9 +18,7 @@ context_empty = ""
 
 # energy_readback =client.get('CK.LL-MKS11/Setting')
 #energy_readback =client.get('CK.LL-MKS15/Setting')
-#steps_readback = client.get('CO.TOWB.102.UVATT2/Setting') # we'll
 #PhaseSh_Sp to be checked but it's probably what we want to change
-#print(steps_readback)
 energy_readback = I.change_energy()
 print(energy_readback)
 

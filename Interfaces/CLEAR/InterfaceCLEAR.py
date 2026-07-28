@@ -290,16 +290,21 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def change_energy(self):
         self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] #changes value globally
         # to be seen
-        # self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : 0.9*energy_readback})
+        self.log(f"Value before changing energy: {self.energy_readback}")
+        new_energy = 0.9 * self.energy_readback # as a test!
+        # self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
+        self.log(f"Value after changing energy: {new_energy}")
         return self.energy_readback
 
     def reset_energy(self):
         print(f"Resetting energy to {self.energy_readback}...")
-
+        # self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : self.energy_readback})
+        print(f"Energy has been reset to {self.energy_readback}...")
 
     def change_intensity(self):
-        steps_readback = self.client.get('CO.TOWB.102.UVATT2/Setting')  # we'll
-
+        steps_readback = self.client.get('CO.TOWB.102.UVATT2/Setting')
+        print(f'Changing intensity to ...')
+        new_laser_intensity = self.nominal_laser_intensity
         return self
 
     def reset_intensity(self):
