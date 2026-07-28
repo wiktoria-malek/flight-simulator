@@ -670,9 +670,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
         # First, read if the screen is already inserted!
         current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']] # 0 or not == 0 means screen is out, whatever else means IN
         if current_screen_inout_status.value == 0:
-            self.log(f"Inserting {screen_name} into {info['position']}")
+            self.log(f"Inserting {screen_name}...")
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"info['get_set_field']": 1}) # 1, meaning INSERT the screen
-            self.log(f"Inserted {screen_name} to position {info['position']}")
+            self.log(f"Inserted {screen_name}!")
         else:
             print(current_screen_inout_status.value)
             self.log(f"Screen {screen_name} already inserted")
@@ -684,13 +684,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
         info = self._get_screen_movement_info(screen_name)
         # First, read if the screen is already extracted!
         current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]  # 0 or not == 0 means screen is out, whatever else means IN
-        if current_screen_inout_status == 0:
+        if current_screen_inout_status.value == 0:
             self.log(f"Screen {screen_name} already extracted")
             return
         else:
-            self.log(f"Extracting {screen_name} back into {info['position']}")
+            self.log(f"Extracting {screen_name}...")
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"info['get_set_field']": 0})  # 0, meaning EXTRACT the screen
-            self.log(f"Extracted {screen_name} back into position {info['position']}")
+            self.log(f"Extracted {screen_name}!")
 
     def get_screens(self, names=None):
         self.log('Reading screens...')
