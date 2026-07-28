@@ -622,7 +622,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             reversed_map = {v: k for k, v in setpoints.items()}
             return reversed_map.get(positions_path, str(positions_path))
         try:
-            value = self.client.get(f"{screen_props["btvdevice"]}/{screen_props["get_prop"]}", context=self.context_empty).data[screen_props["get_field"]]
+            value = self.client.get(f"{screen_props['btvdevice']}/{screen_props['get_prop']}", context=self.context_empty).data[screen_props['get_field']]
             index = int(value.value if hasattr(val, "value") else val)
         except Exception as e:
             self.log(f"Error: {e}")
