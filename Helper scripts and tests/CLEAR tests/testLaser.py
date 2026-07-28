@@ -20,4 +20,4 @@ context_empty = ""
 #laser_readback =client.get('CK.LL-MKS15/Setting')
 steps_readback = client.get('CO.TOWB.102.UVATT2/Setting')
 #PhaseSh_Sp to be checked but it's probably what we want to change
-print(laser_readback)
+print(steps_readback)
