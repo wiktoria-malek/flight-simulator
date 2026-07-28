@@ -67,7 +67,8 @@ context_empty = ""
 r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
 print(r.value) # screen out -> value=0
          # screen in -> value - 1
-
+r2 =client.get('CS.BTV0120_CS.BTV0305/dcm3DriverNames')
+print(r2)
 
 #client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context_empty)
 
