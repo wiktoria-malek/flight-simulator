@@ -672,7 +672,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         if current_screen_inout_status == 0:
             self.log(f"Inserting {screen_name} into {info['position']}")
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"info['get_set_field']": 1}) # 1, meaning INSERT the screen
-            self.log(f"Inserted {screen_name} to position {info["position"]}")
+            self.log(f"Inserted {screen_name} to position {info['position']}")
         else:
             self.log(f"Screen {screen_name} already inserted")
             return
@@ -689,7 +689,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         else:
             self.log(f"Extracting {screen_name} back into {info['position']}")
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"info['get_set_field']": 0})  # 0, meaning EXTRACT the screen
-            self.log(f"Extracted {screen_name} back into position {info["position"]}")
+            self.log(f"Extracted {screen_name} back into position {info['position']}")
 
     def get_screens(self, names=None):
         self.log('Reading screens...')
