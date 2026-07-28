@@ -16,19 +16,30 @@ client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
 
+#
+# steps_readback_position = client.get('CO.TOWB.102.UVATT2/Setting').data['position']
+# steps_readback_position_min = client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
+# steps_readback_position_max = client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
+#
+# # prints:
+# # position_min
+# # position_max
+# # position
+#
+# print(steps_readback_position)
+# print(steps_readback_position_min)
+# print(steps_readback_position_max)
 
-steps_readback_position = client.get('CO.TOWB.102.UVATT2/Setting').data['position']
-steps_readback_position_min = client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
-steps_readback_position_max = client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
 
-# prints:
-# position_min
-# position_max
-# position
-
-print(steps_readback_position)
-print(steps_readback_position_min)
-print(steps_readback_position_max)
+print("Calling change_energy...")
+I.change_energy()
+# print("Called change_energy. Starting to reset...")
+# I.reset_energy()
+# print("Called reset_energy.")
 
 
+# print("Calling change_intensity...")
+# I.change_intensity()
+# print("Called change_intensity...")
+#
 
