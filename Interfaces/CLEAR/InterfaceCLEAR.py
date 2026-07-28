@@ -674,6 +674,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"info['get_set_field']": 1}) # 1, meaning INSERT the screen
             self.log(f"Inserted {screen_name} to position {info['position']}")
         else:
+            print(current_screen_inout_status)
             self.log(f"Screen {screen_name} already inserted")
             return
 
