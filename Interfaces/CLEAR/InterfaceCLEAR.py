@@ -287,7 +287,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return float(default)
 
     def change_energy(self):
-        energy_readback =self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'].value
+        energy_readback =self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
         #print(energy_readback)
         # energy_readback =self.client.get('CK.LL-MKS15/Setting')
         #self.log('Function change_energy needs implementation.')
