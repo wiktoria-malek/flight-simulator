@@ -315,7 +315,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.steps_readback_position_max =self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
         print(f'Changing intensity to ...')
         nominal_settings_steps = self.steps_readback_position
-        N_steps = 100 # to be verified!
+        N_steps = 993 # to be verified!
         new_laser_settings = nominal_settings_steps - N_steps
         self.log(f"The new laser settings will be set to {new_laser_settings}... Nominal value is {self.steps_readback_position}.")
         self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": new_laser_settings})
