@@ -1,5 +1,5 @@
 from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral
-import sys, time, math, os
+import sys, time, math, os, json
 import numpy as np
 import pyda, pyda_japc
 from scipy.integrate import trapezoid
