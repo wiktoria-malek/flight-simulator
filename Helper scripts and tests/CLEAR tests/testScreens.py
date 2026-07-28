@@ -70,14 +70,21 @@ print(r.value) # screen out -> value=0
 r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 print(r2)
 
-client.set('CS.BTV0120_CS.BTV0305O/OPSettingSystem2', data={"positionChannel5":0})
+client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":0})
 r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 print(r3)
 
 #client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context_empty)
 
 # check the delta time, should be less than 1s
+# its a nonlinear with a laser, we should look at the spectrometer, so we dont see a large energy spread , train 10-20ns, laser low enough, a few percent, more or less 5%
+# bpm traces are already normalized with S
+# dont use the cavity bpms, dogleg
+# 3% energy spread rough numbers,
+# 95% could be nice,u can then assume you hvae linear losses
+# 40-2nC
 
+# check display on all bpms
 
 
 
