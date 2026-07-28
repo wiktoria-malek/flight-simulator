@@ -24,7 +24,7 @@ steps_readback = client.get('CO.TOWB.102.UVATT2/Setting')
 # position_max
 # position
 
-print(steps_readback.get('position'))
+print(steps_readback['position'])
 # print(steps_readback.position_min)
 # print(steps_readback.position_max)
 
