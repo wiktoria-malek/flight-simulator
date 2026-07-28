@@ -17,16 +17,18 @@ context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
 
 
-steps_readback = client.get('CO.TOWB.102.UVATT2/Setting')
+steps_readback_position = client.get('CO.TOWB.102.UVATT2/Setting').data['position']
+steps_readback_position_min = client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
+steps_readback_position_max = client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
 
 # prints:
 # position_min
 # position_max
 # position
 
-print(steps_readback['position'])
-# print(steps_readback.position_min)
-# print(steps_readback.position_max)
+print(steps_readback_position)
+print(steps_readback_position_min)
+print(steps_readback_position_max)
 
 
 
