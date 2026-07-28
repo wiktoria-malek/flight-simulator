@@ -16,9 +16,8 @@ client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
 
-
 # laser_readback =client.get('CK.LL-MKS11/Setting')
-laser_readback =client.get('CK.LL-MKS15/Setting')
-
+#laser_readback =client.get('CK.LL-MKS15/Setting')
+steps_readback = client.get('CO.TOWB.102/UVATT2/Setting')
 #PhaseSh_Sp to be checked but it's probably what we want to change
 print(laser_readback)
