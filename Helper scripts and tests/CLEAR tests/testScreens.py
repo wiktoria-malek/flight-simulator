@@ -70,6 +70,10 @@ print(r.value) # screen out -> value=0
 r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 print(r2)
 
+client.set('CS.BTV0120_CS.BTV0305O/SettingSystem2#positionChannel5', 0)
+r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
+print(r3)
+
 #client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context_empty)
 
 # check the delta time, should be less than 1s
