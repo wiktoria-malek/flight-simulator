@@ -34,7 +34,7 @@ context_empty = ""
 print("Calling change_intensity...")
 I.change_intensity()
 print("Called change_intensity. Starting to reset...")
-# I.reset_intensity()
-# print("Called reset_intensity.")
+I.reset_intensity()
+print("Called reset_intensity.")
 
 
