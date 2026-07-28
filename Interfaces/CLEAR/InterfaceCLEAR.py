@@ -663,9 +663,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return label
 
     def insert_screen(self, screen_name):
-        return self._move_screen(screen_name, "screen")
+        #return self._move_screen(screen_name, 1)
+        return self._move_screen(screen_name, "in")
 
     def extract_screen(self, screen_name):
+        #return self._move_screen(screen_name, 0)
         return self._move_screen(screen_name, "out")
 
     def get_screens(self, names=None):
