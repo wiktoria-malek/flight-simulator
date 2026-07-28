@@ -73,6 +73,8 @@ I.insert_screen("CS.BTV0305")
 time.sleep(10)
 
 
+#client.set(f"CS.BTV0305/OPSettingSystem2", data={f"info['get_set_field']": 1})
+
 
 
 # client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":1})
