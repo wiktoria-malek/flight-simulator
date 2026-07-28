@@ -76,8 +76,6 @@ r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 print(r3)
 '''
 
-laser_readback =client.get('CK.LL-MKS11/Setting')
-print(laser_readback)
 
 
 
