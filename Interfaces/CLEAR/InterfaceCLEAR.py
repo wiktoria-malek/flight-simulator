@@ -287,20 +287,21 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return float(default)
 
     def change_energy(self):
-        self.log('Function change_energy needs implementation.')
-        return 0.0
+        energy_readback =self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_Sp'].value
+        #print(energy_readback)
+        # energy_readback =self.client.get('CK.LL-MKS15/Setting')
+        #self.log('Function change_energy needs implementation.')
+        return energy_readback
 
     def reset_energy(self):
         self.log('Function reset_energy needs implementation.')
 
     def change_intensity(self):
-        target_position = self.set_laser_motor_attenuator_position(self.test_laser_intensity)
-        self.log(f'CLEAR test intensity set through motor attenuator: {target_position:.3f} ksteps')
+        steps_readback = self.client.get('CO.TOWB.102.UVATT2/Setting')  # we'll
+
         return self
 
     def reset_intensity(self):
-        target_position = self.set_laser_motor_attenuator_position(self.nominal_laser_intensity)
-        self.log(f'CLEAR nominal intensity restored through motor attenuator: {target_position:.3f} ksteps')
         return self
 
     def get_sequence(self):
