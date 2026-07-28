@@ -318,7 +318,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         N_steps = 100 # to be verified!
         new_laser_settings = nominal_settings_steps - N_steps
         self.log(f"The new laser settings will be set to {new_laser_settings}... Nominal value is {self.steps_readback_position}.")
-        #self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": new_laser_settings})
+        self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": new_laser_settings})
         self.log(f"The new laser settings has been set to {new_laser_settings}. Nominal value was {self.steps_readback_position}.")
         after_intensity_change = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
         self.log(f"Read after change of intensity:", after_intensity_change)
@@ -326,7 +326,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def reset_intensity(self):
         print(f"Resetting intensity to {self.steps_readback_position}...")
-        #self.client.set('CO.TOWB.102.UVATT2/Setting', data = {"position" : self.steps_readback_position})
+        self.client.set('CO.TOWB.102.UVATT2/Setting', data = {"position" : self.steps_readback_position})
         print(f"Intensity steps has been reset to {self.steps_readback_position}...")
         after_intensity_reset = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
         self.log(f"Read after reset of intensity:", after_intensity_reset)
