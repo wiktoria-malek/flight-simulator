@@ -12,7 +12,7 @@
     "  controlDeviceName   – FESA device name of the filter/lamp controller, null if none.",
     "  controlDeviceType   – controller family string, e.g. 'BTVCTRL'. null if no controller.",
     "  controlDeviceFields – type-specific controller parameters (object, empty when no controller).",
-    "                        BTVCTRL: { 'system': 1 or 2 }  (which DCM sub-system to address)",
+    "                        BTVCTRL: { 'system': 1 or 2 }  (which DCM sub- ch to address)",
     "                        Other types will add their own fields here without changing the schema.",
     "  fixValueLamps       – true/false/null (null = unknown, device not in any parsed XML).",
     "  filterInstalled     – whether a filter wheel is present.",

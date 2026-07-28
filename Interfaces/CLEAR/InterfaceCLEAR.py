@@ -206,8 +206,16 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.quad_set_params = dict(zip(config.quad_names, config.current_set_params))
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
         self.quad_status_params = dict(zip(config.quad_names, config.current_status_params))
-
         self.twiss_path = None
+        self.cam_props = CamList() # Load camera configuration from assets/cameras.json
+        self.camList = list(self.cam_props.keys())
+
+    def CamList():
+        _JSON_PATH = os.path.join(os.path.dirname(__file__), 'cameras.json')
+        """Return the full device configuration dict (keyed by BTV device name)."""
+        with open(_JSON_PATH) as f:
+            data = json.load(f)
+        return data['devices']
 
     def get_beam_factors(self):
         pref = self.Pref
@@ -559,11 +567,119 @@ class CLEAR_real_machine(AbstractMachineInterface):
             acq_path = f"{quadrupole}/Acquisition"
             self._wait_for_quadrupole_readback(acq_path, value)
 
+    def get_cam_list(self):
+        with open(self.camera_json_path) as f:
+            data = json.load(f)
+        return data['devices']
+
+    def _get_screen_movement_info(self, screen_name):
+        btv_key = screen_name.rstrip("LH")
+        cam = self.cam_props.get(btv_key)
+        if cam is None: raise RuntimeError(f"Camera {btv_key} not found")
+        if not bool(cam.get("screenInstalled")): raise RuntimeError(f"Camera {btv_key} not installed")
+
+        screen_props = {
+            "btv_key": btv_key,
+            "btvdevice": cam.get('controlDeviceName'),  # None when not configured
+            "ctrl_type" : cam.get('controlDeviceType'),
+            "ctrl_fields" : cam.get('controlDeviceFields', {}),
+            "screen_mover_device" : cam.get('screenMoverDevice'), # None for most cameras
+            "screen_mover_type" : cam.get('screenMoverType'),
+            "screen_mover_fields" : cam.get('screenMoverFields') or {}
+        }
+
+        screen_props["system"] = int(screen_props["ctrl_fields"].get("system", 1))
+        screen_props["has_custom_screen_mover"] = isinstance(screen_props["screenMoverDevice"], str)
+
+        if screen_props["system"] == 1:
+            screen_props["set_prop"] = 'OPSettingSystem1#positionChannel1'
+            screen_props["get_prop"] = 'ExpertSettingDCSystem1'
+            screen_props["get_field"] = 'positionChannel1'
+            screen_props["description_field"] = 'dcm1DriverNames'
+
+        elif screen_props["system"] == 2:
+            screen_props["set_prop"] = 'OPSettingSystem2#positionChannel5'
+            screen_props["get_prop"] = 'ExpertSettingDCSystem2'
+            screen_props["get_field"] = 'positionChannel5'
+            screen_props["description_field"] = 'dcm3DriverNames'
+
+        else:
+            screen_props["set_prop"] = screen_props["set_prop"] = screen_props["field"] = screen_props["description_field"] = None
+
+        return screen_props
+
+    def _screen_position_label(self, screen_props):
+        if screen_props["has_custom_screen_mover"]: return [str(k) for k in screen_props["screen_mover_fields"].get("setpoints", {})]
+        description_data = self.client.get(f"{screen_props['btvdevice']}/Description", context=self.context_empty).data[screen_props["description_field"]]
+        return [str(value).strip() for value in list(description_data) if str(value).strip()]
+
+    def _get_screen_position(self, screen_name):
+        screen_props = self._get_screen_movement_info(screen_name)
+        screen_position_labels = self._screen_position_label(screen_props)
+        if screen_props["has_custom_screen_mover"]:
+            try:
+                positions_path = int(self.client.get(f"{screen_props['screen_mover_device']}/Acquisition", context=self.context_empty).data["position"])
+            except Exception as e:
+                self.log(f"Error: {e}")
+            # Build reverse map: integer value → label
+            setpoints = screen_props["screen_mover_fields"].get("setpoints", {})
+            reversed_map = {v: k for k, v in setpoints.items()}
+            return reversed_map.get(positions_path, str(positions_path))
+        try:
+            value = self.client.get(f"{screen_props["btvdevice"]}/{screen_props["get_prop"]}", context=self.context_empty).data[screen_props["get_field"]]
+            index = int(val.value if hasattr(val, "value") else val)
+        except Exception as e:
+            self.log(f"Error: {e}")
+            return None
+        return screen_position_labels[index] if 0<=index<len(screen_position_labels) else None
+
+    def _move_screen(self, screen_name, requested_position):
+        screen_props = self._get_screen_movement_info(screen_name)
+        screen_position_labels = self._screen_position_label(screen_props)
+        requested_movement_type = requested_position.lower()
+        labels = [_labels.lower() for _labels in screen_position_labels]
+        if requested_movement_type in labels: index = labels.index(requested_movement_type)
+        else: index = None
+        label = labels[index]
+        
+        if screen_props["has_custom_screen_mover"]:
+            setpoints = screen_props["screen_mover_fields"].get("setpoints", {})
+            if label not in setpoints:
+                raise RuntimeError(f"Setpoint {label} not found in screen_mover_fields")
+            value = setpoints[label]
+            device = screen_props["screen_mover_device"]
+            mover_type = screen_props["screen_mover_type"]
+            if mover_type == "StepMotorVME":
+                self.client.set(f"{device}/Move", data={"mode": 2, "value": value, "units": 2})
+            elif mover_type == "NewFocusPicomotor":
+                self.async_set(self.screenMoverDevice + '/Setting#position', int(setpoints[label]))
+                self.client.set(f"{device}/Setting#position", data={"position": value})
+            else: raise RuntimeError(f"Unknown mover type: {mover_type}")
+            self.log(f"Moved {screen_name} to position {label}")
+            return label
+        # ---- Standard BTVCTRL screen command ----
+        if not screen_props["btvdevice"] or screen_props["set_prop"] is None:
+            raise RuntimeError(f"No BTVCTRL controller for {screen_name}")
+        propert_address, field = screen_props["set_prop"].rsplit("#", 1)
+        self.client.set(f"{screen_props['btvdevice']}/{property_addres}", data={field: index})
+        self.log(f"Moved {screen_name} -> {label}")
+        return label
+
     def insert_screen(self, screen_name):
-        pass
+        return self._move_screen(screen_name, "in")
 
     def extract_screen(self, screen_name):
-        pass
+        return self._move_screen(screen_name, "out")
+
+
+
+
+
+
+
+
+
+
 
     def get_screens(self, names=None):
         self.log('Reading screens...')
