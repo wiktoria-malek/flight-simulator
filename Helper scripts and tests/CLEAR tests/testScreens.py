@@ -64,7 +64,8 @@ context_empty = ""
 # I.insert_screen("CS.BTV0305")
 # time.sleep(10)
 
-'''r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
+'''
+r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
 print(r.value) # screen out -> value=0
          # screen in -> value - 1
 r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
@@ -72,9 +73,11 @@ print(r2)
 
 client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":1})
 r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
-print(r3)'''
+print(r3)
+'''
 
 laser_readback =client.get('CK.LL-MKS11/Setting')
+print(laser_readback)
 
 
 
