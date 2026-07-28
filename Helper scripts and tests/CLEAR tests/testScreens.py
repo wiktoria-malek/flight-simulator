@@ -65,7 +65,10 @@ context_empty = ""
 # time.sleep(10)
 
 r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
-print(r)
+print(r.value) # screen out -> value=0
+         # screen in -> value - 1
+
+
 #client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context_empty)
 
 # check the delta time, should be less than 1s
