@@ -587,15 +587,15 @@ class CLEAR_real_machine(AbstractMachineInterface):
         screen_props["has_custom_screen_mover"] = isinstance(screen_props["screen_mover_device"], str)
 
         if screen_props["system"] == 1:
-            screen_props["set_prop"] = 'OPSettingSystem1#positionChannel1'
+            screen_props["set_prop"] = 'OPSettingSystem1'
             screen_props["get_prop"] = 'ExpertSettingDCSystem1'
-            screen_props["get_field"] = 'positionChannel1'
+            screen_props["get_set_field"] = 'positionChannel1'
             screen_props["description_field"] = 'dcm1DriverNames'
 
         elif screen_props["system"] == 2:
-            screen_props["set_prop"] = 'OPSettingSystem2#positionChannel5'
+            screen_props["set_prop"] = 'OPSettingSystem2'
             screen_props["get_prop"] = 'ExpertSettingDCSystem2'
-            screen_props["get_field"] = 'positionChannel5'
+            screen_props["get_set_field"] = 'positionChannel5'
             screen_props["description_field"] = 'dcm3DriverNames'
 
         else:
@@ -666,7 +666,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def insert_screen(self, screen_name):
         #return self._move_screen(screen_name, 1)
-        return self._move_screen(screen_name, "Screen IN")
+        info = self._get_screen_movement_info(screen_name)
+        # First, read if the screen is already inserted!
+
+        response = self.client.get(f"{info['btvdevice'] + info['set_prop']}")
 
     def extract_screen(self, screen_name):
         #return self._move_screen(screen_name, 0)
