@@ -293,19 +293,21 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def change_energy(self):
         self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] #changes value globally
         self.log(f"Value before changing energy: {self.energy_readback}")
-        #new_energy = 0.9 * self.energy_readback # as a test!
-        new_energy = 119.19999
+        new_energy = 0.9 * self.energy_readback # as a test!
+        #new_energy = 119.19999
         self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
         self.log(f"Value after changing energy: {new_energy}")
-        time.sleep(10)
+        time.sleep(10) # write a loop, dont guess time sleep
         after_energy_change = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
         print(after_energy_change)
         return after_energy_change
 
     def reset_energy(self):
         print(f"Resetting energy to {self.energy_readback}...")
-        # self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : self.energy_readback})
+        self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : self.energy_readback})
         print(f"Energy has been reset to {self.energy_readback}...")
+        after_energy_reset = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
+        print(after_energy_reset)
 
     def change_intensity(self):
         self.steps_readback_position = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']

@@ -19,8 +19,12 @@ context_empty = ""
 # energy_readback =client.get('CK.LL-MKS11/Setting')
 #energy_readback =client.get('CK.LL-MKS15/Setting')
 #PhaseSh_Sp to be checked but it's probably what we want to change
+
+print("Change energy method")
 energy_readback = I.change_energy()
 print(energy_readback)
-
+print("Change energy method finished")
+print("Reset energy method")
 I.reset_energy()
+print("Reset energy finished")
 
