@@ -720,7 +720,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return {
             "names": all_names,
-            #"S": np.array(all_s, dtype=float),
+            "S": np.array(all_s, dtype=float),
             "L": np.array(all_l, dtype=float),
         }
 

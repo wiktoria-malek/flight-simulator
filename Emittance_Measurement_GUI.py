@@ -235,10 +235,10 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.show_beamline_button.clicked.connect(self._show_beamline)
 
     def _show_beamline(self):
-        if self.beamline_view is None:
-            self.beamline_view = ShowBeamline(interface = self.interface, parent = self)
         selected_quadrupole, screens = self._get_selection()
-        self.beamline_view._display_beamline_view(quad_selected = selected_quadrupole, screens = screens)
+        if self.beamline_view is None:
+            self.beamline_view = ShowBeamline(interface = self.interface, parent = self, quad_selected = selected_quadrupole, screens = screens)
+        self.beamline_view._display_beamline_view()
         self.beamline_view.show()
         self.beamline_view.raise_()
         self.beamline_view.activateWindow()
@@ -986,20 +986,32 @@ class MainWindow(QMainWindow, QuadrupoleScan):
     def _get_twiss_s_positions(self, names):
         names = list(names)
         positions = [np.nan] * len(names)
+
         if not hasattr(self.interface, "_get_elements_positions"):
             return positions
+
         try:
             pos = self.interface._get_elements_positions()
-            pos_names = list(pos.get("names", []))
-            s = np.asarray(pos.get("S", []), dtype=float)
-            lookup = {
-                name: float(s[i])
-                for i, name in enumerate(pos_names)
-                if i < s.size and np.isfinite(s[i])
-            }
-            positions = [lookup.get(name, np.nan) for name in names]
+            pos_names = [str(name) for name in pos.get("names", [])]
+            s_values = np.asarray(pos.get("S", []), dtype=float)
+            lookup = {name: float(s_values[i]) for i, name in enumerate(pos_names) if i < s_values.size and np.isfinite(s_values[i])}
+            positions = []
+            for requested_name in names:
+                requested_name = str(requested_name)
+                if requested_name in lookup:
+                    positions.append(lookup[requested_name])
+                    continue
+                quad_part_positions = []
+                for lattice_name in (f"{requested_name}_1", f"{requested_name}_2"):
+                    if lattice_name in lookup:
+                        quad_part_positions.append(lookup[lattice_name])
+                if quad_part_positions:
+                    positions.append(min(quad_part_positions))
+                else:
+                    positions.append(np.nan)
         except Exception:
             positions = [np.nan] * len(names)
+
         return positions
 
     def _get_session_for_selected_quad(self, session):
@@ -1074,11 +1086,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.screen_on_plot.setEnabled(not self.show_scan_on_all_screens.isChecked())
 
     def _filter_quadrupoles_in_gui(self):
-        if not hasattr(self, "quadrupoles_list") or self.quadrupoles_list is None:
-            return
-        if not hasattr(self, "screens_list") or self.screens_list is None:
-            return
-
         previously_selected = []
         for i in range(self.quadrupoles_list.count()):
             item = self.quadrupoles_list.item(i)
