@@ -1,16 +1,8 @@
 try:
-    from PyQt6.QtWidgets import (
-        QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel,QMessageBox,QPushButton,
-        QButtonGroup
-        )
+    from PyQt6.QtWidgets import QDialog, QVBoxLayout, QDialogButtonBox, QRadioButton, QLabel,QMessageBox,QPushButton, QButtonGroup
     from PyQt6.QtCore import QEvent, Qt
 except ImportError:
-    from PyQt5.QtWidgets import (
-        QDialog, QVBoxLayout, QDialogButtonBox,
-        QRadioButton, QLabel,QMessageBox, QPushButton,
-        QButtonGroup
-        )
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QDialogButtonBox, QRadioButton, QLabel,QMessageBox, QPushButton, QButtonGroup
     from PyQt5.QtCore import QEvent, Qt
 
 import importlib
@@ -32,7 +24,6 @@ def get_available_interface_setup():
             class_name = entry.get("class_name", "")
             if not module_name:
                 continue
-
             try:
                 module_spec = importlib.util.find_spec(module_name)
             except (ModuleNotFoundError, ValueError, ImportError):
@@ -112,11 +103,9 @@ class SelectAcc(QDialog):
             if ok_button.isEnabled():
                 ok_button.click()
                 return
-
         if key in down_keys:
             self._move_selection(1)
             return
-
         if key in up_keys:
             self._move_selection(-1)
             return

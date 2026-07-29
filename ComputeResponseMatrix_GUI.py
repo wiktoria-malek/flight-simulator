@@ -13,6 +13,8 @@ try:
     from PyQt6.QtGui import QPixmap
     pyqt_version = 6
 
+
+
 except ImportError:
     from PyQt5 import uic
     from PyQt5.QtWidgets import (

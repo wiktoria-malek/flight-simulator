@@ -2,16 +2,12 @@ from datetime import datetime
 import numpy as np
 import pickle
 
-OUTLIER_FACTOR = 10.0
-
-def reject_large_outliers(values, factor=OUTLIER_FACTOR):
+def reject_large_outliers(values, factor=10.0):
     arr = np.asarray(values, dtype=float).copy()
     if arr.ndim != 2 or arr.size == 0:
         return arr
-
     med_abs = np.nanmedian(np.abs(arr), axis=0)
     threshold = factor * med_abs
-
     for j, thr in enumerate(threshold):
         if not np.isfinite(thr) or thr <= 0:
             continue

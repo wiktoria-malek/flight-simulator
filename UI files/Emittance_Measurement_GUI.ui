@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1530</width>
-    <height>1099</height>
+    <height>922</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -56,7 +56,7 @@ QGroupBox#devicesGroup::title {
          </property>
          <layout class="QVBoxLayout" name="devicesVBox">
           <item>
-           <widget class="QPushButton" name="show_beamline">
+           <widget class="QPushButton" name="show_beamline_button">
             <property name="maximumSize">
              <size>
               <width>200</width>

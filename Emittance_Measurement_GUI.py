@@ -26,6 +26,7 @@ from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEn
 from Backend.EM_helpers.QuadrupoleScan import QuadrupoleScan
 from Backend.LogConsole import LogConsole
 from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
+from Backend.EM_helpers.ShowBeamline import ShowBeamline
 from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 class ComputationMode(Enum):
     LRM = "Linear R-response model"
@@ -212,6 +213,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.log_console=None
         self.phase_spaces = None
         self.screen_images = None
+        self.beamline_view = None
         self.log_console_button.clicked.connect(self._show_console_log)
         self.phase_spaces_button.clicked.connect(self._show_phase_spaces)
         self.display_screen_images_button.clicked.connect(self._show_screen_images)
@@ -230,10 +232,16 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.background_shots.setValue(bg_shots)
         self.interface.bg_shots = int(self.background_shots.value())
         self.background_shots.valueChanged.connect(self._on_bg_shots_changed)
-        self.show_beamline.clicked.connect(self._show_beamline)
+        self.show_beamline_button.clicked.connect(self._show_beamline)
 
     def _show_beamline(self):
-        pass
+        if self.beamline_view is None:
+            self.beamline_view = ShowBeamline(interface = self.interface, parent = self)
+        selected_quadrupole, screens = self._get_selection()
+        self.beamline_view._display_beamline_view(quad_selected = selected_quadrupole, screens = screens)
+        self.beamline_view.show()
+        self.beamline_view.raise_()
+        self.beamline_view.activateWindow()
 
     def _on_bg_shots_changed(self, value):
         self.interface.bg_shots = max(0, int(value))

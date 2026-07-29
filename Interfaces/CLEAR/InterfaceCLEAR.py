@@ -1,7 +1,12 @@
 from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral
 import sys, time, math, os, json
 import numpy as np
-import pyda, pyda_japc
+try:
+    import pyda
+    import pyda_japc
+except ImportError:
+    pyda = None
+    pyda_japc = None
 from scipy.integrate import trapezoid
 from enum import Enum
 try:
@@ -17,7 +22,7 @@ except ImportError:
     except Exception:
         clear_lattice = None
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
-
+# import the charge plot
 class BPMsMode(Enum):
     """
     Acquire and process the horizontal (H) and vertical (V) BPM signals.
@@ -108,11 +113,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         # Bpms and correctors in beamline order
         sequence = [
-            'CA.DHG0130', 'CA.DVG0130', 'CA.BPC0220',
-            'CA.DHG0225', 'CA.DVG0225', 'CA.BPC0240',
-            'CA.DHG0245', 'CA.DVG0245', 'CA.BPC0260',
-            'CA.DHG0265', 'CA.BPC0310',
-            'CA.DHG0320', 'CA.DVG0320', 'CA.SDV0340',
+            'CA.DHG0130', 'CA.DVG0130', #'CA.BPC0220',
+            'CA.DHG0225', 'CA.DVG0225', #'CA.BPC0240',
+            'CA.DHG0245', 'CA.DVG0245', #'CA.BPC0260',
+            'CA.DHG0265', #'CA.BPC0310',
+            'CA.DHG0320', 'CA.DVG0320', #'CA.SDV0340',
             'CA.QFD0350', 'CA.QDD0355', 'CA.QFD0360',
             'CA.DHG0385', 'CA.DVG0385',
             'CA.BTV0390L', 'CA.BTV0390H',
@@ -127,8 +132,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
         ]
 
         monitors = [
-                     'CA.BPC0220', 'CA.BPC0240', 'CA.BPC0260',
-                     'CA.BPC0310', 'CA.BPM0530', 'CA.BPM0595',
+                     # 'CA.BPC0220', 'CA.BPC0240', 'CA.BPC0260',
+                     # 'CA.BPC0310',
+                    'CA.BPM0530', 'CA.BPM0595',
                      'CA.BPM0690', 'CA.BPM0820', 'CA.BPM0890',
         ]
 
@@ -136,23 +142,23 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.DHG0130', 'CA.DVG0130',
             'CA.DHG0225', 'CA.DVG0225',
             'CA.DHG0245', 'CA.DVG0245',
-            'CA.DHG0265',
+            'CA.DHG0265', 'CA.DVG0265',
             'CA.DHG0320', 'CA.DVG0320',
-            'CA.SDV0340',
             'CA.DHG0385', 'CA.DVG0385',
             'CA.DHJ0540', 'CA.DVJ0540',
             'CA.DHJ0590', 'CA.DVJ0590',
             'CA.DHJ0710', 'CA.DVJ0710',
             'CA.DHJ0780', 'CA.DVJ0780',
             'CA.DHJ0840', 'CA.DVJ0840',
+            # 'CA.SDV0340',
         ]
 
         self.screen_status_params = {
             "CA.BTV0390L": "CA.BTV0390_CAS.BTV0420/OPSettingSystem1#positionChannel1",
             "CA.BTV0390H": "CA.BTV0390_CAS.BTV0420/OPSettingSystem1#positionChannel1",
-            "CA.BTV0620":  "CAS.BTV0440_CA.BTV0620/OPSettingSystem2#positionChannel2",
+            "CA.BTV0620":  "CAS.BTV0440_CA.BTV0620/OPSettingSystem2#positionChannel5",
             "CA.BTV0730":  "CA.BTV0730_CA.BTV0800/OPSettingSystem1#positionChannel1",
-            "CA.BTV0810":  "CA.BTV0805_CA.BTV0810/OPSettingSystem2#positionChannel2",
+            "CA.BTV0810":  "CA.BTV0805_CA.BTV0810/OPSettingSystem2#positionChannel5",
             "CA.BTV0910":  "CA.BTV0910_CAS.BTV0930/OPSettingSystem1#positionChannel1",
         }
 
@@ -294,7 +300,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] #changes value globally
         self.log(f"Value before changing energy: {self.energy_readback}")
         new_energy = 0.9 * self.energy_readback # as a test!
-        #new_energy = 119.19999
         self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
         self.log(f"Value after changing energy: {new_energy}")
         time.sleep(10) # write a loop, dont guess time sleep

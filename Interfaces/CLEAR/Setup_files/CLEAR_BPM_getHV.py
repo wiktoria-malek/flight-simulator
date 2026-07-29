@@ -3,9 +3,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from pyjapc import PyJapc
 from scipy.integrate import trapezoid
-
 
 # Subtract baseline from signal
 def baseline_correct(samples, n_baseline=100):
@@ -89,10 +87,6 @@ def plot_integral(signals, integrals, labels, BPM, starts=None,ends=None,):
     plt.tight_layout()
     plt.show()
 
-
-
-
-japc = PyJapc(incaAcceleratorName='CTF', selector="SCT.USER.SETUP")
 DEFAULT_WINDOW = (260, 360)
 
 def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW,):
@@ -127,15 +121,14 @@ def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW,):
     H, V
         Processed H and V values.
     """
+    from pyjapc import PyJapc
+    japc = PyJapc(incaAcceleratorName='CTF', selector="SCT.USER.SETUP")
 
-    # H_data = self.client.get(f"{BPM}H-SA/SamplesFromTrigger", context=self.context_acquisition)
-    # V_data = self.client.get(f"{BPM}V-SA/SamplesFromTrigger", context=self.context_acquisition)
     H_data = japc.getParam(f"CA.{BPM}H-SA/SamplesFromTrigger")
     V_data = japc.getParam(f"CA.{BPM}V-SA/SamplesFromTrigger")
     H_samples = H_data["samples"]
     V_samples = V_data["samples"]
-    # H_samples = H_data.data
-    # V_samples = V_data.data
+
     H_b_samples = baseline_correct(H_samples)
     V_b_samples = baseline_correct(V_samples)
 

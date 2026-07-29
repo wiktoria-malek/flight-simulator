@@ -16,9 +16,6 @@ client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
 
-
-
-
 """Test of one corrector and method get_correctors"""
 
 print("Testing corrector CA.DVG0130, reading its values directly from japc/pyda... ")

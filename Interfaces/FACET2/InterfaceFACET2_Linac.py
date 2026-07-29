@@ -1,16 +1,19 @@
 import sys
 import numpy as np
 import time, math
-from epics import get_pv
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 # must run on SLAC controls network
 sys.path.append('/usr/local/facet/tools/python/F2_live_model/')
 sys.path.append('/usr/local/facet/tools/python/F2_pytools/')
 # sys.path.append('/home/fphysics/zack/workspace/F2_pytools/')
-from bmad import BmadLiveModel
-from F2_pytools.controls_jurisdiction import is_SLC
-from F2_pytools.f2bsaBuffer import make_bpm_buffer, get_bpmdata2
-from F2_pytools.mags import set_magnets
+try:
+    from bmad import BmadLiveModel
+    from epics import get_pv
+    from F2_pytools.controls_jurisdiction import is_SLC
+    from F2_pytools.f2bsaBuffer import make_bpm_buffer, get_bpmdata2
+    from F2_pytools.mags import set_magnets
+except ImportError:
+    bmad, epics, F2_pytools  = None, None, None
 from traceback import print_exception
 
 '''
