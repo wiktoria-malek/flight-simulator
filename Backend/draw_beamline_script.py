@@ -21,7 +21,7 @@ class drawBeamline(rft.UserVisitor):
             "multipole": "#FFCC99",  # pale orange, same as sextupole
             "solenoid": "#99CCCC",  # light teal
             "rf_cavity": "#CC99FF",  # lavender
-            "diagnostic": "#E66567",  # soft yellow
+            "diagnostic": "#E66567",  # soft red
         }
 
     def visit(self, e):
@@ -37,29 +37,29 @@ class drawBeamline(rft.UserVisitor):
                 self.ax.plot([s1, s0], [0, 0], color='white', linewidth=1)
 
         elif type(e) == rft.Quadrupole:
-            a, b = (0, 1) if e.get_gradient() > 0 else (-1, 0)
+            a, b = (0, 0.75) if e.get_gradient() > 0 else (-0.75, 0)
             rect = patches.Rectangle((s0, a), s1 - s0, b - a, facecolor=cm['quadrupole'])
             self.ax.add_patch(rect)
 
         elif type(e) == rft.Solenoid:
-            a, b = (-1, 1)
+            a, b = (-0.75, 0.75)
             rect = patches.Rectangle((s0, a), s1 - s0, b - a, facecolor=cm['solenoid'])
             self.ax.add_patch(rect)
 
         elif type(e) == rft.Multipole:
-            a, b = (-1, 1)
+            a, b = (-0.25, 0.25)
             rect = patches.Rectangle((s0, a), s1 - s0, b - a, facecolor=cm['multipole'])
             self.ax.add_patch(rect)
             #pass
 
         elif type(e) == rft.Sextupole:
-            a, b = (-1, 1)
+            a, b = (-0.75, 0.75)
             rect = patches.Rectangle((s0, a), s1 - s0, b - a, facecolor=cm['sextupole'])
             self.ax.add_patch(rect)
 
         elif type(e) in [rft.RF_FieldMap, rft.RF_FieldMap_1d, rft.RF_FieldMap_1d_CINT,
                          rft.RF_FieldMap_2d, rft.RF_FieldMap_2d_CINT]:
-            a, b = (-1, 1)
+            a, b = (-0.75, 0.75)
             rect = patches.Rectangle((s0, a), s1 - s0, b - a, facecolor=cm['rf_cavity'])
             self.ax.add_patch(rect)
 
@@ -76,7 +76,7 @@ class drawBeamline(rft.UserVisitor):
 
         elif type(e) in [rft.Bpm, rft.Screen]:
             x = 0.5 * (s0 + s1)
-            self.ax.scatter([x], [0], marker="v", s=80, color=cm["diagnostic"], zorder=5)
+            self.ax.scatter([x], [0], marker="v", s=250, color=cm["diagnostic"], zorder=5)
 
         elif type(e) == rft.Lattice and self.latticeframe:
             a, b = -1.1, 1.1
@@ -90,7 +90,22 @@ class drawBeamline(rft.UserVisitor):
                                      facecolor='None', clip_on=False)
             self.ax.add_patch(rect)
 
-        if not isinstance(e, (rft.Drift, rft.Multipole)):
-            x = 0.5 * (e.get_S("entrance") + e.get_S("exit"))
-
-            self.ax.text(x, 1.15, e.get_name(), rotation=90, ha="center", va="bottom", fontsize=6, clip_on=False)
+        if not isinstance(e, (rft.Drift)):
+            x = 0.5 * (s0 + s1)
+            if type(e) == rft.Quadrupole:
+                if e.get_gradient() > 0:
+                    y = 0.85
+                    va = "bottom"
+                else:
+                    y = -0.85
+                    va = "top"
+            elif type(e) in [rft.Bpm, rft.Screen]:
+                y = 0.1
+                va = "bottom"
+            elif type(e)  == rft.Multipole:
+                y = 0.35
+                va = "bottom"
+            else:
+                y = 0.1
+                va = "bottom"
+            self.ax.text(x, y, e.get_name(), rotation=90, ha="center", va=va, fontsize=9, clip_on=True)

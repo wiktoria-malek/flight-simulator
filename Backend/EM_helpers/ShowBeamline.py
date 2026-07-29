@@ -39,11 +39,9 @@ class ShowBeamline(QDialog):
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.addWidget(QLabel("Start element:", self))
         self.start_element_combobox = QComboBox(self)
-        self.start_element_combobox.currentIndexChanged.connect(self.update_beamline_view)
         header_layout.addWidget(self.start_element_combobox)
         header_layout.addWidget(QLabel("Last element:", self))
         self.last_element_combobox = QComboBox(self)
-        self.last_element_combobox.currentIndexChanged.connect(self.update_beamline_view)
         header_layout.addWidget(self.last_element_combobox)
         header_layout.addStretch(1)
         self.last_screen = self.screens[-1]
@@ -69,18 +67,24 @@ class ShowBeamline(QDialog):
         layout.setSpacing(6)
         layout.addWidget(header, 0)
         layout.addWidget(plot_widget, 1)
+        self.start_element_combobox.currentTextChanged.connect(self._display_beamline_view)
+        self.last_element_combobox.currentTextChanged.connect(self._display_beamline_view)
+
 
     def _display_beamline_view(self):
+
         start_element = self.start_element_combobox.currentText()
         last_element = self.last_element_combobox.currentText()
         self.figure.clear()
         ax = self.figure.subplots(1, 1)
         drawer = drawBeamline(ax)
-        ax.set_xlim(self.first_element_position, self.last_element_position)
+        start_s = float(self.interface._get_elements_positions(names=start_element)["S"][0])
+        end_s = float(self.interface._get_elements_positions(names=last_element)["S"][0])
+        ax.set_xlim(start_s, end_s)
         self.lattice.accept(drawer)
+        ax_bottom = ax.secondary_xaxis("bottom")
+        ax_bottom.set_xlabel("S [m]")
+        ax_bottom.set_xticks(np.linspace(start_s, end_s, 6))
+        ax_bottom.tick_params(axis="x", labelsize=9)
         self.canvas.draw()
-
-    def update_beamline_view(self, quad_selected=None, screens = None):
-        pass
-
 
