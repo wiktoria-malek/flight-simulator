@@ -502,42 +502,170 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return sigx, sigy
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker=None, reference_screen=None):
+    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
         screens = list(screens)
         K1_values = np.asarray(K1_values, dtype=float)
+        screens = list(screens)
         if len(screens) == 0:
             raise RuntimeError("No screens provided for emittance scan prediction.")
+        if reference_screen is None:
+            reference_screen = screens[0]
+        if reference_screen not in screens:
+            raise RuntimeError("reference_screen must be one of the selected screens.")
+
+        start_element_name = str(quad_name)
+        end_element_name = str(screens[-1])
+
         if quad_name not in self.quadrupoles:
             raise ValueError(f"Quadrupole {quad_name} not found in quadrupoles")
-        missing_screens = [screen for screen in screens if screen not in self.screens]
-        if missing_screens:
-            raise ValueError(f"Screens not found: {missing_screens}")
-        original_quad = self.get_quadrupoles(names=[quad_name])
-        if len(original_quad["bdes"]) == 0:
+        if len(screens) == 0:
+            raise ValueError("No screens")
+
+        original_quads = self.get_quadrupoles(names=[quad_name])
+        if len(original_quads["bdes"]) == 0:
             raise RuntimeError(f"Could not find original strength for quad {quad_name}")
+        K1_original = float(original_quads["bdes"][0])
 
-        K_original = float(original_quad["bdes"][0])
         B0_original = self.B0
-
-        output_x = np.full((len(K1_values), len(screens)), np.nan, dtype=float)
-        output_y = np.full((len(K1_values), len(screens)), np.nan, dtype=float)
+        output_x = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
+        output_y = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
 
         try:
-            for k, K1 in enumerate(K1_values):
+            for k,K1 in enumerate(K1_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
+                self.set_quadrupoles([quad_name], [float(K1)], track = False)
+                start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
+                start_element = start_elements[0]
+                if isinstance(start_element, list):
+                    start_element = start_element[0]
 
-                self.set_quadrupoles([quad_name], [float(K1)], track=False)
-                self.B0 = self._build_bunch_from_guesses(emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0)
-                self.__track_bunch()
-                output_x[k, :], output_y[k, :] = self._read_tracked_bunch_screen_sigmas(screens)
+                end_element = self.lattice[end_element_name]
+                if isinstance(end_element, list):
+                    end_element = end_element[-1]
+
+                temp_bunch = self._build_bunch_from_guesses(
+                    emit_x=float(emit_x), emit_y=float(emit_y),
+                    beta_x0=float(beta_x0), beta_y0=float(beta_y0),
+                    alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
+                )
+
+                lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+                tracked_to_last_screen = lattice_view.track(temp_bunch)
+
+                for si, screen_name in enumerate(screens):
+                    screen_elem = self.lattice[screen_name]
+                    if isinstance(screen_elem, list):
+                        screen_elem = screen_elem[-1]
+                    bunch_at_screen = None
+                    try:
+                        bunch_at_screen = screen_elem.get_bunch()
+                    except Exception:
+                        bunch_at_screen = None
+                    if bunch_at_screen is None and str(screen_name) == end_element_name:
+                        bunch_at_screen = tracked_to_last_screen
+                    if bunch_at_screen is None:
+                        continue
+                    m = bunch_at_screen.get_phase_space('%x %y')
+                    if m is not None and len(m) > 0:
+                        output_x[k, si] = float(np.std(m[:, 0]))
+                        output_y[k, si] = float(np.std(m[:, 1]))
 
         finally:
+            self.set_quadrupoles([quad_name], [float(K1_original)], track=False)
             self.B0 = B0_original
-            self.set_quadrupoles([quad_name], [K_original], track=False)
             self.__track_bunch()
 
         return output_x, output_y
+
+    def get_phase_space_transport_to_screens(self, reference_screen=None, screens=None):
+        if screens is None:
+            screens = list(self.screens)
+        if isinstance(screens, str):
+            screens = [screens]
+        screens = list(screens)
+
+        if reference_screen is None:
+            reference_screen = screens[0]
+
+        original_bunch = self.B0
+
+        result = {
+            "reference_screen": str(reference_screen),
+            "screens": [str(s) for s in screens],
+            "x": {"R11": [], "R12": [], "R21": [], "R22": []},
+            "y": {"R33": [], "R34": [], "R43": [], "R44": []},
+        }
+
+        try:
+            start_element = self.lattice[reference_screen]
+            if isinstance(start_element, list):
+                start_element = start_element[-1]
+
+            end_element = self.lattice[screens[-1]]
+            if isinstance(end_element, list):
+                end_element = end_element[-1]
+
+            bx = np.array([
+                [1.0, 0.0, 0.0, 0.0, 0.0, self.Pref],
+                [0.0, 1.0, 0.0, 0.0, 0.0, self.Pref],
+            ], dtype=float)
+
+            bunch_x = rft.Bunch6d(rft.electronmass, 0.0, self.Q, bx)
+            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+            tracked_x = lattice_view.track(bunch_x)
+
+            for screen in screens:
+                screen_element = self.lattice[screen]
+                if isinstance(screen_element, list):
+                    screen_element = screen_element[-1]
+
+                b = screen_element.get_bunch()
+                if b is None and str(screen) == str(screens[-1]):
+                    b = tracked_x
+
+                ps = np.asarray(b.get_phase_space("%x %xp"), dtype=float)
+
+                result["x"]["R11"].append(float(ps[0, 0]))
+                result["x"]["R12"].append(float(ps[1, 0]))
+                result["x"]["R21"].append(float(ps[0, 1]))
+                result["x"]["R22"].append(float(ps[1, 1]))
+
+            by = np.array([
+                [0.0, 0.0, 1.0, 0.0, 0.0, self.Pref],
+                [0.0, 0.0, 0.0, 1.0, 0.0, self.Pref],
+            ], dtype=float)
+
+            bunch_y = rft.Bunch6d(rft.electronmass, 0.0, self.Q, by)
+            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+            tracked_y = lattice_view.track(bunch_y)
+
+            for screen in screens:
+                screen_element = self.lattice[screen]
+                if isinstance(screen_element, list):
+                    screen_element = screen_element[-1]
+
+                b = screen_element.get_bunch()
+                if b is None and str(screen) == str(screens[-1]):
+                    b = tracked_y
+
+                ps = np.asarray(b.get_phase_space("%y %yp"), dtype=float)
+
+                # [
+                #     [x_of_particle_0, xp_of_particle_0],
+                #     [x_of_particle_1, xp_of_particle_1],
+                # ]
+
+                result["y"]["R33"].append(float(ps[0, 0]))
+                result["y"]["R34"].append(float(ps[1, 0]))
+                result["y"]["R43"].append(float(ps[0, 1]))
+                result["y"]["R44"].append(float(ps[1, 1]))
+
+        finally:
+            self.B0 = original_bunch
+            self.__track_bunch()
+
+        return result
 
     def get_quadrupoles(self, names=None):
         #self.log("Reading quadrupoles' strengths...")
