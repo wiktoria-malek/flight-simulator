@@ -706,7 +706,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             names = [names]
         selected_names = self.screen_names if names is None else [name for name in self.screen_names if name in names]
         s_positions = self._get_twiss_s_positions(selected_names)
-
         hpixel_list = []
         vpixel_list = []
         xb_list = []
@@ -736,6 +735,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
                     self.acquire_screen_background(screen_name, frames = 10)
                 subtracted_img, bg_img, beam_img = self.acquire_screen_image(screen_name)
                 x_mean, y_mean, sigx, sigy, total, img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel)
+
             except Exception as e:
                 self.log(f"Couldn't acquire screen image for {screen_name}, because: {e}")
                 x_mean = np.nan
@@ -764,7 +764,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             vedges_all.append(np.asarray(vedges, dtype=float))
             inout_list.append(status)
 
-        return {
+        screens = {
             "names": list(selected_names),
             "hpixel": np.asarray(hpixel_list, dtype=float), # mm
             "vpixel": np.asarray(vpixel_list, dtype=float), # mm
@@ -781,6 +781,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "S": np.asarray(s_positions, dtype=float),
             "inout": np.asarray(inout_list, dtype=float),
         }
+
+        return screens
 
     def get_target_dispersion(self, names=None):
         if names is None:

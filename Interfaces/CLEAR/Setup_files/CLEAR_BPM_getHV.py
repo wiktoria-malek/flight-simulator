@@ -1,6 +1,15 @@
 # Initailly made for Wiktoria and Andrea to be able to test their flight simulator at CLEAR
 # Sara S. July 2026
 
+
+
+
+# one BPM is inverted!!!!!!
+
+
+
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import trapezoid

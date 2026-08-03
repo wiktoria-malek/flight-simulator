@@ -67,6 +67,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         return 'ATF2_Ext'
 
     def __init__(self, bg_shots=10.0, nsamples=10, nominal_intensity=0.15, wfs_intensity=0.1):
+        self.screen_backgrounds = {}
         self.nsamples = nsamples
         self.bpm_sample_interval_s = 0.5
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
@@ -581,21 +582,13 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             v_factor = 1.0
         return h_factor, v_factor
 
-
-
-    def acquire_otr_image(self, screen_pv_name, min_total_intensity=135000, max_retries=3):
+    def acquire_screen_image(self, screen_name, min_total_intensity=135000, max_retries=3):
         """
-        It might be super slow.
-        1 call of get_screens() will take 8s x number_of_screens
-        So, for 4 screens it's 32 seconds.
-        EM GUI calls get_screens() multiple times, every K1 change.
-
         Acquires an OTR image with background subtraction.
         Takes the background once, then loops the beam acquisition if the
         total integrated intensity is below min_total_intensity.
         """
-
-        print(f"Acquiring Background and Beam for {screen_pv_name}...")
+        screen_pv_name = self.screen_pv_names.get(screen_name)
         pv_in_name = f'{screen_pv_name}:Target:WRITE:IN'
         pv_out_name = f'{screen_pv_name}:Target:WRITE:OUT'
         pv_img_data_name = f'{screen_pv_name}:IMAGE:ArrayData'
@@ -604,30 +597,11 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         otr_out_pv = PV(pv_out_name)
         image_data_pv = PV(pv_img_data_name)
         image_acquire_pv = PV(pv_acquire_name)
-        bg_frames = []
-
-        if self.bg_shots == 0:
-            self.log(" -> Retracting screen to ensure clean insert...")
-            otr_out_pv.put(1)
-            time.sleep(5)
-            bg_img = np.zeros((960, 1280), dtype = float)
-        else:
-            self.log(" -> Retracting screen for background...")
-            otr_out_pv.put(1)
-            time.sleep(5)
-            for i in range(self.bg_shots):
-                image_acquire_pv.put(1)
-                time.sleep(1)
-                bg_data = image_data_pv.get()
-                image_acquire_pv.put(0)
-                bg_frames.append(bg_data.reshape(960, 1280).astype(np.float64))
-            bg_img = np.median(bg_frames, axis=0)
-
-        print(" -> Inserting screen for beam...")
-        otr_in_pv.put(1)
+        bg_img = self.screen_backgrounds[screen_name]
+        print(f"Inserting screen {screen_name} for beam...")
+        self.insert_screen(screen_name)
         time.sleep(5)
-
-        subtracted_img = None
+        beam_frames = []
         for attempt in range(1, max_retries + 1):
             beam_frames = []
             for i in range(5):
@@ -652,85 +626,97 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         otr_out_pv.put(1)
         return subtracted_img, bg_img, beam_img
 
-    def _screen_data_from_image(self, image,hpixel,vpixel,screen_pv_name):
-        if image is None:
-            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1,1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
-        img = np.asarray(image, dtype=float)
+    def _screen_data_from_image(self, image, hpixel, vpixel): # better be subtracted!
+        if image is None or np.asarray(image, dtype=float).ndim!=2 or np.asarray(image, dtype=float).size==0:
+            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
+
+        # I_xi_yi, I = I_beam - I_background
+        img = np.asarray(image, dtype=float).copy()
         img[~np.isfinite(img)] = 0.0
-        total = float(np.sum(img)) # intensity
-        ny ,nx  = img.shape # rows, columns
-        if total <= 0.0 or nx == 0 or ny == 0:
-            hedges = np.arange(nx + 1, dtype = float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1)
-            vedges = np.arange(ny + 1, dtype = float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1)
-
+        img[img < 0] = 0.0
+        ny, nx = img.shape # e.g. ny = no. of rows, nx = no. of columns
+        j = np.arange(nx)
+        i = np.arange(ny)
+        summed_intensity = np.sum(img)
+        if summed_intensity <= 0:
+            hedges = (np.arange(nx + 1) - nx / 2) * hpixel
+            vedges = (np.arange(ny + 1) - ny / 2) * vpixel
             return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
+        proj_x = np.sum(img, axis=0)
+        proj_y = np.sum(img, axis=1)
 
-        if not np.isfinite(hpixel) or hpixel <= 0:
-            hpixel = 1e-3
-        if not np.isfinite(vpixel) or vpixel <= 0:
-            vpixel = 1e-3
+        # center of each pixel can be expressed as: x_j = (j - (N_x - 1)/2)*hpixel, y_i = (i - (N_i - 1)/2)vhpixel
 
-        x_centers = (np.arange(nx, dtype = float) - 0.5 * (nx -1)) * hpixel # middle of the pixel
-        y_centers = (np.arange(ny, dtype = float) - 0.5 * (ny -1) ) * vpixel
-        proj_x = np.sum(img, axis = 0)
-        proj_y = np.sum(img, axis = 1)
-        x_mean = float(np.sum(x_centers * proj_x) / total)
-        y_mean = float(np.sum(y_centers * proj_y) / total)
+        '''
+        x_centers and y_centers are arrays containing the physical coordinates of the centre of each pixel. 
+        They allow to convert the image from pixel intensities into beam position and beam size.
+        '''
+        x_pixels_positions = (j - (nx - 1) / 2) * hpixel # coordinates of centre of each pixel
+        y_pixels_positions = (i - (ny - 1) / 2) * vpixel
+        x_mean_positions = np.sum((x_pixels_positions * proj_x) / summed_intensity)
+        y_mean_positions = np.sum((y_pixels_positions * proj_y) / summed_intensity)
 
-        # mOTR:analyzer:dispersion:selectedmotr
-        # hack to avoid background subtraction
-        command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
-        result = subprocess.run(command,shell=True)
-        time.sleep(1)
-        result = subprocess.run(command,shell=True)
-        time.sleep(1)
-        result = subprocess.run(command,shell=True)
-        time.sleep(10)
-        sigx_pv = f"mOTR:analyzer:size:H"
-        sigy_pv = f"mOTR:analyzer:size:V"
-        sigx_pv_value = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
-        sigy_pv_value = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+        sigx = np.sqrt(np.sum((x_pixels_positions - x_mean_positions)**2 * proj_x) / summed_intensity)
+        sigy = np.sqrt(np.sum((y_pixels_positions - y_mean_positions)**2 * proj_y) / summed_intensity)
 
-        sigx_from_image = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0))) # mm
-        sigy_from_image = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0))) # mm
+        hedges = (np.arange(nx+1) - nx / 2) * hpixel
+        vedges = (np.arange(ny+1) - ny / 2) * vpixel
+
+
         '''
         Logic commented is for reading sigx and sigy from precomputed PVs, not from image analysis.
+        
+        # # mOTR:analyzer:dispersion:selectedmotr
+        # # hack to avoid background subtraction
+        # command = f"caput mOTR:analyzer:dispersion:selectedmotr {screen_pv_name[-1]}"
+        # result = subprocess.run(command,shell=True)
+        # time.sleep(1)
+        # result = subprocess.run(command,shell=True)
+        # time.sleep(1)
+        # result = subprocess.run(command,shell=True)
+        # time.sleep(10)
+        # sigx_pv = f"mOTR:analyzer:size:H"
+        # sigy_pv = f"mOTR:analyzer:size:V"
+        # sigx_pv_value = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+        # sigy_pv_value = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+        # 
+        # sigx_from_image = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0))) # mm
+        # sigy_from_image = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0))) # mm
+
+        # # sigx_prev = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+        # # sigy_prev = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+        # # max_retries = 5
+        # # for attempt in range(max_retries):
+        # #     time.sleep(5)
+        # #     sigx_new = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
+        # #     sigy_new = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
+        # #     if not np.isfinite(sigx_prev) or not np.isfinite(sigy_prev):
+        # #         sigx_prev, sigy_prev = sigx_new, sigy_new
+        # #         continue
+        # #     if sigx_prev <= 0 or sigy_prev <= 0 or sigx_new <= 0 or sigy_new <= 0:
+        # #         sigx_prev, sigy_prev = sigx_new, sigy_new
+        # #         continue
+        # #     change_x = max(sigx_new / sigx_prev, sigx_prev / sigx_new)
+        # #     change_y = max(sigy_new / sigy_prev, sigy_prev / sigy_new)
+        # #     if change_x <= 8 and change_y <= 8:
+        # #         sigx = sigx_new / 1000.0
+        # #         sigy = sigy_new / 1000.0
+        # #         break
+        # #     print("Screen size changed too much between measurements of sigx and sigy. Remeasuring...")
+        # #     sigx_prev, sigy_prev = sigx_new, sigy_new
+        # # else:
+        # #     sigx = sigx_prev / 1000.0 if np.isfinite(sigx_prev) else sigx
+        # #     sigy = sigy_prev / 1000.0 if np.isfinite(sigy_prev) else sigy
+        # 
+        # print("sigx from precomputed PV: ", sigx_pv_value)
+        # print("sigy from precomputed PV: ", sigy_pv_value)
+        # print("sigx from image analysis: ", sigx_from_image)
+        # print("sigy from image analysis: ", sigy_from_image)
+        # # np.average(h[1:], weights=np.sum(i,axis=0)) # andrea's suggestion
+        # # mOTR:analyzer:size
         '''
-        # sigx_prev = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
-        # sigy_prev = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
-        # max_retries = 5
-        # for attempt in range(max_retries):
-        #     time.sleep(5)
-        #     sigx_new = self.make_safe_float(PV(sigx_pv).get(), default=np.nan)
-        #     sigy_new = self.make_safe_float(PV(sigy_pv).get(), default=np.nan)
-        #     if not np.isfinite(sigx_prev) or not np.isfinite(sigy_prev):
-        #         sigx_prev, sigy_prev = sigx_new, sigy_new
-        #         continue
-        #     if sigx_prev <= 0 or sigy_prev <= 0 or sigx_new <= 0 or sigy_new <= 0:
-        #         sigx_prev, sigy_prev = sigx_new, sigy_new
-        #         continue
-        #     change_x = max(sigx_new / sigx_prev, sigx_prev / sigx_new)
-        #     change_y = max(sigy_new / sigy_prev, sigy_prev / sigy_new)
-        #     if change_x <= 8 and change_y <= 8:
-        #         sigx = sigx_new / 1000.0
-        #         sigy = sigy_new / 1000.0
-        #         break
-        #     print("Screen size changed too much between measurements of sigx and sigy. Remeasuring...")
-        #     sigx_prev, sigy_prev = sigx_new, sigy_new
-        # else:
-        #     sigx = sigx_prev / 1000.0 if np.isfinite(sigx_prev) else sigx
-        #     sigy = sigy_prev / 1000.0 if np.isfinite(sigy_prev) else sigy
+        return x_mean_positions, y_mean_positions, sigx, sigy, summed_intensity, img, hedges, vedges
 
-        print("sigx from precomputed PV: ", sigx_pv_value)
-        print("sigy from precomputed PV: ", sigy_pv_value)
-        print("sigx from image analysis: ", sigx_from_image)
-        print("sigy from image analysis: ", sigy_from_image)
-        # np.average(h[1:], weights=np.sum(i,axis=0)) # andrea's suggestion
-        # mOTR:analyzer:size
-        hedges = (np.arange(nx + 1, dtype = float) - 0.5 * nx) * hpixel
-        vedges = (np.arange(ny + 1, dtype = float) - 0.5 * ny) * vpixel
-
-        return x_mean, y_mean, sigx_from_image, sigy_from_image, total, img, hedges, vedges
 
     def get_screens(self, names=None):
         print('Reading screens...')
@@ -754,30 +740,32 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         for screen_name in selected_names:
             screen_pv_name = self.screen_pv_names.get(screen_name)
-            if screen_pv_name is None:
-                hpixel_list.append(np.nan)
-                vpixel_list.append(np.nan)
-                xb_list.append(np.nan)
-                yb_list.append(np.nan)
-                sigx_list.append(np.nan)
-                sigy_list.append(np.nan)
-                sum_list.append(0.0)
-                images.append(np.zeros((1, 1)))
-                background_images.append(np.zeros((1, 1)))
-                beam_images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0.0, 1.0]))
-                vedges_all.append(np.array([0.0, 1.0]))
-                inout_list.append(np.nan)
-                continue
-
             otr_id = screen_name.replace('OTR', '')
             hpixel_um, vpixel_um = self.get_pixel_calibrations(screen_pv_name)
             hpixel = hpixel_um / 1000.0
             vpixel = vpixel_um / 1000.0
-            status = self.make_safe_float(caget(f'{screen_pv_name}:Target:READ:INOUT'), default=np.nan)
 
-            subtracted_img, bg_img, beam_img = self.acquire_otr_image(screen_pv_name)
-            x_mean, y_mean, sigx, sigy, total, subtracted_img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel,screen_pv_name)
+            try:
+                if screen_name not in self.screen_backgrounds:
+                    self.log(f"Acquiring background image for {screen_name}.")
+                    self.acquire_screen_background(screen_name, frames=10)
+                subtracted_img, bg_img, beam_img = self.acquire_screen_image(screen_name)
+                x_mean, y_mean, sigx, sigy, total, img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel)
+
+            except Exception as e:
+                self.log(f"Couldn't acquire screen image for {screen_name}, because: {e}")
+                x_mean = np.nan
+                y_mean = np.nan
+                sigx = np.nan
+                sigy = np.nan
+                total = 0.0
+                subtracted_img = np.zeros((1, 1), dtype=float)
+                bg_img = np.zeros((1, 1), dtype=float)
+                beam_img = np.zeros((1, 1), dtype=float)
+                hedges = np.array([0.0, 1.0], dtype=float)
+                vedges = np.array([0.0, 1.0], dtype=float)
+
+            status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             xb_list.append(x_mean)
@@ -785,11 +773,11 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             sigx_list.append(sigx)
             sigy_list.append(sigy)
             sum_list.append(total)
-            images.append(subtracted_img)
-            background_images.append(bg_img)
-            beam_images.append(beam_img)
-            hedges_all.append(hedges)
-            vedges_all.append(vedges)
+            images.append(np.asarray(subtracted_img, dtype=float))
+            background_images.append(np.asarray(bg_img, dtype=float))
+            beam_images.append(np.asarray(beam_img, dtype=float))
+            hedges_all.append(np.asarray(hedges, dtype=float))
+            vedges_all.append(np.asarray(vedges, dtype=float))
             inout_list.append(status)
 
         screens = {
@@ -810,6 +798,39 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             "inout": np.asarray(inout_list, dtype=float),
         }
         return screens
+
+    def acquire_screen_background(self, screen_name, frames = 10):
+        self.extract_screen(screen_name)
+        screen_pv_name = self.screen_pv_names.get(screen_name)
+        pv_in_name = f'{screen_pv_name}:Target:WRITE:IN'
+        pv_out_name = f'{screen_pv_name}:Target:WRITE:OUT'
+        pv_img_data_name = f'{screen_pv_name}:IMAGE:ArrayData'
+        pv_acquire_name = f'{screen_pv_name}:CAMERA:Acquire'
+        otr_in_pv = PV(pv_in_name)
+        otr_out_pv = PV(pv_out_name)
+        image_data_pv = PV(pv_img_data_name)
+        image_acquire_pv = PV(pv_acquire_name)
+        background_frames = []
+        if frames == 0:
+            bg_img = np.zeros((960, 1280), dtype=float)
+        else:
+            for frame in range(frames):
+                self.log(f"Acquiring {frame}/{frames} background frames...")
+                image_acquire_pv.put(1)
+                time.sleep(1)
+                bg_data = image_data_pv.get()
+                image_acquire_pv.put(0)
+                background_frames.append(bg_data.reshape(960, 1280).astype(np.float64))
+                self.log(f"Acquired {frame}/{frames} background frames...")
+            bg_img = np.median(background_frames, axis=0)
+            if not background_frames:
+                raise RuntimeError(f"No background frames available for {screen_name}")
+            self.log(f"Acquired {frames} background frames. Calculating the median...")
+            bg_img = np.median(np.stack(background_frames, axis=0), axis=0)
+            self.log(f"Median calculated.")
+            self.screen_backgrounds[screen_name] = bg_img
+
+        return bg_img
 
     def change_energy(self, delta_freq=4):
         PV('RAMP:CONTROL_ON_SW').put(1)
