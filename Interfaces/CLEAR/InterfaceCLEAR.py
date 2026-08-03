@@ -647,6 +647,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         if current_screen_inout_status.value == 0:
             self.log(f"Inserting {screen_name}...")
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 1}) # 1, meaning INSERT the screen
+            reached_target = self._wait_for_screen_target_position(screen_name, 1)
+            if not reached_target: raise RuntimeError(f"Screen {screen_name} was not inserted within time.")
             self.log(f"Inserted {screen_name}!")
             current_screen_inout_status2 = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]
             print("Current Screen Inout Status:", current_screen_inout_status2)
@@ -667,6 +669,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         else:
             self.log(f"Extracting {screen_name}...")
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 0})  # 0, meaning EXTRACT the screen
+            reached_target = self._wait_for_screen_target_position(screen_name, 0)
+            if not reached_target: raise RuntimeError(f"Screen {screen_name} was not extracted within time.")
             self.log(f"Extracted {screen_name}!")
 
     def acquire_screen_background(self, screen_name, frames = 10):
@@ -687,6 +691,20 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.log(f"Median calculated.")
         self.screen_backgrounds[screen_name] = bg_img
         return bg_img
+
+    def _wait_for_screen_target_position(self, screen_name, target, timeout=10.0, poll_interval=0.05):
+        info = self._get_screen_movement_info(screen_name)
+        t0 = time.perf_counter()
+        while time.perf_counter() - t0 < timeout:
+            current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]  # 0 or not == 0 means screen is out, whatever else means IN
+            if current_screen_inout_status.value == 0 and target==0: return True
+            if current_screen_inout_status.value > 0 and target >0: return True
+            time.sleep(poll_interval)
+        self.log(
+            f'Warning: {screen_name} did not reach target state = {target:.6g} '
+            f'within {timeout:.2f}s. Last readback = {current_screen_inout_status.value:.6g}'
+        )
+        return False
 
     def acquire_screen_image(self, screen_name):
         self.insert_screen(screen_name)
