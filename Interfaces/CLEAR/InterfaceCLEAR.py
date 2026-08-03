@@ -817,40 +817,43 @@ class CLEAR_real_machine(AbstractMachineInterface):
             target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
-    def _screen_data_from_image(self, image, hpixel, vpixel):
-        if image is None:
+    def _screen_data_from_image(self, image, hpixel, vpixel): # better be subtracted!
+        if image is None or np.asarray(image, dtype=float).ndim!=2 or np.asarray(image, dtype=float).size==0:
             return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
 
+        # I_xi_yi, I = I_beam - I_background
         img = np.asarray(image, dtype=float).copy()
         img[~np.isfinite(img)] = 0.0
-        img = img - np.nanmin(img) # lowest values are treated as background, so subtracts lowest value from every cell
-        total = float(np.sum(img)) # intensity
-        ny, nx = img.shape
-
-        if total <= 0.0 or nx == 0 or ny == 0:
-            hedges = np.arange(nx + 1, dtype=float) * (hpixel if np.isfinite(hpixel) and hpixel > 0 else 1.0)
-            vedges = np.arange(ny + 1, dtype=float) * (vpixel if np.isfinite(vpixel) and vpixel > 0 else 1.0)
+        img[img < 0] = 0.0
+        ny, nx = img.shape # e.g. ny = no. of rows, nx = no. of columns
+        j = np.arange(nx)
+        i = np.arange(ny)
+        summed_intensity = np.sum(img)
+        if summed_intensity <= 0:
+            hedges = (np.arange(nx + 1) - nx / 2) * hpixel
+            vedges = (np.arange(ny + 1) - ny / 2) * vpixel
             return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
+        proj_x = np.sum(img, axis=0)
+        proj_y = np.sum(img, axis=1)
 
-        if not np.isfinite(hpixel) or hpixel <= 0:
-            hpixel = 1.0
-        if not np.isfinite(vpixel) or vpixel <= 0:
-            vpixel = 1.0
+        # center of each pixel can be expressed as: x_j = (j - (N_x - 1)/2)*hpixel, y_i = (i - (N_i - 1)/2)vhpixel
 
-        x_centers = (np.arange(nx, dtype=float) - 0.5 * (nx - 1)) * hpixel # subtracts centre of the image, multiplies by the pixel size and therefore its a position with resect to centre of the image
-        y_centers = (np.arange(ny, dtype=float) - 0.5 * (ny - 1)) * vpixel
+        '''
+        x_centers and y_centers are arrays containing the physical coordinates of the centre of each pixel. 
+        They allow to convert the image from pixel intensities into beam position and beam size.
+        '''
+        x_pixels_positions = (j - (nx - 1) / 2) * hpixel # coordinates of centre of each pixel
+        y_pixels_positions = (i - (ny - 1) / 2) * vpixel
+        x_mean_positions = np.sum((x_pixels_positions * proj_x) / summed_intensity)
+        y_mean_positions = np.sum((y_pixels_positions * proj_y) / summed_intensity)
 
-        proj_x = np.sum(img, axis=0) # sum of intensity in each column
-        proj_y = np.sum(img, axis=1) # sum of intensity in each row
+        sigx = np.sqrt(np.sum((x_pixels_positions - x_mean_positions)**2 * proj_x) / summed_intensity)
+        sigy = np.sqrt(np.sum((y_pixels_positions - y_mean_positions)**2 * proj_y) / summed_intensity)
 
-        x_mean = float(np.sum(x_centers * proj_x) / total) # center of intensity of the image
-        y_mean = float(np.sum(y_centers * proj_y) / total)
-        sigx = float(np.sqrt(max(np.sum(((x_centers - x_mean) ** 2) * proj_x) / total, 0.0)))
-        sigy = float(np.sqrt(max(np.sum(((y_centers - y_mean) ** 2) * proj_y) / total, 0.0)))
+        hedges = (np.arange(nx+1) - nx / 2) * hpixel
+        vedges = (np.arange(ny+1) - ny / 2) * vpixel
 
-        hedges = (np.arange(nx + 1, dtype=float) - 0.5 * nx) * hpixel
-        vedges = (np.arange(ny + 1, dtype=float) - 0.5 * ny) * vpixel
-        return x_mean, y_mean, sigx, sigy, total, img, hedges, vedges
+        return x_mean_positions, y_mean_positions, sigx, sigy, summed_intensity, img, hedges, vedges
 
     def log_messages(self, console):
         self.log = console or print
