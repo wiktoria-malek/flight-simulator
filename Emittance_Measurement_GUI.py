@@ -1107,7 +1107,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             return
 
         first_screen_position = min(finite_screen_positions)
-        last_screen_position = max(finite_screen_positions)
         all_quadrupoles = list(getattr(self.interface, "quadrupoles", []))
         quad_order, quad_order_kind = self._get_element_order_values(all_quadrupoles)
 
@@ -1116,17 +1115,12 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         quad_pos = {name: float(s) for name, s in zip(all_quadrupoles, quad_order) if np.isfinite(s)}
 
-        before_last_screen_quads = [
-            name for name in all_quadrupoles
-            if name in quad_pos and quad_pos[name] < last_screen_position
-        ]
+        valid_quadrupoles = [name for name in all_quadrupoles if name in quad_pos and quad_pos[name] < first_screen_position]
 
-        valid_previous = [q for q in getattr(self, "_last_selected_quadrupoles", []) if q in before_last_screen_quads]
-        upstream_to_first_screen_quads = [name for name in before_last_screen_quads if quad_pos[name] < first_screen_position]
+        valid_previous = [q for q in getattr(self, "_last_selected_quadrupoles", []) if q in valid_quadrupoles]
 
         self.quadrupoles_list.blockSignals(True)
-        self._show_s_values_and_device_lists(self.quadrupoles_list, before_last_screen_quads)
-
+        self._show_s_values_and_device_lists(self.quadrupoles_list, valid_quadrupoles)
         if valid_previous:
             for i in range(self.quadrupoles_list.count()):
                 item = self.quadrupoles_list.item(i)
@@ -1134,8 +1128,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 if item_name in valid_previous:
                     item.setSelected(True)
             self._last_selected_quadrupoles = list(valid_previous)
-        elif upstream_to_first_screen_quads:
-            closest_quad = max(upstream_to_first_screen_quads, key=lambda name: quad_pos[name])
+        elif valid_quadrupoles:
+            closest_quad = max(valid_quadrupoles, key=lambda name: quad_pos[name])
             for i in range(self.quadrupoles_list.count()):
                 item = self.quadrupoles_list.item(i)
                 item_name = item.data(Qt.ItemDataRole.UserRole) or item.text()

@@ -24,7 +24,6 @@ except ImportError:
     from PyQt5.QtCore import Qt,QTimer
     from PyQt5.QtGui import QPixmap
     pyqt_version = 5
-
 import numpy as np
 import glob,sys,os,argparse,matplotlib, re
 from Backend.SaveOrLoad import SaveOrLoad

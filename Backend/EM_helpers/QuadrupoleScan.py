@@ -209,7 +209,7 @@ class QuadrupoleScan(SaveOrLoad):
                                 cancel_requested = True
                                 break
                             print("before calling get_screens")
-                            screens_data = self.interface.get_screens([screen_name], move_screen = False)
+                            screens_data = self.interface.get_screens([screen_name])
                             sigma_scale = 1.0
                             sigxy_scale = 1.0
                             if self._get_interface_units() == "um":

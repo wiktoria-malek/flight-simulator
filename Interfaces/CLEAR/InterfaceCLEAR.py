@@ -22,7 +22,6 @@ except ImportError:
     except Exception:
         clear_lattice = None
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
-# import the charge plot
 class BPMsMode(Enum):
     """
     Acquire and process the horizontal (H) and vertical (V) BPM signals.
@@ -63,8 +62,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return 'CLEAR'
 
     def __init__(self, nsamples=1, nominal_intensity=1.5, wfs_intensity=1.0):
-        # would be nice to call here functions that do _read_intensity_nominal and energy
-        # at the constructor, so that we dont lose time during operations like change_energy/intensity to read them
+        self.screen_backgrounds = {}
         self.steps_readback_position = 0.0
         self.energy_readback = 0.0
         self.bpm_mode = BPMsMode.peak
@@ -182,7 +180,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.corrs = [element for element in self.sequence if element in correctors]
         self.screen_names = list(config.cameras.keys())
         self.screens = self.screen_names
-        self.screen_config = config.cameras
+        self.screen_config = config.cameras # it consists also screens that we should not use!
+        # ["CA.BTV0125","CA.BTV0215","CA.BTV0235", "CA.BTV0390", "CAS.BTV0420", "CAS.BTV0440", "CAS.CAMVESPER1",
+        #  "CA.BTV0545","CA.BTV0620", "CA.BTV0730","CA.BTV0800", "CA.BTV0805", "CA.BTV0810" , "CA.BTV0875",
+        #  "CA.BTV0910", "CAS.BTV0930","CA.CAMAIR1", "CA.CAMAIR2", "CA.CAMAIR3","CA.CAMAIR4", "CS.BTV0120", "CS.BTV0305",
+        #  "CS.BTV0420","CS.BTV0520", "CS.BTVVAC1","CS.CAMVAC1","CS.CAMAIR1","CS.CAMAIR2","CS.CAMAIR3","CS.CAMAIR4",
+        #  "PHIN.BTV01","PHIN.BTV.Spectro","PHIN.VCAT"]
         self.bpm_indexes = [index for index, string in enumerate(sequence) if string in self.bpms]
 
         # Bunch current monitors
@@ -636,67 +639,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         return screen_props
 
-    def _screen_position_label(self, screen_props):
-        if screen_props["has_custom_screen_mover"]:
-            return [str(k) for k in screen_props["screen_mover_fields"].get("setpoints", {})]
-        else:
-            description_data = self.client.get(f"{screen_props['btvdevice']}/Description", context=self.context_empty).data[screen_props["description_field"]]
-        return [str(value).strip() for value in list(description_data) if str(value).strip()]
-
-    def _get_screen_position(self, screen_name):
-        screen_props = self._get_screen_movement_info(screen_name)
-        screen_position_labels = self._screen_position_label(screen_props)
-        if screen_props["has_custom_screen_mover"]:
-            try:
-                positions_path = int(self.client.get(f"{screen_props['screen_mover_device']}/Acquisition", context=self.context_empty).data["position"])
-            except Exception as e:
-                self.log(f"Error: {e}")
-                return None
-            # Build reverse map: integer value → label
-            setpoints = screen_props["screen_mover_fields"].get("setpoints", {})
-            reversed_map = {v: k for k, v in setpoints.items()}
-            return reversed_map.get(positions_path, str(positions_path))
-        try:
-            value = self.client.get(f"{screen_props['btvdevice']}/{screen_props['get_prop']}", context=self.context_empty).data[screen_props['get_field']]
-            index = int(value.value if hasattr(val, "value") else val)
-        except Exception as e:
-            self.log(f"Error: {e}")
-            return None
-        return screen_position_labels[index] if 0<=index<len(screen_position_labels) else None
-
-    def _move_screen(self, screen_name, requested_position):
-        screen_props = self._get_screen_movement_info(screen_name)
-        screen_position_labels = self._screen_position_label(screen_props)
-        requested_movement_type = requested_position.lower()
-        labels = [_labels.lower() for _labels in screen_position_labels]
-        # if requested_movement_type in labels:
-        index = labels.index(requested_movement_type)
-        # else:
-        #     index = None
-        label = labels[index]
-        
-        if screen_props["has_custom_screen_mover"]:
-            setpoints = screen_props["screen_mover_fields"].get("setpoints", {})
-            if label not in setpoints:
-                raise RuntimeError(f"Setpoint {label} not found in screen_mover_fields")
-            value = setpoints[label]
-            device = screen_props["screen_mover_device"]
-            mover_type = screen_props["screen_mover_type"]
-            if mover_type == "BStepMotorVME":
-                self.client.set(f"{device}/Move", data={"mode": 2, "value": value, "units": 2})
-            elif mover_type == "NewFocusPicomotor":
-                self.client.set(f"{device}/Setting#position", data={"position": value})
-            else: raise RuntimeError(f"Unknown mover type: {mover_type}")
-            self.log(f"Moved {screen_name} to position {label}")
-            return label
-        # ---- Standard BTVCTRL screen command ----
-        if not screen_props["btvdevice"] or screen_props["set_prop"] is None:
-            raise RuntimeError(f"No BTVCTRL controller for {screen_name}")
-        propert_address, field = screen_props["set_prop"].rsplit("#", 1)
-        self.client.set(f"{screen_props['btvdevice']}/{property_addres}", data={field: index})
-        self.log(f"Moved {screen_name} -> {label}")
-        return label
-
     def insert_screen(self, screen_name):
         #return self._move_screen(screen_name, 1)
         info = self._get_screen_movement_info(screen_name)
@@ -727,13 +669,42 @@ class CLEAR_real_machine(AbstractMachineInterface):
             self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 0})  # 0, meaning EXTRACT the screen
             self.log(f"Extracted {screen_name}!")
 
-    def get_screens(self, names=None):
-        self.log('Reading screens...')
+    def acquire_screen_background(self, screen_name, frames = 10):
+        self.extract_screen(screen_name)
+        background_frames = []
+        for frame in range(frames):
+            self.log(f"Acquiring {frame}/{frames} background frames...")
+            camera_data = self._acquire_screen_data(screen_name)
+            if camera_data is None:
+                continue
+            image = np.asarray(camera_data['image2D'], dtype=float)
+            background_frames.append(image)
+            self.log(f"Acquired {frame}/{frames} background frames...")
+        if not background_frames:
+            raise RuntimeError(f"No background frames available for {screen_name}")
+        self.log(f"Acquired {frames} background frames. Calculating the median...")
+        bg_img = np.median(np.stack(background_frames, axis=0), axis=0)
+        self.log(f"Median calculated.")
+        self.screen_backgrounds[screen_name] = bg_img
+        return bg_img
 
+    def acquire_screen_image(self, screen_name):
+        self.insert_screen(screen_name)
+        camera_data = self._acquire_screen_data(screen_name)
+        if camera_data is None: raise RuntimeError(f"No camera data available for {screen_name}")
+        beam_img = np.asarray(camera_data['image2D'], dtype=float)
+        bg_img = self.screen_backgrounds[screen_name]
+        subtracted_img = beam_img - bg_img
+        subtracted_img[~np.isfinite(subtracted_img)] = 0.0
+        subtracted_img[subtracted_img < 0.0] = 0.0
+        return subtracted_img, bg_img.copy(), beam_img
+
+    def get_screens(self, names=None):
+        background_images, beam_images = [], []
+        self.log(f'Reading screens {names}...')
         if isinstance(names, str):
             names = [names]
         selected_names = self.screen_names if names is None else [name for name in self.screen_names if name in names]
-
         s_positions = self._get_twiss_s_positions(selected_names)
 
         hpixel_list = []
@@ -749,58 +720,48 @@ class CLEAR_real_machine(AbstractMachineInterface):
         inout_list = []
 
         for screen_name in selected_names:
-            camera_config = self.screen_config.get(screen_name, {}) # gets pixel size and resolutino
+            camera_config = self.screen_config.get(screen_name, {}) # gets pixel size and resolution
             hpixel = float(camera_config.get('s_x_res', np.nan))
             vpixel = float(camera_config.get('s_y_res', np.nan))
-            status = self._read_screen_status(screen_name) # is screen inserted or extracted?
-            camera_data = self._acquire_screen_data(screen_name)
-            if camera_data is None:
+
+            try:
+                # image = camera_data["image2D"]
+                # proj_x = camera_data["projDataSet1"]
+                # proj_y = camera_data["projDataSet2"]
+                # x_positions = camera_data["imagePositionSet1"]
+                # y_positions = camera_data["imagePositionSet2"]
+
+                if screen_name not in self.screen_backgrounds:
+                    self.log(f"Acquiring background image for {screen_name}.")
+                    self.acquire_screen_background(screen_name, frames = 10)
+                subtracted_img, bg_img, beam_img = self.acquire_screen_image(screen_name)
+                x_mean, y_mean, sigx, sigy, total, img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel)
+            except Exception as e:
+                self.log(f"Couldn't acquire screen image for {screen_name}, because: {e}")
                 x_mean = np.nan
                 y_mean = np.nan
                 sigx = np.nan
                 sigy = np.nan
                 total = 0.0
-                image = np.zeros((1,1))
-                hedges = np.array([0.0, 1.0])
-                vedges = np.array([0.0, 1.0])
-            else:
-                image = np.asarray(camera_data["image2D"], dtype=float)
-                proj_x = np.asarray(camera_data["projDataSet1"], dtype=float)
-                proj_y = np.asarray(camera_data["projDataSet2"], dtype=float)
-                x_positions = np.asarray(camera_data["imagePositionSet1"], dtype=float)
-                y_positions = np.asarray(camera_data["imagePositionSet2"], dtype=float)
-                proj_x = np.nan_to_num(proj_x, nan = 0.0)
-                proj_y = np.nan_to_num(proj_y, nan = 0.0)
-                proj_x = proj_x - np.min(proj_x)
-                proj_y = proj_y - np.min(proj_y)
-                total_x = float(np.sum(proj_x))
-                total_y = float(np.sum(proj_y))
-                total = float(np.nansum(image))
-                if total_x > 0.0:
-                    x_mean = float(np.sum(x_positions * proj_x) / total_x)
-                    sigx = float(np.sqrt(np.sum((x_positions - x_mean) ** 2 * proj_x) / total_x))
-                else:
-                    x_mean = np.nan
-                    sigx = np.nan
-                if total_y > 0.0:
-                    y_mean = float(np.sum(y_positions * proj_y) / total_y)
-                    sigy = float(np.sqrt(np.sum((y_positions - y_mean) ** 2 * proj_y) / total_y))
-                else:
-                    y_mean = np.nan
-                    sigy = np.nan
-                hedges = x_positions
-                vedges = y_positions
+                subtracted_img = np.zeros((1, 1), dtype=float)
+                bg_img = np.zeros((1, 1), dtype=float)
+                beam_img = np.zeros((1, 1), dtype=float)
+                hedges = np.array([0.0, 1.0], dtype=float)
+                vedges = np.array([0.0, 1.0], dtype=float)
 
+            status = self._read_screen_status(screen_name) # is screen inserted or extracted?
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
-            xb_list.append(x_mean) # x_mean is a center of the beam
+            xb_list.append(x_mean)
             yb_list.append(y_mean)
             sigx_list.append(sigx)
             sigy_list.append(sigy)
-            sum_list.append(total) # sum of all pixels -> intensity
-            images.append(image)
-            hedges_all.append(hedges) # pixel coordinates
-            vedges_all.append(vedges)
+            sum_list.append(total)
+            images.append(np.asarray(subtracted_img, dtype=float))
+            background_images.append(np.asarray(bg_img, dtype=float))
+            beam_images.append(np.asarray(beam_img, dtype=float))
+            hedges_all.append(np.asarray(hedges, dtype=float))
+            vedges_all.append(np.asarray(vedges, dtype=float))
             inout_list.append(status)
 
         return {
@@ -809,12 +770,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "vpixel": np.asarray(vpixel_list, dtype=float), # mm
             "x": np.asarray(xb_list, dtype=float),
             "y": np.asarray(yb_list, dtype=float),
-            "sigx": np.asarray(sigx_list, dtype=float), # we need to get that from the image
+            "sigx": np.asarray(sigx_list, dtype=float),
             "sigy": np.asarray(sigy_list, dtype=float),
             "sum": np.asarray(sum_list, dtype=float),
-            "hedges": hedges_all, #imagePositionSet1 i think its an array
+            "hedges": hedges_all, #imagePositionSet1
             "vedges": vedges_all,
-            "images": images, #image2D
+            "background_images": background_images,
+            "beam_images": beam_images,
+            "images": images, # subtracted images
             "S": np.asarray(s_positions, dtype=float),
             "inout": np.asarray(inout_list, dtype=float),
         }
@@ -854,9 +817,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             target_disp_y.append(dy)
         return target_disp_x, target_disp_y
 
-
-    @staticmethod
-    def _screen_data_from_image(image, hpixel, vpixel):
+    def _screen_data_from_image(self, image, hpixel, vpixel):
         if image is None:
             return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
 
@@ -901,149 +862,3 @@ class CLEAR_real_machine(AbstractMachineInterface):
         except Exception as e:
             print(e)
             return None
-
-    def _read_screen_h_matrix(self, screen_name):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        try:
-            return self.client.get(f'{japc_camera}.Settings/Settings', context=self.context_empty).data['h_matrix']
-        except Exception:
-            return None
-
-
-    @staticmethod
-    def _roi_from_setting(setting, image_shape):
-        if setting is None:
-            return np.array([0, image_shape[1], 0, image_shape[0]], dtype=int)
-        try:
-            if setting.get('imageROIEnable'):
-                x0, y0, dx, dy = setting['imageROI']
-                return np.array([x0, x0 + dx, y0, y0 + dy], dtype=int) # left and right edge of x, the same for y
-            _, _, width, height = setting['imageWindow'] # if not enabled, takes the whole screen image
-            return np.array([0, width, 0, height], dtype=int)
-        except Exception:
-            return np.array([0, image_shape[1], 0, image_shape[0]], dtype=int)
-
-    @staticmethod
-    def _auto_aoi_from_image(image, threshold_fraction=0.2, margin=20):
-        img = np.asarray(image, dtype=float)
-        if img.size == 0 or not np.any(np.isfinite(img)):
-            return None
-
-        work = img.copy()
-        work[~np.isfinite(work)] = 0.0
-        work = work - np.nanmin(work)
-        peak = np.nanmax(work)
-        if not np.isfinite(peak) or peak <= 0:
-            return None
-
-        mask = work >= threshold_fraction * peak # if the most intense pixel has a value of 1000, then, takes values from 200 up, assuming that for example, threshold is 0.2
-        ys, xs = np.where(mask)
-        if xs.size == 0 or ys.size == 0:
-            return None
-
-        ny, nx = work.shape
-        # calculates a smaller rectangle, to isolate the beam from the rest + 20
-        x0 = max(0, int(xs.min()) - margin)
-        x1 = min(nx, int(xs.max()) + margin + 1)
-        y0 = max(0, int(ys.min()) - margin)
-        y1 = min(ny, int(ys.max()) + margin + 1)
-        return x0, x1, y0, y1
-
-    def _intensity_to_attenuator_position(self, value):
-        return float(np.clip(float(value), self.laser_attenuator_min, self.laser_attenuator_max))
-
-    def get_laser_attenuator_position(self):
-        for address in self.laser_attenuator_readback:
-            property_address, field = address.rsplit('#', 1)
-            try:
-                value = self.client.get(property_address, context = self.context_empty).data[field]
-                value = self.make_safe_float(value)
-                if np.isfinite(value):
-                    return value/1e3
-            except Exception:
-                pass
-        return np.nan
-
-    def set_laser_motor_attenuator_position(self, position):
-        position = float(np.clip(float(position), 0.0, 3.0))
-        command_position = position * 1e3
-        self.log(f'Setting CLEAR motor attenuator to {position:.3f} ksteps, ({command_position:.0f} steps)...')
-        self.client.set('CTF2Motor2B/Setting', {'targetPosition': command_position}, context=self.context_empty)
-        time.sleep(1)
-        return position
-
-    def get_laser_motor_attenuator_position(self):
-        for address in self.laser_motor_attenuator_readback:
-            property_address, field = address.rsplit('#', 1)
-            try:
-                value = self.client.get(property_address, context = self.context_empty).data[field]
-                value = self.make_safe_float(value)
-                if np.isfinite(value):
-                    return value/1e3
-            except Exception:
-                pass
-        return np.nan
-
-    def set_uv_attenuator_position(self, attenuator_name, position):
-        if attenuator_name not in self.uv_attenuator_params:
-            raise ValueError(f'Unknown UV attenuator {attenuator_name}. Expected one of {list(self.uv_attenuator_params)}')
-        min_pos, max_pos = self.uv_attenuator_ranges.get(attenuator_name, (-np.inf, np.inf))
-        position = float(np.clip(float(position), min_pos, max_pos))
-        self.log(f'Setting {attenuator_name} to {position:.1f}...')
-        property_address, field = (self.uv_attenuator_params[attenuator_name].rsplit('#', 1))
-        self.client.set(property_address, {field: position}, context=self.context_empty)
-        time.sleep(1)
-        return position
-
-    def set_uv_attenuator_percent(self, attenuator_name, percent):
-        if attenuator_name not in self.uv_attenuator_ranges:
-            raise ValueError(f'Unknown UV attenuator {attenuator_name}. Expected one of {list(self.uv_attenuator_ranges)}')
-        min_pos, max_pos = self.uv_attenuator_ranges[attenuator_name]
-        percent = float(np.clip(float(percent), 0.0, 100.0))
-        position = min_pos + (max_pos - min_pos) * percent / 100.0
-        return self.set_uv_attenuator_position(attenuator_name, position)
-
-    def set_shutter(self, shutter_name, open_shutter=True):
-        if shutter_name not in self.shutter_set_params:
-            raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_set_params)}')
-        property_address, field = self.shutter_set_params[shutter_name].rsplit('#', 1)
-        self.client.set(property_address, {field: bool(open_shutter)}, context = self.context_empty)
-        time.sleep(0.5)
-        return bool(open_shutter)
-
-    def get_shutter(self, shutter_name):
-        if shutter_name not in self.shutter_readback_params:
-            raise ValueError(f'Unknown shutter {shutter_name}. Expected one of {list(self.shutter_readback_params)}')
-        address = self.shutter_readback_params[shutter_name]
-        property_address, field = address.rsplit('#', 1)
-        try:
-            value = self.client.get(property_address, context = self.context_empty).data[field]
-        except Exception:
-            return np.nan
-        return bool(value)
-
-    def _read_bcm_scope(self, scope_name):
-        try:
-            data = self.client.get(f"{scope_name}/Acquisition").data
-            signal = np.asarray(data["value"], dtype=float) * data["sensitivity"] + data["offset"]
-            return float(np.mean(signal[20:60]))
-        except Exception:
-            return np.nan
-
-    def _read_bcm_charge(self, bcm_name):
-        try:
-            sample_address = self.bcm_sample_params[bcm_name]
-            property_address, field = sample_address.rsplit("#", 1)
-            samples = self.client.get(property_address, context=self.context_empty).data[field]
-            gain = self.client.get("CA.BCM01GAIN/Setting").data["enumValue"]
-
-            samples = np.asarray(samples, dtype=float) / 1000.0
-            waveform = samples.reshape(samples.shape[0], -1)[0] if samples.ndim > 1 else samples
-
-            voltage = float(np.mean(waveform[4000:8000])) * 2.13
-            sensitivity = self.bcm_sensitivity.get(str(gain), np.nan)
-
-            return 10.0 * voltage / sensitivity
-        except Exception:
-            return np.nan
-

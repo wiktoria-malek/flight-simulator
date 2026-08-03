@@ -581,6 +581,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             v_factor = 1.0
         return h_factor, v_factor
 
+
+
     def acquire_otr_image(self, screen_pv_name, min_total_intensity=135000, max_retries=3):
         """
         It might be super slow.
@@ -730,7 +732,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         return x_mean, y_mean, sigx_from_image, sigy_from_image, total, img, hedges, vedges
 
-    def get_screens(self, names=None, move_screen=False):
+    def get_screens(self, names=None):
         print('Reading screens...')
         if isinstance(names, str):
             names = [names]
