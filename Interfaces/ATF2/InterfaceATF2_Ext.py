@@ -343,14 +343,21 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         screen_pv_name = self.screen_pv_names.get(screen_name)
         if screen_pv_name is None:
             raise ValueError(f"Unknown screen: {screen_name}")
+        self.log(f"Getting the state of screen {screen_name}...")
         status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
+        self.log(f"Current status of screen {screen_name} is {status}...")
         PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
+        self._wait_for_screen_target_position(screen_name, 1)
 
     def extract_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
         if screen_pv_name is None:
             raise ValueError(f"Unknown screen: {screen_name}")
+        self.log(f"Getting the state of screen {screen_name}...")
+        status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
+        self.log(f"Current status of screen {screen_name} is {status}...")
         PV(f"{screen_pv_name}:Target:WRITE:OUT").put(1)
+        self._wait_for_screen_target_position(screen_name, 0)
 
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
@@ -717,6 +724,19 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         '''
         return x_mean_positions, y_mean_positions, sigx, sigy, summed_intensity, img, hedges, vedges
 
+    def _wait_for_screen_target_position(self, screen_name, target, timeout=10.0, poll_interval=0.05):
+        screen_pv_name = self.screen_pv_names.get(screen_name)
+        t0 = time.perf_counter()
+        while time.perf_counter() - t0 < timeout:
+            status = PV(f'{screen_pv_name}:Target:READ:INOUT').get() # 1 - inserted, 0, extracted
+            if status == 0 and target==0: return True
+            if status > 0 and target > 0: return True
+            time.sleep(poll_interval)
+        self.log(
+            f'Warning: {screen_name} did not reach target state = {target:.6g} '
+            f'within {timeout:.2f}s. Last readback = {status:.6g}'
+        )
+        return False
 
     def get_screens(self, names=None):
         print('Reading screens...')
