@@ -34,6 +34,7 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
         self.quadrupoles = list(dict.fromkeys(e.get_name() for e in self.lattice.get_quadrupoles()))
         self.__setup_beam0()
         self.__track_bunch()
+        self.machine_name = "ATF2"
 
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref0 / self.electronmass) ** 2 + 1.0)

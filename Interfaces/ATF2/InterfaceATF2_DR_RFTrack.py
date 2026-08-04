@@ -42,6 +42,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self.__track_bunch()
         self._saved_sextupoles_state = None
         self.sextupoles = self._get_element_names_from_twiss_types({"SEXTUPOLE"})
+        self.machine_name = "ATF2"
 
     def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
         with open(self.twiss_path, "r") as file:

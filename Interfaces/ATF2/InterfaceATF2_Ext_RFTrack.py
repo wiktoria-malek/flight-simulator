@@ -73,6 +73,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.qmag_rolldes = {name: 0.0 for name in self.quadrupoles}
         #self.qm_list = [s for s in self.interface.get_sequence() if str(s).upper().startswith("Q")]
         self.bg_shots = int(bg_shots)
+        self.machine_name = "ATF2"
 
         # ----------------------------
         # Knobs (linear / nonlinear)

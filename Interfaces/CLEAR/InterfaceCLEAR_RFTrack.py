@@ -180,6 +180,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.nr_quad=11
         self.Lquad=0.226 #magnetic length of the quadrupole in [m]
         self.nominal_K=0.7752883624676146 #3.35  # 1/m
+        self.machine_name = "CLEAR"
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()

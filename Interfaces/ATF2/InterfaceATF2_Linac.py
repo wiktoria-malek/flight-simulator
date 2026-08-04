@@ -143,6 +143,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         self.phase_kl1 = PV('CM1L:phaseRead').get()
         self.laser_intensity1 = PV('RFGun:LaserIntensity1:Read').get()
         self.laser_intensity2 = PV('RFGun:LaserIntensity2:Read').get()
+        self.machine_name = "ATF2"
 
     def log_messages(self,console):
         self.log=console or print

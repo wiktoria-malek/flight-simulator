@@ -11,14 +11,7 @@ sigma² = R11² * <x²> + 2 R11 R12 * <x x'> + R12² * <x'²>
 gamma = (1 + alpha²) / beta
 '''
 class LinearResponse:
-    def __init__(self, coefficients_path=None, dataset_path=None, beta_gamma=None):
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-        if coefficients_path is None:
-            coefficients_path = os.path.join(project_root, "MachineLearning", "ATF2", "QD18X", "Linear_Response_coefficients.npz")
-
-        if dataset_path is None:
-            dataset_path = os.path.join(project_root, "MachineLearning", "ATF2", "QD18X", "Linear_Response_dataset.npz")
-
+    def __init__(self, coefficients_path, dataset_path, beta_gamma):
         self.coefficients_path = coefficients_path
         self.dataset_path = dataset_path
         self.beta_gamma = beta_gamma
@@ -45,6 +38,7 @@ class LinearResponse:
         np.savez(path, screens=np.asarray(self.screens), Rx_fit=self.Rx, Ry_fit=self.Ry, beta_gamma=np.array(self.beta_gamma, dtype=float))
 
     def fit_coefficients_from_R_dataset(self, dataset_path=None):
+        dataset = np.load(dataset_path, allow_pickle=True)
         if dataset_path is None:
             dataset_path = self.dataset_path
 
@@ -59,7 +53,6 @@ class LinearResponse:
         if not np.isfinite(self.beta_gamma) or self.beta_gamma <= 0:
             raise RuntimeError(f"Invalid beta_gamma: {self.beta_gamma}")
 
-        dataset = np.load(dataset_path, allow_pickle=True)
 
         if "beta_gamma" in dataset.files: beta_gamma = float(dataset["beta_gamma"])
         elif self.beta_gamma is not None: beta_gamma = float(self.beta_gamma)

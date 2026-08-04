@@ -35,6 +35,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         self.__track_bunch()
         self._saved_sextupoles_state = None
         self.electronmass = rft.electronmass
+        self.machine_name = "FACET"
 
     def log_messages(self,console):
         self.log=console or print

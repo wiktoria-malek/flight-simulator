@@ -190,6 +190,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 198 # MeV/c
+        self.machine_name = "CLEAR"
 
         self.energy_param = [
             'CA.BEAM/Acquisition#momentum',

@@ -159,7 +159,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         self.arc_dispersion_pv = "MONITOR:DR:ARCDISPERSION"
         self.laser_intensity1 = PV('RFGun:LaserIntensity1:Read').get()
         self.laser_intensity2 = PV('RFGun:LaserIntensity2:Read').get()
-
+        self.machine_name = "ATF2"
 
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY

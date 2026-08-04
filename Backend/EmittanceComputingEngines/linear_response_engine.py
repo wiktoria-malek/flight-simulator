@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from scipy.stats import median_abs_deviation
 from Backend.EM_helpers.LinearResponse import LinearResponse
 from Backend.EmittanceComputingEngines.AbstractComputingEngine import AbstractComputingEngine
@@ -43,8 +44,11 @@ class LinearResponseEngine(AbstractComputingEngine):
         if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")
 
-        linear = LinearResponse(beta_gamma = beta_gamma)
-        linear.beta_gamma = beta_gamma
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        machine_name = getattr(self.interface, "machine_name", [])
+        coefficients_path = os.path.join(project_root, "MachineLearning", str(machine_name), str(quad_name), "Linear_Response_coefficients.npz")
+        dataset_path = os.path.join(project_root, "MachineLearning", str(machine_name), str(quad_name), "Linear_Response_dataset.npz")
+        linear = LinearResponse(coefficients_path=coefficients_path, dataset_path=dataset_path, beta_gamma=beta_gamma)
         direct = linear.solve_twiss_from_measured_sigma2(screens=screens, sigma2_x=sigma2_x[0], sigma2_y=sigma2_y[0])
 
         pred_x = np.asarray(direct["pred_x"], dtype=float)

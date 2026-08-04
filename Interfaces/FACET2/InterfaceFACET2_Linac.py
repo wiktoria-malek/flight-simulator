@@ -95,6 +95,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         # initialize bpm data buffer
         self.bpm_buffer = make_bpm_buffer(self.f2m, self.bpms, Npts=self.nsamples)
         print('InterfaceFACET2_Linac is ready')
+        self.machine_name = "FACET"
 
     def log_messages(self,console):
         self.log=console or print
