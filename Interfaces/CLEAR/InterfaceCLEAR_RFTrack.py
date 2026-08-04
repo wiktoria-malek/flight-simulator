@@ -535,8 +535,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
                 self.set_quadrupoles([quad_name], [float(K1)], track = False)
-                start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
-                start_element = start_elements[0]
+                start_element = self.lattice[start_element_name]
                 if isinstance(start_element, list):
                     start_element = start_element[0]
 
