@@ -72,7 +72,11 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
     output_file.parent.mkdir(parents=True, exist_ok=True)
     K1L_nominal = get_nominal_K1L(interface, quad_name)
     bounds = _get_interface_bounds(interface)
+    gamma_rel, beta_rel = interface.get_beam_factors()
+    beta_gamma = float(gamma_rel) * float(beta_rel)
 
+    if not np.isfinite(beta_gamma) or beta_gamma <= 0:
+        raise RuntimeError(f"Invalid beta_gamma from interface: {beta_gamma}")
     fixed_k1l = float(K1L_nominal)
 
     log(f"{quad_name} nominal/fixed K1L: {fixed_k1l}")
@@ -165,6 +169,9 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
         interface_module=np.array(interface.__class__.__module__),
         K1L_nominal=np.array(K1L_nominal, dtype=float),
         n_requested_samples = np.array(n_samples, dtype=int),
+        beta_gamma=np.array(beta_gamma, dtype=float),
+        gamma_rel=np.array(gamma_rel, dtype=float),
+        beta_rel=np.array(beta_rel, dtype=float),
     )
 
     log("Done.")

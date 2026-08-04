@@ -39,11 +39,13 @@ class LinearResponseEngine(AbstractComputingEngine):
 
         gamma_rel, beta_rel = self.interface.get_beam_factors()
         beta_gamma = float(gamma_rel) * float(beta_rel)
+
         if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")
 
-        linear = LinearResponse()
-        direct = linear.solve_twiss_from_measured_sigma2(screens=screens, sigma2_x=sigma2_x[0], sigma2_y=sigma2_y[0], beta_gamma=beta_gamma)
+        linear = LinearResponse(beta_gamma = beta_gamma)
+        linear.beta_gamma = beta_gamma
+        direct = linear.solve_twiss_from_measured_sigma2(screens=screens, sigma2_x=sigma2_x[0], sigma2_y=sigma2_y[0])
 
         pred_x = np.asarray(direct["pred_x"], dtype=float)
         pred_y = np.asarray(direct["pred_y"], dtype=float)
