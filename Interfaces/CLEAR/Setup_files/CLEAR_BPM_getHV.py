@@ -1,18 +1,15 @@
-# Initailly made for Wiktoria and Andrea to be able to test their flight simulator at CLEAR
-# Sara S. July 2026
-
-
-
-
-# one BPM is inverted!!!!!!
-
-
-
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import trapezoid
+
+def change_inverted_bpm_polarity(samples, bpm):
+    samples = np.asarray(samples, dtype=float)
+    bpm = str(bpm)
+    if bpm.startswith("CA."):
+        bpm = bpm[3:]
+    if bpm == "BPM0890":
+        return -samples
+    return samples
 
 # Subtract baseline from signal
 def baseline_correct(samples, n_baseline=100):
@@ -98,7 +95,7 @@ def plot_integral(signals, integrals, labels, BPM, starts=None,ends=None,):
 
 DEFAULT_WINDOW = (260, 360)
 
-def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW,):
+def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW):
     
     """
     Acquire and process the horizontal (H) and vertical (V) BPM signals.
@@ -135,8 +132,8 @@ def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW,):
 
     H_data = japc.getParam(f"CA.{BPM}H-SA/SamplesFromTrigger")
     V_data = japc.getParam(f"CA.{BPM}V-SA/SamplesFromTrigger")
-    H_samples = H_data["samples"]
-    V_samples = V_data["samples"]
+    H_samples = change_inverted_bpm_polarity(H_data["samples"], BPM)
+    V_samples = change_inverted_bpm_polarity(V_data["samples"], BPM)
 
     H_b_samples = baseline_correct(H_samples)
     V_b_samples = baseline_correct(V_samples)

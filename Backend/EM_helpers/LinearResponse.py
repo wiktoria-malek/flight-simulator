@@ -38,26 +38,21 @@ class LinearResponse:
         np.savez(path, screens=np.asarray(self.screens), Rx_fit=self.Rx, Ry_fit=self.Ry, beta_gamma=np.array(self.beta_gamma, dtype=float))
 
     def fit_coefficients_from_R_dataset(self, dataset_path=None):
-        dataset = np.load(dataset_path, allow_pickle=True)
         if dataset_path is None:
             dataset_path = self.dataset_path
-
-        if self.beta_gamma is None:
-            if "beta_gamma" not in dataset.files:
-                raise RuntimeError(
-                    f"Dataset {dataset_path} does not contain beta_gamma. "
-                    "Regenerate the dataset or pass beta_gamma explicitly."
-                )
+        dataset = np.load(dataset_path, allow_pickle=True)
+        if "beta_gamma" in dataset.files:
             self.beta_gamma = float(dataset["beta_gamma"])
-
+        elif self.beta_gamma is not None:
+            self.beta_gamma = float(self.beta_gamma)
+            print(f"Warning: dataset {dataset_path} does not contain beta_gamma, using fallback from interface.")
+        else:
+            raise RuntimeError(
+                f"Dataset {dataset_path} does not contain beta_gamma "
+                "and no fallback beta_gamma was provided."
+            )
         if not np.isfinite(self.beta_gamma) or self.beta_gamma <= 0:
             raise RuntimeError(f"Invalid beta_gamma: {self.beta_gamma}")
-
-
-        if "beta_gamma" in dataset.files: beta_gamma = float(dataset["beta_gamma"])
-        elif self.beta_gamma is not None: beta_gamma = float(self.beta_gamma)
-        else:
-            raise RuntimeError(f"No beta_gamma found.")
 
         I = np.asarray(dataset["X"], dtype=float) # twiss parameters at the entrance
         # I[i] = [

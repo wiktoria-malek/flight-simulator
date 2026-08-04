@@ -1,4 +1,4 @@
-from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral
+from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral, change_inverted_bpm_polarity
 import sys, time, math, os, json
 import numpy as np
 try:
@@ -552,12 +552,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 hsamples = self.client.get(f"{bpm}H-SA/SamplesFromTrigger", context = self.context_acquisition).data
                 vsamples = self.client.get(f"{bpm}V-SA/SamplesFromTrigger", context=self.context_acquisition).data
                 ssamples = self.client.get(f"{bpm}S-SA/SamplesFromTrigger", context=self.context_acquisition).data
-                H_samples = np.asarray(hsamples["samples"], dtype=float).ravel()
-                V_samples = np.asarray(vsamples["samples"], dtype=float).ravel()
-                S_samples = np.asarray(ssamples["samples"], dtype=float).ravel()
+                H_samples = change_inverted_bpm_polarity(np.asarray(hsamples["samples"], dtype=float).ravel(), bpm)
+                V_samples = change_inverted_bpm_polarity(np.asarray(vsamples["samples"], dtype=float).ravel(), bpm)
+                S_samples = change_inverted_bpm_polarity(np.asarray(ssamples["samples"], dtype=float).ravel(), bpm)
                 H_b_samples = baseline_correct(H_samples)
                 V_b_samples = baseline_correct(V_samples)
+                #s_sum = abs(np.sum(S_samples))
                 s_sum = np.sum(S_samples)
+
                 if mode == BPMsMode.peak: # Find peak (largest magnitude, keeping the sign)
                     H, H_idx = find_peak(H_samples)
                     V, V_idx = find_peak(V_samples)

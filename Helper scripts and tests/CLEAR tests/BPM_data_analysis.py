@@ -10,7 +10,7 @@ while not (project_root_path / "Interfaces").exists() and project_root_path.pare
     project_root_path = project_root_path.parent
 sys.path.insert(0, str(project_root_path))
 os.chdir(project_root_path)
-from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral
+from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, change_inverted_bpm_polarity
 
 path_to_datafiles = "/Users/wiktoriamalek/CERN-Flight_Simulator-Data/20260729_BPMtests"
 bpms = ["BPM0530", "BPM0595", "BPM0690", "BPM0820", "BPM0890"]
@@ -19,9 +19,9 @@ def analyze_data(filename, bpm, show=False):
     file_path = os.path.join(path_to_datafiles, filename)
     with h5py.File(file_path, "r") as f:
 
-        H_SA = f["CLEAREventData"][f"CA.{bpm}H-SA"]["SamplesFromTrigger"]["samples"][0]
-        V_SA = f["CLEAREventData"][f"CA.{bpm}V-SA"]["SamplesFromTrigger"]["samples"][0]
-        S_SA = f["CLEAREventData"][f"CA.{bpm}S-SA"]["SamplesFromTrigger"]["samples"][0]
+        H_SA = change_inverted_bpm_polarity(f["CLEAREventData"][f"CA.{bpm}H-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
+        V_SA = change_inverted_bpm_polarity(f["CLEAREventData"][f"CA.{bpm}V-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
+        S_SA = change_inverted_bpm_polarity(f["CLEAREventData"][f"CA.{bpm}S-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
 
         H_b_samples = baseline_correct(H_SA)
         V_b_samples = baseline_correct(V_SA)
