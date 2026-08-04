@@ -23,7 +23,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
     def get_Quad_K_from_I(self, I, Lquad, Pref):
         G_0 = self.get_grad(I, Lquad)
         K = self.get_Quad_K(G_0, Pref)
-        return K
+        return K # 1/m^2
 
     def __build(self, filename):
         with open(filename) as file:
@@ -110,10 +110,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                     element = rft.Drift(L)
                 elif element_type == 'Quadrupole':
                     if 'QFD' in name:
-                        K = self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                        K1 = self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
                     elif 'QDD' in name:
-                        K = - self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
-                    element = rft.Quadrupole(L, Pref / self.Q, K)
+                        K1 = - self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                    element = rft.Quadrupole(L, Pref / self.Q, K1)
                 elif element_type == 'Corrector':
                     element = rft.Corrector(L)
                 elif element_type == 'BPM':
@@ -127,10 +127,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             return lattice
         start = 'CA.STLINE$START'
         end = 'CA.STLINE$END'
-        quad_currents = np.array([
-            0,  # QFD350
-            0,  # QDD355
-            0,  # QFD360
+        quad_currents = np.array([ # this is to fix....
+            47.5,  # QFD350
+            86.4,  # QDD355
+            44.0,  # QFD360
 
             20,  # QFD510
             40.96551724137931,  # QDD515
@@ -502,9 +502,9 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return sigx, sigy
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
         screens = list(screens)
-        K1_values = np.asarray(K1_values, dtype=float)
+        K1L_values = np.asarray(K1L_values, dtype=float)
         screens = list(screens)
         if len(screens) == 0:
             raise RuntimeError("No screens provided for emittance scan prediction.")
@@ -524,17 +524,17 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         original_quads = self.get_quadrupoles(names=[quad_name])
         if len(original_quads["bdes"]) == 0:
             raise RuntimeError(f"Could not find original strength for quad {quad_name}")
-        K1_original = float(original_quads["bdes"][0])
+        K1L_original = float(original_quads["bdes"][0])
 
         B0_original = self.B0
-        output_x = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
-        output_y = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
+        output_x = np.full((len(K1L_values),len(screens)), np.nan, dtype=float)
+        output_y = np.full((len(K1L_values),len(screens)), np.nan, dtype=float)
 
         try:
-            for k,K1 in enumerate(K1_values):
+            for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
-                self.set_quadrupoles([quad_name], [float(K1)], track = False)
+                self.set_quadrupoles([quad_name], [float(K1L)], track = False)
                 start_element = self.lattice[start_element_name]
                 if isinstance(start_element, list):
                     start_element = start_element[0]
@@ -571,7 +571,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                         output_y[k, si] = float(np.std(m[:, 1]))
 
         finally:
-            self.set_quadrupoles([quad_name], [float(K1_original)], track=False)
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
             self.B0 = B0_original
             self.__track_bunch()
 
@@ -675,19 +675,19 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, list):
                 elements = [elements]
 
-            k1_values = []
+            k1l_values = []
             for element in elements:
                 try:
-                    strength = element.get_K1(self.Pref / self.Q)
+                    strength = element.get_K1L(self.Pref / self.Q)
                 except Exception:
                     continue
                 if isinstance(strength, (list, tuple, np.ndarray)):
                     if len(strength) > 0:
-                        k1_values.append(float(strength[0]))
+                        k1l_values.append(float(strength[0]))
                 else:
-                    k1_values.append(float(strength))
+                    k1l_values.append(float(strength))
 
-            bdes[i] = k1_values[0] if k1_values else 0.0
+            bdes[i] = k1l_values[0] if k1l_values else 0.0
 
         quadrupoles = {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
 
@@ -744,33 +744,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             elements = self.lattice[quadrupole_name]
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
-                element.set_K1(self.Pref / self.Q,float(value))
+                element.set_K1L(self.Pref / self.Q,float(value))
 
         if track:
         # AS A TEST!
             self.__track_bunch()
-
-    def vary_quadrupoles(self, names, delta_values):
-        if not isinstance(names, list):
-            names = [names]
-        if not isinstance(delta_values, (list, tuple, np.ndarray)):
-            delta_values = [delta_values]
-        for quadrupole_name, val in zip(names, delta_values):
-            elements = self.lattice[quadrupole_name]
-            if not isinstance(elements, list):
-                elements = [elements]
-            current_values=[]
-            for element in elements:
-                current=element.get_K1(self.Pref / self.Q)
-                current=float(current[0]) if isinstance(current, (list, tuple,np.ndarray)) else float(current)
-                current_values.append(current)
-            if len(current_values)>1 and not np.allclose(current_values, current_values[0], rtol=0.0, atol=1e-12):
-                self.log(f"Parts of quadrupole {quadrupole_name} have different values")
-            target_value=(current_values[0] if len(current_values)>0 else 0.0) +float(val)
-            for element in elements:
-                element.set_K1(self.Pref / self.Q,target_value)
-
-        self.__track_bunch()
 
     def get_elements_indices(self, names):
         if isinstance(names, str):

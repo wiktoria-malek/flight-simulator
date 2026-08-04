@@ -443,7 +443,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_movable_magnets_names(self):
         return self.movable_magnets
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
         # from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
         # screens_data =
         # simulated_interface = InterfaceATF2_Ext_RFTrack()
@@ -521,15 +521,15 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             data["pvs"] = {name: dict(self.qmag_pv[name]) for name in names}
         return data
 
-    def set_quadrupoles(self, names, k1_values, track=True):
+    def set_quadrupoles(self, names, k1l_values, track=True):
         if type(names) == str:
             names = [names]
-        if not isinstance(k1_values, (list, tuple, np.ndarray)):
-            k1_values = [k1_values]
-        if len(names) != len(k1_values):
-            raise ValueError(f"len(names)={len(names)} != len(k1_values)={len(k1_values)} in set_quadrupoles")
+        if not isinstance(k1l_values, (list, tuple, np.ndarray)):
+            k1l_values = [k1l_values]
+        if len(names) != len(k1l_values):
+            raise ValueError(f"len(names)={len(names)} != len(k1l_values)={len(k1l_values)} in set_quadrupoles")
 
-        for name, k1 in zip(names, k1_values):
+        for name, k1 in zip(names, k1l_values):
             if name not in self.quadrupoles:
                 raise ValueError(f"Quadrupole '{name}' is not magnet list.")
             current_name = self._quadrupole_current_pv_name(name)

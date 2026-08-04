@@ -507,8 +507,8 @@ class SaveOrLoad():
                 "nscreens": session["nscreens"],
                 "is_quad_scan": session["is_quad_scan"],
                 "reference_screen": session.get("reference_screen"),
-                "K1_0": session.get("K1_0"),
-                "K1_values": session.get("K1_values"),
+                "K1L_0": session.get("K1L_0"),
+                "K1L_values": session.get("K1L_values"),
                 "sigma_unit": session.get("sigma_unit", "mm"),
             })
         if initial_points_xopt is not None:

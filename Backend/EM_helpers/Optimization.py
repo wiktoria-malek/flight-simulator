@@ -135,12 +135,12 @@ class Optimization:
             print("Starting to fit Twiss parameters and emittance...")
         screens = list(session.get("screens", []))
         quad_name = session.get("quad_name")
-        K1_values = np.asarray(session.get("K1_values", []), dtype=float)
+        K1L_values = np.asarray(session.get("K1L_values", []), dtype=float)
 
         try:
-            quad_k1_0_readback = np.asarray(session.get("K1_0", K1_values[len(K1_values)//2] if K1_values.size else np.nan))
+            quad_k1l_0_readback = np.asarray(session.get("K1L_0", K1L_values[len(K1L_values)//2] if K1L_values.size else np.nan))
         except Exception:
-            quad_k1_0_readback = np.nan
+            quad_k1l_0_readback = np.nan
 
         sigx = np.asarray(session.get("sigx_mean", []), dtype=float)
         sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
@@ -151,14 +151,14 @@ class Optimization:
             raise ValueError("Session does not contain quad_name")
         if len(screens) < 1:
             raise ValueError("At least one screen is required")
-        if K1_values.size == 0:
-            raise ValueError("Session does not contain K1_values")
+        if K1L_values.size == 0:
+            raise ValueError("Session does not contain K1L_values")
         if sigx.ndim != 2 or sigy.ndim != 2:
             raise ValueError("Invalid sigma array shape")
         if sigx.shape != sigy.shape:
             raise ValueError("sigx and sigy shapes do not match")
-        if sigx.shape[0] != K1_values.size:
-            raise ValueError("K1_values and sigma arrays have incompatible lengths")
+        if sigx.shape[0] != K1L_values.size:
+            raise ValueError("K1L_values and sigma arrays have incompatible lengths")
         if not bounds:
             raise ValueError("Add bounds for optimizer to interface_setup.py")
 
@@ -185,7 +185,7 @@ class Optimization:
         fit_y = None
 
         try:
-            joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1_values=K1_values,
+            joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1L_values=K1L_values,
                                     sigx=sigx, sigx_std=sigx_std, sigy=sigy, sigy_std=sigy_std, bounds = bounds)
 
             fit_x = {
@@ -296,7 +296,7 @@ class Optimization:
         alpha_x0_err = float(err_dict.get("alpha_x0", np.nan))
         beta_y0_err = float(err_dict.get("beta_y0", np.nan))
         alpha_y0_err = float(err_dict.get("alpha_y0", np.nan))
-        quad_k1_0_err = float(err_dict.get("quad_k1_0", np.nan))
+        quad_k1l_0_err = float(err_dict.get("quad_k1l_0", np.nan))
 
         if np.isfinite(beta_gamma) and beta_gamma > 0:
             emit_x_geom_err = emit_x_norm_err / beta_gamma * 1e3 if np.isfinite(emit_x_norm_err) else np.nan
@@ -335,12 +335,12 @@ class Optimization:
             "paused": bool(self._pause_requested),
             "stopped": stopped,
             "fit_quadrupole_strength": bool(self.fit_quadrupole_strength),
-            "quad_k1_0": (
-                float(joint_fit.get("quad_k1_0", np.nan))
+            "quad_k1l_0": (
+                float(joint_fit.get("quad_k1l_0", np.nan))
                 if bool(self.fit_quadrupole_strength) and isinstance(joint_fit, dict)
-                else quad_k1_0_readback
+                else quad_k1l_0_readback
             ),
-            "quad_k1_0_is_fitted": bool(self.fit_quadrupole_strength),
+            "quad_k1l_0_is_fitted": bool(self.fit_quadrupole_strength),
             "emit_x_norm_err": emit_x_norm_err,
             "emit_y_norm_err": emit_y_norm_err,
             "emit_x_geom_err": emit_x_geom_err,
@@ -349,7 +349,7 @@ class Optimization:
             "alpha_x0_err": alpha_x0_err,
             "beta_y0_err": beta_y0_err,
             "alpha_y0_err": alpha_y0_err,
-            "quad_k1_0_err": quad_k1_0_err,
+            "quad_k1l_0_err": quad_k1l_0_err,
             "fit_reduced_chi2": reduced_chi2,
             "fit_chi2": chi2,
         }
@@ -458,7 +458,7 @@ class Optimization:
             "stopped": True,
         }
 
-    def _fit_6d(self, screens, quad_name, K1_values, sigx, sigx_std, sigy, sigy_std, bounds):
+    def _fit_6d(self, screens, quad_name, K1L_values, sigx, sigx_std, sigy, sigy_std, bounds):
         sigx = np.asarray(sigx, dtype=float)
         sigy = np.asarray(sigy, dtype=float)
         sigx_std = np.asarray(sigx_std, dtype=float)
@@ -483,14 +483,14 @@ class Optimization:
         missing_bounds = [name for name in required_bounds if name not in bounds]
         if missing_bounds:
             raise ValueError(f"Missing optimizer bounds in interface_setup.py: {missing_bounds}")
-        K1_values = np.asarray(K1_values, dtype=float)
-        K1_0_readback = float(K1_values[len(K1_values)//2])
-        deltas_for_fit = K1_values / K1_0_readback - 1.0
+        K1L_values = np.asarray(K1L_values, dtype=float)
+        K1L_0_readback = float(K1L_values[len(K1L_values)//2])
+        deltas_for_fit = K1L_values / K1L_0_readback - 1.0
 
         if self.fit_quadrupole_strength:
-            low = 0.7 * K1_0_readback
-            high = 1.3 * K1_0_readback
-            bounds["quad_k1_0"] = [min(low,high), max(low,high)]
+            low = 0.7 * K1L_0_readback
+            high = 1.3 * K1L_0_readback
+            bounds["quad_k1l_0"] = [min(low,high), max(low,high)]
 
 
         vocs = VOCS( # degrees of freedom
@@ -503,17 +503,17 @@ class Optimization:
                        "emit_y_norm", "beta_y0", "alpha_y0"]
 
         if self.fit_quadrupole_strength:
-            params_order.append("quad_k1_0")
+            params_order.append("quad_k1l_0")
 
         low_bounds = np.array([bounds[p][0] for p in params_order], dtype=float)
         high_bounds = np.array([bounds[p][1] for p in params_order], dtype=float)
 
-        def predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
+        def predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1l_0 = None):
             '''
             If the beam at the scanned quadrupole has certain Twiss parameters and given emittance,
             what quadrupole scan should be?
             It's based on implementation in the RFTrack interface, where:
-            it sets a quadrupole to each K1, builds a bunch with given Twiss parameters at quad_name,
+            it sets a quadrupole to each K1L, builds a bunch with given Twiss parameters at quad_name,
             tracks only the lattice view from quad_name to the last selected screen,
             and reads beam sizes at screens.
             '''
@@ -530,15 +530,15 @@ class Optimization:
             emit_y_geom = emit_y_norm / beta_gamma
 
             if self.fit_quadrupole_strength:
-                if quad_k1_0 is None:
-                    raise RuntimeError("quad_k1_0 must be provided when fitting quadrupole strength.")
-                K1_values_used = float(quad_k1_0) * (1.0 + deltas_for_fit)
+                if quad_k1l_0 is None:
+                    raise RuntimeError("quad_k1l_0 must be provided when fitting quadrupole strength.")
+                K1L_values_used = float(quad_k1l_0) * (1.0 + deltas_for_fit)
             else:
-                K1_values_used = K1_values
+                K1L_values_used = K1L_values
 
             try:
                 pred_sigx, pred_sigy = self.interface.predict_emittance_scan_response(quad_name=quad_name, screens=screens,
-                    K1_values=K1_values_used, emit_x=emit_x_norm, emit_y=emit_y_norm, beta_x0=beta_x0, beta_y0=beta_y0,
+                    K1L_values=K1L_values_used, emit_x=emit_x_norm, emit_y=emit_y_norm, beta_x0=beta_x0, beta_y0=beta_y0,
                     alpha_x0=alpha_x0, alpha_y0=alpha_y0, reference_screen=screens[0], stop_checker=(lambda: self._stop_requested or self._pause_requested) if allow_stop else None)
 
             except RuntimeError as e:
@@ -553,7 +553,7 @@ class Optimization:
                 raise RuntimeError(f"Sigma shape does not match measured shape")
             return pred_sigx ** 2, pred_sigy ** 2
 
-        def compute_cost(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1_0 = None):
+        def compute_cost(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = True, quad_k1l_0 = None):
             '''
             It compares how well a scan is predicting a model, how much it differs from data and
             minimizes f, so that it's as small as possible.
@@ -562,7 +562,7 @@ class Optimization:
                 if self._pause_requested:
                     raise OptimizationPaused("Optimization paused.")
                 raise OptimizationStopped("Optimization stopped.")
-            pred2_x, pred2_y = predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop, quad_k1_0 = quad_k1_0)
+            pred2_x, pred2_y = predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop, quad_k1l_0 = quad_k1l_0)
             rx = (pred2_x - sig_x2)[valid_x] if np.any(valid_x) else np.array([], dtype=float)
             ry = (pred2_y - sig_y2)[valid_y] if np.any(valid_y) else np.array([], dtype=float)
             # res = np.concatenate([np.asarray(rx, dtype = float).ravel(), np.asarray(ry, dtype = float).ravel()]) # the better the match, the smaller the number
@@ -589,10 +589,10 @@ class Optimization:
         def evaluate(inputs):
             if self._stop_requested or self._pause_requested:
                 return {"f": 12.0, "cost_real": 1e12}
-            quad_k1_0 = float(inputs["quad_k1_0"]) if self.fit_quadrupole_strength else None
+            quad_k1l_0 = float(inputs["quad_k1l_0"]) if self.fit_quadrupole_strength else None
             try:
                 f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
-                                    float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = False, quad_k1_0 = quad_k1_0)
+                                    float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = False, quad_k1l_0 = quad_k1l_0)
                 f_real = float(f)
                 f_objective = float(np.log10(max(f_real, 1e-12)))
 
@@ -706,13 +706,13 @@ class Optimization:
         emit_y_norm_best = float(best_row["emit_y_norm"])
         beta_y0_best = float(best_row["beta_y0"])
         alpha_y0_best = float(best_row["alpha_y0"])
-        quad_k1_0_best = float(best_row["quad_k1_0"]) if self.fit_quadrupole_strength else None
+        quad_k1l_0_best = float(best_row["quad_k1l_0"]) if self.fit_quadrupole_strength else None
 
         if self._stop_requested or self._pause_requested:
             pred2_x_partial, pred2_y_partial = predict_sigma2_from_fit_params(
                 emit_x_norm_best, beta_x0_best, alpha_x0_best,
                 emit_y_norm_best, beta_y0_best, alpha_y0_best,
-                allow_stop=False, quad_k1_0 = quad_k1_0_best,
+                allow_stop=False, quad_k1l_0 = quad_k1l_0_best,
             )
 
             solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x_partial, pred2_y=pred2_y_partial, best_row=best_row, best_cost=best_cost)
@@ -723,7 +723,7 @@ class Optimization:
         pred2_x, pred2_y = predict_sigma2_from_fit_params(
             emit_x_norm_best, beta_x0_best, alpha_x0_best,
             emit_y_norm_best, beta_y0_best, alpha_y0_best,
-            allow_stop=True, quad_k1_0 = quad_k1_0_best,
+            allow_stop=True, quad_k1l_0 = quad_k1l_0_best,
         )
 
         local_max_nfev = int(getattr(self, "nm_steps", 5000))
@@ -744,7 +744,7 @@ class Optimization:
         ]
 
         if self.fit_quadrupole_strength:
-            x0_values.append(quad_k1_0_best)
+            x0_values.append(quad_k1l_0_best)
 
         x0 = np.array(x0_values, dtype=float)
         x0 = np.clip(x0, low_bounds, high_bounds)
@@ -823,7 +823,7 @@ class Optimization:
                 p2x, p2y = predict_sigma2_from_fit_params(
                     p_c[0], p_c[1], p_c[2],
                     p_c[3], p_c[4], p_c[5],
-                    quad_k1_0=(p_c[6] if self.fit_quadrupole_strength else None),
+                    quad_k1l_0=(p_c[6] if self.fit_quadrupole_strength else None),
                     allow_stop=False,
                 )
             except Exception:
@@ -854,7 +854,7 @@ class Optimization:
                     f"best_f={ls_best_cost[0]:.4g}, "
                     f"current_emit_x={p_c[0]:.6g}, current_beta_x={p_c[1]:.6g}, current_alpha_x={p_c[2]:.6g}, "
                     f"current_emit_y={p_c[3]:.6g}, current_beta_y={p_c[4]:.6g}, current_alpha_y={p_c[5]:.6g}"
-                    + (f", current_quad_k1_0={p_c[6]:.6g}" if self.fit_quadrupole_strength else "")
+                    + (f", current_quad_k1l_0={p_c[6]:.6g}" if self.fit_quadrupole_strength else "")
                 )
 
             return residuals
@@ -868,7 +868,7 @@ class Optimization:
                 try:
                     res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=local_max_nfev, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8)
                     p_try = np.asarray(res_try.x, dtype=float)
-                    f_try, _, _ = compute_cost(p_try[0], p_try[1], p_try[2], p_try[3], p_try[4], p_try[5], quad_k1_0=(p_try[6] if self.fit_quadrupole_strength else None), allow_stop=False)
+                    f_try, _, _ = compute_cost(p_try[0], p_try[1], p_try[2], p_try[3], p_try[4], p_try[5], quad_k1l_0=(p_try[6] if self.fit_quadrupole_strength else None), allow_stop=False)
                     if np.isfinite(f_try) and f_try < best_res_ls_cost:
                         best_res_ls_cost = float(f_try)
                         best_res_ls = res_try
@@ -905,7 +905,7 @@ class Optimization:
 
         best_row = best_row.copy()
         if self.fit_quadrupole_strength:
-            best_row["quad_k1_0"] = float(p_final[6])
+            best_row["quad_k1l_0"] = float(p_final[6])
         best_row["emit_x_norm"] = float(p_final[0])
         best_row["beta_x0"] = float(p_final[1])
         best_row["alpha_x0"] = float(p_final[2])
@@ -916,14 +916,14 @@ class Optimization:
         stopped_during_fit = stopped_during_fit or ls_stopped[0]
 
         if stopped_during_fit or self._stop_requested or self._pause_requested:
-            pred2_x_p, pred2_y_p = predict_sigma2_from_fit_params(p_final[0], p_final[1], p_final[2], p_final[3], p_final[4], p_final[5], quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None), allow_stop=False)
+            pred2_x_p, pred2_y_p = predict_sigma2_from_fit_params(p_final[0], p_final[1], p_final[2], p_final[3], p_final[4], p_final[5], quad_k1l_0=(p_final[6] if self.fit_quadrupole_strength else None), allow_stop=False)
             solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x_p, pred2_y=pred2_y_p, best_row=best_row, best_cost=best_cost_final)
             if self._pause_requested:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             #raise OptimizationStopped("Optimization stopped.", solution=solution)
             return solution
 
-        pred2_x, pred2_y = predict_sigma2_from_fit_params(p_final[0], p_final[1], p_final[2], p_final[3], p_final[4], p_final[5], quad_k1_0=(p_final[6] if self.fit_quadrupole_strength else None), allow_stop=True)
+        pred2_x, pred2_y = predict_sigma2_from_fit_params(p_final[0], p_final[1], p_final[2], p_final[3], p_final[4], p_final[5], quad_k1l_0=(p_final[6] if self.fit_quadrupole_strength else None), allow_stop=True)
 
         solution = self._build_joint_partial_output(screens=screens, sigma2_x=sig_x2, sigma2_y=sig_y2, pred2_x=pred2_x, pred2_y=pred2_y, best_row=best_row, best_cost=best_cost_final)
         solution["message"] = "Joint x+y Bayesian optimization + least-squares."

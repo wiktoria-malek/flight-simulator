@@ -76,7 +76,7 @@ class QuadrupoleScan(SaveOrLoad):
 
             except ValueError as e:
                 msg = str(e)
-                if "zero K1_0" in msg:
+                if "zero K1L_0" in msg:
                     skipped_quadrupoles.append({"quad_name": quad_name, "reason": msg})
                     continue
                 raise
@@ -119,23 +119,23 @@ class QuadrupoleScan(SaveOrLoad):
             raise ValueError("delta_max must be larger than delta_min")
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
 
-        K1_0 = np.nan
+        K1L_0 = np.nan
         quad_names = list(getattr(self.interface, "quadrupoles", []))
         if steps_requested > 0:
             if quad_name not in quad_names:
                 raise ValueError("Quadrupole name not found in quadrupoles")
             quadrupoles = self.interface.get_quadrupoles([quad_name])
-            K1_0 = float(quadrupoles["bdes"][0])
-            if np.isclose(K1_0, 0.0):
-                raise ValueError("The quadrupole has zero K1_0. You should choose another one.")
+            K1L_0 = float(quadrupoles["bdes"][0])
+            if np.isclose(K1L_0, 0.0):
+                raise ValueError("The quadrupole has zero K1L_0. You should choose another one.")
         if steps_requested == 0:
-            K1_0 = 0.0
+            K1L_0 = 0.0
             deltas = np.array([0.0], dtype=float)
-            K1_values = np.array([0.0], dtype=float)
+            K1L_values = np.array([0.0], dtype=float)
         else:
             deltas = np.linspace(float(delta_min), float(delta_max), steps_requested)
-            K1_values = K1_0 * (1 + deltas)
-        nsteps_scan = len(K1_values)
+            K1L_values = K1L_0 * (1 + deltas)
+        nsteps_scan = len(K1L_values)
         nscreens = len(screens)
 
         sigx_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
@@ -170,7 +170,7 @@ class QuadrupoleScan(SaveOrLoad):
                      insert_screen(screen_name)
                      time.sleep(10)
                 try:
-                    for i, K1 in enumerate(K1_values):
+                    for i, K1L in enumerate(K1L_values):
                         while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
                             setattr(self, "_scan_is_paused", True)
                             QApplication.processEvents()
@@ -183,7 +183,7 @@ class QuadrupoleScan(SaveOrLoad):
                             break
                         if steps_requested > 0:
                             print("Before set_quadrupoles")
-                            self.interface.set_quadrupoles([quad_name], [float(K1)])
+                            self.interface.set_quadrupoles([quad_name], [float(K1L)])
                             time.sleep(5)
                             print("After set_quadrupoles")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
@@ -247,7 +247,7 @@ class QuadrupoleScan(SaveOrLoad):
                             existing_step = {
                                 "step_index": int(i),
                                 "delta": float(deltas[i]),
-                                "K1": float(K1),
+                                "K1L": float(K1L),
                                 "state_files": [],
                             }
                             scan_steps.append(existing_step)
@@ -263,7 +263,7 @@ class QuadrupoleScan(SaveOrLoad):
                             "quadrupoles": [quad_name] if steps_requested>0 else [],
                             "screens": screens,
                             "reference_screen": reference_screen,
-                            "K1_0": float(K1_0),
+                            "K1L_0": float(K1L_0),
                             "sigx_mean": sigx_mean.tolist(),
                             "sigy_mean": sigy_mean.tolist(),
                             "sigxy_mean": sigxy_mean.tolist(),
@@ -273,7 +273,7 @@ class QuadrupoleScan(SaveOrLoad):
                             "sigxy_std": sigxy_std.tolist(),
                             #"tilt_std": tilt_std.tolist(),
                             "deltas": deltas.tolist(),
-                            "K1_values": K1_values.tolist(),
+                            "K1L_values": K1L_values.tolist(),
                             "scan_steps": scan_steps,
                             "states_dir": output_dir,
                             "cancelled": bool(cancel_requested),
@@ -285,8 +285,8 @@ class QuadrupoleScan(SaveOrLoad):
                         }
 
                         if progress_callback is not None:
-                            completed = k * len(K1_values) + i + 1
-                            total = len(screens) * len(K1_values)
+                            completed = k * len(K1L_values) + i + 1
+                            total = len(screens) * len(K1L_values)
                             progress_callback(session_partial, completed, total)
                         if cancel_requested:
                             break
@@ -299,8 +299,8 @@ class QuadrupoleScan(SaveOrLoad):
                         extract_screen(screen_name)
                         time.sleep(10)
         finally:
-            if steps_requested > 0 and np.isfinite(K1_0):
-                self.interface.set_quadrupoles([quad_name], [float(K1_0)])
+            if steps_requested > 0 and np.isfinite(K1L_0):
+                self.interface.set_quadrupoles([quad_name], [float(K1L_0)])
 
         session = {
             "delta_min": float(delta_min),
@@ -312,7 +312,7 @@ class QuadrupoleScan(SaveOrLoad):
             "quadrupoles": [quad_name] if steps_requested > 0 else [],
             "screens": screens,
             "reference_screen": reference_screen,
-            "K1_0": float(K1_0),
+            "K1L_0": float(K1L_0),
             "sigx_mean": sigx_mean.tolist(),
             "sigy_mean": sigy_mean.tolist(),
             "sigxy_mean": sigxy_mean.tolist(),
@@ -322,7 +322,7 @@ class QuadrupoleScan(SaveOrLoad):
             "sigxy_std": sigxy_std.tolist(),
             #"tilt_std": tilt_std.tolist(),
             "deltas": deltas.tolist(),
-            "K1_values": K1_values.tolist(),
+            "K1L_values": K1L_values.tolist(),
             "scan_steps": scan_steps,
             "states_dir": output_dir,
             "cancelled": bool(cancel_requested),

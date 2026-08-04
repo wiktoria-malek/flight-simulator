@@ -321,7 +321,7 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, list):
                 elements = [elements]
 
-            k1_values = []
+            k1l_values = []
             for element in elements:
                 try:
                     strength = element.get_K1(self.Pref / self.Q)
@@ -329,11 +329,11 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                     continue
                 if isinstance(strength, (list, tuple, np.ndarray)):
                     if len(strength) > 0:
-                        k1_values.append(float(strength[0]))
+                        k1l_values.append(float(strength[0]))
                 else:
-                    k1_values.append(float(strength))
+                    k1l_values.append(float(strength))
 
-            bdes[i] = k1_values[0] if k1_values else 0.0
+            bdes[i] = k1l_values[0] if k1l_values else 0.0
 
         quadrupoles = {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
 

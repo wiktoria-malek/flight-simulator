@@ -98,7 +98,7 @@ def print_plane_results(name, ml_sigma, rft_sigma):
 def main():
     if K1_VALUES.size == 0:
         raise RuntimeError(
-            "K1_VALUES is empty. Paste the exact K1 values from the session."
+            "K1L_VALUES is empty. Paste the exact K1L values from the session."
         )
 
     rft_interface = InterfaceATF2_Ext_RFTrack()
@@ -113,7 +113,7 @@ def main():
     common_arguments = {
         "quad_name": QUAD_NAME,
         "screens": SCREENS,
-        "K1_values": K1_VALUES,
+        "K1L_values": K1_VALUES,
         "emit_x": RFT_SOLUTION["emit_x"],
         "beta_x0": RFT_SOLUTION["beta_x0"],
         "alpha_x0": RFT_SOLUTION["alpha_x0"],

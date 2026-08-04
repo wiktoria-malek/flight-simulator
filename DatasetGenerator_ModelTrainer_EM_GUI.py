@@ -67,7 +67,7 @@ class DatasetGeneratorWorker(QObject):
         self.quad_name = quad_name
         self.screens = screens
         self.n_samples = n_samples
-        self.k1_relative_change = relative_k_change
+        self.k1l_relative_change = relative_k_change
         self.output_file = output_file
         self.stop_requested = False
 
@@ -97,14 +97,14 @@ class DatasetGeneratorWorker(QObject):
 
             # normal dataset generation
             # result = generate_dataset(quad_name=self.quad_name, screens=self.screens, interface = self.interface,
-            #                           k1_relative_change=self.k1_relative_change,
+            #                           k1l_relative_change=self.k1l_relative_change,
             #                           n_samples = self.n_samples, output_file = self.output_file,
             #                           log_callback = self._emit_log, progress_callback = self._emit_progress,
             #                           stop_checker = self._should_stop)
 
             # appending new dataset
             self._emit_log(f"Appending to dataset: {self.output_file}")
-            result = append_dataset(quad_name = self.quad_name, screens = self.screens, interface = self.interface, k1_relative_change = self.k1_relative_change, n_samples = self.n_samples, existing_file=self.output_file, new_bounds=new_bounds)
+            result = append_dataset(quad_name = self.quad_name, screens = self.screens, interface = self.interface, k1l_relative_change = self.k1l_relative_change, n_samples = self.n_samples, existing_file=self.output_file, new_bounds=new_bounds)
 
             self.finished.emit(result)
 
@@ -501,7 +501,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         quad_name = quadrupoles[0]
         relative_k_change = (float(self.k1_relative_min_spin.value()), float(self.k1_relative_max_spin.value()))
         if relative_k_change[0] >= relative_k_change[1]:
-            QMessageBox.warning(self, "Error", "K1 relative min must be smaller than K1 relative max.")
+            QMessageBox.warning(self, "Error", "K1L relative min must be smaller than K1L relative max.")
             return
         n_samples = int(self.samples_spin.value())
         output_dir = self.output_dir_edit.text().strip()

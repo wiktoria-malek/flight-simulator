@@ -4,7 +4,7 @@ RMSE - root mean squared error
 R2 - score of fit quality. Best is 1.0
 
 The model learns:
-[emitx_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, K1]
+[emitx_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, K1L]
 ->
 [sigx2_OTR0X, sigx2_OTR1X, sigx2_OTR2X, sigx2_OTR3X,
 sigy2_OTR0X, sigy2_OTR1X, sigy2_OTR2X, sigy2_OTR3X]
@@ -145,8 +145,8 @@ class TrainModel:
             self.quad_name = str(data["quad_name"])
 
         finite = np.all(np.isfinite(X), axis=1) & np.all(np.isfinite(Y), axis=1) # deletes samples with nan, -inf, +inf
-        n_k1_per_twiss_set = 7
-        groups = np.arange(X.shape[0],dtype = int) // max(1, n_k1_per_twiss_set)
+        n_k1l_per_twiss_set = 7
+        groups = np.arange(X.shape[0],dtype = int) // max(1, n_k1l_per_twiss_set)
         X = X[finite]
         Y = Y[finite]
         self.sample_groups = groups[finite]
@@ -383,7 +383,7 @@ class MLInterface:
             )
         return self.trainer.predict_array(X)
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, reference_screen = None, stop_checker = None):
+    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, reference_screen = None, stop_checker = None):
 
         if callable(stop_checker) and stop_checker():
             raise RuntimeError("__OPTIMIZATION_STOP__")
@@ -396,8 +396,8 @@ class MLInterface:
 
         X = []
 
-        for K1 in K1_values:
-            X.append([emit_x, beta_x0, alpha_x0, emit_y, beta_y0, alpha_y0, K1])
+        for K1L in K1L_values:
+            X.append([emit_x, beta_x0, alpha_x0, emit_y, beta_y0, alpha_y0, K1L])
             # scan_points * 7
 
         X = np.asarray(X, dtype=float)

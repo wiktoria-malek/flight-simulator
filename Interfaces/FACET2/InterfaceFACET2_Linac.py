@@ -25,8 +25,7 @@ def get_screens(self):
     pass
 def set_quadrupoles(self):
     pass
-def vary_quadrupoles(self, names, corr_vals):
-    pass
+
 '''
 
 

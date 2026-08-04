@@ -518,7 +518,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, list):
                 elements = [elements]
 
-            k1_values = []
+            k1l_values = []
             for element in elements:
                 try:
                     strength = element.get_K1L(self.Pref / self.Q)*2
@@ -526,11 +526,11 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                     continue
                 if isinstance(strength, (list, tuple, np.ndarray)):
                     if len(strength) > 0:
-                        k1_values.append(float(strength[0]))
+                        k1l_values.append(float(strength[0]))
                 else:
-                    k1_values.append(float(strength))
+                    k1l_values.append(float(strength))
 
-            bdes[i] = k1_values[0] if k1_values else 0.0
+            bdes[i] = k1l_values[0] if k1l_values else 0.0
 
         quadrupoles = {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy(),
                        "xdes": np.array([self.qmag_xdes.get(name, 0.0) for name in self.quadrupoles], dtype=float),
@@ -797,9 +797,9 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             sigy[i] = float(screen_data["sigy"][idx])
         return sigx, sigy
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
         screens = list(screens)
-        K1_values = np.asarray(K1_values, dtype=float)
+        K1L_values = np.asarray(K1L_values, dtype=float)
         screens = list(screens)
         if len(screens) == 0:
             raise RuntimeError("No screens provided for emittance scan prediction.")
@@ -819,17 +819,17 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         original_quads = self.get_quadrupoles(names=[quad_name])
         if len(original_quads["bdes"]) == 0:
             raise RuntimeError(f"Could not find original strength for quad {quad_name}")
-        K1_original = float(original_quads["bdes"][0])
+        K1L_original = float(original_quads["bdes"][0])
 
         B0_original = self.B0
-        output_x = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
-        output_y = np.full((len(K1_values),len(screens)), np.nan, dtype=float)
+        output_x = np.full((len(K1L_values),len(screens)), np.nan, dtype=float)
+        output_y = np.full((len(K1L_values),len(screens)), np.nan, dtype=float)
 
         try:
-            for k,K1 in enumerate(K1_values):
+            for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
-                self.set_quadrupoles([quad_name], [float(K1)], track = False)
+                self.set_quadrupoles([quad_name], [float(K1L)], track = False)
                 start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
                 start_element = start_elements[0]
                 if isinstance(start_element, list):
@@ -867,7 +867,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                         output_y[k, si] = float(np.std(m[:, 1]))
 
         finally:
-            self.set_quadrupoles([quad_name], [float(K1_original)], track=False)
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
             self.B0 = B0_original
             self.__track_bunch()
 

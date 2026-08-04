@@ -469,8 +469,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 return "-"
             return f"{value:.3f}{suffix}"
 
-        quad_strength_text = fmt_value(result.get("quad_k1_0"), " 1/m")
-        if result.get("quad_k1_0_is_fitted", False) and quad_strength_text != "-":
+        quad_strength_text = fmt_value(result.get("quad_k1l_0"), " 1/m")
+        if result.get("quad_k1l_0_is_fitted", False) and quad_strength_text != "-":
             quad_strength_text += " (fit)"
         elif quad_strength_text != "-":
             quad_strength_text += " (nominal)"
@@ -540,7 +540,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         session_to_plot = self._get_session_for_selected_quad(session)
         if session_to_plot is None:
             return
-        K1_values = np.asarray(session_to_plot["K1_values"], dtype=float)
+        K1L_values = np.asarray(session_to_plot["K1L_values"], dtype=float)
         sigx = np.asarray(session_to_plot["sigx_mean"], dtype=float)
         sigy = np.asarray(session_to_plot["sigy_mean"], dtype=float)
         screens = list(session_to_plot["screens"])
@@ -574,8 +574,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             mask_x = np.isfinite(sigx[:, i])
             mask_y = np.isfinite(sigy[:, i])
 
-            ax1.plot(K1_values[mask_x], sigx[mask_x, i], 'o-', label=screen)
-            ax2.plot(K1_values[mask_y], sigy[mask_y, i], 'o-', label=screen)
+            ax1.plot(K1L_values[mask_x], sigx[mask_x, i], 'o-', label=screen)
+            ax2.plot(K1L_values[mask_y], sigy[mask_y, i], 'o-', label=screen)
 
         if session_to_plot.get("is_conventional_em", False):
             title = f"Conventional multi-screen EM: {quad_name}"
@@ -607,7 +607,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         n_screens = min(len(screens), pred_x.shape[1], pred_y.shape[1])
         screens = screens[:n_screens]
 
-        K1_values = np.asarray(self.session["K1_values"], dtype=float)
+        K1L_values = np.asarray(self.session["K1L_values"], dtype=float)
         sigx = np.asarray(self.session["sigx_mean"], dtype=float)
         sigy = np.asarray(self.session["sigy_mean"], dtype=float)
         fig = self.canvas.figure
@@ -631,13 +631,13 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
             base_color = color_cycle[prediction_i % len(color_cycle)]
             fit_color = lighten_color(base_color, amount=0.45)
-            ax1.plot(K1_values, sigx[:, session_i], "o", color=base_color, label=f"{screen} data")
+            ax1.plot(K1L_values, sigx[:, session_i], "o", color=base_color, label=f"{screen} data")
             fit_x = np.sqrt(np.maximum(pred_x[:, prediction_i], 0.0))
-            ax1.plot(K1_values, fit_x, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
-            ax2.plot(K1_values, sigy[:, session_i], "o", color=base_color, label=f"{screen} data")
+            ax1.plot(K1L_values, fit_x, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
+            ax2.plot(K1L_values, sigy[:, session_i], "o", color=base_color, label=f"{screen} data")
 
             fit_y = np.sqrt(np.maximum(pred_y[:, prediction_i], 0.0))
-            ax2.plot(K1_values, fit_y, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
+            ax2.plot(K1L_values, fit_y, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
 
         unit = self.session.get("sigma_unit", self._get_interface_units())
 
@@ -667,19 +667,19 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             delta_min = float(self.emittance_settings["delta_min"])
             delta_max = float(self.emittance_settings["delta_max"])
             deltas = np.linspace(delta_min, delta_max, steps_requested)
-            K1_values = np.full(steps_requested, np.nan)
+            K1L_values = np.full(steps_requested, np.nan)
             for path, state in zip(self.loaded_state_files, self.loaded_states_from_scan):
                 filename = os.path.basename(path)
                 step_i = int(filename.split("_")[3])  # screen_0000_step_0003_shot_0000.pkl -> 0003
                 quad = state.get_quadrupoles()
-                K1_values[step_i] = float(np.ravel(quad["bdes"])[0])
-            K1_0 = float(np.nanmean(K1_values / (1.0 + deltas))) # to be verified
+                K1L_values[step_i] = float(np.ravel(quad["bdes"])[0])
+            K1L_0 = float(np.nanmean(K1L_values / (1.0 + deltas))) # to be verified
             nsteps_scan = steps_requested
 
         else:
-            delta_min, delta_max, K1_0, nsteps_scan = 0.0, 0.0, 0.0, 1
+            delta_min, delta_max, K1L_0, nsteps_scan = 0.0, 0.0, 0.0, 1
             deltas = np.array([0.0])
-            K1_values = np.array([0.0])
+            K1L_values = np.array([0.0])
 
         nscreens = int(self.emittance_settings["nscreens"])
         screens = list(self.emittance_settings.get("screens",[]))
@@ -723,7 +723,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             scan_steps.append({
                 "step_index": int(i),
                 "delta": float(deltas[i]),
-                "K1": float(K1_values[i]),
+                "K1L": float(K1L_values[i]),
                 "state_files": state_files,
             })
 
@@ -738,7 +738,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "quadrupoles": [quad_name] if quad_name and is_quad_scan else [],
             "screens": screens,
             "reference_screen": screens[0] if screens else "",
-            "K1_0": float(K1_0),
+            "K1L_0": float(K1L_0),
             "sigx_mean": sigx_mean.tolist(),
             "sigy_mean": sigy_mean.tolist(),
             "sigxy_mean": sigxy_mean.tolist(),
@@ -746,7 +746,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "sigy_std": sigy_std.tolist(),
             "sigxy_std": sigxy_std.tolist(),
             "deltas": deltas.tolist(),
-            "K1_values": K1_values.tolist(),
+            "K1L_values": K1L_values.tolist(),
             "scan_steps": scan_steps,
             "states_dir": folder,
             "cancelled": False,
@@ -754,7 +754,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "images": images,
         }
 
-        print("K1:", session["K1_values"])
+        print("K1L:", session["K1L_values"])
         print("sigx:", session["sigx_mean"])
         print("sigy:", session["sigy_mean"])
         print("unit:", session.get("sigma_unit"))
@@ -786,8 +786,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         # FOR TESTS!!!
         # scale = 0.8
         # session_bad = copy.deepcopy(self.session)
-        # session_bad["K1_0"] = self.session["K1_0"] * scale
-        # session_bad["K1_values"] = (np.asarray(self.session["K1_values"]) * scale).tolist()
+        # session_bad["K1L_0"] = self.session["K1L_0"] * scale
+        # session_bad["K1L_values"] = (np.asarray(self.session["K1L_values"]) * scale).tolist()
         # FOR TESTS!!! in order to test again, pass session_bad to the worker, instead of self.session
 
         computing_method = self.computing_method_combo.currentText().strip()
