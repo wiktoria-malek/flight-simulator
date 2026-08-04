@@ -39,7 +39,7 @@ class State:
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            corr_indexes = np.array([index for index, string in enumerate(self.correctors['names']) if string in names])
+            corr_indexes = np.array([index for index, string in enumerate(self.correctors['names']) if string in names], dtype=int)
             correctors = {
                 "names": np.array(self.correctors['names'])[corr_indexes],
                 "bdes": np.array(self.correctors['bdes'])[corr_indexes],
@@ -53,7 +53,8 @@ class State:
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            bpm_indexes = np.array([index for index, string in enumerate(self.bpms['names']) if string in names])
+            bpm_indexes = np.array([index for index, string in enumerate(self.bpms['names']) if string in names], dtype=int)
+
             bpms = {
                 "names": np.array(self.bpms['names'])[bpm_indexes],
                 "x": np.array(self.bpms['x'])[:,bpm_indexes],
@@ -69,7 +70,7 @@ class State:
             names = [names]
         icts = self.icts
         if names is not None:
-            ict_indexes = np.array([index for index, string in enumerate(icts['names']) if string in names])
+            ict_indexes = np.array([index for index, string in enumerate(icts['names']) if string in names], dtype=int)
             icts = {
                 "names": np.array(self.icts['names'])[ict_indexes],
                 "charge": np.array(self.icts['charge'])[ict_indexes]
@@ -81,7 +82,7 @@ class State:
             names = [names]
         quadrupoles = self.quadrupoles
         if names is not None:
-            quadrupole_indexes = np.array([index for index, string in enumerate(quadrupoles.get('names', [])) if string in names])
+            quadrupole_indexes = np.array([index for index, string in enumerate(quadrupoles.get('names', [])) if string in names], dtype=int)
             subset = {"names": np.array(quadrupoles.get('names', []))[quadrupole_indexes]}
             for key, value in quadrupoles.items():
                 if key == "names":
@@ -98,7 +99,7 @@ class State:
             names = [names]
         sextupoles=self.sextupoles
         if names is not None:
-            sextupole_indexes=np.array([index for index, string in enumerate(sextupoles['names']) if string in names])
+            sextupole_indexes = np.array([index for index, string in enumerate(sextupoles['names']) if string in names], dtype=int)
             sextupoles = {
                 "names": np.array(self.sextupoles['names'])[sextupole_indexes],
                 "bdes": np.array(self.sextupoles['bdes'])[sextupole_indexes],
@@ -144,7 +145,7 @@ class State:
         if isinstance(names, str):
             names = [names]
         if names is not None:
-            screen_indexes = np.array([index for index, string in enumerate(self.screens['names']) if string in names])
+            screen_indexes = np.array([index for index, string in enumerate(self.screens['names']) if string in names], dtype=int)
             screens = {"names": np.array(self.screens['names'])[screen_indexes],
                        "hpixel": np.array(self.screens['hpixel'])[screen_indexes],
                        "vpixel": np.array(self.screens['vpixel'])[screen_indexes],

@@ -43,8 +43,12 @@ class ResponseMatrix_DFS_WFS():
         if actuator_mode == "quadrupole_movers":
             return self._compute_qm_response_matrix(pairs=pairs, qcorrs=correctors, bpms=bpms, triangular=triangular)
         else:
-            hcorrs = [string for string in correctors if self._is_h_corrector(string)]
-            vcorrs = [string for string in correctors if self._is_v_corrector(string)]
+            # hcorrs = [string for string in correctors if self._is_h_corrector(string)]
+            # vcorrs = [string for string in correctors if self._is_v_corrector(string)]
+            file = pairs[0][0]
+            S = State(filename=file)
+            hcorrs = [c for c in correctors if c in S.hcorrectors_names]
+            vcorrs = [c for c in correctors if c in S.vcorrectors_names]
 
         # Pick all correctors preceding the last bpm
         hcorrs = [corr for corr in hcorrs if self.sequence.index(corr) < self.sequence.index(bpms[-1])]
