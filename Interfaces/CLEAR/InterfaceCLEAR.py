@@ -182,7 +182,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         lattice = get_lattice(start, end, self.Pref, quad_currents)
         return lattice, element_descriptions, start, end
 
-    def __init__(self, nsamples=1, nominal_intensity=1.5, wfs_intensity=1.0):
+    def __init__(self, nsamples=1, bg_shots=10.0 ):
         self.screen_backgrounds = {}
         self.steps_readback_position = 0.0
         self.energy_readback = 0.0
@@ -290,8 +290,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BCMTHZ2/Acquisition#charge',
         ]
 
-        self.nominal_laser_intensity = nominal_intensity
-        self.test_laser_intensity = wfs_intensity
         self.quadrupoles = list(config.quad_names)
         self.quad_set_params = dict(zip(config.quad_names, config.current_set_params))
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
@@ -302,6 +300,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.lattice, self.element_descriptions, self.start, self.end = self.__build(filename=survey_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
         self.lattice.set_tt_nsteps(0)
+        self.bg_shots = int(bg_shots)
 
     def CamList(self):
         _JSON_PATH = os.path.join(os.path.dirname(__file__), 'cameras.json')
@@ -785,7 +784,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             if not reached_target: raise RuntimeError(f"Screen {screen_name} was not extracted within time.")
             self.log(f"Extracted {screen_name}!")
 
-    def acquire_screen_background(self, screen_name, frames = 10):
+    def acquire_screen_background(self, screen_name, frames = self.bg_shots):
         self.extract_screen(screen_name)
         background_frames = []
         for frame in range(frames):
