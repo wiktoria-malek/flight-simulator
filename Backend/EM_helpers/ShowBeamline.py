@@ -17,7 +17,11 @@ class ShowBeamline(QDialog):
     def __init__(self, interface, parent=None, quad_selected=None, screens = None):
         super().__init__(parent)
         self.interface = interface
-        self.quad_selected = str(quad_selected[0])
+        quadrupoles = list(getattr(self.interface, "quadrupoles", []))
+        try:
+            self.quad_selected = quad_selected[0]
+        except:
+            self.quad_selected = quadrupoles[0]
         self.screens = [str(screen) for screen in screens]
         self.lattice = getattr(self.interface, "lattice", None)
         self.setWindowTitle("Beamline View")
@@ -46,16 +50,17 @@ class ShowBeamline(QDialog):
         header_layout.addStretch(1)
         self.last_screen = self.screens[-1]
 
-        mapped_quad_elements = self.interface._map_quadrupoles_names_from_lattice(self.quad_selected)
 
-        if not isinstance(mapped_quad_elements, list):
-            mapped_quad_elements = [mapped_quad_elements]
-        self.start_element_name = mapped_quad_elements[0].get_name()
-        start_positions = self.interface._get_elements_positions(names=self.start_element_name)["S"]
+        start_quad_element = self.interface._give_elements_to_show_beamline(self.quad_selected)
+        try:
+            self.start_element_name = start_quad_element.get_name()
+        except:
+            self.start_element_name = start_quad_element
+        start_positions = self.interface._get_elements_positions_show_beamline(names=self.start_element_name)["S"]
         self.first_element_position = float(start_positions[0])
-        self.last_element_position = self.interface._get_elements_positions(names = self.last_screen)['S'][0]
+        self.last_element_position = self.interface._get_elements_positions_show_beamline(names = self.last_screen)['S'][0]
 
-        self.lattice_names = self.interface._get_elements_positions()["names"]
+        self.lattice_names = self.interface._get_elements_positions_show_beamline()["names"]
         self.start_element_combobox.addItems([str(e) for e in self.lattice_names])
         self.last_element_combobox.addItems([str(e) for e in self.lattice_names])
 
@@ -78,8 +83,8 @@ class ShowBeamline(QDialog):
         self.figure.clear()
         ax = self.figure.subplots(1, 1)
         drawer = drawBeamline(ax)
-        start_s = float(self.interface._get_elements_positions(names=start_element)["S"][0])
-        end_s = float(self.interface._get_elements_positions(names=last_element)["S"][0])
+        start_s = float(self.interface._get_elements_positions_show_beamline(names=start_element)["S"][0])
+        end_s = float(self.interface._get_elements_positions_show_beamline(names=last_element)["S"][0])
         ax.set_xlim(start_s, end_s)
         self.lattice.accept(drawer)
         ax_bottom = ax.secondary_xaxis("bottom")

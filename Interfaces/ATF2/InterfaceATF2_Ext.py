@@ -1,3 +1,4 @@
+import RF_Track as rft
 import sys, time, math, os, threading, struct, ctypes
 import numpy as np
 from epics import PV, ca, caget
@@ -71,6 +72,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.nsamples = nsamples
         self.bpm_sample_interval_s = 0.5
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
+        self.lattice = rft.Lattice(self.twiss_path)
+        self.lattice.set_tt_nsteps(0)
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 1.2999999e3 # MeV/c, until a PV is specified
         self.screen_names = ['OTR0X', 'OTR1X', 'OTR2X', 'OTR3X']
@@ -135,7 +138,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         self.sextupoles = ["SF6FF", "SK4FF", "SK3FF", "SF5FF", "SD4FF", "SK2FF", "SK1FF", "SF1FF", "SD0FF"]
         self.screens = ['OTR0X', 'OTR1X','OTR2X','OTR3X']
-        #self.quadrupoles = ['OTR0X', 'OTR1X','OTR2X','OTR3X']
 
         # Use list comprehension to filter out strings starting with 'Z' or 'z'
         monitors_from_sequence = [string for string in sequence if not string.lower().startswith('z')]
@@ -331,6 +333,54 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.log(f"Current status of screen {screen_name} is {status}...")
         PV(f"{screen_pv_name}:Target:WRITE:OUT").put(1)
         self._wait_for_screen_target_position(screen_name, 0)
+
+    def _map_quadrupoles_names_from_lattice(self, name):
+        name = str(name)
+        elements =  []
+        for quad_name in [name, f"{name}_1", f"{name}_2"]:
+            try:
+                quad_parts = self.lattice[quad_name]
+            except Exception as e:
+                continue
+            if not isinstance(quad_parts, list):
+                quad_parts = [quad_parts]
+            elements.extend(quad_parts) # adding each element of the list, not the whole list as an element
+        return elements
+
+    def _get_elements_positions_show_beamline(self, names=None):
+        if isinstance(names, str):
+            names = [names]
+
+        all_names = []
+        all_s = []
+        all_l = []
+        s_pos = 0.0
+
+        for element in self.lattice['*']:
+            element_name = element.get_name()
+            try:
+                element_length = float(element.get_length())
+            except Exception:
+                element_length = 0.0
+
+            if names is None or element_name in names:
+                all_names.append(element_name)
+                all_s.append(s_pos)
+                all_l.append(element_length)
+
+            s_pos += element_length
+
+        return {
+            "names": all_names,
+            "S": np.array(all_s, dtype=float),
+        }
+
+    def _give_elements_to_show_beamline(self, quad_selected):
+        mapped_quad_elements = self._map_quadrupoles_names_from_lattice(quad_selected)
+        if not isinstance(mapped_quad_elements, list):
+            mapped_quad_elements = [mapped_quad_elements]
+        start_quad_element_name = mapped_quad_elements[0]
+        return start_quad_element_name
 
     def get_beam_factors(self):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY

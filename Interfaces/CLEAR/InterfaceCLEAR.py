@@ -61,6 +61,127 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def get_name(self):
         return 'CLEAR'
 
+    def __build(self, filename):
+        with open(filename) as file:
+            lines = file.readlines()
+        element_descriptions = {}
+        previous_name = None
+        quad_index = 0
+        corr_index = 0
+        for line in lines:
+            if line[0:2] != ' "':
+                continue
+
+            text = re.findall(r'"([A-Za-z0-9.$_]+)"', line)
+            numbers = re.findall(r'\d+\.\d+', line)
+            name = text[0]
+
+            if name == 'CA.BTV0800':
+                continue
+            element_type = None
+            if 'QFD' in name or 'QDD' in name:
+                element_type = 'Quadrupole'
+            elif 'BTV' in name:
+                element_type = 'Screen'
+            elif 'DHG' in name or 'DHJ' in name or 'SDV' in name:
+                element_type = 'Corrector'
+            elif 'BPC' in name or 'BPM' in name:
+                element_type = 'BPM'
+            elif len(text) > 1 and text[1] == 'MARKER':
+                element_type = 'Marker'
+
+            if element_type is None:
+                continue
+
+            s_end = float(numbers[0])
+            L = float(numbers[1])
+            s_start = s_end - L
+
+            L = round(L, 4)
+            s_start = round(s_start, 4)
+            s_end = round(s_end, 4)
+
+            if previous_name is not None:
+                L_drift = round(s_start - element_descriptions[previous_name]['s_end'], 4)
+                if L_drift != 0:
+                    element_descriptions[previous_name + ' Drift'] = {
+                        'element_type': 'Drift',
+                        'L': L_drift,
+                        's_start': element_descriptions[previous_name]['s_end'],
+                        's_end': s_start,
+                        'quad_index': None,
+                        'corr_index': None,
+                    }
+
+            element_descriptions[name] = {
+                'element_type': element_type,
+                'L': L,
+                's_start': s_start,
+                's_end': s_end,
+                'quad_index': quad_index if element_type == 'Quadrupole' else None,
+                'corr_index': corr_index if element_type == 'Corrector' else None,
+            }
+
+            if element_type == 'Quadrupole':
+                quad_index += 1
+            if element_type == 'Corrector':
+                corr_index += 1
+
+            previous_name = name
+
+        def get_lattice(start, end, Pref, quad_currents, include_end=True):
+            start_index = list(element_descriptions.keys()).index(start)
+            end_index = list(element_descriptions.keys()).index(end)
+            if include_end:
+                end_index += 1
+            lattice = rft.Lattice()
+            names = list(element_descriptions.keys())
+            elements = list(element_descriptions.values())
+            for name, element_description in zip(names[start_index:end_index], elements[start_index:end_index]):
+                element_type = element_description['element_type']
+                L = element_description['L']
+                quad_index = element_description['quad_index']
+
+                if element_type == 'Drift':
+                    element = rft.Drift(L)
+                elif element_type == 'Quadrupole':
+                    if 'QFD' in name:
+                        K = self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                    elif 'QDD' in name:
+                        K = - self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                    element = rft.Quadrupole(L, Pref / self.Q, K)
+                elif element_type == 'Corrector':
+                    element = rft.Corrector(L)
+                elif element_type == 'BPM':
+                    element = rft.Bpm(L)
+                elif element_type == 'Screen' or element_type == 'Marker':
+                    element = rft.Screen()
+                else:
+                    continue
+                element.set_name(name)
+                lattice.append(element)
+            return lattice
+        start = 'CA.STLINE$START'
+        end = 'CA.STLINE$END'
+        quad_currents = np.array([
+            0,  # QFD350
+            0,  # QDD355
+            0,  # QFD360
+
+            20,  # QFD510
+            40.96551724137931,  # QDD515
+            20,  # QFD520
+
+            0,  # QFD760
+            0,  # QDD765
+            0,  # QFD770
+
+            0,  # QDD870
+            0  # QFD880
+        ])  # A
+        lattice = get_lattice(start, end, self.Pref, quad_currents)
+        return lattice, element_descriptions, start, end
+
     def __init__(self, nsamples=1, nominal_intensity=1.5, wfs_intensity=1.0):
         self.screen_backgrounds = {}
         self.steps_readback_position = 0.0
@@ -178,6 +299,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.twiss_path = None
         self.cam_props = self.CamList() # Load camera configuration from assets/cameras.json
         self.camList = list(self.cam_props.keys())
+        self.lattice, self.element_descriptions, self.start, self.end = self.__build(filename=survey_path)
+        self.lattice.set_bpm_resolution(bpm_resolution)
+        self.lattice.set_tt_nsteps(0)
 
     def CamList(self):
         _JSON_PATH = os.path.join(os.path.dirname(__file__), 'cameras.json')
@@ -185,6 +309,38 @@ class CLEAR_real_machine(AbstractMachineInterface):
         with open(_JSON_PATH) as f:
             data = json.load(f)
         return data['devices']
+
+    def _give_elements_to_show_beamline(self, quad_selected):
+        start_quad_element_name = quad_selected
+        return start_quad_element_name
+
+    def _get_elements_positions_show_beamline(self, names=None):
+        if isinstance(names, str):
+            names = [names]
+
+        all_names = []
+        all_s = []
+        all_l = []
+        s_pos = 0.0
+
+        for element in self.lattice['*']:
+            element_name = element.get_name()
+            try:
+                element_length = float(element.get_length())
+            except Exception:
+                element_length = 0.0
+
+            if names is None or element_name in names:
+                all_names.append(element_name)
+                all_s.append(s_pos)
+                all_l.append(element_length)
+
+            s_pos += element_length
+
+        return {
+            "names": all_names,
+            "S": np.array(all_s, dtype=float),
+        }
 
     def get_beam_factors(self):
         pref = self.Pref

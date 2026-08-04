@@ -704,6 +704,38 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return quadrupoles
 
+    def _get_elements_positions_show_beamline(self, names=None):
+        if isinstance(names, str):
+            names = [names]
+
+        all_names = []
+        all_s = []
+        all_l = []
+        s_pos = 0.0
+
+        for element in self.lattice['*']:
+            element_name = element.get_name()
+            try:
+                element_length = float(element.get_length())
+            except Exception:
+                element_length = 0.0
+
+            if names is None or element_name in names:
+                all_names.append(element_name)
+                all_s.append(s_pos)
+                all_l.append(element_length)
+
+            s_pos += element_length
+
+        return {
+            "names": all_names,
+            "S": np.array(all_s, dtype=float),
+        }
+
+    def _give_elements_to_show_beamline(self, quad_selected):
+        start_quad_element_name = quad_selected
+        return start_quad_element_name
+
     def set_quadrupoles(self, names, values_range, track = True):
         if isinstance(names, str):
             names = [names]

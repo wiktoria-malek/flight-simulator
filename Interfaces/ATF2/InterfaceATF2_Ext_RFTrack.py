@@ -100,6 +100,13 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def _original_quad_name(self, name):
         return re.sub(r"_[12]$", "", str(name))
 
+    def _give_elements_to_show_beamline(self, quad_selected):
+        mapped_quad_elements = self._map_quadrupoles_names_from_lattice(quad_selected)
+        if not isinstance(mapped_quad_elements, list):
+            mapped_quad_elements = [mapped_quad_elements]
+        start_quad_element_name = mapped_quad_elements[0]
+        return start_quad_element_name
+
     def _map_quadrupoles_names_from_lattice(self, name):
         name = str(name)
         elements =  []
@@ -722,6 +729,34 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "names": all_names,
             #"S": np.array(all_s, dtype=float),
             "L": np.array(all_l, dtype=float),
+        }
+
+    def _get_elements_positions_show_beamline(self, names=None):
+        if isinstance(names, str):
+            names = [names]
+
+        all_names = []
+        all_s = []
+        all_l = []
+        s_pos = 0.0
+
+        for element in self.lattice['*']:
+            element_name = element.get_name()
+            try:
+                element_length = float(element.get_length())
+            except Exception:
+                element_length = 0.0
+
+            if names is None or element_name in names:
+                all_names.append(element_name)
+                all_s.append(s_pos)
+                all_l.append(element_length)
+
+            s_pos += element_length
+
+        return {
+            "names": all_names,
+            "S": np.array(all_s, dtype=float),
         }
 
     def align_everything(self):
