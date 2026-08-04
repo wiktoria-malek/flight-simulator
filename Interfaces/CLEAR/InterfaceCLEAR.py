@@ -69,35 +69,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 198 # MeV/c
-        self.laser_attenuator_readback = [
-            'CA.GUN-ATTN/AQN#actualPosition',
-            'CA.GUN-ATTN/CMD#requestedPosition',
-        ]
-        self.laser_attenuator_min = 0.0
-        self.laser_attenuator_max = 3.0
-        self.laser_motor_attenuator_readback = [
-            'CTF2Motor2B/Acquisition#position',
-            'CTF2Motor2B/Acquisition#actualPosition',
-            'CTF2Motor2B/Status#position',
-            'CTF2Motor2B/Setting#targetPosition',
-        ]
-
-        self.uv_attenuator_params = {
-            'UVATT1': 'CO.TOWB.101.UVATT1/Setting#position',
-            'UVATT2': 'CO.TOWB.102.UVATT2/Setting#position',
-        }
-        self.uv_attenuator_ranges = {
-            'UVATT1': (2017.0, 5526.0),
-            'UVATT2': (1549.0, 5159.0),
-        }
-        self.shutter_set_params = {
-            'UVBEAM1': 'CO.TOSL.101.UVBEAM1_Set_Pos/SettingBoolean#value',
-            'UVBEAM2': 'CO.TOSL.101.UVBEAM2_Set_Pos/SettingBoolean#value',
-        }
-        self.shutter_readback_params = {
-            'UVBEAM1': 'CO.TOSL.101.UVBEAM1_Acq_Pos/AcquisitionBoolean#value',
-            'UVBEAM2': 'CO.TOSL.101.UVBEAM2_Acq_Pos/AcquisitionBoolean#value',
-        }
 
         self.energy_param = [
             'CA.BEAM/Acquisition#momentum',
@@ -198,21 +169,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BCMTHZ2/Acquisition#charge',
         ]
 
-        self.bcm_sample_params = {
-            "Gun_BCM": "CA.SABCM01/Samples#samples",
-            "Vesper_BCM": "CA.SABPMCAL-SIS5-2/Samples#samples",
-        }
-
-        self.bcm_sensitivity = {
-            "6dB": 2.085,
-            "12dB": 4.18,
-            "18dB": 8.35,
-            "20dB": 10.42,
-            "26dB1": 20.97,
-            "26dB2": 20.95,
-            "32dB": 41.9,
-            "40dB": 105.0,
-        }
         self.nominal_laser_intensity = nominal_intensity
         self.test_laser_intensity = wfs_intensity
         self.quadrupoles = list(config.quad_names)

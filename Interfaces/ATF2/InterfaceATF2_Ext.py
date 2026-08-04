@@ -289,21 +289,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for alias in self.qmag_alias_to_canonical.keys():
             # Use the alias itself for mover PVs (e.g. QM16FF:MAG:DES:X).
             self.qmag_pv[alias] = self._build_qmag_pv_names(alias)
-
         self.bg_shots = int(bg_shots)
-
-    def _quad_calib(self, name):
-
-        ## to fix, quad calib doesnt exist anymore!!!!
-        canonical = self.qmag_alias_to_canonical.get(name, name)
-        calib = self.QUAD_CALIB.get(name) or self.QUAD_CALIB.get(canonical)
-        if calib is None:
-            raise KeyError(f"No A-K1 calibration for quadrupole '{name}' ")
-        k_T_per_A = float(calib["k_T_per_A"])
-        L_m = float(calib["L_m"])
-        if k_T_per_A == 0.0 or L_m == 0.0:
-            raise ValueError(f"Calibration for '{name}' is 0. ")
-        return k_T_per_A, L_m
 
     def current_to_k1(self, name, current_A):
         current_A = float(current_A)
@@ -313,15 +299,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         mag_name_for_library = canonical[1:] if canonical.startswith("M") else canonical
         if self.mag_ki is not None:
             return self.mag_ki.current_to_k1(mag_name_for_library, current_A, self.Pref / 1e3)
-
-        k_T_per_A, L_m = self._quad_calib(name)
-        integrated_gradient_T = k_T_per_A * current_A
-        gradient_T_per_m = integrated_gradient_T / L_m
-        beam_rigidity_Tm = 3.3356409519815204 * (self.Pref / 1e3)
-        k1 = gradient_T_per_m / beam_rigidity_Tm
-        if mag_name_for_library.upper().startswith("QD"):
-            k1 = -abs(k1)
-        return float(k1)
+        else: raise KeyError(f"No A-K1 calibration for '{name}' ")
 
     def k1_to_current(self, name, k1):
         k1 = float(k1)
@@ -331,13 +309,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         mag_name_for_library = canonical[1:] if canonical.startswith("M") else canonical
         if self.mag_ki is not None:
             return self.mag_ki.k1_to_current(mag_name_for_library, k1, self.Pref / 1e3)
-
-        k_T_per_A, L_m = self._quad_calib(name)
-        beam_rigidity_Tm = 3.3356409519815204 * (self.Pref / 1e3)
-        gradient_T_per_m = abs(k1) * beam_rigidity_Tm
-        integrated_gradient_T = gradient_T_per_m * L_m
-        current_A = integrated_gradient_T / k_T_per_A
-        return float(current_A)
+        else:
+            raise KeyError(f"No A-K1 calibration for '{name}' ")
 
     def insert_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
