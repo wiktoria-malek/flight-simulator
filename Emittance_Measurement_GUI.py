@@ -293,6 +293,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         is_linear_mode = self.computation_mode == ComputationMode.LRM
         if is_linear_mode:
             self.steps_settings.setValue(0)
+            self.quadrupoles_list.setEnabled(True)
         else:
             self.steps_settings.setValue(5)
             self._on_nsteps_scan_changed(self.steps_settings.value())

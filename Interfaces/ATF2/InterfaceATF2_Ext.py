@@ -1,10 +1,10 @@
 import RF_Track as rft
-import sys, time, math, os, threading, struct, ctypes
+import sys, time, math, os, threading, struct, ctypes, subprocess
 import numpy as np
 from epics import PV, ca, caget
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 from collections import defaultdict
-import subprocess
+from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
 
 class CurrentDropToZeroError(RuntimeError):
     def __init__(self, message, *, target=None, readback=None, magnets=None):
@@ -38,16 +38,7 @@ class MagKiWrapper:
         field = (ctypes.c_float * 2)(0.0, 0.0)
         efflen = ctypes.c_float(0.0)
         status = int(
-            self._func(
-                int(mode),
-                str(name).encode("ascii"),
-                ctypes.c_float(float(energy_GeV)),
-                kvalue,
-                current,
-                ctypes.byref(efflen),
-                field,
-            )
-        )
+            self._func(int(mode), str(name).encode("ascii"), ctypes.c_float(float(energy_GeV)), kvalue, current, ctypes.byref(efflen), field))
         if status != 1:
             raise RuntimeError(f"mag_ki_main failed for {name}, mode={mode}, status={status}")
         return {
@@ -57,10 +48,10 @@ class MagKiWrapper:
             "field": float(field[0]),
         }
 
-    def current_to_k1(self, name, current_A, energy_GeV):
+    def current_to_k1l(self, name, current_A, energy_GeV):
         return self._call(self.MODE_I_TO_K, name, energy_GeV, current_main=current_A)["k"]
 
-    def k1_to_current(self, name, k1, energy_GeV):
+    def k1l_to_current(self, name, k1, energy_GeV):
         return self._call(self.MODE_K_TO_I, name, energy_GeV, k_main=k1)["current"]
 
 class InterfaceATF2_Ext(AbstractMachineInterface):
@@ -85,7 +76,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         }
         self.bpm_sample_interval_s = 0.5
         self.screen_image_shape = (960, 1280) # image size = 1280 x 960
-
+        self.tracking_interface = InterfaceATF2_Ext_RFTrack()
         # Bpms and correctors in beamline order
         sequence = [
             "MB2X", "ZV1X", "QF1X", "ZV2X", "QD2X", "QF3X", "ZH1X", "ZV3X", "QF4X",
@@ -293,26 +284,39 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             self.qmag_pv[alias] = self._build_qmag_pv_names(alias)
         self.bg_shots = int(bg_shots)
 
-    def current_to_k1(self, name, current_A):
+    def current_to_k1l(self, name, current_A):
         current_A = float(current_A)
         if not np.isfinite(current_A):
             return np.nan
         canonical = self.qmag_alias_to_canonical.get(name, name)
         mag_name_for_library = canonical[1:] if canonical.startswith("M") else canonical
         if self.mag_ki is not None:
-            return self.mag_ki.current_to_k1(mag_name_for_library, current_A, self.Pref / 1e3)
+            return self.mag_ki.current_to_k1l(mag_name_for_library, current_A, self.Pref / 1e3)
         else: raise KeyError(f"No A-K1 calibration for '{name}' ")
 
-    def k1_to_current(self, name, k1):
+    def k1l_to_current(self, name, k1):
         k1 = float(k1)
         if not np.isfinite(k1):
             raise ValueError(f"Cannot convert K1 for quadrupole '{name}': {k1}")
         canonical = self.qmag_alias_to_canonical.get(name, name)
         mag_name_for_library = canonical[1:] if canonical.startswith("M") else canonical
         if self.mag_ki is not None:
-            return self.mag_ki.k1_to_current(mag_name_for_library, k1, self.Pref / 1e3)
+            return self.mag_ki.k1l_to_current(mag_name_for_library, k1, self.Pref / 1e3)
         else:
             raise KeyError(f"No A-K1 calibration for '{name}' ")
+
+    def update_tracking_model_with_clibmagnet(self, nominal_bdes_value = None, nominal_bact_value = None, names=None):
+        if isinstance(names, str):
+            names = [names]
+        bact = np.array(nominal_bact_value, dtype=float)
+        bdes = np.array(nominal_bdes_value, dtype=float)
+        self.log(f"Updating tracking model for {names}..."
+                 f"Current nominal bdes value from the machine [1/m]: {bdes}, "
+                 f"Current nominal bact value from the machine [1/m]: {bact}")
+        self.tracking_interface.set_quadrupoles(names, bact)
+        self.log(f"Reading new values set in the lattice:")
+        print(self.tracking_interface.get_quadrupoles(names)["bdes"])
+        self.log(f"Changed model values to match the lattice!")
 
     def insert_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -497,8 +501,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         iact = np.array(iact, dtype=float)
 
         try:
-            bdes = np.array([self.current_to_k1(n, i) for n, i in zip(names, ides)], dtype=float)
-            bact = np.array([self.current_to_k1(n, i) for n, i in zip(names, iact)], dtype=float)
+            bdes = np.array([self.current_to_k1l(n, i) for n, i in zip(names, ides)], dtype=float)
+            bact = np.array([self.current_to_k1l(n, i) for n, i in zip(names, iact)], dtype=float)
+            self.update_tracking_model_with_clibmagnet(names=names, nominal_bdes_value = bdes, nominal_bact_value = bact)
         except Exception as exc:
             print(f"current to K1 conversion failed for quadrupoles {names}: {exc}")
             bdes = np.array([np.nan for _ in names], dtype=float)
@@ -506,8 +511,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         data = {
             "names": names,
-            "bdes": bdes, # 1/m^2,
-            "bact": bact,  # 1/m^2
+            "bdes": bdes, # 1/m,
+            "bact": bact,  # 1/m
             "ides": np.array(ides, dtype=float),
             "iact": np.array(iact, dtype=float),
             "xdes": np.array(xdes, dtype=float),
@@ -534,7 +539,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
                 raise ValueError(f"Quadrupole '{name}' is not magnet list.")
             current_name = self._quadrupole_current_pv_name(name)
             print(name)
-            target_current = self.k1_to_current(current_name, float(k1))  # A
+            target_current = self.k1l_to_current(current_name, float(k1))  # A
             self._pv_put(f"{current_name}:currentWrite", float(target_current))
             self._wait_for_magnet_readback(current_name, float(target_current))
 

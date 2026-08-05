@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1530</width>
-    <height>922</height>
+    <height>1002</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -56,17 +56,59 @@ QGroupBox#devicesGroup::title {
          </property>
          <layout class="QVBoxLayout" name="devicesVBox">
           <item>
-           <widget class="QPushButton" name="show_beamline_button">
-            <property name="maximumSize">
-             <size>
-              <width>200</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>Show beamline</string>
-            </property>
-           </widget>
+           <layout class="QHBoxLayout" name="horizontalLayout_8">
+            <item>
+             <widget class="QPushButton" name="show_beamline_button">
+              <property name="maximumSize">
+               <size>
+                <width>240</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>Show beamline</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="download_quads_button">
+              <property name="maximumSize">
+               <size>
+                <width>240</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>Download quadrupoles status</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="quad_status_tooltip">
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Downloads the status of all quadrupoles from the machine and updates RF-Track model with more accurate numbers to provide accurate tracking.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QToolButton#quad_status_tooltip{
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#quad_status_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+              </property>
+              <property name="text">
+               <string>?</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
           <item>
            <layout class="QHBoxLayout" name="devicesHBox">

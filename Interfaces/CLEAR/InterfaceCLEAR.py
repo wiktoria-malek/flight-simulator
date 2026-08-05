@@ -1,4 +1,5 @@
 from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral, change_inverted_bpm_polarity
+from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
 import sys, time, math, os, json
 import numpy as np
 try:
@@ -191,7 +192,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 198 # MeV/c
         self.machine_name = "CLEAR"
-
+        self.tracking_interface = InterfaceCLEAR_RFTrack()
         self.energy_param = [
             'CA.BEAM/Acquisition#momentum',
             'CA.BEAM/Acquisition#energy',
