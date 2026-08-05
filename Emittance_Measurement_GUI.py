@@ -1,4 +1,4 @@
-import RF_Track as rft # do not touch this
+import RF_Track as rft # do not touch this import!
 import os, sys, time
 import numpy as np
 from datetime import datetime
@@ -91,7 +91,6 @@ class OptimizationWorker(QObject):
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
         self.computing_method = computing_method
 
-
     def _emit_progress(self, phase, current, total):
         self.progress.emit(str(phase), int(current), int(total))
 
@@ -156,10 +155,11 @@ class OptimizationWorker(QObject):
             self.done.emit()
 
 class MainWindow(QMainWindow, QuadrupoleScan):
-    def __init__(self, interface, dir_name, bg_shots = 10):
+    def __init__(self, interface, dir_name, is_rft_in_project_name, bg_shots = 10):
         super().__init__()
         self.interface = interface
         self.dir_name = dir_name
+        self.is_rft_in_project_name = is_rft_in_project_name
         self.session = None
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
@@ -233,6 +233,24 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.interface.bg_shots = int(self.background_shots.value())
         self.background_shots.valueChanged.connect(self._on_bg_shots_changed)
         self.show_beamline_button.clicked.connect(self._show_beamline)
+        if self.is_rft_in_project_name==True:
+            self.download_quads_button.setEnabled(False)
+        else:
+            self.download_quads_button.setEnabled(True)
+            self.download_quads_button.clicked.connect(self._download_all_quads_status)
+
+    def _download_all_quads_status(self):
+        try:
+            output_file_name = os.path.join(self.dir_name, "quadrupoles_status.npz")
+            quadrupoles = list(getattr(self.interface, "quadrupoles", []))
+            self.log(f"Saving quadrupoles {quadrupoles} real readbacks to {self.dir_name}.")
+            quadrupoles_real_status=self.interface.get_quadrupoles(names=quadrupoles)
+            self.log(f"Successfully read real readbacks. Trying to save to {self.dir_name}")
+            np.savez(output_file_name, **quadrupoles_real_status) # it will save all the fields separately, instead of saving the entire dictionary as a python object, meaning we would have to load pickle and do allow_pickle etc
+            self.log(f"Saved quadrupoles real status to {self.dir_name}.")
+        except Exception as e:
+            QMessageBox.information(self, "Save quadrupoles status", f"An error occured while trying to save quadrupoles status. {e}")
+            return
 
     def _show_beamline(self):
         selected_quadrupole, screens = self._get_selection()
@@ -1215,13 +1233,14 @@ if __name__ == "__main__":
     I = dialog
     project_name = I.get_name()
     bg_shots = 10
-    if "RFT" in project_name:
+    is_rft_in_project_name = bool("RFT" in project_name)
+    if is_rft_in_project_name:
         bg_shots = 0
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     dir_name = f"~/CERN-Flight_Simulator-Data/EM_{I.get_name()}{time_str}_session_settings"
     dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
-    w = MainWindow(I, dir_name, bg_shots)
+    w = MainWindow(I, dir_name=dir_name, is_rft_in_project_name=is_rft_in_project_name, bg_shots=bg_shots)
     w.show()
     sys.exit(app.exec())

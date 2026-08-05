@@ -847,7 +847,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         }
         return screens
 
-    def acquire_screen_background(self, screen_name, frames = self.bg_shots):
+    def acquire_screen_background(self, screen_name, frames = None):
+        if frames is None: frames = self.bg_shots
         self.extract_screen(screen_name)
         screen_pv_name = self.screen_pv_names.get(screen_name)
         pv_in_name = f'{screen_pv_name}:Target:WRITE:IN'
