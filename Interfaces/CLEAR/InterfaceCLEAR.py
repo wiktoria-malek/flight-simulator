@@ -788,7 +788,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
             if not reached_target: raise RuntimeError(f"Screen {screen_name} was not extracted within time.")
             self.log(f"Extracted {screen_name}!")
 
-    def acquire_screen_background(self, screen_name, frames = self.bg_shots):
+    def acquire_screen_background(self, screen_name, frames = None):
+        if frames is None: frames = self.bg_shots
         self.extract_screen(screen_name)
         background_frames = []
         for frame in range(frames):

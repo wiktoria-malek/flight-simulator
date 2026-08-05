@@ -38,8 +38,7 @@ class LinearResponseEngine(AbstractComputingEngine):
         sigma2_x = np.asarray(sigx ** 2, dtype=float)
         sigma2_y = np.asarray(sigy ** 2, dtype=float)
 
-        gamma_rel, beta_rel = self.interface.get_beam_factors()
-        beta_gamma = float(gamma_rel) * float(beta_rel)
+        gamma_rel, beta_rel, beta_gamma = self.interface.get_beam_factors()
 
         if not np.isfinite(beta_gamma) or beta_gamma <= 0:
             raise RuntimeError("Invalid beam factors")

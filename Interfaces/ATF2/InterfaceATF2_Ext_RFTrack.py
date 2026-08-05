@@ -169,7 +169,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
-        return gamma_rel, beta_rel
+        beta_gamma = gamma_rel * beta_rel
+        if not np.isfinite(beta_gamma) or beta_gamma <= 0:
+            raise RuntimeError("Invalid beam factors")
+        return gamma_rel, beta_rel, beta_gamma
 
     def log_messages(self, console):
         self.log = console or print

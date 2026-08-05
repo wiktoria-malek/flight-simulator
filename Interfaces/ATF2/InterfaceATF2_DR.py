@@ -166,7 +166,10 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         Pref = 1.2999999e3
         gamma_rel = np.sqrt((Pref / 0.51099895) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
-        return gamma_rel, beta_rel
+        beta_gamma = gamma_rel * beta_rel
+        if not np.isfinite(beta_gamma) or beta_gamma <= 0:
+            raise RuntimeError("Invalid beam factors")
+        return gamma_rel, beta_rel, beta_gamma
 
     def _read_twiss_file(self):
         with open(self.twiss_path, "r") as file:

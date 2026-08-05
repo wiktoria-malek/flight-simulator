@@ -239,9 +239,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         hpixel = 0.001
         vpixel = 0.001
-
         selected_screens = [screen for screen in self.screens if names is None or screen in names]
-
         hpixel_list = []
         vpixel_list = []
         xb_list = []
@@ -334,7 +332,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
-        return gamma_rel, beta_rel
+        beta_gamma = gamma_rel * beta_rel
+        if not np.isfinite(beta_gamma) or beta_gamma <= 0:
+            raise RuntimeError("Invalid beam factors")
+        return gamma_rel, beta_rel, beta_gamma
 
     def change_energy(self):
         self.__setup_beam1()

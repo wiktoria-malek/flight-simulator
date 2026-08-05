@@ -125,10 +125,10 @@ class OptimizationWorker(QObject):
         cut_session = dict(self.session)
         cut_session["screens"] = [session_screens[i] for i in selected_indices]
 
-        for key in ("sigx_mean", "sigy_mean", "sigxy_mean", "sigx_std", "sigy_std", "sigxy_std", "images"):
-            if key not in self.session: continue
+        for key in ("sigx_mean", "sigy_mean", "sigxy_mean", "sigx_std", "sigy_std", "sigxy_std"):
             values = np.asarray(self.session[key], dtype=float)
             cut_session[key] = values[:, selected_indices, ...].tolist()
+        cut_session["images"] = [[self.session["images"][step_index][screen_index] for screen_index in selected_indices] for step_index in range(len(self.session["images"]))]
         cut_session["nscreens"] = len(selected_indices)
         reference_screen = cut_session.get("reference_screen")
         if reference_screen not in cut_session["screens"]:
@@ -825,7 +825,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         thread.finished.connect(self._on_optimization_finished)
         thread.finished.connect(thread.deleteLater)
         thread.started.connect(worker.run)
-
         self._optimization_thread = thread
         self._optimization_worker = worker
         self._set_progress(30)

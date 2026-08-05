@@ -164,7 +164,6 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # self.bpm_indexes = [index for index, string in enumerate(monitors) if string in self.bpms]
 
         '''
-        
            Sato-san's way:
            BPM order must follow MONITOR_INDEX_TO_NAME, independent from sequence.
            
@@ -390,7 +389,10 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         # TO BE REPLACED WITH A PV OF REAL BEAM ENERGY
         gamma_rel = np.sqrt((self.Pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
-        return gamma_rel, beta_rel
+        beta_gamma = gamma_rel * beta_rel
+        if not np.isfinite(beta_gamma) or beta_gamma <= 0:
+            raise RuntimeError("Invalid beam factors")
+        return gamma_rel, beta_rel, beta_gamma
 
     def _read_twiss_file(self):
         with open(self.twiss_path, "r") as file:
