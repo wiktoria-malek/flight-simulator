@@ -752,6 +752,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         scan_steps=[]
         for i in range(nsteps_scan):
+
             state_files = [path for path in files if int(os.path.basename(path).split("_")[3]) == i]
 
             scan_steps.append({
