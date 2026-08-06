@@ -16,7 +16,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 # beta y 10.4249046
 # alpha y 3.181594115
 
-# For QF17Xv:
+# For QF17X start:
 #     "emit_x": 5.2,
 #     "beta_x0": 4.868043658,
 #     "alpha_x0": 0.001450331482 ,
@@ -38,6 +38,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     def __init__(self, population=2e10, bg_shots = 0.0,  jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
         self.log = print
+        self.is_simulation = True
         #self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
         #self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'ATF2_EXT_FF_v5.2.twiss')
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Ext_ATF2', 'atf2_full_twiss.tfs')

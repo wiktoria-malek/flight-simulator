@@ -128,9 +128,9 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         start = 'CA.STLINE$START'
         end = 'CA.STLINE$END'
         quad_currents = np.array([ # this is to fix....
-            47.5,  # QFD350
-            86.4,  # QDD355
-            44.0,  # QFD360
+            0.0,  # QFD350
+            0.0,  # QDD355
+            0.0,  # QFD360
 
             20,  # QFD510
             40.96551724137931,  # QDD515
@@ -154,6 +154,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.nsamples = nsamples
         self.nparticles = nparticles
         self.electronmass=rft.electronmass
+        self.is_simulation = True
         survey_path = os.path.join(os.path.dirname(__file__), "clear.survey0_filtered.tfs")
         self.lattice, self.element_descriptions, self.start, self.end = self.__build(filename=survey_path)
         self.lattice.set_bpm_resolution(bpm_resolution)

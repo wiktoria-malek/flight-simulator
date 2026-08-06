@@ -155,11 +155,11 @@ class OptimizationWorker(QObject):
             self.done.emit()
 
 class MainWindow(QMainWindow, QuadrupoleScan):
-    def __init__(self, interface, dir_name, is_rft_in_project_name, bg_shots = 10):
+    def __init__(self, interface, dir_name, is_simulation, bg_shots = 10):
         super().__init__()
         self.interface = interface
         self.dir_name = dir_name
-        self.is_rft_in_project_name = is_rft_in_project_name
+        self.is_simulation = is_simulation
         self.session = None
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.interface.bg_shots = int(self.background_shots.value())
         self.background_shots.valueChanged.connect(self._on_bg_shots_changed)
         self.show_beamline_button.clicked.connect(self._show_beamline)
-        if self.is_rft_in_project_name==True:
+        if self.is_simulation==True:
             self.download_quads_button.setEnabled(False)
         else:
             self.download_quads_button.setEnabled(True)
@@ -681,6 +681,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         is_quad_scan = bool(self.emittance_settings.get("is_quad_scan", True))
         steps_requested = int(self.emittance_settings["scan_steps"])
+        quad_name = self.emittance_settings.get("quad_name")
+        if not quad_name:
+            raise ValueError("Choose a quadrupole before rebuilding a fixed-K1L session.")
 
         if is_quad_scan:
             delta_min = float(self.emittance_settings["delta_min"])
@@ -696,13 +699,25 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             nsteps_scan = steps_requested
 
         else:
-            delta_min, delta_max, K1L_0, nsteps_scan = 0.0, 0.0, 0.0, 1
+            strengths = []
+            for state in states:
+                quadrupoles = state.get_quadrupoles()
+                names = list(quadrupoles.get("names", []))
+                bdes = np.asarray(quadrupoles.get("bdes", []), dtype=float)
+                if quad_name in names:
+                    strengths.append(float(bdes[names.index(quad_name)]))
+            if not strengths or not np.any(np.isfinite(strengths)):
+                raise ValueError(
+                    "The loaded fixed-K1L session does not contain the selected quadrupole strength. "
+                    "Please rescan it with the current application version."
+                )
+            K1L_0 = float(np.nanmean(strengths))
+            delta_min, delta_max, nsteps_scan = 0.0, 0.0, 1
             deltas = np.array([0.0])
-            K1L_values = np.array([0.0])
+            K1L_values = np.array([K1L_0])
 
         nscreens = int(self.emittance_settings["nscreens"])
         screens = list(self.emittance_settings.get("screens",[]))
-        quad_name = self.emittance_settings.get("quad_name")
         if not screens:
             _, screens = self._get_selection()
         screens = screens[:nscreens]
@@ -754,7 +769,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "nshots": int(self.emittance_settings["nshots"]),
             "sigma_unit": "mm",
             "quad_name": quad_name,
-            "quadrupoles": [quad_name] if quad_name and is_quad_scan else [],
+            "quadrupoles": [quad_name],
             "screens": screens,
             "reference_screen": screens[0] if screens else "",
             "K1L_0": float(K1L_0),
@@ -763,6 +778,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "sigxy_mean": sigxy_mean.tolist(),
             "sigx_std": sigx_std.tolist(),
             "sigy_std": sigy_std.tolist(),
+            "sigx_shots": sigx_samples.tolist(),
+            "sigy_shots": sigy_samples.tolist(),
             "sigxy_std": sigxy_std.tolist(),
             "deltas": deltas.tolist(),
             "K1L_values": K1L_values.tolist(),
@@ -1231,15 +1248,16 @@ if __name__ == "__main__":
 
     I = dialog
     project_name = I.get_name()
+    is_simulation = bool(getattr(I, "is_simulation"))
     bg_shots = 10
-    is_rft_in_project_name = bool("RFT" in project_name)
-    if is_rft_in_project_name:
+    #is_rft_in_project_name = bool("RFT" in project_name)
+    if  is_simulation:
         bg_shots = 0
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     dir_name = f"~/CERN-Flight_Simulator-Data/EM_{I.get_name()}{time_str}_session_settings"
     dir_name = os.path.expanduser(os.path.expandvars(dir_name))
 
-    w = MainWindow(I, dir_name=dir_name, is_rft_in_project_name=is_rft_in_project_name, bg_shots=bg_shots)
+    w = MainWindow(I, dir_name=dir_name, is_simulation=is_simulation, bg_shots=bg_shots)
     w.show()
     sys.exit(app.exec())

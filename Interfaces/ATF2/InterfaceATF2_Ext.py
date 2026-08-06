@@ -74,6 +74,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             'OTR2X': 'mOTR2',
             'OTR3X': 'mOTR3'
         }
+        self.is_simulation = False
         self.bpm_sample_interval_s = 0.5
         self.screen_image_shape = (960, 1280) # image size = 1280 x 960
         self.tracking_interface = InterfaceATF2_Ext_RFTrack()

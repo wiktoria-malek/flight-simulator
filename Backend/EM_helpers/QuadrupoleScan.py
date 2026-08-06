@@ -119,19 +119,22 @@ class QuadrupoleScan(SaveOrLoad):
             raise ValueError("delta_max must be larger than delta_min")
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
 
-        K1L_0 = np.nan
         quad_names = list(getattr(self.interface, "quadrupoles", []))
-        if steps_requested > 0:
-            if quad_name not in quad_names:
-                raise ValueError("Quadrupole name not found in quadrupoles")
-            quadrupoles = self.interface.get_quadrupoles([quad_name])
-            K1L_0 = float(quadrupoles["bdes"][0])
-            if np.isclose(K1L_0, 0.0):
-                raise ValueError("The quadrupole has zero K1L_0. You should choose another one.")
+        if not quad_name or quad_name not in quad_names:
+            raise ValueError("Choose a quadrupole from the machine quadrupole list.")
+
+        quadrupoles = self.interface.get_quadrupoles([quad_name])
+        bdes = np.asarray(quadrupoles.get("bdes", []), dtype=float)
+        if bdes.size != 1 or not np.isfinite(bdes[0]):
+            raise RuntimeError(f"Could not read the initial strength of quadrupole {quad_name}.")
+        K1L_0 = float(bdes[0])
+
+        if steps_requested > 0 and np.isclose(K1L_0, 0.0):
+            raise ValueError("The quadrupole has zero K1L_0. You should choose another one.")
+
         if steps_requested == 0:
-            K1L_0 = 0.0
             deltas = np.array([0.0], dtype=float)
-            K1L_values = np.array([0.0], dtype=float)
+            K1L_values = np.array([K1L_0], dtype=float)
         else:
             deltas = np.linspace(float(delta_min), float(delta_max), steps_requested)
             K1L_values = K1L_0 * (1 + deltas)
@@ -146,6 +149,10 @@ class QuadrupoleScan(SaveOrLoad):
         sigy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigxy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         #tilt_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
+        sigx_shots = np.full((nsteps_scan, nscreens, nshots), np.nan, dtype=float)
+        sigy_shots = np.full((nsteps_scan, nscreens, nshots), np.nan, dtype=float)
+        sigxy_shots = np.full((nsteps_scan, nscreens, nshots), np.nan, dtype=float)
+
         scan_steps = []
         images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
         output_dir = self._get_scan_dir(quad_name, steps_requested)
@@ -191,12 +198,9 @@ class QuadrupoleScan(SaveOrLoad):
                         sxy_shots = np.full(nshots, np.nan, dtype=float)
                         # tilt_shots = np.full(nshots, np.nan, dtype=float)
                         state_files = []
-                        if steps_requested > 0:
-                            print("before calling get_quadrupoles")
-                            quad_data = self.interface.get_quadrupoles([quad_name])
-                            print("after calling get_quadrupoles")
-                        else:
-                            quad_data = []
+                        print("before calling get_quadrupoles")
+                        quad_data = self.interface.get_quadrupoles([quad_name])
+                        print("after calling get_quadrupoles")
                         for j in range(nshots):
                             while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
                                 setattr(self, "_scan_is_paused", True)
@@ -242,6 +246,9 @@ class QuadrupoleScan(SaveOrLoad):
                             sigy_std[i, k] = np.nanstd(sy_shots)
                             sigxy_std[i, k] = np.nanstd(sxy_shots)
                             #tilt_std[i, k] = np.nanstd(tilt_shots)
+                            sigx_shots[i, k, :] = sx_shots
+                            sigy_shots[i, k, :] = sy_shots
+
                         existing_step = next((step for step in scan_steps if int(step.get("step_index", -1)) == int(i)), None)
                         if existing_step is None:
                             existing_step = {
@@ -259,8 +266,8 @@ class QuadrupoleScan(SaveOrLoad):
                             "steps": int(steps_requested),
                             "is_quad_scan": bool(steps_requested>0),
                             "nshots": int(nshots),
-                            "quad_name": quad_name if steps_requested > 0 else None,
-                            "quadrupoles": [quad_name] if steps_requested>0 else [],
+                            "quad_name": quad_name,
+                            "quadrupoles": [quad_name],
                             "screens": screens,
                             "reference_screen": reference_screen,
                             "K1L_0": float(K1L_0),
@@ -271,6 +278,8 @@ class QuadrupoleScan(SaveOrLoad):
                             "sigx_std": sigx_std.tolist(),
                             "sigy_std": sigy_std.tolist(),
                             "sigxy_std": sigxy_std.tolist(),
+                            "sigx_shots": sigx_shots.tolist(),
+                            "sigy_shots": sigy_shots.tolist(),
                             #"tilt_std": tilt_std.tolist(),
                             "deltas": deltas.tolist(),
                             "K1L_values": K1L_values.tolist(),
@@ -308,8 +317,8 @@ class QuadrupoleScan(SaveOrLoad):
             "steps": int(steps_requested),
             "is_quad_scan": bool(steps_requested > 0),
             "nshots": int(nshots),
-            "quad_name": quad_name if steps_requested > 0 else None,
-            "quadrupoles": [quad_name] if steps_requested > 0 else [],
+            "quad_name": quad_name,
+            "quadrupoles": [quad_name],
             "screens": screens,
             "reference_screen": reference_screen,
             "K1L_0": float(K1L_0),
@@ -320,6 +329,8 @@ class QuadrupoleScan(SaveOrLoad):
             "sigx_std": sigx_std.tolist(),
             "sigy_std": sigy_std.tolist(),
             "sigxy_std": sigxy_std.tolist(),
+            "sigx_shots": sigx_shots.tolist(),
+            "sigy_shots": sigy_shots.tolist(),
             #"tilt_std": tilt_std.tolist(),
             "deltas": deltas.tolist(),
             "K1L_values": K1L_values.tolist(),

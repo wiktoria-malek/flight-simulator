@@ -249,13 +249,13 @@ QGroupBox#scanGroup::title {
           <item row="3" column="1">
            <widget class="QSpinBox" name="meas_per_step">
             <property name="minimum">
-             <number>1</number>
+             <number>2</number>
             </property>
             <property name="maximum">
              <number>200</number>
             </property>
             <property name="value">
-             <number>1</number>
+             <number>2</number>
             </property>
            </widget>
           </item>

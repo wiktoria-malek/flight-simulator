@@ -142,8 +142,8 @@ class Optimization:
 
         sigx = np.asarray(session.get("sigx_mean", []), dtype=float)
         sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
-        sigx_std = np.asarray(session.get("sigx_std", []), dtype=float)
-        sigy_std = np.asarray(session.get("sigy_std", []), dtype=float)
+        sigx_shots = np.asarray(session.get("sigx_shots", []), dtype=float)
+        sigy_shots = np.asarray(session.get("sigy_shots", []), dtype=float)
 
         if not quad_name:
             raise ValueError("Session does not contain quad_name")
@@ -180,7 +180,7 @@ class Optimization:
         fit_y = None
 
         try:
-            joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1L_values=K1L_values, sigx=sigx, sigx_std=sigx_std, sigy=sigy, sigy_std=sigy_std, bounds = bounds)
+            joint_fit = self._fit_6d(screens=screens, quad_name=quad_name, K1L_values=K1L_values, sigx_shots=sigx_shots, sigy_shots=sigy_shots, bounds = bounds)
 
             fit_x = {
                 "emit": joint_fit["emit_x_geom"],
@@ -406,15 +406,35 @@ class Optimization:
             "cost": float(best_cost) if np.isfinite(best_cost) else np.nan,
         }
 
-    def _fit_6d(self, screens, quad_name, K1L_values, sigx, sigx_std, sigy, sigy_std, bounds):
-        sig_x2 = (np.asarray(sigx, dtype=float)) **2
-        sig_y2 = (np.asarray(sigy, dtype=float))**2
-        valid_x = np.isfinite(sig_x2)
-        valid_y = np.isfinite(sig_y2)
-        sigx_std = np.asarray(sigx_std, dtype=float)
-        sigy_std = np.asarray(sigy_std, dtype=float)
-        if not np.any(np.isfinite(sig_x2)) and not np.any(np.isfinite(sig_y2)): # if False
-            raise RuntimeError(f"No valid measurements for joint fit")
+    def _fit_6d(self, screens, quad_name, K1L_values, sigx_shots, sigy_shots, bounds):
+
+        # sigma^2 for every individual shot
+        q_x_shots = sigx_shots **2
+        q_y_shots = sigy_shots **2
+
+        # number of valid shots at each scan point and screen
+        n_x_sum = np.sum(np.isfinite(q_x_shots), axis=2)
+        n_y_sum = np.sum(np.isfinite(q_y_shots), axis=2)
+
+        # measured mean sigma^2
+        sig_x2 = np.nanmean(q_x_shots, axis=2)
+        sig_y2 = np.nanmean(q_y_shots, axis=2)
+
+        # sample standard deviation of sigma^2, then standard error of its mean
+        s_qx = np.nanstd(q_x_shots, axis=2, ddof=1)
+        s_qy = np.nanstd(q_y_shots, axis=2, ddof=1)
+
+        # uncertainty
+        u_x = np.where(n_x_sum >=2, s_qx / np.sqrt(n_x_sum), 0.1 * sig_x2) # more shots means lower uncertainty
+        u_y = np.where(n_y_sum >= 2, s_qy / np.sqrt(n_y_sum), 0.1 * sig_y2)
+
+        # points usable in statistical chi2
+        valid_x = np.isfinite(sig_x2) & np.isfinite(u_x) & (u_x > 0) & (n_x_sum >= 1)
+        valid_y = np.isfinite(sig_y2) & np.isfinite(u_y) & (u_y > 0) & (n_y_sum >= 1)
+
+        # if not np.any(valid_x) and not np.any(valid_y):
+        #     raise RuntimeError("No valid measurements with at least two shots.")
+
         gamma_rel, beta_rel, beta_gamma = self.interface.get_beam_factors()
         bounds = dict(bounds or {})
         K1L_values = np.asarray(K1L_values, dtype=float)
@@ -477,22 +497,19 @@ class Optimization:
                     raise OptimizationPaused("Optimization paused.")
                 raise OptimizationStopped("Optimization stopped.")
             pred2_x, pred2_y = predict_sigma2_from_fit_params(emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, allow_stop = allow_stop, quad_k1l_0 = quad_k1l_0)
-            rx = (pred2_x - sig_x2)[valid_x] if np.any(valid_x) else np.array([], dtype=float)
-            ry = (pred2_y - sig_y2)[valid_y] if np.any(valid_y) else np.array([], dtype=float)
 
-            rx = rx[np.isfinite(rx)]
-            ry = ry[np.isfinite(ry)]
+            if np.any(valid_x) and not np.all(np.isfinite(pred2_x[valid_x])): return 1e12, pred2_x, pred2_y
+            if np.any(valid_y) and not np.all(np.isfinite(pred2_y[valid_y])): return 1e12, pred2_x, pred2_y
 
-            scale_x = np.nanmedian(np.abs(sig_x2[valid_x])) ** 2 if np.any(valid_x) else 1.0
-            scale_y = np.nanmedian(np.abs(sig_y2[valid_y])) ** 2 if np.any(valid_y) else 1.0
+            # cost : (model - measurement) / uncertainty
+            residual_x = (pred2_x - sig_x2)[valid_x] / u_x[valid_x]
+            residual_y = (pred2_y - sig_y2)[valid_y] / u_y[valid_y]
 
-            scale_x = max(float(scale_x), 1e-30)
-            scale_y = max(float(scale_y), 1e-30)
+            # chi2 - sum of squared residuals
 
-            cost_x = float(np.mean(rx ** 2)) / scale_x if rx.size else 0.0
-            cost_y = float(np.mean(ry ** 2)) / scale_y if ry.size else 0.0
+            chi2 = float(np.sum(residual_x ** 2) + np.sum(residual_y ** 2))
 
-            return 0.5 * (cost_x + cost_y), pred2_x, pred2_y
+            return chi2, pred2_x, pred2_y
 
         def evaluate(inputs):
             if self._stop_requested or self._pause_requested:
@@ -680,17 +697,10 @@ class Optimization:
             except Exception:
                 return np.full(n_x + n_y, 1e3, dtype=float)
 
-            rx = (p2x - sig_x2)[valid_x].ravel() if np.any(valid_x) else np.array([], dtype=float)
-            ry = (p2y - sig_y2)[valid_y].ravel() if np.any(valid_y) else np.array([], dtype=float)
-            rx = rx[np.isfinite(rx)]
-            ry = ry[np.isfinite(ry)]
+            residuals_x = ((p2x - sig_x2)[valid_x] / u_x[valid_x]).ravel()
+            residuals_y = ((p2y - sig_y2)[valid_y] / u_y[valid_y]).ravel()
 
-            if rx.size == 0 and ry.size == 0:
-                return np.full(n_x + n_y, 1e3, dtype=float)
-
-            rx_scaled = np.sqrt(0.5 / n_x) * rx / np.sqrt(scale_x) if rx.size else np.array([], dtype=float)
-            ry_scaled = np.sqrt(0.5 / n_y) * ry / np.sqrt(scale_y) if ry.size else np.array([], dtype=float)
-            residuals = np.concatenate([rx_scaled, ry_scaled])
+            residuals = np.concatenate([ residuals_x, residuals_y])
 
             f = float(np.sum(residuals ** 2))
             if np.isfinite(f) and f < ls_best_cost[0]:

@@ -197,7 +197,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BEAM/Acquisition#momentum',
             'CA.BEAM/Acquisition#energy',
         ]
-
+        self.is_simulation = False
         self.context_acquisition = "SCT.USER.SETUP"
         self.context_empty = ""
         self.log = print
