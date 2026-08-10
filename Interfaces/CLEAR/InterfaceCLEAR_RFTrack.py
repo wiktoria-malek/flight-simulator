@@ -127,10 +127,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             return lattice
         start = 'CA.STLINE$START'
         end = 'CA.STLINE$END'
-        quad_currents = np.array([ # this is to fix....
+        quad_currents = np.array([
             0.0,  # QFD350
             0.0,  # QDD355
-            0.0,  # QFD360
+            43.98,  # QFD360
 
             20,  # QFD510
             40.96551724137931,  # QDD515
@@ -142,6 +142,24 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
             0,  # QDD870
             0  # QFD880
+
+            ## new scan
+            # 1.0,  # QFD350
+            # 0.0,  # QDD355
+            # 0,  # QFD360
+            #
+            # 20,  # QFD510
+            # 40.96551724137931,  # QDD515
+            # 20,  # QFD520
+            #
+            # 0,  # QFD760
+            # 0,  # QDD765
+            # 0,  # QFD770
+            #
+            # 0,  # QDD870
+            # 0  # QFD880
+
+
         ])  # A
         lattice = get_lattice(start, end, self.Pref, quad_currents)
         return lattice, element_descriptions, start, end
@@ -184,6 +202,17 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.machine_name = "CLEAR"
 
     def __setup_beam0(self):
+        # P_ref = 205  # MeV/c
+        # population = 50 * pC
+        # Lquad = 0.226  # m
+        # beta_x = 17.9
+        # beta_y = 8.07
+        # alpha_x = 0.236
+        # alpha_y = -1.72
+        # emitt_x = 12.7  # normalized mm mrad
+        # emitt_y = 4.34  # normalized mm mrad
+        # sigma_t = 10 * ps
+        # sigma_pt = 18
         T = rft.Bunch6d_twiss()
         T.emitt_x = 7.04 # mm.mrad normalised emittance
         T.emitt_y = 3.39  # 0.727 # mm.mrad
@@ -191,8 +220,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.beta_y = 24  #2.73  # m
         T.alpha_x = -0.49
         T.alpha_y = -3.65 #0.339
-        T.sigma_t = 10*rft.ps #or 37*rft.ps # mm/c
-        T.sigma_pt = 10 # permille
+        T.sigma_t = 0#10*rft.ps #or 37*rft.ps # mm/c
+        T.sigma_pt = 0 # permille
         T.mean_xp=0.0
         T.mean_yp=0.0
         self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population, 1, self.Pref, T, self.nparticles) # reference particle

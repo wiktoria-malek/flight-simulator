@@ -67,7 +67,7 @@ for bpm in bpms:
     H_values = [result["H"] for result in bpm_results]
     event_numbers = range(1, len(bpm_results) + 1)
     plt.plot(event_numbers, H_values, label=f"{bpm} H")
-    plt.title("H values")
+    plt.title("H values [mV]")
     plt.xlabel("Event number")
     plt.ylabel("Signal amplitude [mV]")
     plt.legend()
@@ -80,7 +80,7 @@ for bpm in bpms:
     V_values = [result["V"] for result in bpm_results]
     event_numbers = range(1, len(bpm_results) + 1)
     plt.plot(event_numbers, V_values, label=f"{bpm} V")
-    plt.title("V values")
+    plt.title("V values [mV]")
     plt.xlabel("Event number")
     plt.ylabel("Signal amplitude [mV]")
     plt.legend()
@@ -117,26 +117,11 @@ print("Singular values for H in %: ", variance_percent_h)
 print("First mode:", Vt_h[0])
 print("Second mode:", Vt_h[1])
 
-M_v = M_v - np.mean(M_v, axis=0)
-U_v, singular_values_v, Vt_v = np.linalg.svd(M_v, full_matrices=False)
-print(f"Singular values for V: {singular_values_v}")
-variance_percent_v = singular_values_v**2 / np.sum(singular_values_v**2) * 100
-print("Singular values for V in %: ", variance_percent_v)
-
-print("First mode:", Vt_v[0])
-print("Second mode:", Vt_v[1])
-
 # plt.figure()
 # plt.xlabel("S")
 # plt.ylabel("H")
 # plt.scatter(S_values, H_values)
 # plt.show()
-
-'''
-The BPM position signals are relatively stable over the 97 recorded pulses, with no catastrophic outliers. 
-Their pulse-to-pulse variation is strongly correlated and dominated by one common mode, accounting for 91% of the 
-horizontal variation and 98% of the vertical variation.
-'''
 
 fig1 = plt.figure()
 nh_events, nh_bpms = M_h.shape
@@ -158,7 +143,6 @@ ax2.set_xlabel('BPM')
 ax2.set_ylabel('Orbit [#]')
 ax2.set_zlabel('V')
 plt.show()
-
 
 std_h = np.std(M_h, axis=0)
 std_v = np.std(M_v, axis=0)
@@ -219,20 +203,12 @@ ax2 = fig.add_subplot(1, 2, 2, projection="3d")
 n_events_h, n_modes_h = Vt_h.shape
 X_h, Y_h = np.meshgrid(np.arange(1, n_modes_h + 1), np.arange(1, n_events_h + 1))
 ax1.plot_surface(X_h, Y_h, Vt_h, cmap="viridis")
-ax1.set_title(r"$Vt_h$ matrix from SVD")
+ax1.set_title(r"$Vt_hv$ matrix from SVD")
 ax1.set_xlabel("SVD mode")
 ax1.set_ylabel("BPM")
 ax1.set_zlabel(r"$Vt_h$ coefficient value")
-n_events_v, n_modes_v = Vt_v.shape
-X_v, Y_v = np.meshgrid(np.arange(1, n_modes_v + 1), np.arange(1, n_events_v + 1))
-ax2.plot_surface(X_v, Y_v, Vt_v, cmap="viridis")
-ax2.set_title(r"$Vt_v$ matrix from SVD")
-ax2.set_xlabel("SVD mode")
-ax2.set_ylabel("BPM")
-ax2.set_zlabel(r"$Vt_v$ coefficient value")
 plt.tight_layout()
 plt.show()
-
 
 fig, (ax1, ax2) = plt.subplots(1, 2)
 x = np.arange(len(bpms))
@@ -243,15 +219,6 @@ ax1.set_ylabel("Mode coefficient value")
 ax1.set_xticks(x)
 ax1.set_xticklabels(bpms)
 ax1.axhline(0, linewidth=1)
-ax1.grid(True)
-ax2.plot(x, Vt_v[0], marker="o")
-ax2.set_title(r"$V_v^T$ first row")
-ax2.set_xlabel("BPM")
-ax2.set_ylabel("Mode coefficient value")
-ax2.set_xticks(x)
-ax2.set_xticklabels(bpms)
-ax2.axhline(0, linewidth=1)
-ax2.grid(True)
 plt.tight_layout()
 plt.show()
 '''========V==========='''
@@ -265,6 +232,24 @@ plt.xlabel("SVD mode")
 plt.ylabel("Singular value")
 plt.title("Singular values")
 plt.xticks(modes)
+plt.grid(True)
+plt.legend()
+plt.show()
+
+mean_s = []
+std_s = []
+plt.figure()
+x = np.arange(len(bpms))
+plt.xticks(x, bpms)
+for bpm in bpms:
+    bpm_results = [result for result in all_results if result["bpm"] == bpm]
+    s_values = np.asarray([result["S"] for result in bpm_results], dtype=float)
+    mean_s.append(np.mean(s_values))
+    std_s.append(np.std(s_values))
+plt.errorbar(bpms, mean_s, yerr=std_s, fmt='o-', capsize = 5, linewidth=1.5)
+plt.xlabel("BPM")
+plt.ylabel("Mean S value from 97 orbits [mV]")
+plt.title(r"Mean BPM total signal $\pm 1\sigma$")
 plt.grid(True)
 plt.legend()
 plt.show()

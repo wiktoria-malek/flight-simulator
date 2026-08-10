@@ -78,6 +78,7 @@ class OptimizationWorker(QObject):
     done = pyqtSignal()
     progress = pyqtSignal(str, int, int)
     info = pyqtSignal(str)
+    ml_not_found_rft_fallback = pyqtSignal()
 
     def __init__(self, interface, session, selected_screens = None, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False, computing_method = "Linear R-response model"):
         super().__init__()
@@ -143,7 +144,8 @@ class OptimizationWorker(QObject):
             session_for_opt = self._cut_session_to_detected_devices()
             tool = EmittanceComputingEngineSelector.create(method=self.computing_method, interface=self.interface,
                 session=session_for_opt, machine_name=machine_name, info_callback=self.info.emit, n_starts=self.n_starts,
-                xopt_initial_points=self.xopt_initial_points, xopt_steps=self.xopt_steps, nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength, progress_callback=self._emit_progress)
+                xopt_initial_points=self.xopt_initial_points, xopt_steps=self.xopt_steps, nm_steps=self.nm_steps,
+                fit_quadrupole_strength=self.fit_quadrupole_strength, progress_callback=self._emit_progress, fallback_callback = self. ml_not_found_rft_fallback.emit)
             self.optimizer_ready.emit(tool)
             output = tool.fit_from_session(session_for_opt, bounds=bounds)
             self.finished.emit(output)
@@ -488,30 +490,40 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 return "-"
             return f"{value:.3f}{suffix}"
 
+        def formatted_result(value, error, unit=""):
+            value_text = fmt_value(value)
+            error_text = fmt_value(error)
+            if value_text == "-":
+                return "-"
+            if error_text == "-":
+                return f"{value_text} {unit}".rstrip()
+            return f"{value_text} ± {error_text} {unit}".rstrip()
+
         quad_strength_text = fmt_value(result.get("quad_k1l_0"), " 1/m")
         if result.get("quad_k1l_0_is_fitted", False) and quad_strength_text != "-":
             quad_strength_text += " (fit)"
         elif quad_strength_text != "-":
             quad_strength_text += " (nominal)"
         self.result_quad_strength.setText(quad_strength_text)
-        self.result_emit_x_norm.setText(fmt_value(result.get("emit_x_norm"), f" ± {result.get("emit_x_norm_err")} mm·mrad"))
-        self.result_emit_y_norm.setText(fmt_value(result.get("emit_y_norm"), f" ± {result.get("emit_y_norm_err")} mm·mrad"))
-        self.result_emit_x_geom.setText(fmt_value(result.get("emit_x_geom"), f" ± {result.get("emit_x_geom_err")} nm·rad"))
-        self.result_emit_y_geom.setText(fmt_value(result.get("emit_y_geom"), f" ± {result.get("emit_y_geom_err")} nm·rad"))
-        self.result_beta_x0.setText(fmt_value(result.get("beta_x0"), f" ± {result.get("beta_x0_err")} m"))
-        self.result_alpha_x0.setText(fmt_value(result.get("alpha_x0"),  f" ± {result.get("alpha_x0_err")}"))
-        self.result_beta_y0.setText(fmt_value(result.get("beta_y0"), f" ± {result.get("beta_y0_err")} m"))
-        self.result_alpha_y0.setText(fmt_value(result.get("alpha_y0"),  f" ± {result.get("alpha_y0_err")}"))
+        self.result_emit_x_norm.setText(formatted_result(result.get("emit_x_norm"), result.get("emit_x_norm_err"), "mm·mrad"))
+        self.result_emit_y_norm.setText(formatted_result(result.get("emit_y_norm"), result.get("emit_y_norm_err"), "mm·mrad"))
+        self.result_emit_x_geom.setText(formatted_result(result.get("emit_x_geom"), result.get("emit_x_geom_err"), "nm·rad"))
+        self.result_emit_y_geom.setText(formatted_result(result.get("emit_y_geom"), result.get("emit_y_geom_err"), "nm·rad"))
+        self.result_beta_x0.setText(formatted_result(result.get("beta_x0"), result.get("beta_x0_err"), "m"))
+        self.result_alpha_x0.setText(formatted_result(result.get("alpha_x0"), result.get("alpha_x0_err")))
+        self.result_beta_y0.setText(formatted_result(result.get("beta_y0"), result.get("beta_y0_err"), "m"))
+        self.result_alpha_y0.setText(formatted_result(result.get("alpha_y0"), result.get("alpha_y0_err")))
         self.result_reference_screen.setText(result["screen0"])
 
         print("Errors of the fit:")
-        print("Error of emit_x_norm: ", result.get("emit_x_norm_err"))
-        print("Error of emit_y_norm: ", result.get("emit_y_norm_err"))
-        print("Error of emit_x_geom: ", result.get("emit_x_geom_err"))
-        print("Error of emit_y_geom: ", result.get("emit_y_geom_err"))
-        print("Error of beta_x0_err: ", result.get("beta_x0_err"))
-        print("Error of alpha_x0_err: ", result.get("alpha_x0_err"))
-        print("Error of alpha_y0_err: ", result.get("alpha_y0_err"))
+        print("Error of emit_x_norm: ", fmt_value(result.get("emit_x_norm_err")))
+        print("Error of emit_y_norm: ", fmt_value(result.get("emit_y_norm_err")))
+        print("Error of emit_x_geom: ", fmt_value(result.get("emit_x_geom_err")))
+        print("Error of emit_y_geom: ", fmt_value(result.get("emit_y_geom_err")))
+        print("Error of beta_x0: ", fmt_value(result.get("beta_x0_err")))
+        print("Error of alpha_x0: ", fmt_value(result.get("alpha_x0_err")))
+        print("Error of beta_y0: ", fmt_value(result.get("beta_y0_err")))
+        print("Error of alpha_y0: ", fmt_value(result.get("alpha_y0_err")))
 
 
     def _reset_canvas(self):
@@ -623,14 +635,17 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             screens = [screen for screen in screens if screen in session_screens]
         pred_x = np.asarray(pred_x, dtype=float)
         pred_y = np.asarray(pred_y, dtype=float)
+        prediction_observable = str((result or {}).get("prediction_observable", "sigma2"))
+        if prediction_observable not in {"sigma", "sigma2"}:
+            raise ValueError(f"Unknown prediction observable: {prediction_observable}")
         n_screens = min(len(screens), pred_x.shape[1], pred_y.shape[1])
         screens = screens[:n_screens]
-
         K1L_values = np.asarray(self.session["K1L_values"], dtype=float)
         sigx = np.asarray(self.session["sigx_mean"], dtype=float)
         sigy = np.asarray(self.session["sigy_mean"], dtype=float)
         fig = self.canvas.figure
         fig.clear()
+
 
         def lighten_color(color, amount=0.45):
             import matplotlib.colors as mcolors
@@ -651,11 +666,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             base_color = color_cycle[prediction_i % len(color_cycle)]
             fit_color = lighten_color(base_color, amount=0.45)
             ax1.plot(K1L_values, sigx[:, session_i], "o", color=base_color, label=f"{screen} data")
-            fit_x = np.sqrt(np.maximum(pred_x[:, prediction_i], 0.0))
+            fit_x = pred_x[:, prediction_i] if prediction_observable == "sigma" else np.sqrt(np.maximum(pred_x[:, prediction_i], 0.0))
             ax1.plot(K1L_values, fit_x, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
             ax2.plot(K1L_values, sigy[:, session_i], "o", color=base_color, label=f"{screen} data")
 
-            fit_y = np.sqrt(np.maximum(pred_y[:, prediction_i], 0.0))
+            fit_y = pred_y[:, prediction_i] if prediction_observable == "sigma" else np.sqrt(np.maximum(pred_y[:, prediction_i], 0.0))
             ax2.plot(K1L_values, fit_y, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
 
         unit = self.session.get("sigma_unit", self._get_interface_units())
@@ -845,6 +860,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         thread.started.connect(worker.run)
         self._optimization_thread = thread
         self._optimization_worker = worker
+        worker.ml_not_found_rft_fallback.connect(lambda: self.computing_method_combo.setCurrentText(ComputationMode.RFT.value))
         self._set_progress(30)
         thread.start()
 
@@ -1150,9 +1166,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             return
 
         quad_pos = {name: float(s) for name, s in zip(all_quadrupoles, quad_order) if np.isfinite(s)}
-
         valid_quadrupoles = [name for name in all_quadrupoles if name in quad_pos and quad_pos[name] < first_screen_position]
-
         valid_previous = [q for q in getattr(self, "_last_selected_quadrupoles", []) if q in valid_quadrupoles]
 
         self.quadrupoles_list.blockSignals(True)

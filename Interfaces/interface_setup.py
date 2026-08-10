@@ -79,34 +79,56 @@ INTERFACE_SETUP = {
                     "em_sigma_unit": "mm"
 
                 },
-                    "bounds": {   # QF17X RF-Track validation
-                        "emit_x_norm": [3.5, 8.0],
-                        "beta_x0": [2.0, 8.0],
-                        "alpha_x0": [-2.0, 2.0],
-                        "emit_y_norm": [0.01, 0.5],
-                        "beta_y0": [0.2, 1.2],
-                        "alpha_y0": [-1.0, 1.0],
-                    }
-
-
-            # "bounds": {  # QD18X entrance
-            #     "emit_x_norm": [1.0, 9.0], # 5.2
-            #     "beta_x0": [0.1, 15.0], # 1.316683546
-            #     "alpha_x0": [-2.5, 2.5], # -1.36594821
-            #     "emit_y_norm": [0.01, 9.0], # 0.03
-            #     "beta_y0": [0.5, 30.0], # 10.70167088
-            #     "alpha_y0": [-5.0, 5.0], # -0.4245954529
+            # # QF17X — simulation
+            # "bounds": {
+            #     "emit_x_norm": [4.5, 6.0],
+            #     "beta_x0": [3.5, 6.5],
+            #     "alpha_x0": [-1.0, 1.0],
+            #     "emit_y_norm": [0.01, 0.06],
+            #     "beta_y0": [0.4, 1.0],
+            #     "alpha_y0": [-0.4, 0.6],
             # }
 
-            # "bounds": { # QD16X
-            #     "emit_x_norm": [5.0, 9.0],
-            #     "beta_x0": [0.4, 2.0],
-            #     "alpha_x0": [-2.0, 1.5],
-            #
-            #     "emit_y_norm": [0.1, 0.4],
-            #     "beta_y0": [3.0, 8.0],
-            #     "alpha_y0": [1.0, 5.0],
+            # # QD16X — simulation
+            # "bounds": {
+            #     "emit_x_norm": [4.5, 6.0],
+            #     "beta_x0": [0.5, 1.4],
+            #     "alpha_x0": [-0.8, 0.8],
+            #     "emit_y_norm": [0.01, 0.06],
+            #     "beta_y0": [4.0, 7.0],
+            #     "alpha_y0": [-0.5, 1.0],
             # }
+
+        # # QD18X — simulation
+        # "bounds": {
+        #     "emit_x_norm": [4.5, 10.0],
+        #     "beta_x0": [0.7, 5.0],
+        #     "alpha_x0": [-3.0, -0.5],
+        #     "emit_y_norm": [0.01, 0.9],
+        #     "beta_y0": [7.5, 15.0],
+        #     "alpha_y0": [-1.5, 1.0],
+        # }
+
+        # # QF17X — real machine, initial fit
+        #    # around:
+        #     # ml | rftrack
+        #     # 8.458 | 7.8677
+        #     # 5.280 | 5.782
+        #     # -2.453 | -2.644
+        #     # 0.389 | 0.388
+        #     # 0.631 | 0.63944
+        #     # 0.032 | 0.02945
+        #
+        # "bounds": {
+        #     "emit_x_norm": [5.0, 9.0],
+        #     "beta_x0": [3.0, 9.0],
+        #     "alpha_x0": [-4.0, -1.0],
+        #     "emit_y_norm": [0.08, 0.8],
+        #     "beta_y0": [0.2, 1.5],
+        #     "alpha_y0": [-1.0, 1.0],
+        # }
+
+
         },
         {
             "display_name": "ATF2 Linac",
@@ -244,7 +266,7 @@ INTERFACE_SETUP = {
             "display_name": "CLEAR RFTrack",
             "module": "Interfaces.CLEAR.InterfaceCLEAR_RFTrack",
             "class_name": "InterfaceCLEAR_RFTrack",
-            "settings": {"jitter":0.1, "bpm_resolution":0.05, "nsamples":1},
+            "settings": {"jitter": 0.0, "bpm_resolution": 0.0, "nsamples": 1},
             "actions": ["align_everything","misalign_quadrupoles","misalign_bpms"],
             "units":
                 {
@@ -252,15 +274,14 @@ INTERFACE_SETUP = {
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 0.0001
                 },
-            "bounds":
-                {
-                    "emit_x_norm": [0.5, 10.0],
-                    "beta_x0": [0.2, 20.0],
-                    "alpha_x0": [-4.0, 2.0],
-                    "emit_y_norm": [0.5, 10.0],
-                    "beta_y0": [10.0, 30.0],
-                    "alpha_y0": [-8.0, 2.0],
-                }
+            "bounds": {
+                "emit_x_norm": [5.0, 10.0],
+                "beta_x0": [30.0, 70.0],
+                "alpha_x0": [10.0, 35.0],
+                "emit_y_norm": [5.0, 12.0],
+                "beta_y0": [200.0, 400.0],
+                "alpha_y0": [-150.0, -80.0],
+            }
         },
     ],
 }

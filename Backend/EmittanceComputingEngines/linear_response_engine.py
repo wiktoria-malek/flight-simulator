@@ -99,6 +99,7 @@ class LinearResponseEngine(AbstractComputingEngine):
             "quad_k1l_0": quad_k1l_0_readback,
             "quad_k1l_0_is_fitted": False,
             "fit_method": self.name,
+            "prediction_observable": "sigma2",
         }
 
         return {

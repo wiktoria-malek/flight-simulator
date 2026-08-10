@@ -32,16 +32,23 @@ class QuadrupoleScan(SaveOrLoad):
 
     def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, reference_screen=None, progress_callback=None):
         steps = int(steps)
-        if steps == 0:
-            return self._run_single_scan(quad_name = None, screens=screens, delta_min=0.0, delta_max=0.0, steps = 0, nshots = nshots, reference_screen=reference_screen, progress_callback=progress_callback)
         if isinstance(quad_name, str):
             quad_names = [quad_name]
         else:
-            quad_names = list(quad_name)
+            quad_names = list(quad_name or [])
+
         if len(quad_names) == 0:
             raise ValueError("At least one quadrupole must be provided")
+
+        if steps == 0:
+            if len(quad_names) != 1:
+                raise ValueError("For Linear Response, choose exactly one quadrupole.")
+            return self._run_single_scan(quad_name=quad_names[0], screens=screens,
+                delta_min=0.0, delta_max=0.0, steps=0, nshots=nshots,
+                reference_screen=reference_screen, progress_callback=progress_callback)
+
         if len(quad_names) == 1:
-            print(f"{quad_name} is going to be scanned")
+            print(f"{quad_names[0]} is going to be scanned")
             return self._run_single_scan(quad_name=quad_names[0], screens=screens, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, reference_screen=reference_screen, progress_callback=progress_callback)
 
         per_quad_sessions = []

@@ -6,8 +6,8 @@ R2 - score of fit quality. Best is 1.0
 The model learns:
 [emitx_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, K1L]
 ->
-[sigx2_OTR0X, sigx2_OTR1X, sigx2_OTR2X, sigx2_OTR3X,
-sigy2_OTR0X, sigy2_OTR1X, sigy2_OTR2X, sigy2_OTR3X]
+[sigx_OTR0X, sigx_OTR1X, sigx_OTR2X, sigx_OTR3X,
+sigy_OTR0X, sigy_OTR1X, sigy_OTR2X, sigy_OTR3X]
 
 '''
 
@@ -96,6 +96,7 @@ class TrainModel:
         self.y_scaler = None
         self.param_names = []
         self.sigma_names = []
+        self.target_observable = "sigma"
         self.metrics = {}
         self.sample_groups=None
 
@@ -139,6 +140,9 @@ class TrainModel:
             self.param_names = [str(v) for v in data["param_names"]]
         if "sigma_names" in data:
             self.sigma_names = [str(v) for v in data["sigma_names"]]
+        self.target_observable = str(data["target_observable"].item()) if "target_observable" in data.files else "sigma2"
+        if self.target_observable not in {"sigma", "sigma2"}:
+            raise RuntimeError(f"Unsupported ML dataset target: {self.target_observable}")
         if "screens" in data:
             self.screens = [str(v) for v in data["screens"]]
         if "quad_name" in data:
@@ -323,6 +327,7 @@ class TrainModel:
             "y_scale": self.y_scaler.scale_,
             "param_names": self.param_names,
             "sigma_names": self.sigma_names,
+            "target_observable": self.target_observable,
             "screens": self.screens,
             "quad_name": self.quad_name,
             "machine_name": self.machine_name,
@@ -352,6 +357,9 @@ class TrainModel:
 
         self.param_names = [str(v) for v in checkpoint.get("param_names", [])]
         self.sigma_names = [str(v) for v in checkpoint.get("sigma_names", [])]
+        self.target_observable = str(checkpoint.get("target_observable", "sigma2"))
+        if self.target_observable not in {"sigma", "sigma2"}:
+            raise RuntimeError(f"Unsupported ML model target: {self.target_observable}")
         self.screens = [str(v) for v in checkpoint.get("screens", self.screens)]
         self.quad_name = str(checkpoint.get("quad_name", self.quad_name))
         self.machine_name = str(checkpoint.get("machine_name", self.machine_name))
@@ -367,6 +375,8 @@ class MLInterface:
         self.model_file = get_ml_model_file(self.machine_name, self.quad_name, self.screens)
         self.trainer = TrainModel(screens=self.screens, quad_name=self.quad_name, machine_name=self.machine_name, model_file=self.model_file)
         self.trainer.load_model()
+        if self.trainer.target_observable == "sigma2":
+            print(f"Legacy ML model predicts sigma^2; retrain {self.model_file} to use direct sigma predictions.")
 
     def __getattr__(self, name):
         return getattr(self.interface, name) # if there is a function that MLInterface doesn't have (almost all of them), it gets them form the
@@ -410,8 +420,12 @@ class MLInterface:
         prediction_sigx = Y[:, :n_screens]
         prediction_sigy = Y[:, n_screens:]
 
-        prediction_sigx = np.sqrt(np.maximum(prediction_sigx, 0.0)) # cuts values that are negative to 0.0
-        prediction_sigy = np.sqrt(np.maximum(prediction_sigy, 0.0)) # element for element, checks if negative
+        if self.trainer.target_observable == "sigma2":
+            prediction_sigx = np.sqrt(np.maximum(prediction_sigx, 0.0))
+            prediction_sigy = np.sqrt(np.maximum(prediction_sigy, 0.0))
+        else:
+            prediction_sigx = np.maximum(prediction_sigx, 0.0)
+            prediction_sigy = np.maximum(prediction_sigy, 0.0)
 
         return prediction_sigx, prediction_sigy
 

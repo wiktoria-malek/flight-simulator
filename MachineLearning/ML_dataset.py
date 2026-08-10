@@ -35,6 +35,7 @@ PARAMETER_NAMES = [
 ]
 
 N_K1_PER_TWISS = 7
+TARGET_OBSERVABLE = "sigma"
 
 def _save_dataset_checkpoint(output_file, X, Y, twiss_group_ids, screens, quad_name, k1l_relative_change, bounds, interface, K1L_nominal, n_samples, n_twiss_combinations, n_k1l_per_twiss_set):
     output_file = Path(output_file)
@@ -45,7 +46,8 @@ def _save_dataset_checkpoint(output_file, X, Y, twiss_group_ids, screens, quad_n
         Y=np.asarray(Y, dtype=float),
         twiss_group_ids=np.asarray(twiss_group_ids, dtype=int),
         param_names=np.array(PARAMETER_NAMES),
-        sigma_names=np.array([f"sigx2_{screen}" for screen in screens] + [f"sigy2_{screen}" for screen in screens]),
+        sigma_names=np.array([f"sigx_{screen}" for screen in screens] + [f"sigy_{screen}" for screen in screens]),
+        target_observable=np.array(TARGET_OBSERVABLE),
         screens=np.array(screens),
         quad_name=np.array(quad_name),
         reference_screen=np.array(screens[0]),
@@ -134,15 +136,25 @@ def append_dataset(quad_name, screens, interface, k1l_relative_change, n_samples
     generate_dataset(quad_name=quad_name, screens=screens, interface=interface, k1l_relative_change=k1l_relative_change, n_samples=n_samples, output_file=tmp_file, log_callback=print, progress_callback=None, stop_checker=None, new_bounds=new_bounds)
     new = np.load(tmp_file, allow_pickle=True)
 
+    existing_target = str(existing["target_observable"].item()) if "target_observable" in existing.files else "sigma2"
+    if existing_target not in {"sigma", "sigma2"}:
+        raise RuntimeError(f"Unknown target observable in {existing_file}: {existing_target}")
+
+    existing_y = np.asarray(existing["Y"], dtype=float)
+    if existing_target == "sigma2":
+        existing_y = np.sqrt(np.maximum(existing_y, 0.0))
+
     X = np.concatenate([existing["X"], new["X"]])
-    Y = np.concatenate([existing["Y"], new["Y"]])
+    Y = np.concatenate([existing_y, new["Y"]])
+    existing_screens = [str(screen) for screen in existing["screens"]]
 
     np.savez(
         existing_file,
         X=X,
         Y=Y,
         param_names=existing["param_names"],
-        sigma_names=existing["sigma_names"],
+        sigma_names=np.array([f"sigx_{screen}" for screen in existing_screens] + [f"sigy_{screen}" for screen in existing_screens]),
+        target_observable=np.array(TARGET_OBSERVABLE),
         screens=existing["screens"],
         quad_name=existing["quad_name"],
         reference_screen=existing["reference_screen"],
@@ -227,13 +239,13 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
 
             for k_idx, K1L in enumerate(K1L_array):
                 parameters = np.array([emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, float(K1L)], dtype=float)
-                sigma2 = np.concatenate([pred_sigx[k_idx,:]**2, pred_sigy[k_idx,:]**2]).astype(float)
+                sigma = np.concatenate([pred_sigx[k_idx,:], pred_sigy[k_idx,:]]).astype(float)
 
-                if not (np.all(np.isfinite(parameters)) and np.all(np.isfinite(sigma2))):
+                if not (np.all(np.isfinite(parameters)) and np.all(np.isfinite(sigma))):
                     continue
 
                 X.append(parameters)
-                Y.append(sigma2)
+                Y.append(sigma)
                 twiss_group_ids.append(int(twiss_combination))
                 processed_rows += 1
 

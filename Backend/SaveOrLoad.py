@@ -256,6 +256,19 @@ class SaveOrLoad():
         for screen in screens:
             for it in self.screens_list.findItems(screen, Qt.MatchFlag.MatchExactly):
                 it.setSelected(True)
+        if quad_selected:
+            self.quadrupoles_list.blockSignals(True)
+            self.quadrupoles_list.clearSelection()
+
+            for i in range(self.quadrupoles_list.count()):
+                item = self.quadrupoles_list.item(i)
+                item_name = str(item.data(Qt.ItemDataRole.UserRole) or item.text())
+                if item_name == quad_selected:
+                    item.setSelected(True)
+                    break
+
+            self.quadrupoles_list.blockSignals(False)
+            self._last_selected_quadrupoles = [quad_selected]
 
         QMessageBox.warning(self, "Load session", "The folder doesn't contain scan settings values. Using currently set settings.")
         folder_name = os.path.basename(os.path.normpath(folder))
