@@ -165,6 +165,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.actuator_mode = ActuatorMode.Kicker
         self._setup_actuator_mode_combo()
 
+    def _save_machine_status(self):
+        time_str = datetime.now().strftime("%y%m%d%H%M%S")
+        default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
+        self._session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_session_settings")
+        os.makedirs(self._session_dir, exist_ok=True)
+        machine_state = self.interface.get_state()
+        machine_state.save(filename=os.path.join(self._session_dir, "machine_status.pkl"))
+        self.session_database_3.setText(self._session_dir)
+        return machine_state
+
     def _setup_actuator_mode_combo(self):
         self.actuator_mode_combo.blockSignals(True)
         self.actuator_mode_combo.setCurrentText(self.actuator_mode.value)
@@ -444,15 +454,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         print("Starting button clicked...")
         self.log("Starting button clicked...")
         if not self._running:
+            saved_state = self._save_machine_status()
             self._running = True
             self._step = True
-            saved_state = self.interface.get_state()
             sextupoles = saved_state.get_sextupoles()
             sextupoles_to_disable = len(sextupoles["names"]) > 0
             completed = False
             try:
                 if sextupoles_to_disable:
-                    self._start_correction(machine_state=saved_state)
+                    self._start_correction()
 
                     # self.interface.set_sextupoles(sextupoles["names"], np.zeros(len(sextupoles["names"]), dtype=float))
                     # self.log("Sextupoles disabled before BBA")
@@ -464,7 +474,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     # self._show_sextupole_restoration_popup()
                     # QMessageBox.information(self, "Correction", "BBA and sextupole restoration finished.")
                 else:
-                    self._start_correction(machine_state=saved_state)
+                    self._start_correction()
                 completed = True
             finally:
                 self._running = False
@@ -712,7 +722,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.reset_ref_orb = True
         self.log("Resetting reference orbit")
 
-    def _start_correction(self, silent=False, preserve_plots=False, machine_state=None):
+    def _start_correction(self, silent=False, preserve_plots=False):
         try:
             plot_snapshot = None
             if preserve_plots:
@@ -740,8 +750,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     "abs_rms_xy": list(self._hist_abs_rms_xy),
                 }
             corrs, bpms = self._get_selection()
-            if machine_state is None:
-                machine_state = self.interface.get_state()
 
             if self.actuator_mode == ActuatorMode.QM:
                 self._start_qm_correction(silent=silent, preserve_plots=preserve_plots)
@@ -1159,8 +1167,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             if not silent:
                 self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, self.max_horizontal_current_spinbox.value(), self.max_vertical_current_spinbox.value(),
                                            bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy, Axy,
-                                           Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()),
-                                           machine_state_file=machine_state)
+                                           Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()))
             if preserve_plots and plot_snapshot is not None:
                 self._hist_orbit_x[:] = plot_snapshot["orbit_x"]
                 self._hist_orbit_y[:] = plot_snapshot["orbit_y"]

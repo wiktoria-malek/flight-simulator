@@ -127,40 +127,19 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             return lattice
         start = 'CA.STLINE$START'
         end = 'CA.STLINE$END'
-        quad_currents = np.array([
-            0.0,  # QFD350
-            0.0,  # QDD355
-            43.98,  # QFD360
+        quad_currents = np.array([1,  # QFD350
+                                  0,  # QDD355
+                                  0,  # QFD360
+                                  20,  # QFD510
+                                  42.3,  # QDD515
+                                  20,  # QFD520
+                                  0,  # QFD760
+                                  0,  # QDD765
+                                  0,  # QFD770
+                                  0,  # QDD870
+                                  0  # QFD880
+                                  ])  # A
 
-            20,  # QFD510
-            40.96551724137931,  # QDD515
-            20,  # QFD520
-
-            0,  # QFD760
-            0,  # QDD765
-            0,  # QFD770
-
-            0,  # QDD870
-            0  # QFD880
-
-            ## new scan
-            # 1.0,  # QFD350
-            # 0.0,  # QDD355
-            # 0,  # QFD360
-            #
-            # 20,  # QFD510
-            # 40.96551724137931,  # QDD515
-            # 20,  # QFD520
-            #
-            # 0,  # QFD760
-            # 0,  # QDD765
-            # 0,  # QFD770
-            #
-            # 0,  # QDD870
-            # 0  # QFD880
-
-
-        ])  # A
         lattice = get_lattice(start, end, self.Pref, quad_currents)
         return lattice, element_descriptions, start, end
 
