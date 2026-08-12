@@ -47,7 +47,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 element_type = 'Quadrupole'
             elif 'BTV' in name:
                 element_type = 'Screen'
-            elif 'DHG' in name or 'DHJ' in name or 'SDV' in name:
+            elif 'DHG' in name or 'DHJ' in name:
                 element_type = 'Corrector'
             elif 'BPC' in name or 'BPM' in name:
                 element_type = 'BPM'

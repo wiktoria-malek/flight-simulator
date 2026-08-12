@@ -275,12 +275,12 @@ INTERFACE_SETUP = {
                     "sysid_corrector_kick": 0.0001
                 },
             "bounds": {
-                "emit_x_norm": [5.0, 10.0],
-                "beta_x0": [30.0, 70.0],
-                "alpha_x0": [10.0, 35.0],
-                "emit_y_norm": [5.0, 12.0],
-                "beta_y0": [200.0, 400.0],
-                "alpha_y0": [-150.0, -80.0],
+                "emit_x_norm": [0.0, 20.0],
+                "beta_x0": [0.0, 200.0],
+                "alpha_x0": [-50.0, 50.0],
+                "emit_y_norm": [0.0, 20.0],
+                "beta_y0": [0.0, 200.0],
+                "alpha_y0": [-50.0, 50.0],
             }
         },
     ],
