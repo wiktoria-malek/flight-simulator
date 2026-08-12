@@ -164,6 +164,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.subtract_jitter_checkbox.setChecked(False)
         self.actuator_mode = ActuatorMode.Kicker
         self._setup_actuator_mode_combo()
+        self.restore_machine_status_button.clicked.connect(self._pick_and_load_machine_status_file)
 
     def _save_machine_status(self):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")

@@ -207,6 +207,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles) # reference bunch
         self.dfs_test_energy = 0.98
         self.wfs_test_charge = 0.90
+        self._beam_mode = "nominal"
 
     def __setup_beam1(self):
         # Beam for DFS - Reduced energy
@@ -349,20 +350,24 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
     def change_energy(self):
         self.__setup_beam1()
         self.__track_bunch()
+        self._beam_mode = "energy_changed"
         dP_P = self.dfs_test_energy - 1.0
         return dP_P
 
     def reset_energy(self):
         self.__setup_beam0()
         self.__track_bunch()
+        self._beam_mode = "nominal"
 
     def change_intensity(self): #reduced charge
         self.__setup_beam2()
         self.__track_bunch()
+        self._beam_mode = "intensity_changed"
 
     def reset_intensity(self):
         self.__setup_beam0()
         self.__track_bunch()
+        self._beam_mode = "nominal"
 
     def _get_elements_positions(self, names=None):
         if isinstance(names, str):

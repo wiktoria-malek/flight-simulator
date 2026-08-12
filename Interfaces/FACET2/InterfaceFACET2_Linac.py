@@ -214,6 +214,42 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         self.PVs['Q_setpoint'].put(self.init_charge_setpoint)
         return self
 
+    def get_beam_settings(self):
+        energy_pvs = {
+            "dl10_feedback_vernier": "dl10e_setpoint",
+            "bc11_feedback_vernier": "bc11e_setpoint",
+            "bc14_feedback_vernier": "bc14e_setpoint",
+            "bc20_feedback_vernier": "bc20e_setpoint",
+        }
+        intensity_pvs = {
+            "uvwp_angle": "UVWP_angle",
+            "charge_setpoint": "Q_setpoint",
+        }
+        return {
+            "energy": {name: self._safe_float(self.PVs[pv].get()) for name, pv in energy_pvs.items()},
+            "intensity": {name: self._safe_float(self.PVs[pv].get()) for name, pv in intensity_pvs.items()},
+        }
+
+    def restore_beam_settings(self, settings):
+        settings = settings or {}
+        energy_pvs = {
+            "dl10_feedback_vernier": "dl10e_setpoint",
+            "bc11_feedback_vernier": "bc11e_setpoint",
+            "bc14_feedback_vernier": "bc14e_setpoint",
+            "bc20_feedback_vernier": "bc20e_setpoint",
+        }
+        intensity_pvs = {
+            "uvwp_angle": "UVWP_angle",
+            "charge_setpoint": "Q_setpoint",
+        }
+        for values, pv_names in ((settings.get("energy", {}), energy_pvs),
+                                 (settings.get("intensity", {}), intensity_pvs)):
+            for name, pv_name in pv_names.items():
+                value = self._safe_float(values.get(name))
+                if np.isfinite(value):
+                    self.PVs[pv_name].put(value)
+        return True
+
     def get_icts(self, names=None):
         return {"names": [], "charge": np.array([])}
 

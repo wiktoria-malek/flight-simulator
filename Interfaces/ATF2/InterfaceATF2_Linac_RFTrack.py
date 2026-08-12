@@ -25,6 +25,7 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
         self.Q = -1
         self.dfs_test_energy = 0.98
         self.wfs_test_charge = 0.90
+        self._beam_mode = "nominal"
         self.freq = 2855.9822615999997e+6 # Hz
         self.lattice = self._build_lattice()
         self.lattice.set_bpm_resolution(bpm_resolution)
@@ -100,20 +101,24 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
     def change_energy(self):
         self.__setup_beam1()
         self.__track_bunch()
+        self._beam_mode = "energy_changed"
         dP_P = self.dfs_test_energy - 1.0
         return dP_P
 
     def reset_energy(self):
         self.__setup_beam0()
         self.__track_bunch()
+        self._beam_mode = "nominal"
 
     def change_intensity(self):  # reduced charge
         self.__setup_beam2()
         self.__track_bunch()
+        self._beam_mode = "intensity_changed"
 
     def reset_intensity(self):
         self.__setup_beam0()
         self.__track_bunch()
+        self._beam_mode = "nominal"
 
     def get_sequence(self):
         return self.sequence

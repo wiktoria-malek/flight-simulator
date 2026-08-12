@@ -452,6 +452,23 @@ class CLEAR_real_machine(AbstractMachineInterface):
         after_intensity_reset = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
         self.log(f"Read after reset of intensity:", after_intensity_reset)
 
+    def get_beam_settings(self):
+        settings = {"energy": {}, "intensity": {}}
+        settings["energy"]["mks11_phase"] = self.make_safe_float(self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'])
+        settings["intensity"]["uvatt2_position"] = self.make_safe_float(self.client.get('CO.TOWB.102.UVATT2/Setting').data['position'])
+        return settings
+
+    def restore_beam_settings(self, settings):
+        settings = settings or {}
+        phase = self.make_safe_float(settings.get("energy", {}).get("mks11_phase"))
+        if np.isfinite(phase):
+            self.client.set('CK.LL-MKS11/Setting', data={"PhaseSh_SP": phase})
+
+        position = self.make_safe_float(settings.get("intensity", {}).get("uvatt2_position"))
+        if np.isfinite(position):
+            self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": position})
+        return True
+
     def get_sequence(self):
         return self.sequence
 

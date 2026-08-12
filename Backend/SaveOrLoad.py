@@ -118,7 +118,6 @@ class SaveOrLoad():
             QMessageBox.warning(self, "Load data", "Wrong data directory selected")
         self._data_dirs[oper] = info
         button_ui.setText(folder)
-        #QMessageBox.information(button_ui, "Data directory selected", button_name)
 
     def _pick_and_load_disp_data(self):
         self._pick_and_load_data_dir(oper="dfs", button_ui=self.dfs_response_3, button_name="DFS Data Loaded")
@@ -128,6 +127,50 @@ class SaveOrLoad():
 
     def _pick_and_load_traj_data(self):
         self._pick_and_load_data_dir(oper="traj", button_ui=self.trajectory_response_3,button_name="Trajectory Data Loaded")
+
+    def _pick_and_load_machine_status_file(self):
+        directory = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Machine Status", directory, "Machine status (*.pkl)")
+        if not filename:
+            return
+        try:
+            state = State(filename=filename)
+        except Exception as exc:
+            QMessageBox.warning(self, "Restore machine status", f"Could not load this file:\n{exc}")
+            return
+
+        interface_id = f"{type(self.interface).__module__}.{type(self.interface).__name__}"
+        if state.get_interface_id() != interface_id:
+            QMessageBox.warning(self, "Restore machine status", "This machine status was created on a different interface/machine. Choose appropriate one or change inetrface.")
+            return
+        self.log("Restoring correctores from machine status...")
+        correctors = state.get_correctors()
+        self.log("Correctors restored!")
+        self.log("Restoring quadrupoles from machine status...")
+        quadrupoles = state.get_quadrupoles()
+        self.log("Quadrupoles restored!")
+        self.log("Restoring sextupoles from machine status...")
+        sextupoles = state.get_sextupoles()
+        self.log("Sextupoles restored!")
+        self.log("Restoring correctors' strengths from machine status...")
+        self.interface.restore_correctors_state(state)
+        self.log("Correctors restored!")
+        self.log("Restoring quadrupoles' state from machine status...")
+        self.interface.restore_quadrupoles_state(state)
+        self.log("Quadrupoles restored!")
+        self.log("Restoring sextupoles' state from machine status...")
+        self.interface.restore_sextupoles_state(state)
+        self.log("Sextupoles restored!")
+        self.log("Restoring energy and intensity from machine status...")
+        self.interface.restore_beam_settings(state.get_beam_settings())
+        self.log("Energy and intensity restored!")
+        return
+
+        if hasattr(self, "machine_status_file"):
+            self.machine_status_file.setText(filename)
+        if hasattr(self, "log"):
+            self.log(f"Machine status restored from {filename}")
+        QMessageBox.information(self, "Restore machine status", "Machine status restored.")
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By, is_jitter_subtraction_checked, machine_state_file=None):
         save_session_dir = getattr(self, "_session_dir", None)

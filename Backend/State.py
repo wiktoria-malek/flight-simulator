@@ -17,7 +17,7 @@ def reject_large_outliers(values, factor=10.0):
     return arr
 
 class State:
-    def __init__(self, sextupoles = None, correctors=None,bpms=None, icts=None,sequence=None,hcorrectors_names=None,vcorrectors_names=None,screens=None,quadrupoles=None,timestamp=None,filename=None):
+    def __init__(self, sextupoles = None, correctors=None,bpms=None, icts=None,sequence=None,hcorrectors_names=None,vcorrectors_names=None,screens=None,quadrupoles=None,beam_settings=None,timestamp=None,filename=None,interface_id=None):
         if filename is not None:
             self.load(filename)
             return
@@ -30,6 +30,8 @@ class State:
         self.screens = screens if screens is not None else {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])}
         self.quadrupoles = quadrupoles if quadrupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([]), "xdes": np.array([]), "ydes": np.array([]), "rolldes": np.array([])}
         self.sextupoles = sextupoles if sextupoles is not None else {"names": [], "bdes": np.array([]), "bact": np.array([])}
+        self.beam_settings = beam_settings if beam_settings is not None else {}
+        self.interface_id = interface_id
         self.timestamp = timestamp if timestamp is not None else datetime.now()
 
     def get_sequence(self):
@@ -141,6 +143,12 @@ class State:
         }
         return orbit
 
+    def get_beam_settings(self):
+        return self.beam_settings
+
+    def get_interface_id(self):
+        return self.interface_id
+
     def get_screens(self,names=None):
         if isinstance(names, str):
             names = [names]
@@ -181,6 +189,8 @@ class State:
                                      "hedges": [], "vedges": [], "images": [], "S": np.array([])})
             self.quadrupoles = data.get('quadrupoles', {"names": [], "bdes": np.array([]), "bact": np.array([]), "xdes": np.array([]), "ydes": np.array([]), "rolldes": np.array([])})
             self.sextupoles = data.get('sextupoles', {"names": [], "bdes": np.array([]), "bact": np.array([])})
+            self.beam_settings = data.get('beam_settings', {})
+            self.interface_id = data.get('interface_id')
             self.hcorrectors_names = data['hcorrectors_names']
             self.vcorrectors_names = data['vcorrectors_names']
             self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
@@ -238,6 +248,8 @@ class State:
             "screens": screens,
             "quadrupoles": quadrupoles,
             "sextupoles": sextupoles,
+            "beam_settings": self.beam_settings,
+            "interface_id": self.interface_id,
             "hcorrectors_names": self.hcorrectors_names,
             "vcorrectors_names": self.vcorrectors_names,
             "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")

@@ -180,6 +180,22 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity1)
         return self
 
+    def get_beam_settings(self):
+        settings = {"energy": {}, "intensity": {}}
+        for section, name, pv_name in (("energy", "cm1l_phase", "CM1L:phaseRead"), ("intensity", "laser_intensity1", "RFGun:LaserIntensity1:Read")):
+            settings[section][name] = float(PV(pv_name).get())
+        return settings
+
+    def restore_beam_settings(self, settings):
+        settings = settings or {}
+        phase = settings.get("energy", {}).get("cm1l_phase")
+        if phase is not None:
+            PV('CM1L:phaseWrite').put(float(phase))
+        intensity = settings.get("intensity", {}).get("laser_intensity1")
+        if intensity is not None:
+            PV('RFGun:LaserIntensity1:Write').put(float(intensity))
+        return True
+
     def get_sequence(self):
         return self.sequence
 
@@ -429,6 +445,5 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         else:
             out["Ttot"] = float("nan")
         return out
-
 
 

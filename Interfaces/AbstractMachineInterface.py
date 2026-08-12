@@ -74,6 +74,31 @@ class AbstractMachineInterface(ABC):
     def set_quadrupoles(self, names, values):
         raise NotImplementedError(f"{self.get_name()} does not implement set_quadrupoles")
 
+    def get_beam_settings(self):
+        if hasattr(self, "_beam_mode"):
+            return {
+                "simulation": {
+                    "beam_mode": self._beam_mode,
+                    "dfs_energy_scale": float(self.dfs_test_energy),
+                    "wfs_charge_scale": float(self.wfs_test_charge),
+                }
+            }
+        return {}
+
+    def restore_beam_settings(self, settings):
+        simulation = (settings or {}).get("simulation")
+        if simulation is None:
+            return False
+        self.dfs_test_energy = float(simulation.get("dfs_energy_scale", self.dfs_test_energy))
+        self.wfs_test_charge = float(simulation.get("wfs_charge_scale", self.wfs_test_charge))
+        mode = simulation.get("beam_mode", "nominal")
+        self.reset_energy()
+        if mode == "energy_changed":
+            self.change_energy()
+        elif mode == "intensity_changed":
+            self.change_intensity()
+        return True
+
     def get_state(self):
         return State(
             correctors=self.get_correctors(),
@@ -85,6 +110,8 @@ class AbstractMachineInterface(ABC):
             screens=self.get_screens(),
             quadrupoles=self.get_quadrupoles(),
             sextupoles=self.get_sextupoles(),
+            beam_settings=self.get_beam_settings(),
+            interface_id=f"{type(self).__module__}.{type(self).__name__}",
         )
 
     def restore_correctors_state(self, state):
@@ -98,6 +125,16 @@ class AbstractMachineInterface(ABC):
                 self.set_quadrupoles(quadrupoles["names"], quadrupoles["bdes"])
             except NotImplementedError:
                 pass
+
+        if not hasattr(self, "apply_qmag_xyroll"):
+            return
+        xdes = np.asarray(quadrupoles.get("xdes", []), dtype=float)
+        ydes = np.asarray(quadrupoles.get("ydes", []), dtype=float)
+        rolldes = np.asarray(quadrupoles.get("rolldes", []), dtype=float)
+        valid = np.isfinite(xdes) & np.isfinite(ydes) & np.isfinite(rolldes)
+        if np.any(valid):
+            names = np.asarray(quadrupoles["names"], dtype=object)[valid].tolist()
+            self.apply_qmag_xyroll(names, xdes[valid], ydes[valid], rolldes[valid], wait=True)
 
     def restore_sextupoles_one_by_one(self, state, callback=None):
         sextupoles = state.get_sextupoles()

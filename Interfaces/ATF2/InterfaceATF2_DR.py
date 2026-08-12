@@ -252,6 +252,28 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity1)
         return self
 
+    def get_beam_settings(self):
+        settings = {"energy": {}, "intensity": {}}
+        for name, pv_name in (
+            ("ramp_control", "RAMP:CONTROL_ON_SW"),
+            ("ramp_pl4", "RAMP:PL4:ONOFF_SW"),
+        ):
+            settings["energy"][name] = float(PV(pv_name).get())
+            settings["intensity"]["laser_intensity1"] = float(PV('RFGun:LaserIntensity1:Read').get())
+        return settings
+
+    def restore_beam_settings(self, settings):
+        settings = settings or {}
+        energy = settings.get("energy", {})
+        for name, pv_name in (("ramp_control", "RAMP:CONTROL_ON_SW"),
+                              ("ramp_pl4", "RAMP:PL4:ONOFF_SW")):
+            if name in energy:
+                PV(pv_name).put(float(energy[name]))
+        intensity = settings.get("intensity", {}).get("laser_intensity1")
+        if intensity is not None:
+            PV('RFGun:LaserIntensity1:Write').put(float(intensity))
+        return True
+
     def get_sequence(self):
         return self.sequence
 
