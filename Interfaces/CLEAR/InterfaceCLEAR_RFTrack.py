@@ -53,7 +53,6 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 element_type = 'BPM'
             elif len(text) > 1 and text[1] == 'MARKER':
                 element_type = 'Marker'
-
             if element_type is None:
                 continue
 
@@ -181,24 +180,15 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.machine_name = "CLEAR"
 
     def __setup_beam0(self):
-        # P_ref = 205  # MeV/c
-        # population = 50 * pC
-        # Lquad = 0.226  # m
-        # beta_x = 17.9
-        # beta_y = 8.07
-        # alpha_x = 0.236
-        # alpha_y = -1.72
-        # emitt_x = 12.7  # normalized mm mrad
-        # emitt_y = 4.34  # normalized mm mrad
-        # sigma_t = 10 * ps
-        # sigma_pt = 18
         T = rft.Bunch6d_twiss()
-        T.emitt_x = 7.04 # mm.mrad normalised emittance
-        T.emitt_y = 3.39  # 0.727 # mm.mrad
-        T.beta_x = 15.6 # m
-        T.beta_y = 24  #2.73  # m
-        T.alpha_x = -0.49
-        T.alpha_y = -3.65 #0.339
+
+        T.emitt_x = 12.7000 # mm.mrad normalised emittance
+        T.emitt_y = 4.3400   # mm.mrad
+        T.beta_x = 46.244900 # m
+        T.beta_y = 109.143468  # m; back-propagated from QFD350 entrance
+        T.alpha_x = 1.314308
+        T.alpha_y = 7.248155
+
         T.sigma_t = 0#10*rft.ps #or 37*rft.ps # mm/c
         T.sigma_pt = 0 # permille
         T.mean_xp=0.0
@@ -213,12 +203,14 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         # Beam for DFS - Reduced energy
         Pref = self.dfs_test_energy * self.Pref
         T = rft.Bunch6d_twiss()
-        T.emitt_x = 7.04 # mm.mrad normalised emittance
-        T.emitt_y = 3.39  # 0.727 # mm.mrad
-        T.beta_x = 15.6 # m
-        T.beta_y = 24  #2.73  # m
-        T.alpha_x = -0.49
-        T.alpha_y = -3.65 #0.339
+
+        T.emitt_x = 12.7000 # mm.mrad normalised emittance
+        T.emitt_y = 4.3400   # mm.mrad
+        T.beta_x = 46.244900 # m
+        T.beta_y = 109.143468  # m; back-propagated from QFD350 entrance
+        T.alpha_x = 1.314308
+        T.alpha_y = 7.248155
+
         T.sigma_t = 10*rft.ps #or 37*rft.ps # mm/c
         T.sigma_pt = 10 # permille
         T.mean_xp=0.0
@@ -230,12 +222,14 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         # Beam for WFS - Reduced bunch charge
         population = self.wfs_test_charge * self.population
         T = rft.Bunch6d_twiss()
-        T.emitt_x = 7.04 # mm.mrad normalised emittance
-        T.emitt_y = 3.39  # 0.727 # mm.mrad
-        T.beta_x = 15.6 # m
-        T.beta_y = 24  #2.73  # m
-        T.alpha_x = -0.49
-        T.alpha_y = -3.65 #0.339
+
+        T.emitt_x = 12.7000 # mm.mrad normalised emittance
+        T.emitt_y = 4.3400   # mm.mrad
+        T.beta_x = 46.244900 # m
+        T.beta_y = 109.143468  # m; back-propagated from QFD350 entrance
+        T.alpha_x = 1.314308
+        T.alpha_y = 7.248155
+
         T.sigma_t = 10*rft.ps #or 37*rft.ps # mm/c
         T.sigma_pt = 10 # permille
         T.mean_xp=0.0
@@ -243,7 +237,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles)
         self.P0 = rft.Bunch6d_QR(rft.electronmass, population,  1, self.Pref, T, self.nparticles)
 
-    def get_screens(self, names=None, move_screen=True):
+    def get_screens(self, names=None):
         if isinstance(names, str):
             names = [names]
 

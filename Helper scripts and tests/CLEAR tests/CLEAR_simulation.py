@@ -20,16 +20,22 @@ s, sigma_x, sigma_y, emit_x, emit_y, beta_x, beta_y, alpha_x, alpha_y = T.T
 gamma_x = (1.0 + alpha_x**2) / beta_x
 gamma_y = (1.0 + alpha_y**2) / beta_y
 
-quad_s = interface.element_descriptions["CA.QDD0515"]["s_start"]
-quad_index = np.argmin(np.abs(s - quad_s))
+def print_twiss_at(element_name: str) -> None:
+    s_target = interface.element_descriptions[element_name]["s_start"]
+    index = np.argmin(np.abs(s - s_target))
+    print(f"\nTwiss parameters at {element_name} (s = {s_target:.4f} m)")
+    print(f"  epsilon_x = {emit_x[index]:.4f} mm mrad")
+    print(f"  beta_x    = {beta_x[index]:.4f} m")
+    print(f"  alpha_x   = {alpha_x[index]:.4f}")
+    print(f"  epsilon_y = {emit_y[index]:.4f} mm mrad")
+    print(f"  beta_y    = {beta_y[index]:.4f} m")
+    print(f"  alpha_y   = {alpha_y[index]:.4f}")
 
-print(f"\nTwiss parameters at the entrance of QDD515 (s = {quad_s:.4f} m)")
-print(f"  epsilon_x = {emit_x[quad_index]:.4f} mm mrad")
-print(f"  beta_x    = {beta_x[quad_index]:.4f} m")
-print(f"  alpha_x   = {alpha_x[quad_index]:.4f}")
-print(f"  epsilon_y = {emit_y[quad_index]:.4f} mm mrad")
-print(f"  beta_y    = {beta_y[quad_index]:.4f} m")
-print(f"  alpha_y   = {alpha_y[quad_index]:.4f}")
+
+# The notebook reference Twiss values should be recovered at QFD350.
+print_twiss_at("CA.QFD0350")
+print_twiss_at("CA.QDD0515")
+quad_s = interface.element_descriptions["CA.QDD0515"]["s_start"]
 
 fig, axes = plt.subplots(4, 1, figsize=(11, 11), sharex=True)
 ax_sigma, ax_beta, ax_alpha, ax_emit = axes
