@@ -28,31 +28,13 @@ from Backend.BBA_helpers.TestOrbits_BBA import TestOrbits
 from Backend.BBA_helpers.RMS_Plots_BBA import RMS_Plots
 from Backend.SaveOrLoad import SaveOrLoad
 from Backend.BBA_helpers.Sextupole_Restoration_Logic import Sextupole_Restoration_Logic
-from Backend.BBA_helpers.QM_mode_helpers import QM_mode_helpers
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import matplotlib.pyplot as plt
-from enum import Enum
-from dataclasses import dataclass
 from Backend.BBA_helpers.BPM_weights import BPM_weights
+from Backend.ActuatorMode import ActuatorMode
 from traceback import print_exception
 from Interfaces.interface_setup import INTERFACE_SETUP
 from Knobs.jitter_subtraction import (apply_jitter_subtraction, explain_reference_selection, fit_jitter_model)
-
-
-class ActuatorMode(Enum):
-    Kicker = "Correctors"  # Kicker"
-    QM = "Quadrupole movers"  # "QM"
-
-
-@dataclass
-class QmResponseMatrices:
-    qcorrs: list
-    r_xx: np.ndarray
-    r_xy: np.ndarray
-    r_yx: np.ndarray
-    r_yy: np.ndarray
-    t_xx: np.ndarray
-    t_yy: np.ndarray
 
 
 class PlotPopup(QMainWindow):
@@ -99,7 +81,7 @@ class BpmWeightsDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
-class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Restoration_Logic, QM_mode_helpers):
+class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Restoration_Logic):
     def __init__(self, interface, dir_name, nominal_state=None, start_state=None):
         super().__init__()
         self.cwd = os.getcwd()
@@ -163,7 +145,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.jitter_model = None
         self.subtract_jitter_checkbox.setChecked(False)
         self.actuator_mode = ActuatorMode.Kicker
-        self._setup_actuator_mode_combo()
+        self._setup_corrector_controls()
         self.restore_machine_status_button.clicked.connect(self._pick_and_load_machine_status_file)
 
     def _save_machine_status(self):
@@ -176,21 +158,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.session_database_3.setText(self._session_dir)
         return machine_state
 
-    def _setup_actuator_mode_combo(self):
-        self.actuator_mode_combo.blockSignals(True)
-        self.actuator_mode_combo.setCurrentText(self.actuator_mode.value)
-        self.actuator_mode_combo.blockSignals(False)
-
-        self.actuator_mode_combo.currentTextChanged.connect(self._on_actuator_mode_changed)
+    def _setup_corrector_controls(self):
+        self.actuator_mode_label.setVisible(False)
+        self.actuator_mode_combo.setVisible(False)
         self.pushButton_11.clicked.connect(self.load_session_settings)
         self.sextupole_restoration_button.clicked.connect(self._show_sextupole_restoration_popup)
-        if hasattr(self.interface, "get_quadrupoles"):
-            try:
-                self.qm_corrs = self.interface.get_quadrupole_movers_names()
-            except Exception:
-                self.qm_corrs = []
-        else:
-            self.qm_corrs = []
         self.setWindowTitle("BBA GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
@@ -233,60 +205,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
-        self._setup_qm_controls()
-        self._refresh_corrector_list()
-        self._update_qm_widgets_visibility()
-        self._refresh_specific_bpm_candidates()
         self._refresh_metric_plots_for_mode()
-        is_qm = self.actuator_mode == ActuatorMode.QM
-        if is_qm:
-            self.radio_buttons[0].setChecked(True)
-            self.groupBox_6.setTitle("DFS not used in QM mode")
-            self.groupBox_7.setTitle("WFS not used in QM mode")
-
-        self.radio_buttons[1].setEnabled(not is_qm)
-        self.radio_buttons[2].setEnabled(not is_qm)
-
-        for widget in (self.dfs_response_3, self.pushButton_9, self.mode_dispersion, self.wfs_response_3,
-                       self.pushButton_10, self.mode_wakefield):
-            widget.setEnabled(not is_qm)
-
-    def _on_actuator_mode_changed(self, text):
-        if text not in [mode.value for mode in ActuatorMode]:
-            return
-        self.actuator_mode = ActuatorMode(text)
-        if not hasattr(self, "specific_bpm_row"):
-            return
-        self.actuator_mode = ActuatorMode(text)
-        self._refresh_corrector_list()
-        self._update_qm_widgets_visibility()
-        self._refresh_specific_bpm_candidates()
-        self._refresh_metric_plots_for_mode()
-        is_qm = self.actuator_mode == ActuatorMode.QM
-        if is_qm:
-            self.radio_buttons[0].setChecked(True)
-        self.radio_buttons[1].setEnabled(not is_qm)
-        self.radio_buttons[2].setEnabled(not is_qm)
-
-        for widget in (self.dfs_response_3, self.pushButton_9, self.mode_dispersion,
-                       self.wfs_response_3, self.pushButton_10, self.mode_wakefield):
-            widget.setEnabled(not is_qm)
-
-    def _refresh_corrector_list(self):
-        self.correctors_list.clear()
-        if self.actuator_mode == ActuatorMode.QM:
-            items = self.qm_corrs
-            self.groupBox_5.setTitle("Quadrupoles")
-        else:
-            items = self.corrs
-            self.groupBox_5.setTitle("Correctors")
-        self.correctors_list.insertItems(0, [str(item) for item in items])
-
-        for gb in (self.groupBox_5, self.groupBox_8):
-            t = gb.title()
-            gb.setTitle("")
-            gb.setTitle(t)
-        self.horizontalLayout_corrbpms_tables.activate()
 
     def _load_logo(self):
         self.logo_label.setText("")
@@ -566,18 +485,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         elif ax is self.wake_ax:
             self._refresh_plot_popup("wake")
 
-    def _plot_disabled_panel(self, ax, canvas, title="Not used in QM Mode"):
-        if canvas is None or ax is None:
-            return
-        ax.clear()
-        ax.set_facecolor("#F0F0F0")
-        ax.text(0.5, 0.5, title, transform=ax.transAxes, ha="center", va="center", fontsize=12, color="#777777")
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for spine in ax.spines.values():
-            spine.set_color('#CCCCCC')
-        canvas.draw_idle()
-
     def _get_bpm_weights_text(self, bpm_name):
         wbpm_orb, wbpm_dfs, wbpm_wfs = self.bpm_weights.get(bpm_name, (1.0, 1.0, 1.0))
         return f"[w1 = {wbpm_orb:g}, w2 = {wbpm_dfs:g}, w3 = {wbpm_wfs:g}]"  # general format, removes reduntant zeros at the end etc.
@@ -600,8 +507,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             self.bpms_list.addItem(item)
 
     def _get_selection(self):
-        corrs_all = self.qm_corrs if self.actuator_mode == ActuatorMode.QM else self.initial_state.get_correctors()[
-            "names"]
+        corrs_all = self.initial_state.get_correctors()["names"]
         bpms_all = self.initial_state.get_bpms()["names"]
 
         selected_corrs = []
@@ -752,15 +658,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 }
             corrs, bpms = self._get_selection()
 
-            if self.actuator_mode == ActuatorMode.QM:
-                self._start_qm_correction(silent=silent, preserve_plots=preserve_plots)
-                return
-
             self._build_jitter_model_for_correction(actuators=corrs, bpms=bpms)
             if self.jitter_model is not None:
                 refs = set(self.jitter_model["reference_bpms"])
                 bpms = [bpm for bpm in bpms if bpm not in refs]
-                self.log("Removed jitter reference BPMs from QM correction targets")
+                self.log("Removed jitter reference BPMs from correction targets")
             print("Starting correction...")
             self.log("Starting correction...")
 
@@ -1276,31 +1178,21 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self._hist_disp_x_err.clear(), self._hist_disp_y_err.clear(), self._hist_disp_err.clear()
         self._hist_wake_x_err.clear(), self._hist_wake_y_err.clear(), self._hist_wake_err.clear()
 
-        if self.actuator_mode == ActuatorMode.QM:
-            self._refresh_metric_plots_for_mode()
-        else:
-            self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[], vals=[], title=None)
-            self._plot_series(self.disp_ax, self.disp_canvas, values_x=[], values_y=[], vals=[], title=None)
-            self._plot_series(self.wake_ax, self.wake_canvas, values_x=[], values_y=[], vals=[], title=None)
+        self._plot_series(self.traj_ax, self.traj_canvas, values_x=[], values_y=[], vals=[], title=None)
+        self._plot_series(self.disp_ax, self.disp_canvas, values_x=[], values_y=[], vals=[], title=None)
+        self._plot_series(self.wake_ax, self.wake_canvas, values_x=[], values_y=[], vals=[], title=None)
         self._refresh_all_plot_popups()
 
     def _refresh_metric_plots_for_mode(self):
-        if self.actuator_mode == ActuatorMode.QM:
-            self.plot_widget_4.setEnabled(False)
-            self.plot_widget_5.setEnabled(False)
-            self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title="QM - distance from initial trajectory")
-            self._plot_disabled_panel(self.disp_ax, self.disp_canvas, title="DFS not used in QM mode")
-            self._plot_disabled_panel(self.wake_ax, self.wake_canvas, title="WFS not used in QM mode")
-        else:
-            self.plot_widget_4.setEnabled(True)
-            self.plot_widget_5.setEnabled(True)
-            if self.disp_ax is not None:
-                self.disp_ax.set_facecolor("white")
-            if self.wake_ax is not None:
-                self.wake_ax.set_facecolor("white")
-            self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title=None)
-            self._plot_series(self.disp_ax, self.disp_canvas, [], [], [], title=None)
-            self._plot_series(self.wake_ax, self.wake_canvas, [], [], [], title=None)
+        self.plot_widget_4.setEnabled(True)
+        self.plot_widget_5.setEnabled(True)
+        if self.disp_ax is not None:
+            self.disp_ax.set_facecolor("white")
+        if self.wake_ax is not None:
+            self.wake_ax.set_facecolor("white")
+        self._plot_series(self.traj_ax, self.traj_canvas, [], [], [], title=None)
+        self._plot_series(self.disp_ax, self.disp_canvas, [], [], [], title=None)
+        self._plot_series(self.wake_ax, self.wake_canvas, [], [], [], title=None)
 
     def _apply_jitter_subtraction_to_state(self, state):
         if self.jitter_model is None:
@@ -1308,7 +1200,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         state.bpms = apply_jitter_subtraction(state.get_bpms(), self.jitter_model)
         return state
 
-    def handling(self, app_name, cwd=None, args=None, is_qm_mode=False):
+    def handling(self, app_name, cwd=None, args=None):
         try:
             path = os.path.join(os.path.dirname(__file__), app_name)
             workdir = os.path.expanduser(os.path.expandvars(cwd))
@@ -1318,10 +1210,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             env = QProcessEnvironment.systemEnvironment()
             proc.setProcessEnvironment(env)
             argv = [path] + list(args or [])
-            if is_qm_mode:
-                argv += ["--actuator_mode", "QM"]
-            else:
-                argv += ["--actuator_mode", "Kicker"]
             proc.start(sys.executable, argv)
             proc.readyReadStandardOutput.connect(
                 lambda p=proc: print(bytes(p.readAllStandardOutput()).decode(errors="ignore")))
@@ -1337,7 +1225,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         dispersion_dir = self.dfs_response_3.text()
         wakefield_dir = self.wfs_response_3.text()
         selected_mode = None
-        is_qm = self.actuator_mode == ActuatorMode.QM
         for rb in self.radio_buttons:
             if rb.isChecked():
                 selected_mode = rb.text()
@@ -1363,8 +1250,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 return
             args = ["--dir1", wakefield_dir, "--dir2", orbit_dir, "--diff", "--compute"]
 
-        self.handling('ComputeResponseMatrix_GUI.py', cwd=self.cwd, args=args,
-                      is_qm_mode=is_qm)  # args = arguments passed to the second program
+        self.handling('ComputeResponseMatrix_GUI.py', cwd=self.cwd, args=args)
 
 
 if __name__ == "__main__":
