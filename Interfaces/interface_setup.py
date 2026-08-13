@@ -89,15 +89,15 @@ INTERFACE_SETUP = {
             #     "alpha_y0": [-0.4, 0.6],
             # }
 
-            # # QD16X — simulation
-            # "bounds": {
-            #     "emit_x_norm": [4.5, 6.0],
-            #     "beta_x0": [0.5, 1.4],
-            #     "alpha_x0": [-0.8, 0.8],
-            #     "emit_y_norm": [0.01, 0.06],
-            #     "beta_y0": [4.0, 7.0],
-            #     "alpha_y0": [-0.5, 1.0],
-            # }
+            # QD16X — simulation
+            "bounds": {
+                "emit_x_norm": [4.5, 6.0],
+                "beta_x0": [0.5, 1.4],
+                "alpha_x0": [-0.8, 0.8],
+                "emit_y_norm": [0.01, 0.06],
+                "beta_y0": [4.0, 7.0],
+                "alpha_y0": [-0.5, 1.0],
+            }
 
         # # QD18X — simulation
         # "bounds": {
