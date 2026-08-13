@@ -212,6 +212,9 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         except Exception:
             return float(default)
 
+    def _wait_for_pv_readback(self, pv_name, target, tolerance=1e-3, timeout=10.0):
+        return self._wait_for_readback(lambda: self.make_safe_float(PV(pv_name).get(), default=np.nan), target, description=pv_name, tolerance=tolerance, timeout=timeout)
+
     def _valid_pv_value(self, pv_names, default = np.nan):
         for pv_name in pv_names:
             try:
@@ -225,12 +228,12 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
     def change_energy(self):
         PV('RAMP:CONTROL_ON_SW').put(1)
-        time.sleep(2)
+        self._wait_for_pv_readback('RAMP:CONTROL_ON_SW', 1)
         ### delta_freq MUST MATCH :MI2: to EPICS --> means "MINUS2"
         delta_freq = +4 # kHz
         # PV('RAMP:MI2:ONOFF_SW').put(1)
         PV('RAMP:PL4:ONOFF_SW').put(1)
-        time.sleep(2)
+        self._wait_for_pv_readback('RAMP:PL4:ONOFF_SW', 1)
         DR_freq = 714e3; # 714 MHz in kHz
         DR_momentum_compaction = 2.1e-3
         dP_P = -delta_freq / DR_freq / DR_momentum_compaction
@@ -238,18 +241,19 @@ class InterfaceATF2_DR(AbstractMachineInterface):
 
     def reset_energy(self):
         PV('RAMP:CONTROL_OFF_SW').put(0)
-        time.sleep(2)
+        self._wait_for_pv_readback('RAMP:CONTROL_ON_SW', 0)
 
     def change_intensity(self, intensity=0.1):
         print(f'Changing laser intensity to {intensity}...')
         laser_intensity1 = 10000 * float(intensity) / self.laser_intensity2
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity1)
-        time.sleep(3)
+        self._wait_for_pv_readback('RFGun:LaserIntensity1:Read', laser_intensity1)
         return self
 
     def reset_intensity(self):
         print('Resetting laser intensity...')
         PV('RFGun:LaserIntensity1:Write').put(self.laser_intensity1)
+        self._wait_for_pv_readback('RFGun:LaserIntensity1:Read', self.laser_intensity1)
         return self
 
     def get_beam_settings(self):
@@ -268,10 +272,14 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         for name, pv_name in (("ramp_control", "RAMP:CONTROL_ON_SW"),
                               ("ramp_pl4", "RAMP:PL4:ONOFF_SW")):
             if name in energy:
-                PV(pv_name).put(float(energy[name]))
+                target = float(energy[name])
+                PV(pv_name).put(target)
+                self._wait_for_pv_readback(pv_name, target)
         intensity = settings.get("intensity", {}).get("laser_intensity1")
         if intensity is not None:
-            PV('RFGun:LaserIntensity1:Write').put(float(intensity))
+            target = float(intensity)
+            PV('RFGun:LaserIntensity1:Write').put(target)
+            self._wait_for_pv_readback('RFGun:LaserIntensity1:Read', target)
         return True
 
     def get_sequence(self):

@@ -326,7 +326,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
         self.log(f"Current status of screen {screen_name} is {status}...")
         PV(f"{screen_pv_name}:Target:WRITE:IN").put(1)
-        self._wait_for_screen_target_position(screen_name, 1)
+        if not self._wait_for_screen_target_position(screen_name, 1):
+            raise RuntimeError(f"Screen {screen_name} was not inserted within time.")
 
     def extract_screen(self, screen_name):
         screen_pv_name = self.screen_pv_names.get(screen_name)
@@ -336,7 +337,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         status = PV(f'{screen_pv_name}:Target:READ:INOUT').get()
         self.log(f"Current status of screen {screen_name} is {status}...")
         PV(f"{screen_pv_name}:Target:WRITE:OUT").put(1)
-        self._wait_for_screen_target_position(screen_name, 0)
+        if not self._wait_for_screen_target_position(screen_name, 0):
+            raise RuntimeError(f"Screen {screen_name} was not extracted within time.")
 
     def _map_quadrupoles_names_from_lattice(self, name):
         name = str(name)
@@ -435,6 +437,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
             return float(arr.flat[0])
         except Exception:
             return float(default)
+
+    def _wait_for_pv_readback(self, pv_name, target, tolerance=1e-3, timeout=10.0):
+        return self._wait_for_readback(lambda: self.make_safe_float(PV(pv_name).get(), default=np.nan), target, description=pv_name, tolerance=tolerance, timeout=timeout)
 
     def _valid_pv_value(self, pv_names, default = np.nan):
         for pv_name in pv_names:
@@ -758,10 +763,13 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def _wait_for_screen_target_position(self, screen_name, target, timeout=10.0, poll_interval=0.05):
         screen_pv_name = self.screen_pv_names.get(screen_name)
         t0 = time.perf_counter()
+        status = np.nan
         while time.perf_counter() - t0 < timeout:
-            status = PV(f'{screen_pv_name}:Target:READ:INOUT').get() # 1 - inserted, 0, extracted
-            if status == 0 and target==0: return True
-            if status > 0 and target > 0: return True
+            status = self.make_safe_float(PV(f'{screen_pv_name}:Target:READ:INOUT').get(), default=np.nan)
+            if status == 0 and target == 0:
+                return True
+            if status > 0 and target > 0:
+                return True
             time.sleep(poll_interval)
         self.log(
             f'Warning: {screen_name} did not reach target state = {target:.6g} '
@@ -886,12 +894,12 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
     def change_energy(self, delta_freq=4):
         PV('RAMP:CONTROL_ON_SW').put(1)
-        time.sleep(2)
+        self._wait_for_pv_readback('RAMP:CONTROL_ON_SW', 1)
         # delta_freq in kHz
         ### delta_freq MUST MATCH :MI2: to EPICS --> means "MINUS2"
         # PV('RAMP:MI2:ONOFF_SW').put(1)
         PV('RAMP:PL4:ONOFF_SW').put(1)
-        time.sleep(2)
+        self._wait_for_pv_readback('RAMP:PL4:ONOFF_SW', 1)
         DR_freq = 714e3  # 714 MHz in kHz
         DR_momentum_compaction = 2.1e-3
         dP_P = -float(delta_freq) / DR_freq / DR_momentum_compaction
@@ -899,7 +907,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
     def reset_energy(self):
         PV('RAMP:CONTROL_OFF_SW').put(0)
-        time.sleep(2)
+        self._wait_for_pv_readback('RAMP:CONTROL_ON_SW', 0)
 
     def change_intensity(self, laserintensity=None):
         if laserintensity is None:
@@ -908,7 +916,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.laser_intensity = self.make_safe_float(PV('RFGun:LaserIntensity1:Read').get(), default=np.nan)
         laser_intensity = float(laserintensity) * 100 * 5
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
-        time.sleep(3)
+        self._wait_for_pv_readback('RFGun:LaserIntensity1:Read', laser_intensity)
         return self
 
     def reset_intensity(self):
@@ -916,7 +924,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         print(f'Resetting laser intensity to {new_laser_intensity}...')
         laser_intensity = new_laser_intensity * 100 * 5 # Korysko dixit: 100 for percent, 5 convesion factor
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity)
-        time.sleep(3)
+        self._wait_for_pv_readback('RFGun:LaserIntensity1:Read', laser_intensity)
         return self
 
     def get_beam_settings(self):
@@ -931,10 +939,14 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         energy = settings.get("energy", {})
         for name, pv_name in (("ramp_control", "RAMP:CONTROL_ON_SW"), ("ramp_pl4", "RAMP:PL4:ONOFF_SW")):
             if name in energy:
-                PV(pv_name).put(float(energy[name]))
+                target = float(energy[name])
+                PV(pv_name).put(target)
+                self._wait_for_pv_readback(pv_name, target)
         intensity = settings.get("intensity", {}).get("laser_intensity1")
         if intensity is not None:
-            PV('RFGun:LaserIntensity1:Write').put(float(intensity))
+            target = float(intensity)
+            PV('RFGun:LaserIntensity1:Write').put(target)
+            self._wait_for_pv_readback('RFGun:LaserIntensity1:Read', target)
         return True
 
     def get_sequence(self):
@@ -1238,9 +1250,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         for qmag, current in zip(names, currents):
             canonical = self.qmag_alias_to_canonical.get(qmag, qmag)
             pv_des = PV(f'{canonical}:currentWrite')
-            curr_val = pv_des.get()
-            pv_des.put(curr_val + current)
-        time.sleep(1)
+            target = self.make_safe_float(pv_des.get(), default=np.nan) + float(current)
+            pv_des.put(target)
+            self._wait_for_magnet_readback(canonical, target)
 
     def apply_qmag_xyroll(self, names, x_um, y_um, roll_m, wait=True, max_attempts=5, attempt_timeout=30.0, settle_dt=0.5, tol_um=15.0):
         if type(names) == str:

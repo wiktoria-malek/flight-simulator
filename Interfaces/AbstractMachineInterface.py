@@ -1,8 +1,28 @@
 from abc import ABC, abstractmethod
 from Backend.State import State
+import time
 import numpy as np
 
 class AbstractMachineInterface(ABC):
+
+    def _wait_for_readback(self, read_value, target, *, description, tolerance=1e-4, timeout=10.0, poll_interval=0.05):
+        t0 = time.perf_counter()
+        last_value = np.nan
+        while time.perf_counter() - t0 < timeout:
+            try:
+                value = np.asarray(read_value())
+                last_value = float(value.flat[0]) if value.size else np.nan
+            except Exception:
+                last_value = np.nan
+            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
+                return True
+            time.sleep(poll_interval)
+        log = getattr(self, "log", print)
+        log(
+            f"Warning: {description} did not reach target {float(target):.6g} "
+            f"within {timeout:.2f}s. Last readback = {last_value:.6g}"
+        )
+        return False
 
     @abstractmethod
     def get_name(self):

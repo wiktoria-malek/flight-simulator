@@ -629,6 +629,47 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.reset_ref_orb = True
         self.log("Resetting reference orbit")
 
+    def _build_jitter_model_for_correction(self, actuators, bpms):
+        if not self.subtract_jitter_checkbox.isChecked():
+            self.jitter_model = None
+            return None
+
+        sequence = self.interface.get_sequence()
+        refs, reason = explain_reference_selection(bpms, actuators, sequence, min_refs=2)
+
+        if reason:
+            self.log(f"Jitter subtraction disabled: {reason}")
+            self.jitter_model = None
+            return None
+
+        old_nsamples = getattr(self.interface, "nsamples", None)
+        fit_nsamples = 300
+
+        try:
+            if old_nsamples is not None:
+                self.interface.nsamples = fit_nsamples
+            bpms_snapshot = self.interface.get_bpms()
+        finally:
+            if old_nsamples is not None:
+                self.interface.nsamples = old_nsamples
+
+        targets = [str(bpm) for bpm in bpms if str(bpm) not in set(refs)]
+
+        model, fit_reason = fit_jitter_model(bpms_list=[bpms_snapshot], reference_bpms=refs, target_bpms=targets)
+
+        if model is None:
+            self.log(f"Jitter subtraction disabled: {fit_reason}")
+            self.jitter_model = None
+            return None
+
+        self.jitter_model = model
+        self.log(
+            "Jitter subtraction enabled with refs: "
+            + ", ".join(refs)
+            + f"; fitted from {fit_nsamples} fixed-config BPM samples"
+        )
+        return model
+
     def _start_correction(self, silent=False, preserve_plots=False):
         try:
             plot_snapshot = None
@@ -870,7 +911,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     plt.title("DFS: measured orbit difference vs target dispersion")
                     plt.legend()
                     plt.grid(True, alpha=0.3)
-                    plt.show()
                     Bx.append(wgt_dfs * ((O1x - O0x) - Dx))
                     By.append(wgt_dfs * ((O1y - O0y) - Dy))
 

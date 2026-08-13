@@ -161,6 +161,9 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         )
         return False
 
+    def _wait_for_pv_readback(self, pv, target, *, description, tolerance=1e-4, timeout=10.0):
+        return self._wait_for_readback(lambda: self._safe_float(pv.get(), default=np.nan), target, description=description, tolerance=tolerance, timeout=timeout)
+
     def _meascharge(self):
         qraw = []
         for j in range(self.nsamples):
@@ -178,32 +181,39 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
     def change_energy(self):
         """ set beam to -2MeV at DL10 and disable downstream feedbacks """
         print('Lowering beam energy starting from BC11')
-        get_pv(f'PHYS:SYS1:1:F2LFB_BC11E_VERN').put(-3.0)
-        get_pv(f'PHYS:SYS1:1:F2LFB_BC14E_VERN').put(-40.0)
-        get_pv(f'PHYS:SYS1:1:F2LFB_BC20E_VERN').put(-40.0)
+        targets = {
+            'bc11e_setpoint': -3.0,
+            'bc14e_setpoint': -40.0,
+            'bc20e_setpoint': -40.0,
+        }
+        for name, target in targets.items():
+            self.PVs[name].put(target)
+        for name, target in targets.items():
+            self._wait_for_pv_readback(self.PVs[name], target, description=name)
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC11BL_TARGET').put(4400)
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC14BL_TARGET').put(5000)
-        time.sleep(5.0)
         return -(3.0/335.0)
 
     def reset_energy(self):
         """ zero dl10 setpoint, re-enable feedbacks """
         print('Restoring beam energy at BC11, re-enabling feedbacks')
-        get_pv(f'PHYS:SYS1:1:F2LFB_BC11E_VERN').put(0)
-        get_pv(f'PHYS:SYS1:1:F2LFB_BC14E_VERN').put(0)
-        get_pv(f'PHYS:SYS1:1:F2LFB_BC20E_VERN').put(0)
+        for name in ('bc11e_setpoint', 'bc14e_setpoint', 'bc20e_setpoint'):
+            self.PVs[name].put(0.0)
+        for name in ('bc11e_setpoint', 'bc14e_setpoint', 'bc20e_setpoint'):
+            self._wait_for_pv_readback(self.PVs[name], 0.0, description=name)
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC11BL_TARGET').put(5000)
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC14BL_TARGET').put(8000)
-        time.sleep(5.0)
 
     def change_intensity(self):
         """ lowers bunch charge by ~200pC (2.5deg UV WP angle adjustment) """
         self.UVWP_init = self.PVs['UVWP_angle'].get()
         self.Q_init = self._meascharge()
-        self.PVs['UVWP_angle'].put(self.UVWP_init - 2.5)
-        time.sleep(2.0)
+        uvwp_target = self.UVWP_init - 2.5
+        self.PVs['UVWP_angle'].put(uvwp_target)
+        self._wait_for_pv_readback(self.PVs['UVWP_angle'], uvwp_target, description='UVWP_angle')
         self.Q_new = self._meascharge()
         self.PVs['Q_setpoint'].put(self.Q_new)
+        self._wait_for_pv_readback(self.PVs['Q_setpoint'], self.Q_new, description='Q_setpoint')
         print(f'Charge changed: {self.Q_init:.1f}  {self.Q_new:.1f} pC')
         return self
 
@@ -212,6 +222,8 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         print(f'restoring charge setpoint to {self.init_charge_setpoint} pC')
         self.PVs['UVWP_angle'].put(self.UVWP_init)
         self.PVs['Q_setpoint'].put(self.init_charge_setpoint)
+        self._wait_for_pv_readback(self.PVs['UVWP_angle'], self.UVWP_init, description='UVWP_angle')
+        self._wait_for_pv_readback(self.PVs['Q_setpoint'], self.init_charge_setpoint, description='Q_setpoint')
         return self
 
     def get_beam_settings(self):
@@ -248,6 +260,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
                 value = self._safe_float(values.get(name))
                 if np.isfinite(value):
                     self.PVs[pv_name].put(value)
+                    self._wait_for_pv_readback(self.PVs[pv_name], value, description=pv_name)
         return True
 
     def get_icts(self, names=None):

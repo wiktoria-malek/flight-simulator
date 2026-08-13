@@ -418,7 +418,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         new_energy = 0.9 * self.energy_readback # as a test!
         self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
         self.log(f"Value after changing energy: {new_energy}")
-        time.sleep(10) # write a loop, dont guess time sleep
+        self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', new_energy)
         after_energy_change = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
         print(after_energy_change)
         return after_energy_change
@@ -426,6 +426,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def reset_energy(self):
         print(f"Resetting energy to {self.energy_readback}...")
         self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : self.energy_readback})
+        self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', self.energy_readback)
         print(f"Energy has been reset to {self.energy_readback}...")
         after_energy_reset = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
         print(after_energy_reset)
@@ -440,6 +441,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         new_laser_settings = nominal_settings_steps + N_steps
         self.log(f"The new laser settings will be set to {new_laser_settings}... Nominal value is {self.steps_readback_position}.")
         self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": new_laser_settings})
+        self._wait_for_japc_readback('CO.TOWB.102.UVATT2/Setting', 'position', new_laser_settings)
         self.log(f"The new laser settings has been set to {new_laser_settings}. Nominal value was {self.steps_readback_position}.")
         after_intensity_change = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
         self.log(f"Read after change of intensity:", after_intensity_change)
@@ -448,6 +450,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def reset_intensity(self):
         print(f"Resetting intensity to {self.steps_readback_position}...")
         self.client.set('CO.TOWB.102.UVATT2/Setting', data = {"position" : self.steps_readback_position})
+        self._wait_for_japc_readback('CO.TOWB.102.UVATT2/Setting', 'position', self.steps_readback_position)
         print(f"Intensity steps has been reset to {self.steps_readback_position}...")
         after_intensity_reset = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
         self.log(f"Read after reset of intensity:", after_intensity_reset)
@@ -463,10 +466,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
         phase = self.make_safe_float(settings.get("energy", {}).get("mks11_phase"))
         if np.isfinite(phase):
             self.client.set('CK.LL-MKS11/Setting', data={"PhaseSh_SP": phase})
+            self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', phase)
 
         position = self.make_safe_float(settings.get("intensity", {}).get("uvatt2_position"))
         if np.isfinite(position):
             self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": position})
+            self._wait_for_japc_readback('CO.TOWB.102.UVATT2/Setting', 'position', position)
         return True
 
     def get_sequence(self):
@@ -623,44 +628,22 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "tmit": np.asarray(tmit, dtype=float),
         }
 
-    def _wait_for_corrector_readback(self, corrector, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
+    def _wait_for_japc_readback(self, property_address, field, target, *, context=None, tolerance=5e-3, timeout=10.0):
+        def read_value():
+            data = self.client.get(property_address, context=context).data
+            return self.make_safe_float(data.get(field), default=np.nan)
+
+        return self._wait_for_readback(read_value, target, description=f"{property_address}#{field}", tolerance=tolerance, timeout=timeout)
+
+    def _wait_for_corrector_readback(self, corrector, target, tolerance=5e-3, timeout=10.0):
         readback_param = self.corrector_get_params[corrector]
-        t0 = time.perf_counter()
-        last_value = np.nan
-        while time.perf_counter() - t0 < timeout:
-            try:
-                data = self.client.get(readback_param, context=self.context_acquisition).data
-                last_value = self.make_safe_float(data.get('currentAverage'), default=np.nan)
-            except Exception:
-                last_value = np.nan
+        property_address, field = readback_param.rsplit("#", 1)
+        return self._wait_for_japc_readback(property_address, field, target, context=self.context_acquisition, tolerance=tolerance, timeout=timeout)
 
-            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
-                return True
-            time.sleep(poll_interval)
-        self.log(
-            f'Warning: {readback_param} did not reach target {float(target):.6g} '
-            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
-        )
-        return False
-
-    def _wait_for_quadrupole_readback(self, readback_value, target, tolerance= 5e-3, timeout=10.0, poll_interval=0.05):
-        t0 = time.perf_counter()
-        last_value = np.nan
-        while time.perf_counter() - t0 < timeout:
-            try:
-                last_value = self.client.get(readback_value, context = self.context_acquisition).data["currentAverage"]
-            except Exception as e:
-                last_value = np.nan
-
-            if np.isfinite(last_value) and abs(last_value - float(target)) <= tolerance:
-                return True
-            time.sleep(poll_interval)
-        self.log(
-            f'Warning: {readback_value} did not reach target {float(target):.6g} '
-            f'within {timeout:.2f}s. Last readback = {last_value:.6g}'
-        )
-
-        return False
+    def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance=5e-3, timeout=10.0):
+        readback_param = self.quad_get_params[quadrupole]
+        property_address, field = readback_param.rsplit("#", 1)
+        return self._wait_for_japc_readback(property_address, field, target, context=self.context_acquisition, tolerance=tolerance, timeout=timeout)
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
@@ -672,7 +655,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for corrector, corr_val in zip(names, corr_vals):
             target = corr_val
             self.client.set(self.corrector_set_params[corrector], data={'current': target})
-            self._wait_for_magnet_readback(corrector, target)
+            self._wait_for_corrector_readback(corrector, target)
 
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -732,8 +715,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
             self.client.set(property_address, data={field: value})
-            acq_path = f"{quadrupole}/Acquisition"
-            self._wait_for_quadrupole_readback(acq_path, value)
+            self._wait_for_quadrupole_readback(quadrupole, value)
 
     def _get_screen_movement_info(self, screen_name):
         btv_key = screen_name.rstrip("LH")
