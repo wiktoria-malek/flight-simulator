@@ -23,35 +23,8 @@ except ImportError:
     except Exception:
         clear_lattice = None
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
-class BPMsMode(Enum):
-    """
-    Acquire and process the horizontal (H) and vertical (V) BPM signals.
 
-    Parameters
-    ----------
-    BPM : str
-        BPM name: "BPM0530", "BPM0595", "BPM0690", "BPM0820", "BPM0890".
-    mode : str
-        - "peak"
-            Return the peak value of the raw signal.
-        - "baseline_peak"
-            Return the peak value after baseline correction.
-        - "integral"
-            Return the integral of the baseline-corrected signal.
-        - "integral_window"
-            Return the integral of the baseline-corrected signal over the
-            specified integration window, [min=0, max=730]. If not specified,
-            running with default window.
-        - "integral_threshold"
-            Return the integral of the baseline-corrected signal between the
-            5% peak threshold crossings.
-    plot : optional
-        Display processing plots.
-    Returns
-    -------
-    H, V
-        Processed H and V values.
-    """
+class BPMsMode(Enum):
     peak = "peak"
     baseline_peak = "baseline_peak"
     integral = "integral"
@@ -299,9 +272,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.twiss_path = None
         self.cam_props = self.CamList() # Load camera configuration from assets/cameras.json
         self.camList = list(self.cam_props.keys())
-        self.lattice, self.element_descriptions, self.start, self.end = self.__build(filename=survey_path)
-        self.lattice.set_bpm_resolution(bpm_resolution)
-        self.lattice.set_tt_nsteps(0)
+        self.lattice = self.tracking_interface.lattice
+        self.element_descriptions = self.tracking_interface.element_descriptions
+        self.start = self.tracking_interface.start
+        self.end = self.tracking_interface.end
         self.bg_shots = int(bg_shots)
 
     def CamList(self):
@@ -345,18 +319,16 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def get_beam_factors(self):
         pref = self.Pref
-        try:
-            data = self.client.get("CA.BEAM/Acquisition").data
-        except Exception as e:
-            data={}
+        data = self.client.get("CA.BEAM/Acquisition").data
         for field in ("momentum", "energy"):
-            value = self.make_safe_float(data.get(field), default = np.nan)
+            value = self.make_safe_float(data.get(field), default=np.nan)
             if np.isfinite(value) and value > 0:
                 pref = value
                 break
         gamma_rel = np.sqrt((pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
-        return gamma_rel, beta_rel
+        beta_gamma = gamma_rel * beta_rel
+        return gamma_rel, beta_rel, beta_gamma
 
     def _read_twiss_file(self):
         if self.twiss_path is None:
@@ -675,8 +647,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         if isinstance(names, str):
             names = [names]
 
-        bdes = []
-        bact = []
+        ides = []
+        iact = []
 
         for quadrupole in names:
             set_address = self.quad_set_params[quadrupole]
@@ -694,28 +666,43 @@ class CLEAR_real_machine(AbstractMachineInterface):
             except Exception:
                 get_value = np.nan
 
-            bdes.append(self.make_safe_float(set_value))
-            bact.append(self.make_safe_float(get_value))
+            ides.append(self.make_safe_float(set_value))
+            iact.append(self.make_safe_float(get_value))
+
+        ides = np.asarray(ides, dtype=float)
+        iact = np.asarray(iact, dtype=float)
+        try:
+            bdes = np.asarray([self.current_to_k1l(name, current) for name, current in zip(names, ides)], dtype=float)
+            bact = np.asarray([self.current_to_k1l(name, current) for name, current in zip(names, iact)], dtype=float)
+            self.update_tracking_model_with_japc_readback(names=names, nominal_bdes_value=bdes, nominal_bact_value=bact)
+
+        except Exception as exc:
+            self.log(f"CLEAR current-to-K1L conversion failed for {names}: {exc}")
+            bdes = np.full(len(names), np.nan, dtype=float)
+            bact = np.full(len(names), np.nan, dtype=float)
 
         return {
             "names": list(names),
-            "bdes": np.asarray(bdes, dtype=float),
-            "bact": np.asarray(bact, dtype=float),
+            "bdes": bdes,
+            "bact": bact,
+            "ides": ides,
+            "iact": iact,
         }
 
-    def set_quadrupoles(self, names, values):
+    def set_quadrupoles(self, names, k1l_values):
         if isinstance(names, str):
             names = [names]
-        if not isinstance(values, (list, tuple, np.ndarray)):
-            values = [values]
-        if len(names) != len(values):
-            raise ValueError(f"len(names)={len(names)} != len(values)={len(values)}")
+        if not isinstance(k1l_values, (list, tuple, np.ndarray)):
+            k1l_values = [k1l_values]
+        if len(names) != len(k1l_values):
+            raise ValueError(f"len(names)={len(names)} != len(k1l_values)={len(k1l_values)}")
 
-        for quadrupole, value in zip(names, values):
+        for quadrupole, k1l in zip(names, k1l_values):
+            current_A = self.k1l_to_current(quadrupole, k1l)
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
-            self.client.set(property_address, data={field: value})
-            self._wait_for_quadrupole_readback(quadrupole, value)
+            self.client.set(property_address, data={field: current_A})
+            self._wait_for_quadrupole_readback(quadrupole, current_A)
 
     def _get_screen_movement_info(self, screen_name):
         btv_key = screen_name.rstrip("LH")
@@ -754,9 +741,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return screen_props
 
     def insert_screen(self, screen_name):
-        #return self._move_screen(screen_name, 1)
         info = self._get_screen_movement_info(screen_name)
-        # First, read if the screen is already inserted!
         current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']] # 0 or not == 0 means screen is out, whatever else means IN
         if current_screen_inout_status.value == 0:
             self.log(f"Inserting {screen_name}...")
@@ -772,10 +757,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return
 
     def extract_screen(self, screen_name):
-        # return self._move_screen(screen_name, 1)
         screen_name = screen_name.rstrip("LH")
         info = self._get_screen_movement_info(screen_name)
-        # First, read if the screen is already extracted!
         current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]  # 0 or not == 0 means screen is out, whatever else means IN
         if current_screen_inout_status.value == 0:
             self.log(f"Screen {screen_name} already extracted")
@@ -916,6 +899,48 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
         return screens
+
+    @staticmethod
+    def _quad_sign(name):
+        if "QFD" in name:
+            return 1.0
+        if "QDD" in name:
+            return -1.0
+        raise ValueError(f"Unknown interface quadrupole: {name}")
+
+    def current_to_k1l(self, name, current_A, pref_mev_c=None):
+        current_A = float(current_A)
+        pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
+        if not np.isfinite(current_A) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
+            return np.nan
+
+        length = self.tracking_interface.element_descriptions[name]["L"]
+        k1 = self.tracking_interface.get_Quad_K_from_I(current_A, length, pref_mev_c)
+        return self._quad_sign(name) * k1 * length
+
+    def k1l_to_current(self, name, k1l, pref_mev_c=None):
+        k1l = float(k1l)
+        pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
+        if not np.isfinite(k1l) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
+            raise ValueError(f"Invalid K1L or reference momentum for {name}")
+        a = float(self.tracking_interface.get_ITF(0.0))
+        b = float(a - self.tracking_interface.get_ITF(1.0))
+        target = self._quad_sign(name) * k1l * pref_mev_c / 299.8
+        discriminant = a * a - 4.0 * b * target
+        if discriminant < 0.0:
+            raise ValueError(f"K1L={k1l:.6g} is outside the CLEAR calibration range for {name}")
+        solutions = ((a - np.sqrt(discriminant)) / (2.0 * b),
+                 (a + np.sqrt(discriminant)) / (2.0 * b))
+        return float(min(solutions, key=abs))
+
+    def update_tracking_model_with_japc_readback(self, nominal_bdes_value=None, nominal_bact_value=None, names=None):
+        if isinstance(names, str):
+            names = [names]
+        bact = np.asarray(nominal_bact_value, dtype=float)
+        self.tracking_interface.set_quadrupoles(names, bact)
+
+    def predict_emittance_scan_response(self, *args, **kwargs):
+        return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
 
     def get_target_dispersion(self, names=None):
         if names is None:

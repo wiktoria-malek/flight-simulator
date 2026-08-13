@@ -587,7 +587,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                         output_y[k, si] = float(np.std(m[:, 1]))
 
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
+            self.set_quadrupoles([quad_name], [float(K1L_original)])
             self.B0 = B0_original
             self.__track_bunch()
 
@@ -751,7 +751,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         start_quad_element_name = quad_selected
         return start_quad_element_name
 
-    def set_quadrupoles(self, names, values_range, track = True):
+    def set_quadrupoles(self, names, values_range):
         if isinstance(names, str):
             names = [names]
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
@@ -761,10 +761,6 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
                 element.set_K1L(self.Pref / self.Q,float(value))
-
-        if track:
-        # AS A TEST!
-            self.__track_bunch()
 
     def get_elements_indices(self, names):
         if isinstance(names, str):

@@ -443,8 +443,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.logo_label.setText("")
         self.logo_label.setScaledContents(False)
 
-        transform_mode = (
-            Qt.TransformationMode.SmoothTransformation
+        transform_mode = (Qt.TransformationMode.SmoothTransformation
             if pyqt_version == 6
             else Qt.SmoothTransformation
         )
