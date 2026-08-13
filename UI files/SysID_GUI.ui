@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1512</width>
-    <height>813</height>
+    <height>810</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -31,13 +31,13 @@
      <number>16</number>
     </property>
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout">
+     <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,0">
       <item>
-       <layout class="QHBoxLayout" name="horizontal_layout">
+       <layout class="QHBoxLayout" name="horizontal_layout" stretch="0,1">
         <item>
          <widget class="QGroupBox" name="devicesGroup">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+           <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
@@ -59,7 +59,7 @@ QGroupBox#devicesGroup::title {
           <property name="title">
            <string>Devices</string>
           </property>
-          <layout class="QVBoxLayout" name="left_layout">
+          <layout class="QVBoxLayout" name="left_layout" stretch="1,1">
            <property name="spacing">
             <number>8</number>
            </property>
@@ -77,6 +77,12 @@ QGroupBox#devicesGroup::title {
            </property>
            <item>
             <widget class="QGroupBox" name="correctorsGroup">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="styleSheet">
               <string notr="true">QGroupBox#correctorsGroup {
     background-color: rgb(245, 245, 245);
@@ -94,7 +100,7 @@ QGroupBox#correctorsGroup::title {
              <property name="title">
               <string>Correctors</string>
              </property>
-             <layout class="QVBoxLayout" name="correctors_group_vbox">
+             <layout class="QVBoxLayout" name="correctors_group_vbox" stretch="0,0,1,0">
               <property name="spacing">
                <number>6</number>
               </property>
@@ -167,6 +173,12 @@ QGroupBox#correctorsGroup::title {
            </item>
            <item>
             <widget class="QGroupBox" name="bpmsGroup">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="styleSheet">
               <string notr="true">QGroupBox#bpmsGroup {
     background-color: rgb(245, 245, 245);
@@ -184,7 +196,7 @@ QGroupBox#bpmsGroup::title {
              <property name="title">
               <string>BPMs</string>
              </property>
-             <layout class="QVBoxLayout" name="bpms_group_vbox">
+             <layout class="QVBoxLayout" name="bpms_group_vbox" stretch="1,0">
               <property name="spacing">
                <number>6</number>
               </property>
@@ -245,12 +257,19 @@ QGroupBox#bpmsGroup::title {
          </widget>
         </item>
         <item>
-         <layout class="QVBoxLayout" name="right_layout">
+         <layout class="QVBoxLayout" name="right_layout" stretch="0,0,1">
           <property name="spacing">
            <number>2</number>
           </property>
           <item>
-           <layout class="QHBoxLayout" name="topRowLayout">
+           <widget class="QWidget" name="topRowWidget">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <layout class="QHBoxLayout" name="topRowLayout">
             <property name="spacing">
              <number>8</number>
             </property>
@@ -735,7 +754,8 @@ QGroupBox::title {
               </property>
              </widget>
             </item>
-           </layout>
+            </layout>
+           </widget>
           </item>
           <item>
            <spacer name="verticalSpacer">

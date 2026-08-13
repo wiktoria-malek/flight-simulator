@@ -1,19 +1,62 @@
 try:
-    from PyQt6.QtWidgets import QDialog, QVBoxLayout, QDialogButtonBox, QRadioButton, QLabel,QMessageBox,QPushButton, QButtonGroup
+    from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QDialogButtonBox, QRadioButton, QLabel,QMessageBox,QPushButton, QButtonGroup
     from PyQt6.QtCore import QEvent, Qt
+    from PyQt6.QtGui import QPixmap
 except ImportError:
-    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QDialogButtonBox, QRadioButton, QLabel,QMessageBox, QPushButton, QButtonGroup
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QDialogButtonBox, QRadioButton, QLabel,QMessageBox, QPushButton, QButtonGroup
     from PyQt5.QtCore import QEvent, Qt
+    from PyQt5.QtGui import QPixmap
 
 import importlib
 import importlib.util
+from pathlib import Path
 from Interfaces.interface_setup import INTERFACE_SETUP
+
+
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "UI files" / "Assets"
+ACCELERATOR_BRANDING = {
+    "ATF2": ("KEK", "atf2_logo.png", "kek_logo.png"),
+    "FACET2": ("SLAC", "facet2_logo.png", "slac_logo.png"),
+    "CLEAR": ("CERN", "clear_logo.png", "CERN_logo.png"),
+}
 
 def _no_focus_policy():
     return Qt.FocusPolicy.NoFocus if hasattr(Qt, "FocusPolicy") else Qt.NoFocus
 
 def _strong_focus_policy():
     return Qt.FocusPolicy.StrongFocus if hasattr(Qt, "FocusPolicy") else Qt.StrongFocus
+
+
+def _keep_aspect_ratio():
+    return Qt.AspectRatioMode.KeepAspectRatio if hasattr(Qt, "AspectRatioMode") else Qt.KeepAspectRatio
+
+
+def _smooth_transformation():
+    return Qt.TransformationMode.SmoothTransformation if hasattr(Qt, "TransformationMode") else Qt.SmoothTransformation
+
+
+def _branding_header(accelerator):
+    branding = ACCELERATOR_BRANDING.get(accelerator)
+    if branding is None:
+        return None
+
+    institute, accelerator_logo, institute_logo = branding
+    header = QHBoxLayout()
+    header.setContentsMargins(0, 0, 0, 6)
+    header.setSpacing(12)
+    header.addStretch()
+
+    for logo_name in (accelerator_logo, institute_logo):
+        pixmap = QPixmap(str(ASSETS_DIR / logo_name))
+        if pixmap.isNull():
+            continue
+        logo = QLabel()
+        logo.setPixmap(pixmap.scaled(140, 58, _keep_aspect_ratio(), _smooth_transformation()))
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter if hasattr(Qt, "AlignmentFlag") else Qt.AlignCenter)
+        header.addWidget(logo)
+
+    header.addStretch()
+    return header
 
 def get_available_interface_setup():
     available_setup = {}
@@ -125,6 +168,9 @@ class InterfaceSelectionDialog(QDialog):
         self.are_more_machines = len(self.available_interface_setup.keys()) > 1
         self.entries = self.available_interface_setup.get(selected_acc, [])
         layout = QVBoxLayout(self)
+        branding_header = _branding_header(selected_acc)
+        if branding_header is not None:
+            layout.addLayout(branding_header)
         layout.addWidget(QLabel("Choose one of the following Interfaces:"))
 
         self.radio_buttons = []
@@ -252,4 +298,3 @@ def choose_acc_and_interface(parent=None):
         if getattr(interface_dialog,"go_back",False):
             continue
         return None
-

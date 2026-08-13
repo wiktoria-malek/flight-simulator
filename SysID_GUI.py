@@ -102,15 +102,6 @@ class Worker(QObject):
         vkicks = self.vkicks
         hkicks = self.hkicks
         pending_steps=0
-
-        # #delete later
-        # if hasattr(self.interface, "get_sextupoles") and hasattr(self.interface, "set_sextupoles"):
-        #     sextupoles = self.interface.get_sextupoles()
-        #     sextupole_names = list(sextupoles.get("names", []))
-        #     if sextupole_names:
-        #         self.interface.set_sextupoles(sextupole_names, np.zeros(len(sextupole_names), dtype=float))
-        #         print("SysID: sextupoles switched OFF before response matrix measurement.")
-
         for iter in range(self.Niter):
             for corrector in self.correctors:
                 filename_p=os.path.join(self.output_dir, f'DATA_{corrector}_p{iter:04d}.pkl')
@@ -378,24 +369,25 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.vcorrector_names = set(map(str, self.interface.get_vcorrectors_names() or []))
         self.pattern_corrs_input.setPlaceholderText("e.g. ZH*, ZV*, IP*")
         self.pattern_corrs_input.textChanged.connect(self.pattern_matching)
-        self.sysid_graph_popup = None
+        self.sysid_plot_popup = None
+        self._last_plot_data = None
 
     def _handle_plot_double_click(self, event):
         if event is None:
             return
         if getattr(event, "dblclick", False) and getattr(event, "button", None) == 1:
-            self._show_sysid_graph_popup()
+            self._show_sysid_plot_popup()
 
-    def _show_sysid_graph_popup(self):
-        if self.R is None:
+    def _show_sysid_plot_popup(self):
+        if self._last_plot_data is None:
             QMessageBox.information(self, "No SysID data", "Run SysID first.")
             return
-        if self.sysid_graph_popup is None:
-            self.sysid_graph_popup = PlotPopup("Response Matrix", parent=self)
-        self._draw_sysid_graph(self.sysid_graph_popup.plot, self.R)
-        self.sysid_graph_popup.show()
-        self.sysid_graph_popup.raise_()
-        self.sysid_graph_popup.activateWindow()
+        if self.sysid_plot_popup is None:
+            self.sysid_plot_popup = PlotPopup("SysID orbit response", parent=self)
+        self._draw_sysid_plot(self.sysid_plot_popup.plot, *self._last_plot_data)
+        self.sysid_plot_popup.show()
+        self.sysid_plot_popup.raise_()
+        self.sysid_plot_popup.activateWindow()
 
     def _is_h_corrector(self, s):
         return str(s) in self.hcorrector_names
@@ -851,29 +843,42 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 return i - 0.5
         return len(bpm_position) - 0.5
 
-    def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, bpm_names,corrector):
+    def _draw_sysid_plot(self, plot, Diff_x, Err_x, Diff_y, Err_y, bpm_names, corrector):
         Diff_x=np.asarray(Diff_x).ravel()
         Diff_y=np.asarray(Diff_y).ravel()
         Err_x=np.asarray(Err_x).ravel()
         Err_y=np.asarray(Err_y).ravel()
         bpm_names=[str(x) for x in bpm_names]
 
-        self.plot_widget.axes.clear()
+        plot.axes.clear()
         n=min(len(Diff_x),len(Diff_y),len(Err_x),len(Err_y))
         scale=np.arange(n) # np.arange(start,stop,step) -> 0,n,1
-        self.plot_widget.axes.errorbar(scale, Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
-        self.plot_widget.axes.errorbar(scale, Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
+        plot.axes.errorbar(scale, Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
+        plot.axes.errorbar(scale, Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
         device_x = self._device_position_on_bpm_axis(corrector.split(":")[0], bpm_names)
-        self.plot_widget.axes.axvline(device_x, linestyle='--', linewidth=2, color = "purple")
-        self.plot_widget.axes.text(device_x, self.plot_widget.axes.get_ylim()[1], corrector, rotation=90, va="top", ha="right")
-        self.plot_widget.axes.legend(loc='upper left')
-        self.plot_widget.axes.set_xticks(scale)
-        self.plot_widget.axes.set_xticklabels(bpm_names[:n],rotation=90,fontsize=8)
-        self.plot_widget.axes.set_ylabel(f'Orbit [{self.bpm_unit}]')
-        self.plot_widget.axes.set_title(f"{self._actuator_label()} '{corrector}'")
-        self.plot_widget.axes.grid(color='#EEEEEE')
-        self.plot_widget.draw()
-        self.plot_widget.repaint()
+        plot.axes.axvline(device_x, linestyle='--', linewidth=2, color = "purple")
+        plot.axes.text(device_x, plot.axes.get_ylim()[1], corrector, rotation=90, va="top", ha="right")
+        plot.axes.legend(loc='upper left')
+        plot.axes.set_xticks(scale)
+        plot.axes.set_xticklabels(bpm_names[:n],rotation=90,fontsize=8)
+        plot.axes.set_ylabel(f'Orbit [{self.bpm_unit}]')
+        plot.axes.set_title(f"{self._actuator_label()} '{corrector}'")
+        plot.axes.grid(color='#EEEEEE')
+        plot.draw()
+        plot.repaint()
+
+    def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, bpm_names,corrector):
+        self._last_plot_data = (
+            np.asarray(Diff_x).copy(),
+            np.asarray(Err_x).copy(),
+            np.asarray(Diff_y).copy(),
+            np.asarray(Err_y).copy(),
+            [str(name) for name in bpm_names],
+            str(corrector),
+        )
+        self._draw_sysid_plot(self.plot_widget, *self._last_plot_data)
+        if self.sysid_plot_popup is not None and self.sysid_plot_popup.isVisible():
+            self._draw_sysid_plot(self.sysid_plot_popup.plot, *self._last_plot_data)
 
     def _pick_and_load_data_dir(self):
         default_dir = os.path.join(self.cwd)

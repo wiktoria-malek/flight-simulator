@@ -455,12 +455,8 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_movable_magnets_names(self):
         return self.movable_magnets
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
-        # from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
-        # screens_data =
-        # simulated_interface = InterfaceATF2_Ext_RFTrack()
-        # simulated_interface.set_quadrupoles()
-        pass
+    def predict_emittance_scan_response(self, *args, **kwargs): # from optimizer, delegates all variables to the simulation
+        return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
 
     def _quadrupole_current_pv_name(self,name):
         if name.startswith("M") and name[1:].startswith(("QF", "QD", "QM")):
