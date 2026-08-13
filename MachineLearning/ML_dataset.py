@@ -14,6 +14,7 @@ import sys, time
 from pathlib import Path
 from Interfaces.interface_setup import INTERFACE_SETUP
 import numpy as np
+import RF_Track as rft
 
 THIS_FILE = Path(__file__).resolve()
 PROJECT_ROOT = THIS_FILE.parents[1]
@@ -83,10 +84,6 @@ def _get_interface_bounds(interface):
         return {}
     return dict(interface_defaults.get("bounds", {}))
 
-def samples_uniform(rng, bounds, name):
-    low, high = bounds[name]
-    return float(rng.uniform(low, high))
-
 def get_nominal_K1L(interface, quad_name):
     quads = interface.get_quadrupoles()
     names = list(quads["names"])
@@ -95,22 +92,14 @@ def get_nominal_K1L(interface, quad_name):
         raise RuntimeError(f"Quad {quad_name} not present in interface. Available examples: {names[:10]}")
     return float(strengths[names.index(quad_name)])
 
-def build_sample(rng, K1L_nominal, bounds, relative_k_change):
-    emit_x_norm = samples_uniform(rng, bounds, "emit_x_norm")
-    beta_x0 = samples_uniform(rng, bounds, "beta_x0")
-    alpha_x0 = samples_uniform(rng, bounds, "alpha_x0")
-    emit_y_norm = samples_uniform(rng, bounds, "emit_y_norm")
-    beta_y0 = samples_uniform(rng, bounds, "beta_y0")
-    alpha_y0 = samples_uniform(rng, bounds, "alpha_y0")
-    K1L_delta = float(rng.uniform(relative_k_change[0], relative_k_change[1]))
-    K1L = float(K1L_nominal*(1.0+K1L_delta))
-    parameters = np.array([
-        emit_x_norm, beta_x0, alpha_x0,
-        emit_y_norm, beta_y0, alpha_y0,
-        K1L,
-    ], dtype=float)
-
-    return parameters
+def build_twiss_samples_quasirandom(bounds, n_samples):
+    twiss_names = PARAMETER_NAMES[:6]
+    lower = np.array([bounds[name][0] for name in twiss_names], dtype=float)
+    upper = np.array([bounds[name][1] for name in twiss_names], dtype=float)
+    if np.any(upper <= lower):
+        raise ValueError("Every Twiss sampling bound must satisfy lower < upper.")
+    unit_points = np.asarray(rft.qrand(int(n_samples), 6), dtype=float)
+    return lower + unit_points * (upper - lower)
 
 def build_k1l_set(rng, K1L_nominal, relative_k_change, number_of_k1l_per_twiss_set, jitter_fraction=0.05):
     delta_min = float(relative_k_change[0])
@@ -182,6 +171,8 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
 
     rng = np.random.default_rng(RANDOM_SEED)
     log = log_callback if callable(log_callback) else print
+    print("RF-Track quasi-random diagnostic: rft.qrand(100, 6)")
+    print(rft.qrand(100, 6))
     n_samples = int(n_samples)
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -196,9 +187,11 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
     n_k1l_per_twiss_set = min(N_K1_PER_TWISS, max(1, n_samples))
     n_twiss_combinations = max(1, int(np.ceil(n_samples / n_k1l_per_twiss_set)))
     n_total = n_k1l_per_twiss_set * n_twiss_combinations
+    twiss_samples = build_twiss_samples_quasirandom(bounds, n_twiss_combinations)
 
     log(f"{quad_name} nominal K1L: {K1L_nominal}")
     log(f"Generating {n_samples} rows with {n_twiss_combinations} twiss combinations and {n_k1l_per_twiss_set} K1Ls per sample.")
+    log("Twiss sampling: 6D RF-Track quasi-random sequence.")
     log(f"Screens: {screens}")
     log(f"K1L relative change: {k1l_relative_change}")
     log(f"Output file: {output_file}")
@@ -216,8 +209,8 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
         if callable(stop_checker) and stop_checker():
             log("Dataset generation stopped by user.")
             break
-        twiss_parameters = build_sample(rng, K1L_nominal, bounds, k1l_relative_change)
-        emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0, _ = twiss_parameters
+        twiss_parameters = twiss_samples[twiss_combination]
+        emit_x_norm, beta_x0, alpha_x0, emit_y_norm, beta_y0, alpha_y0 = twiss_parameters
         K1L_array = build_k1l_set(rng, K1L_nominal, k1l_relative_change, n_k1l_per_twiss_set)
         try:
             pred_sigx, pred_sigy = interface.predict_emittance_scan_response(
