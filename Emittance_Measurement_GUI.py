@@ -745,6 +745,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         sigy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         sigxy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
+        hedges = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
+        vedges = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
         print(f"GUI Nshots: {nshots}, GUI Scan steps: {nsteps_scan}")
 
         for path, state in zip(files, states):
@@ -760,6 +762,12 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             screen_images = state.get_screens().get("images", [])
             if len(screen_images) > 0:
                 images[step_i][screen_i][shot_i] = np.asarray(screen_images[0]).tolist()
+            screen_hedges = screen_data.get("hedges", [])
+            if len(screen_hedges) > 0:
+                hedges[step_i][screen_i][shot_i] = np.asarray(screen_hedges[0], dtype=float).tolist()
+            screen_vedges = screen_data.get("vedges", [])
+            if len(screen_vedges) > 0:
+                vedges[step_i][screen_i][shot_i] = np.asarray(screen_vedges[0], dtype=float).tolist()
 
         sigx_mean = np.nanmean(sigx_samples, axis=2)
         sigy_mean = np.nanmean(sigy_samples, axis=2)
@@ -807,6 +815,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "cancelled": False,
             "nsteps_scan": int(nsteps_scan),
             "images": images,
+            "hedges": hedges,
+            "vedges": vedges,
         }
 
         print("K1L:", session["K1L_values"])

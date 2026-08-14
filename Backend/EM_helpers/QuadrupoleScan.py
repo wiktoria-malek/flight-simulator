@@ -162,6 +162,8 @@ class QuadrupoleScan(SaveOrLoad):
 
         scan_steps = []
         images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
+        hedges = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
+        vedges = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
         output_dir = self._get_scan_dir(quad_name, steps_requested)
         cancel_requested = False
         self.load_screens_data_database.setText(output_dir)
@@ -233,6 +235,10 @@ class QuadrupoleScan(SaveOrLoad):
                                 sx_shots[j] = float(screens_data["sigx"][idx]) * sigma_scale
                                 sy_shots[j] = float(screens_data["sigy"][idx]) * sigma_scale
                                 images[i][k][j]=np.asarray(screens_data["images"][idx]).tolist()
+                                if idx < len(screens_data.get("hedges", [])):
+                                    hedges[i][k][j] = np.asarray(screens_data["hedges"][idx], dtype=float).tolist()
+                                if idx < len(screens_data.get("vedges", [])):
+                                    vedges[i][k][j] = np.asarray(screens_data["vedges"][idx], dtype=float).tolist()
                                 if "sigxy" in screens_data:
                                     sxy_shots[j] = float(screens_data["sigxy"][idx]) * sigxy_scale
                                 #tilt_shots[j] = float(screens_data["tilt"][idx])
@@ -297,6 +303,8 @@ class QuadrupoleScan(SaveOrLoad):
                             "current_screen_index": int(k),
                             "nsteps_scan": int(nsteps_scan),
                             "images": images,
+                            "hedges": hedges,
+                            "vedges": vedges,
                             "sigma_unit": "mm",
                         }
 
@@ -346,6 +354,8 @@ class QuadrupoleScan(SaveOrLoad):
             "cancelled": bool(cancel_requested),
             "nsteps_scan": int(nsteps_scan), # number of measurements at screens (even if steps=0, nsteps_scan = 1)
             "images": images,
+            "hedges": hedges,
+            "vedges": vedges,
             "sigma_unit": "mm",
             "nscreens": len(screens),
         }

@@ -71,31 +71,54 @@ class DisplayScreenImages(QDialog):
         screen_index = self.screen_combobox.currentIndex()
         step_index = self.step_combobox.currentIndex()
         images = self.session.get("images", [])
-        steps = self.session.get("steps", [])
-        images_per_shot = images[step_index][screen_index]
-
-        # images[step][screen][shot]
         shot_images = images[step_index][screen_index]
         shot_images = [np.asarray(image, dtype=float) for image in shot_images if image is not None]
+        if not shot_images:
+            fig = self.canvas.figure
+            fig.clear()
+            ax = fig.add_subplot(111)
+            screen_name = self.screen_combobox.currentText()
+            step_name = self.step_combobox.currentText()
+            ax.text(0.5, 0.5, f"No image saved for {screen_name} at step {step_name}.", ha="center", va="center", transform=ax.transAxes)
+            ax.set_axis_off()
+            self.canvas.draw_idle()
+            return
         image = np.nanmean(np.stack(shot_images, axis=0), axis=0)
+        hedges = self._get_edges("hedges", step_index, screen_index)
+        vedges = self._get_edges("vedges", step_index, screen_index)
+
+        if image.shape == (hedges.size - 1, vedges.size - 1):
+            image = image.T
+        intensity_x = np.nansum(image, axis=0)
+        intensity_y = np.nansum(image, axis=1)
+
         fig = self.canvas.figure
         fig.clear()
         gridspec=fig.add_gridspec(2,2,width_ratios=(4,1), height_ratios=(1,4), hspace=0.05, wspace=0.05)
         ax = fig.add_subplot(gridspec[1,0])
         ax_x = fig.add_subplot(gridspec[0,0],sharex=ax)
         ax_y = fig.add_subplot(gridspec[1,1],sharey=ax)
-        ax.imshow(image.T, origin="lower", aspect="auto", cmap="jet")
-        intensity_x = np.nansum(image, axis=1)
-        intensity_y = np.nansum(image, axis=0)
-        ax_x.plot(intensity_x)
-        ax_y.plot(intensity_y, np.arange(len(intensity_y)))
+        x_coordinates = 0.5 * (hedges[:-1] + hedges[1:])
+        y_coordinates = 0.5 * (vedges[:-1] + vedges[1:])
+        ax.imshow(image, origin="lower", extent=[hedges[0], hedges[-1], vedges[0], vedges[-1]], aspect="auto", cmap="jet")
+        ax.set_xlabel("x [mm]")
+        ax.set_ylabel("y [mm]")
+        ax_x.plot(x_coordinates, intensity_x)
+        ax_y.plot(intensity_y, y_coordinates)
         ax_x.tick_params(labelbottom=False)
         ax_y.tick_params(labelleft=False)
         self.canvas.draw_idle()
 
-
-
-
+    def _get_edges(self, key, step_index, screen_index):
+        values = self.session.get(key, [])
+        if step_index >= len(values) or screen_index >= len(values[step_index]):
+            return None
+        for shot_edges in values[step_index][screen_index]:
+            if shot_edges is not None:
+                edges = np.asarray(shot_edges, dtype=float)
+                if edges.ndim == 1 and np.all(np.isfinite(edges)):
+                    return edges
+        return None
 
 
 
