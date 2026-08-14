@@ -143,6 +143,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return lattice, element_descriptions, start, end
 
     def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
+        self.sigmaCut = 2.0
         self.Pref = 198 # MeV/c
         self.Q=-1
         self.population = population
@@ -191,10 +192,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         T.sigma_t = 0#10*rft.ps #or 37*rft.ps # mm/c
         T.sigma_pt = 0 # permille
-        T.mean_xp=0.0
-        T.mean_yp=0.0
-        self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population, 1, self.Pref, T, self.nparticles) # reference particle
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles) # reference bunch
+        T.mean_xp = 0.0
+        T.mean_yp = 0.0
+        sigmaCut = 2.0
+        self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population, 1, self.Pref, T, self.nparticles, sigmaCut) # reference particle
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, sigmaCut) # reference bunch
         self.dfs_test_energy = 0.98
         self.wfs_test_charge = 0.90
         self._beam_mode = "nominal"
@@ -215,8 +217,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.sigma_pt = 10 # permille
         T.mean_xp=0.0
         T.mean_yp=0.0
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q , Pref, T, self.nparticles)
-        self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population,  1 , Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q , Pref, T, self.nparticles, self.sigmaCut)
+        self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population,  1 , Pref, T, self.nparticles, self.sigmaCut)
 
     def __setup_beam2(self):
         # Beam for WFS - Reduced bunch charge
@@ -234,8 +236,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.sigma_pt = 10 # permille
         T.mean_xp=0.0
         T.mean_yp=0.0
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles)
-        self.P0 = rft.Bunch6d_QR(rft.electronmass, population,  1, self.Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
+        self.P0 = rft.Bunch6d_QR(rft.electronmass, population,  1, self.Pref, T, self.nparticles, self.sigmaCut)
 
     def get_screens(self, names=None):
         if isinstance(names, str):
@@ -494,7 +496,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.sigma_pt = 10
         T.mean_xp = 0.0
         T.mean_yp = 0.0
-        return rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
+        return rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
 
     def _read_tracked_bunch_screen_sigmas(self, screens):
         screen_data = self.get_screens(names=screens)

@@ -37,6 +37,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def __init__(self, population=2e10, bg_shots = 0.0,  jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         super().__init__()
+        self.sigmaCut = 2.0
         self.log = print
         self.is_simulation = True
         #self.rng = np.random.default_rng(12345) # uncomment for jitter subtraction check
@@ -190,7 +191,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         T.sigma_t = 8  # mm/c
         T.sigma_pt = 0.8  # permille
         # T_sigma_pt = 0.0001 # for test
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
 
     def __setup_beam1(self):
         # Beam for DFS - Reduced energy
@@ -205,7 +206,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         T.sigma_t = 8  # mm/c
         T.sigma_pt = 0.8  # permille
         Nparticles = 1000  # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, Pref, T, self.nparticles, self.sigmaCut)
 
     def __setup_beam2(self):
         # Beam for WFS - Reduced bunch charge
@@ -220,7 +221,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         T.sigma_t = 8  # mm/c
         T.sigma_pt = 0.8  # permille
         Nparticles = 1000  # number of macroparticles
-        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles)
+        self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
@@ -774,7 +775,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def misalign_quadrupoles(self, sigma_x=0.100, sigma_y=0.100):
         self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch()
+        self.__track_bunch() # when u create the lattice, das shitty
 
     def misalign_bpms(self, sigma_x=0.100, sigma_y=0.100):
         self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
@@ -790,7 +791,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         T.alpha_y = float(alpha_y0)
         T.sigma_t = 8  # mm/c
         T.sigma_pt = 0.8  # permille
-        bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
+        bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
         return bunch
 
     def _read_tracked_bunch_screen_screensigmas(self, screens):
