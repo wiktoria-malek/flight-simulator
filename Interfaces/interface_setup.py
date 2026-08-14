@@ -91,22 +91,22 @@ INTERFACE_SETUP = {
 
             # QD16X — simulation
             "bounds": {
-                "emit_x_norm": [4.5, 6.0],
-                "beta_x0": [0.5, 1.4],
-                "alpha_x0": [-0.8, 0.8],
-                "emit_y_norm": [0.01, 0.06],
-                "beta_y0": [4.0, 7.0],
-                "alpha_y0": [-0.5, 1.0],
+                "emit_x_norm": [0.5, 20.0],
+                "beta_x0": [0.001, 30.0],
+                "alpha_x0": [-1.0, 1.0],
+                "emit_y_norm": [0.01, 2.0],
+                "beta_y0": [0.001, 30.0],
+                "alpha_y0": [-5.0, 5.0],
             }
 
         # # QD18X — simulation
         # "bounds": {
-        #     "emit_x_norm": [4.5, 10.0],
-        #     "beta_x0": [0.7, 5.0],
-        #     "alpha_x0": [-3.0, -0.5],
-        #     "emit_y_norm": [0.01, 0.9],
-        #     "beta_y0": [7.5, 15.0],
-        #     "alpha_y0": [-1.5, 1.0],
+        #     "emit_x_norm": [5, 10.0],
+        #     "beta_x0": [0.001, 60.0],
+        #     "alpha_x0": [-15.0, 15.0],
+        #     "emit_y_norm": [0.01, 5.0],
+        #     "beta_y0": [0.001, 60.0],
+        #     "alpha_y0": [-15, 15.0],
         # }
 
         # # QF17X — real machine, initial fit
@@ -121,11 +121,11 @@ INTERFACE_SETUP = {
         #
         # "bounds": {
         #     "emit_x_norm": [5.0, 9.0],
-        #     "beta_x0": [3.0, 9.0],
-        #     "alpha_x0": [-4.0, -1.0],
-        #     "emit_y_norm": [0.08, 0.8],
-        #     "beta_y0": [0.2, 1.5],
-        #     "alpha_y0": [-1.0, 1.0],
+        #     "beta_x0": [0.001, 50.0],
+        #     "alpha_x0": [-4.0, 4.0],
+        #     "emit_y_norm": [0.01, 1.0],
+        #     "beta_y0": [0.001, 50.0],
+        #     "alpha_y0": [-4.0, 4.0],
         # }
 
 
