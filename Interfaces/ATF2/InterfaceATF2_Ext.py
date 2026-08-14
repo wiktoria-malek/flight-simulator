@@ -458,6 +458,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def predict_emittance_scan_response(self, *args, **kwargs): # from optimizer, delegates all variables to the simulation
         return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
 
+    def get_R_matrix_scan(self, *args, **kwargs):
+        return self.tracking_interface.get_R_matrix_scan(*args, **kwargs)
+
     def _quadrupole_current_pv_name(self,name):
         if name.startswith("M") and name[1:].startswith(("QF", "QD", "QM")):
             return name[1:]

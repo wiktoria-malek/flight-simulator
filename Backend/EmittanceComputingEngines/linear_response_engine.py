@@ -1,6 +1,5 @@
 import numpy as np
 import os
-from scipy.stats import median_abs_deviation
 from Backend.EM_helpers.LinearResponse import LinearResponse
 from Backend.EmittanceComputingEngines.AbstractComputingEngine import AbstractComputingEngine
 
@@ -53,23 +52,6 @@ class LinearResponseEngine(AbstractComputingEngine):
         pred_x = np.asarray(direct["pred_x"], dtype=float)
         pred_y = np.asarray(direct["pred_y"], dtype=float)
 
-        res_x = pred_x - sigma2_x
-        res_y = pred_y - sigma2_y
-
-        data_res_x = res_x.reshape(-1)
-        data_res_y = res_y.reshape(-1)
-
-        rms_x = float(np.sqrt(np.nanmean(data_res_x ** 2))) if data_res_x.size else np.nan
-        rms_y = float(np.sqrt(np.nanmean(data_res_y ** 2))) if data_res_y.size else np.nan
-        mad_x = float(median_abs_deviation(data_res_x, scale="normal")) if data_res_x.size else np.nan
-        mad_y = float(median_abs_deviation(data_res_y, scale="normal")) if data_res_y.size else np.nan
-
-        per_screen_x = {screen: float(abs(res_x[0, i])) for i, screen in enumerate(screens)}
-        per_screen_y = {screen: float(abs(res_y[0, i])) for i, screen in enumerate(screens)}
-
-        worst_screen_x = max(per_screen_x, key=per_screen_x.get) if per_screen_x else None
-        worst_screen_y = max(per_screen_y, key=per_screen_y.get) if per_screen_y else None
-
         result = {
             "screen0": screens[0],
             "quad_name": quad_name,
@@ -83,14 +65,6 @@ class LinearResponseEngine(AbstractComputingEngine):
             "alpha_y0": direct["alpha_y0"],
             "fit_x_cost": 0.0,
             "fit_y_cost": 0.0,
-            "fit_x_residual_rms": rms_x,
-            "fit_y_residual_rms": rms_y,
-            "fit_x_residual_mad": mad_x,
-            "fit_y_residual_mad": mad_y,
-            "fit_x_residual_rms_per_screen": per_screen_x,
-            "fit_y_residual_rms_per_screen": per_screen_y,
-            "worst_screen_x": worst_screen_x,
-            "worst_screen_y": worst_screen_y,
             "fit_x_found": True,
             "fit_y_found": True,
             "paused": False,

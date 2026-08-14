@@ -184,10 +184,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         T.emitt_x = 12.7000 # mm.mrad normalised emittance
         T.emitt_y = 4.3400   # mm.mrad
-        T.beta_x = 46.244900 # m
-        T.beta_y = 109.143468  # m; back-propagated from QFD350 entrance
-        T.alpha_x = 1.314308
-        T.alpha_y = 7.248155
+        T.beta_x = 46.1766 # m
+        T.beta_y = 109.1117  # m; back-propagated from QFD350 entrance
+        T.alpha_x = 1.3126
+        T.alpha_y = 7.2462
 
         T.sigma_t = 0#10*rft.ps #or 37*rft.ps # mm/c
         T.sigma_pt = 0 # permille
@@ -544,7 +544,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
-                self.set_quadrupoles([quad_name], [float(K1L)], track = False)
+                self.set_quadrupoles([quad_name], [float(K1L)])
                 start_element = self.lattice[start_element_name]
                 if isinstance(start_element, list):
                     start_element = start_element[0]
@@ -675,6 +675,84 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             self.__track_bunch()
 
         return result
+
+    def get_R_matrix_scan(self, quad_name, screens, K1L_values):
+        screens = list(screens)
+        K1L_values = np.asarray(K1L_values, dtype=float)
+        original_quads = self.get_quadrupoles(names=[quad_name])
+        K1L_original = float(original_quads["bdes"][0])
+        end_element_name = str(screens[-1])
+
+        n_k1l = len(K1L_values)
+        n_screens = len(screens)
+        R11 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+        R12 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+        R33 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+        R34 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+
+        original_bunch = self.B0
+        try:
+            for k, K1L in enumerate(K1L_values):
+                self.set_quadrupoles([quad_name], [float(K1L)])
+                start_element = self.lattice[quad_name]
+                if isinstance(start_element, list): start_element = start_element[0]
+                end_element = self.lattice[end_element_name]
+                if isinstance(end_element, list): end_element = end_element[-1]
+
+                bx = np.array([
+                    [1.0, 0.0, 0.0, 0.0, 0.0, self.Pref],  # x = 1, x' = 0
+                    [0.0, 1.0, 0.0, 0.0, 0.0, self.Pref],  # x = 0, x' = 1
+                ], dtype=float)
+
+                bunch_x = rft.Bunch6d(rft.electronmass, 0.0, self.Q, bx)
+                tracked_x = rft.Lattice_view(self.lattice, start_element, end_element).track(bunch_x)
+
+                for si, screen_name in enumerate(screens):
+                    screen_elem = self.lattice[screen_name]
+                    if isinstance(screen_elem, list):
+                        screen_elem = screen_elem[-1]
+                    b_x = None
+                    try:
+                        b_x = screen_elem.get_bunch()  # Read the test particles cached at this screen.
+                    except Exception:
+                        b_x = None
+                    if b_x is None and str(screen_name) == end_element_name:
+                        b_x = tracked_x
+                    if b_x is None:
+                        continue
+                    phase_space_x = np.asarray(b_x.get_phase_space("%x %xp"), dtype=float)
+                    R11[k, si] = phase_space_x[0, 0]  # k: K1L index, si: screen index.
+                    R12[k, si] = phase_space_x[1, 0]
+
+                by = np.array([
+                    [0.0, 0.0, 1.0, 0.0, 0.0, self.Pref],  # y = 1, y' = 0
+                    [0.0, 0.0, 0.0, 1.0, 0.0, self.Pref],  # y = 0, y' = 1
+                ], dtype=float)
+                bunch_y = rft.Bunch6d(rft.electronmass, 0.0, self.Q, by)
+                tracked_y = rft.Lattice_view(self.lattice, start_element, end_element).track(bunch_y)
+
+                for si, screen_name in enumerate(screens):
+                    screen_elem = self.lattice[screen_name]
+                    if isinstance(screen_elem, list):
+                        screen_elem = screen_elem[-1]
+                    b_y = None
+                    try:
+                        b_y = screen_elem.get_bunch()  # Read the test particles cached at this screen.
+                    except Exception:
+                        b_y = None
+                    if b_y is None and str(screen_name) == end_element_name:
+                        b_y = tracked_y
+                    if b_y is None:
+                        continue
+                    phase_space_y = np.asarray(b_y.get_phase_space("%y %yp"), dtype=float)
+                    R33[k, si] = phase_space_y[0, 0]  # k: K1L index, si: screen index.
+                    R34[k, si] = phase_space_y[1, 0]
+        finally:
+            self.set_quadrupoles([quad_name], [float(K1L_original)])
+            self.B0 = original_bunch
+            self.__track_bunch()
+
+        return {"R11": R11, "R12": R12, "R33": R33, "R34": R34, "screens": screens, "K1L_values": K1L_values}
 
     def get_quadrupoles(self, names=None):
         #self.log("Reading quadrupoles' strengths...")

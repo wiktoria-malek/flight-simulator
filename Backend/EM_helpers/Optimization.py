@@ -1,11 +1,12 @@
 import numpy as np
-from scipy.stats import median_abs_deviation, qmc
+from scipy.stats import qmc
 from scipy.optimize import minimize, least_squares
 import pandas as pd
 from xopt import Xopt
 from xopt.vocs import VOCS, select_best
 from xopt.evaluator import Evaluator
 from xopt.generators.bayesian import ExpectedImprovementGenerator
+from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable
 
 class OptimizationStopped(Exception):
     def __init__(self, message = "Optimization stopped", solution = None):
@@ -18,9 +19,10 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization:
-    def __init__(self, interface, n_starts=1, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None):
+    def __init__(self, interface, n_starts=1, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None, use_linear_optics=True):
         self.progress_callback = progress_callback
         self.interface = interface
+        self.use_linear_optics = bool(use_linear_optics)
         self.n_starts = int(n_starts)
         self.rng = np.random.default_rng(rng_seed)
         self._stop_requested = False
@@ -144,21 +146,8 @@ class Optimization:
         sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
         sigx_shots = np.asarray(session.get("sigx_shots", []), dtype=float)
         sigy_shots = np.asarray(session.get("sigy_shots", []), dtype=float)
-
         if not quad_name:
             raise ValueError("Session does not contain quad_name")
-        if len(screens) < 1:
-            raise ValueError("At least one screen is required")
-        if K1L_values.size == 0:
-            raise ValueError("Session does not contain K1L_values")
-        if sigx.ndim != 2 or sigy.ndim != 2:
-            raise ValueError("Invalid sigma array shape")
-        if sigx.shape != sigy.shape:
-            raise ValueError("sigx and sigy shapes do not match")
-        if sigx.shape[0] != K1L_values.size:
-            raise ValueError("K1L_values and sigma arrays have incompatible lengths")
-        if not bounds:
-            raise ValueError("Add bounds for optimizer to interface_setup.py")
 
         sigma_template_x = np.asarray(sigx if sigx.size else np.empty((0, len(screens))), dtype=float)
         sigma_template_y = np.asarray(sigy if sigy.size else np.empty((0, len(screens))), dtype=float)
@@ -169,10 +158,6 @@ class Optimization:
                 "beta0": np.nan,
                 "alpha0": np.nan,
                 "pred": np.full_like(sigma_template, np.nan, dtype=float),
-                "residual_rms": np.nan,
-                "residual_mad": np.nan,
-                "residual_rms_per_screen": {screen: np.nan for screen in screens},
-                "worst_screen": None,
                 "cost": np.nan,
             }
         joint_fit = None
@@ -187,10 +172,6 @@ class Optimization:
                 "beta0": joint_fit["beta_x0"],
                 "alpha0": joint_fit["alpha_x0"],
                 "pred": joint_fit["pred_x"],
-                "residual_rms": joint_fit["residual_rms_x"],
-                "residual_mad": joint_fit["residual_mad_x"],
-                "residual_rms_per_screen": joint_fit["residual_rms_per_screen_x"],
-                "worst_screen": joint_fit["worst_screen_x"],
                 "cost": joint_fit["cost"],
             }
             fit_y = {
@@ -198,10 +179,6 @@ class Optimization:
                 "beta0": joint_fit["beta_y0"],
                 "alpha0": joint_fit["alpha_y0"],
                 "pred": joint_fit["pred_y"],
-                "residual_rms": joint_fit["residual_rms_y"],
-                "residual_mad": joint_fit["residual_mad_y"],
-                "residual_rms_per_screen": joint_fit["residual_rms_per_screen_y"],
-                "worst_screen": joint_fit["worst_screen_y"],
                 "cost": joint_fit["cost"],
             }
 
@@ -218,10 +195,6 @@ class Optimization:
                         "beta0": joint_fit["beta_x0"],
                         "alpha0": joint_fit["alpha_x0"],
                         "pred": joint_fit["pred_x"],
-                        "residual_rms": joint_fit["residual_rms_x"],
-                        "residual_mad": joint_fit["residual_mad_x"],
-                        "residual_rms_per_screen": joint_fit["residual_rms_per_screen_x"],
-                        "worst_screen": joint_fit["worst_screen_x"],
                         "cost": joint_fit["cost"],
                     }
                 fit_y = {
@@ -229,10 +202,6 @@ class Optimization:
                         "beta0": joint_fit["beta_y0"],
                         "alpha0": joint_fit["alpha_y0"],
                         "pred": joint_fit["pred_y"],
-                        "residual_rms": joint_fit["residual_rms_y"],
-                        "residual_mad": joint_fit["residual_mad_y"],
-                        "residual_rms_per_screen": joint_fit["residual_rms_per_screen_y"],
-                        "worst_screen": joint_fit["worst_screen_y"],
                         "cost": joint_fit["cost"],
                     }
             else:
@@ -286,14 +255,6 @@ class Optimization:
             "alpha_y0": fit_y["alpha0"],
             "fit_x_cost": fit_x["cost"],
             "fit_y_cost": fit_y["cost"],
-            "fit_x_residual_rms": fit_x["residual_rms"],
-            "fit_y_residual_rms": fit_y["residual_rms"],
-            "fit_x_residual_mad": fit_x["residual_mad"],
-            "fit_y_residual_mad": fit_y["residual_mad"],
-            "fit_x_residual_rms_per_screen": fit_x["residual_rms_per_screen"],
-            "fit_y_residual_rms_per_screen": fit_y["residual_rms_per_screen"],
-            "worst_screen_x": fit_x["worst_screen"],
-            "worst_screen_y": fit_y["worst_screen"],
             "fit_quadrupole_strength": bool(self.fit_quadrupole_strength),
             "quad_k1l_0": (
                 float(joint_fit.get("quad_k1l_0", np.nan))
@@ -320,6 +281,7 @@ class Optimization:
             "pred_x": fit_x["pred"],
             "pred_y": fit_y["pred"],
             "screens": list(session.get("screens", [])),
+            "K1L_values": K1L_values.tolist(),
         }
 
         self.best_out_so_far = output
@@ -339,48 +301,6 @@ class Optimization:
     def _build_joint_partial_output(self, screens, sigma_x, sigma_y, pred_x, pred_y, best_row, best_cost):
         if best_row is None or pred_x is None or pred_y is None:
             return None
-        per_screen_res_x = {screen: [] for screen in screens}
-        per_screen_res_y = {screen: [] for screen in screens}
-        data_res_x = []
-        data_res_y = []
-
-        for k in range(pred_x.shape[0]):
-            for i, screen in enumerate(screens):
-                yx = sigma_x[k, i]
-                ypx = pred_x[k, i]
-                if np.isfinite(yx) and np.isfinite(ypx):
-                    rx = (ypx - yx)
-                    data_res_x.append(rx)
-                    per_screen_res_x[screen].append(rx)
-
-                yy = sigma_y[k, i]
-                ypy = pred_y[k, i]
-                if np.isfinite(yy) and np.isfinite(ypy):
-                    ry = (ypy - yy)
-                    data_res_y.append(ry)
-                    per_screen_res_y[screen].append(ry)
-
-        data_res_x = np.asarray(data_res_x, dtype=float)
-        data_res_y = np.asarray(data_res_y, dtype=float)
-
-        rms_res_x = float(np.sqrt(np.mean(data_res_x ** 2))) if data_res_x.size else np.nan
-        rms_res_y = float(np.sqrt(np.mean(data_res_y ** 2))) if data_res_y.size else np.nan
-        mad_res_x = float(median_abs_deviation(data_res_x, scale="normal")) if data_res_x.size else np.nan
-        mad_res_y = float(median_abs_deviation(data_res_y, scale="normal")) if data_res_y.size else np.nan
-
-        per_screen_rms_x = {}
-        per_screen_rms_y = {}
-        for screen in screens:
-            arrx = np.asarray(per_screen_res_x[screen], dtype=float)
-            arry = np.asarray(per_screen_res_y[screen], dtype=float)
-            per_screen_rms_x[screen] = float(np.sqrt(np.mean(arrx ** 2))) if arrx.size else np.nan
-            per_screen_rms_y[screen] = float(np.sqrt(np.mean(arry ** 2))) if arry.size else np.nan
-
-        finite_x = [(screen, val) for screen, val in per_screen_rms_x.items() if np.isfinite(val)]
-        finite_y = [(screen, val) for screen, val in per_screen_rms_y.items() if np.isfinite(val)]
-        worst_screen_x = max(finite_x, key=lambda x: x[1])[0] if finite_x else None
-        worst_screen_y = max(finite_y, key=lambda x: x[1])[0] if finite_y else None
-
         gamma_rel, beta_rel, beta_gamma = self.interface.get_beam_factors()
         emit_x_geom = max(float(best_row["emit_x_norm"]) / beta_gamma, 1e-12)
         emit_y_geom = max(float(best_row["emit_y_norm"]) / beta_gamma, 1e-12)
@@ -396,14 +316,7 @@ class Optimization:
             "pred_y": pred_y,
             "emit_x_norm": float(best_row["emit_x_norm"]),
             "emit_y_norm": float(best_row["emit_y_norm"]),
-            "residual_rms_x": rms_res_x,
-            "residual_rms_y": rms_res_y,
-            "residual_mad_x": mad_res_x,
-            "residual_mad_y": mad_res_y,
-            "residual_rms_per_screen_x": per_screen_rms_x,
-            "residual_rms_per_screen_y": per_screen_rms_y,
-            "worst_screen_x": worst_screen_x,
-            "worst_screen_y": worst_screen_y,
+            "quad_k1l_0": (float(best_row["quad_k1l_0"]) if "quad_k1l_0" in best_row else np.nan),
             "cost": float(best_cost) if np.isfinite(best_cost) else np.nan,
         }
 
@@ -425,8 +338,8 @@ class Optimization:
         s_sigx = np.nanstd(sigma_x_shots, axis=2, ddof=1)
         s_sigy = np.nanstd(sigma_y_shots, axis=2, ddof=1)
 
-        fallback_u_x = np.maximum(0.05 * np.abs(sig_x), 1e-12)
-        fallback_u_y = np.maximum(0.05 * np.abs(sig_y), 1e-12)
+        fallback_u_x = np.maximum(0.08 * np.abs(sig_x), 1e-12)
+        fallback_u_y = np.maximum(0.08 * np.abs(sig_y), 1e-12)
         u_x = np.where(n_x_sum >= 2, s_sigx / np.sqrt(n_x_sum), fallback_u_x)
         u_y = np.where(n_y_sum >= 2, s_sigy / np.sqrt(n_y_sum), fallback_u_y)
         u_x = np.where(np.isfinite(u_x) & (u_x > 0), u_x, fallback_u_x)
@@ -531,84 +444,119 @@ class Optimization:
             )
             return {"f": f}
 
-        evaluator = Evaluator(function = evaluate) # how to calculate merit function
-        generator = ExpectedImprovementGenerator(vocs = vocs) # how to choose the next point
-        X = Xopt(generator = generator, evaluator = evaluator, vocs = vocs)
-        total_initial = max(1, int(self.xopt_initial_points))
-
-        best_row = None # from X.data
+        original_low_bounds = low_bounds.copy()
+        original_high_bounds = high_bounds.copy()
+        X = None
+        best_row = None
         best_cost = np.inf
         stopped_during_fit = False
+        use_global_search = True
 
-        def update_best_from_data():
-            nonlocal best_row, best_cost # it allows the inner function to overwrite best_row, best_cost, not create it again
-            data = getattr(X, "data", None)
-            if data is None or len(data) == 0:
-                return
-            good = data.copy()
-            if "xopt_error" in good.columns:
-                try:
-                    good = good[~good["xopt_error"].astype(bool)] # chooses only points where there was no xopt_error
-                except Exception:
-                    pass
-            if len(good) == 0 or "f" not in good.columns:
-                return
-            idx = good["f"].astype(float).idxmin() # change each value to float
-            row = good.loc[idx]
-            cost = float(row["f"])
+        if self.use_linear_optics:
+            try:
+                linear_optics = estimate_twiss_use_linear_optics_start(self.interface, quad_name, screens, K1L_values, sig_x, sig_y, u_x, u_y, valid_x, valid_y, beta_gamma)
+                x0_linear_optics_values = [linear_optics[p] for p in ("emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0")]
+                if self.fit_quadrupole_strength: x0_linear_optics_values.append(K1L_0_readback)
+                x0_linear_optics = np.clip(np.array(x0_linear_optics_values, dtype=float), original_low_bounds, original_high_bounds)
+                cost_linear_optics, _, _ = compute_cost(*x0_linear_optics[:6], allow_stop=False, quad_k1l_0=(float(x0_linear_optics[6]) if self.fit_quadrupole_strength else None))
 
-            if np.isfinite(cost) and cost < best_cost: # updates best solution using the real, not log-transformed, cost
-                best_cost = cost
-                best_row = row
+                if np.isfinite(cost_linear_optics):
+                    use_global_search = False
+                    row_values = dict(zip(params_order, x0_linear_optics))
+                    row_values["f"] = float(cost_linear_optics)
+                    best_row = pd.Series(row_values)
+                    best_cost = float(cost_linear_optics)
+                    rel_window = 0.15
+                    half_width = rel_window * (original_high_bounds - original_low_bounds)
+                    if self.fit_quadrupole_strength:
+                        half_width[-1] = original_high_bounds[-1] - original_low_bounds[-1]
+                    low_bounds = np.maximum(original_low_bounds, x0_linear_optics - half_width)
+                    high_bounds = np.minimum(original_high_bounds, x0_linear_optics + half_width)
+                    low_bounds = np.minimum(low_bounds, x0_linear_optics - 1e-9)
+                    high_bounds = np.maximum(high_bounds, x0_linear_optics + 1e-9)
+                    print(f"Linear optics cost: cost={cost_linear_optics:.6g}, x0={row_values}")
+                else:
+                    print(f"Something went wrong, using Xopt now...")
+            except CheckLinearOpticsUnavailable as e:
+                print(f"Something went wrong, using Xopt now...")
+            except Exception as e:
+                print(f"Something went wrong, using Xopt now...")
 
-        try:
-            lhs_seed = int(self.rng.integers(0, 2**31 - 1))
-            sampler = qmc.LatinHypercube(d=len(params_order), seed = lhs_seed)
-            unit_samples = sampler.random(n=total_initial)
-            lhs_samples = qmc.scale(unit_samples, low_bounds, high_bounds)
-            lhs_df = pd.DataFrame(lhs_samples, columns=params_order)
-            print(f"Joint Xopt init: {total_initial} samples in {len(params_order)} degrees of freedom")
-            X.evaluate_data(lhs_df)
-            update_best_from_data()
+        if use_global_search:
+            evaluator = Evaluator(function = evaluate) # how to calculate merit function
+            generator = ExpectedImprovementGenerator(vocs = vocs) # how to choose the next point
+            X = Xopt(generator = generator, evaluator = evaluator, vocs = vocs)
+            total_initial = max(1, int(self.xopt_initial_points))
 
-            for i in range(self.xopt_steps):
-                print(f"Joint Xopt step {i + 1}/{self.xopt_steps}")
-                self._emit_progress("Xopt", i + 1, self.xopt_steps)
-                if self._stop_requested:
-                    if best_row is not None:
-                        stopped_during_fit = True
-                        break
-                    raise OptimizationStopped("Optimization stopped.")
-                if self._pause_requested:
-                    if best_row is not None:
-                        stopped_during_fit = True
-                        break
-                    raise OptimizationPaused("Optimization paused.")
+            def update_best_from_data():
+                nonlocal best_row, best_cost # it allows the inner function to overwrite best_row, best_cost, not create it again
+                data = getattr(X, "data", None)
+                if data is None or len(data) == 0:
+                    return
+                good = data.copy()
+                if "xopt_error" in good.columns:
+                    try:
+                        good = good[~good["xopt_error"].astype(bool)] # chooses only points where there was no xopt_error
+                    except Exception:
+                        pass
+                if len(good) == 0 or "f" not in good.columns:
+                    return
+                idx = good["f"].astype(float).idxmin() # change each value to float
+                row = good.loc[idx]
+                cost = float(row["f"])
 
-                X.step()
+                if np.isfinite(cost) and cost < best_cost: # updates best solution using the real, not log-transformed, cost
+                    best_cost = cost
+                    best_row = row
+
+            try:
+                lhs_seed = int(self.rng.integers(0, 2**31 - 1))
+                sampler = qmc.LatinHypercube(d=len(params_order), seed = lhs_seed)
+                unit_samples = sampler.random(n=total_initial)
+                lhs_samples = qmc.scale(unit_samples, low_bounds, high_bounds)
+                lhs_df = pd.DataFrame(lhs_samples, columns=params_order)
+                print(f"Joint Xopt init: {total_initial} samples in {len(params_order)} degrees of freedom")
+                X.evaluate_data(lhs_df)
                 update_best_from_data()
-                if self._stop_requested or self._pause_requested:
+
+                for i in range(self.xopt_steps):
+                    print(f"Joint Xopt step {i + 1}/{self.xopt_steps}")
+                    self._emit_progress("Xopt", i + 1, self.xopt_steps)
+                    if self._stop_requested:
+                        if best_row is not None:
+                            stopped_during_fit = True
+                            break
+                        raise OptimizationStopped("Optimization stopped.")
+                    if self._pause_requested:
+                        if best_row is not None:
+                            stopped_during_fit = True
+                            break
+                        raise OptimizationPaused("Optimization paused.")
+
+                    X.step()
+                    update_best_from_data()
+                    if self._stop_requested or self._pause_requested:
+                        stopped_during_fit = True
+                        break
+
+            except OptimizationStopped:
+                if best_row is not None:
                     stopped_during_fit = True
-                    break
+                else:
+                    raise
+            except OptimizationPaused:
+                if best_row is not None:
+                    stopped_during_fit = True
+                else:
+                    raise
+            if best_row is None:
+                raise RuntimeError("Joint Xopt failed to find best fit solution.")
 
-        except OptimizationStopped:
-            if best_row is not None:
-                stopped_during_fit = True
-            else:
-                raise
-        except OptimizationPaused:
-            if best_row is not None:
-                stopped_during_fit = True
-            else:
-                raise
-        if best_row is None:
-            raise RuntimeError("Joint Xopt failed to find best fit solution.")
-
-        print(
-            f"Joint Xopt finished. "
-            f"evaluations={0 if getattr(X, 'data', None) is None else len(X.data)}, "
-            f"best_found={best_row is not None}, stopped={stopped_during_fit}"
-        )
+            print(
+                f"Joint Xopt finished. "
+                f"evaluations={0 if getattr(X, 'data', None) is None else len(X.data)}, "
+                f"best_found={best_row is not None}, stopped={stopped_during_fit}"
+            )
 
         emit_x_norm_best = float(best_row["emit_x_norm"])
         beta_x0_best = float(best_row["beta_x0"])
@@ -648,13 +596,17 @@ class Optimization:
             return np.clip(point, low_bounds + margin, high_bounds - margin)
 
         data_for_starts = getattr(X, "data", None)
+        good = pd.DataFrame(columns=list(params_order) + ["f"])
         if data_for_starts is not None and len(data_for_starts) > 0:
             good = data_for_starts.copy()
             if "xopt_error" in good.columns: good = good[~good["xopt_error"].astype(bool)]
 
         ls_starts = [_move_away_from_bounds_edges(x0)]
-        good = good.sort_values("f", ascending=True)
-        number_of_ls_tries=good.head(self.n_starts)
+        if len(good) > 0 and "f" in good.columns:
+            good = good.sort_values("f", ascending=True)
+            number_of_ls_tries = good.head(self.n_starts)
+        else:
+            number_of_ls_tries = good.iloc[0:0]
 
         for _, row in number_of_ls_tries.iterrows():
             parameter = np.array([float(row[p]) for p in params_order], dtype=float)

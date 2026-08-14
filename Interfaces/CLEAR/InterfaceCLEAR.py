@@ -942,6 +942,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def predict_emittance_scan_response(self, *args, **kwargs):
         return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
 
+    def get_R_matrix_scan(self, *args, **kwargs):
+        return self.tracking_interface.get_R_matrix_scan(*args, **kwargs)
+
     def get_target_dispersion(self, names=None):
         if names is None:
             names = self.bpms

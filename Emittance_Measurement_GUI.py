@@ -624,7 +624,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         fig.tight_layout()
         self.canvas.draw()
 
-    def _plot_fit_overlay(self, pred_x, pred_y, result=None, screens=None):
+    def _plot_fit_overlay(self, pred_x, pred_y, result=None, screens=None, fit_k1l_values=None):
         if self.session is None:
             return
         session_screens = list(self.session.get("screens", []))
@@ -642,6 +642,10 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         K1L_values = np.asarray(self.session["K1L_values"], dtype=float)
         sigx = np.asarray(self.session["sigx_mean"], dtype=float)
         sigy = np.asarray(self.session["sigy_mean"], dtype=float)
+        if fit_k1l_values is not None and len(fit_k1l_values) == pred_x.shape[0]:
+            fit_K1L_values = np.asarray(fit_k1l_values, dtype=float)
+        else:
+            fit_K1L_values = K1L_values
         fig = self.canvas.figure
         fig.clear()
 
@@ -666,11 +670,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             fit_color = lighten_color(base_color, amount=0.45)
             ax1.plot(K1L_values, sigx[:, session_i], "o", color=base_color, label=f"{screen} data")
             fit_x = pred_x[:, prediction_i] if prediction_observable == "sigma" else np.sqrt(np.maximum(pred_x[:, prediction_i], 0.0))
-            ax1.plot(K1L_values, fit_x, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
+            ax1.plot(fit_K1L_values, fit_x, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
             ax2.plot(K1L_values, sigy[:, session_i], "o", color=base_color, label=f"{screen} data")
 
             fit_y = pred_y[:, prediction_i] if prediction_observable == "sigma" else np.sqrt(np.maximum(pred_y[:, prediction_i], 0.0))
-            ax2.plot(K1L_values, fit_y, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
+            ax2.plot(fit_K1L_values, fit_y, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
 
         unit = self.session.get("sigma_unit", self._get_interface_units())
 
@@ -884,11 +888,12 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         pred_x = np.asarray(output["pred_x"], dtype=float)
         pred_y = np.asarray(output["pred_y"], dtype=float)
         optimization_screens = list(output.get("screens", self.session.get("screens", [])))
+        fit_k1l_values = output.get("K1L_values")
         self.session["optimization_result"] = result
         self.session["optimization_pred_x"] = pred_x.tolist()
         self.session["optimization_pred_y"] = pred_y.tolist()
         self._update_fit_panel(result)
-        self._plot_fit_overlay(pred_x, pred_y, result, screens = optimization_screens)
+        self._plot_fit_overlay(pred_x, pred_y, result, screens = optimization_screens, fit_k1l_values = fit_k1l_values)
         self.save_emittance_measurement_session(initial_points_xopt=int(self.xopt_initial_points_spin.value()), xopt_steps=int(self.xopt_steps_spin.value()), ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()))
         self._set_progress(100)
 
@@ -1264,7 +1269,6 @@ if __name__ == "__main__":
     project_name = I.get_name()
     is_simulation = bool(getattr(I, "is_simulation"))
     bg_shots = 10
-    #is_rft_in_project_name = bool("RFT" in project_name)
     if  is_simulation:
         bg_shots = 0
     print(f"Selected interface: {project_name}")

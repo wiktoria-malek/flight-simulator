@@ -607,7 +607,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         self.__track_bunch()
 
-    def set_quadrupoles(self, names, values_range, track = True):
+    def set_quadrupoles(self, names, values_range):
         if isinstance(names, str):
             names = [names]
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
@@ -617,9 +617,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
                 element.set_K1L(self.Pref / self.Q,float(value/2))
-        if track:
-        # AS A TEST!
-            self.__track_bunch()
 
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -794,7 +791,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles)
         return bunch
 
-    def _read_tracked_bunch_screen_sigmas(self, screens):
+    def _read_tracked_bunch_screen_screensigmas(self, screens):
         screen_data = self.get_screens(names = screens)
         name_to_index = {name: i for i, name in enumerate(screen_data["names"])}
         sigx = np.full(len(screens), np.nan, dtype=float)
@@ -839,7 +836,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
-                self.set_quadrupoles([quad_name], [float(K1L)], track = False)
+                self.set_quadrupoles([quad_name], [float(K1L)])
                 start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
                 start_element = start_elements[0]
                 if isinstance(start_element, list):
@@ -877,7 +874,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                         output_y[k, si] = float(np.std(m[:, 1]))
 
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
+            self.set_quadrupoles([quad_name], [float(K1L_original)])
             self.B0 = B0_original
             self.__track_bunch()
 
@@ -1056,6 +1053,67 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return result
 
+    def get_R_matrix_scan(self, quad_name, screens, K1L_values):
+        screens = list(screens)
+        K1L_values = np.asarray(K1L_values, dtype=float)
+        original_quads = self.get_quadrupoles(names=[quad_name])
+        K1L_original = float(original_quads["bdes"][0])
+        end_element_name = str(screens[-1])
+
+        n_k1l = len(K1L_values)
+        n_screens = len(screens)
+        R11 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+        R12 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+        R33 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+        R34 = np.full((n_k1l, n_screens), np.nan, dtype=float)
+
+        original_bunch = self.B0
+        try:
+            for k, K1L in enumerate(K1L_values):
+                self.set_quadrupoles([quad_name], [float(K1L)])
+                start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
+                start_element = start_elements[0]
+                if isinstance(start_element, list):
+                    start_element = start_element[0]
+                end_element = self.lattice[end_element_name]
+                if isinstance(end_element, list):
+                    end_element = end_element[-1]
+
+                bx = np.array([[1.0, 0.0, 0.0, 0.0, 0.0, self.Pref], # x = 1 ,  x' = 0
+                               [0.0, 1.0, 0.0, 0.0, 0.0, self.Pref]], dtype=float) # x = 0, x' = 1
+                bunch_x = rft.Bunch6d(rft.electronmass, 0.0, self.Q, bx)
+                tracked_x = rft.Lattice_view(self.lattice, start_element, end_element).track(bunch_x)
+
+                for si, screen_name in enumerate(screens):
+                    screen_elem = self.lattice[screen_name]
+                    if isinstance(screen_elem, list):
+                        screen_elem = screen_elem[-1]
+                    b_x = screen_elem.get_bunch() # reads screens after tracking
+                    if b_x is None and str(screen_name) == end_element_name: b_x = tracked_x
+                    phase_space_x = np.asarray(b_x.get_phase_space("%x %xp"), dtype=float)
+                    R11[k, si] = phase_space_x[0, 0] # R11[2,1] - > 3rd K1L, 2nd screen
+                    R12[k, si] = phase_space_x[1, 0]
+
+                by = np.array([[0.0, 0.0, 1.0, 0.0, 0.0, self.Pref], [0.0, 0.0, 0.0, 1.0, 0.0, self.Pref]], dtype=float)
+                bunch_y = rft.Bunch6d(rft.electronmass, 0.0, self.Q, by)
+                tracked_y = rft.Lattice_view(self.lattice, start_element, end_element).track(bunch_y)
+
+                for si, screen_name in enumerate(screens):
+                    screen_elem = self.lattice[screen_name]
+                    if isinstance(screen_elem, list):
+                        screen_elem = screen_elem[-1]
+                    b_y = screen_elem.get_bunch()
+                    if b_y is None and str(screen_name) == end_element_name: b_y = tracked_y
+                    phase_space_y = np.asarray(b_y.get_phase_space("%y %yp"), dtype=float)
+                    R33[k, si] = phase_space_y[0, 0]
+                    R34[k, si] = phase_space_y[1, 0]
+        finally:
+            self.set_quadrupoles([quad_name], [float(K1L_original)])
+            self.B0 = original_bunch
+            self.__track_bunch()
+
+        return {"R11": R11, "R12": R12, "R33": R33, "R34": R34, "screens": screens, "K1L_values": K1L_values}
+
 
     '''
     SATO-SAN'S METHODS:
@@ -1066,7 +1124,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     # ----------------------------
     def get_linear_knob_names(self):
         return list(self.knobs.linear_matrix.keys())
-
 
     def get_nonlinear_knob_names(self):
         return list(self.knobs.nonlinear_matrix.keys())
