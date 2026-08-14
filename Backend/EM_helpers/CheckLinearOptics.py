@@ -40,7 +40,7 @@ def _solve_plane(R1, R2, sigma, u, valid):
     alpha0 = float(-eps_alpha / emit_geom)
     return emit_geom, beta0, alpha0
 
-def estimate_twiss_linear_optics(interface, quad_name, screens, K1L_values, sig_x, sig_y, u_x, u_y, valid_x, valid_y, beta_gamma):
+def estimate_twiss_use_linear_optics_start(interface, quad_name, screens, K1L_values, sig_x, sig_y, u_x, u_y, valid_x, valid_y, beta_gamma):
 
     transport = interface.get_R_matrix_scan(quad_name=quad_name, screens=screens, K1L_values=K1L_values)
     R11, R12 = np.asarray(transport["R11"], dtype=float), np.asarray(transport["R12"], dtype=float)

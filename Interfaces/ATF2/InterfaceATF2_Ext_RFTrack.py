@@ -607,7 +607,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         self.__track_bunch()
 
-    def set_quadrupoles(self, names, values_range):
+    def set_quadrupoles(self, names, values_range, track=True):
         if isinstance(names, str):
             names = [names]
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
@@ -617,6 +617,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
                 element.set_K1L(self.Pref / self.Q,float(value/2))
+        if track:
+            self.__track_bunch()
 
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
@@ -836,7 +838,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
-                self.set_quadrupoles([quad_name], [float(K1L)])
+                self.set_quadrupoles([quad_name], [float(K1L)], track=False)
                 start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
                 start_element = start_elements[0]
                 if isinstance(start_element, list):
@@ -874,7 +876,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                         output_y[k, si] = float(np.std(m[:, 1]))
 
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)])
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
             self.B0 = B0_original
             self.__track_bunch()
 
@@ -1070,7 +1072,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         original_bunch = self.B0
         try:
             for k, K1L in enumerate(K1L_values):
-                self.set_quadrupoles([quad_name], [float(K1L)])
+                self.set_quadrupoles([quad_name], [float(K1L)], track=False)
                 start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
                 start_element = start_elements[0]
                 if isinstance(start_element, list):
@@ -1108,7 +1110,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                     R33[k, si] = phase_space_y[0, 0]
                     R34[k, si] = phase_space_y[1, 0]
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)])
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
             self.B0 = original_bunch
             self.__track_bunch()
 

@@ -520,8 +520,6 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             raise RuntimeError("No screens provided for emittance scan prediction.")
         if reference_screen is None:
             reference_screen = screens[0]
-        if reference_screen not in screens:
-            raise RuntimeError("reference_screen must be one of the selected screens.")
 
         start_element_name = str(quad_name)
         end_element_name = str(screens[-1])
@@ -544,7 +542,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
-                self.set_quadrupoles([quad_name], [float(K1L)])
+                self.set_quadrupoles([quad_name], [float(K1L)], track=False)
                 start_element = self.lattice[start_element_name]
                 if isinstance(start_element, list):
                     start_element = start_element[0]
@@ -581,7 +579,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                         output_y[k, si] = float(np.std(m[:, 1]))
 
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)])
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
             self.B0 = B0_original
             self.__track_bunch()
 
@@ -693,7 +691,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         original_bunch = self.B0
         try:
             for k, K1L in enumerate(K1L_values):
-                self.set_quadrupoles([quad_name], [float(K1L)])
+                self.set_quadrupoles([quad_name], [float(K1L)], track=False)
                 start_element = self.lattice[quad_name]
                 if isinstance(start_element, list): start_element = start_element[0]
                 end_element = self.lattice[end_element_name]
@@ -748,7 +746,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                     R33[k, si] = phase_space_y[0, 0]  # k: K1L index, si: screen index.
                     R34[k, si] = phase_space_y[1, 0]
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)])
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
             self.B0 = original_bunch
             self.__track_bunch()
 
@@ -823,7 +821,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         start_quad_element_name = quad_selected
         return start_quad_element_name
 
-    def set_quadrupoles(self, names, values_range):
+    def set_quadrupoles(self, names, values_range, track=True):
         if isinstance(names, str):
             names = [names]
         if not (isinstance(values_range, (list, tuple, np.ndarray))):
@@ -833,6 +831,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, (list)): elements = [elements]
             for element in elements:
                 element.set_K1L(self.Pref / self.Q,float(value))
+        if track:
+            self.__track_bunch()
 
     def get_elements_indices(self, names):
         if isinstance(names, str):

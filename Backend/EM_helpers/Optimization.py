@@ -381,8 +381,6 @@ class Optimization:
             beta_y0 = float(beta_y0)
             alpha_y0 = float(alpha_y0)
 
-            if emit_x_norm < 0.0 or emit_y_norm < 0.0 or beta_x0 < 0.0 or beta_y0 < 0.0:
-                raise RuntimeError("Invalid joint fit paramaters. Emittance and beta should be positive.")
             if self.fit_quadrupole_strength:
                 if quad_k1l_0 is None:
                     raise RuntimeError("quad_k1l_0 must be provided when fitting quadrupole strength.")
@@ -637,12 +635,7 @@ class Optimization:
 
             p_c = np.asarray(z, dtype=float)
             try:
-                px, py = predict_sigma_from_fit_params(
-                    p_c[0], p_c[1], p_c[2],
-                    p_c[3], p_c[4], p_c[5],
-                    quad_k1l_0=(p_c[6] if self.fit_quadrupole_strength else None),
-                    allow_stop=False,
-                )
+                px, py = predict_sigma_from_fit_params(p_c[0], p_c[1], p_c[2], p_c[3], p_c[4], p_c[5], quad_k1l_0=(p_c[6] if self.fit_quadrupole_strength else None), allow_stop=False)
             except Exception:
                 return np.full(n_x + n_y, 1e3, dtype=float)
 
@@ -659,7 +652,7 @@ class Optimization:
             ls_eval[0] += 1
             self._emit_progress("Least squares", min(ls_eval[0], self.nm_steps), self.nm_steps)
             print(
-                f" LS {ls_eval[0]} (max_nfev={self.nm_steps}): "
+                f" LS {ls_eval[0]}: "
                 f"best_f={ls_best_cost[0]:.4g}, "
                 f"current_emit_x={p_c[0]:.6g}, current_beta_x={p_c[1]:.6g}, current_alpha_x={p_c[2]:.6g}, "
                 f"current_emit_y={p_c[3]:.6g}, current_beta_y={p_c[4]:.6g}, current_alpha_y={p_c[5]:.6g}"
