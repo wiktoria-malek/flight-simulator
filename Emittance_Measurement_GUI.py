@@ -16,7 +16,6 @@ except ImportError:
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 import matplotlib
-import matplotlib.colors as mcolors
 matplotlib.use("QtAgg")
 from Interfaces.interface_setup import INTERFACE_SETUP
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -581,16 +580,19 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         fig = self.canvas.figure
         fig.clear()
 
-        def lighten_plot_color(color, amount = 0.45):
-            rgb = np.array(mcolors.to_rgb(color), dtype=float)
-            return tuple(rgb + (1.0 - rgb) * amount)
-
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212, sharex=ax1)
 
-        color_cycle = matplotlib.rcParams['axes.prop_cycle'].by_key().get('color', [])
-        if not color_cycle:
-            color_cycle = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
+        color_cycle = [
+                        "#E69F00",  # orange
+                        "#0072B2",  # blue
+                        "#009E73",  # green
+                        "#D55E00",  # red
+                        "#CC79A7",  # reddish purple
+                        "#56B4E9",  # light blue
+                        "#F0E442",  # yellow
+                        "#000000",  # black
+                        ]
 
         if self.show_scan_on_all_screens.isChecked():
             screen_indices = list(range(len(screens)))
@@ -601,19 +603,14 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             else:
                 screen_indices = list(range(len(screens)))
 
-        for i in screen_indices:
+        for plot_i, i in enumerate(screen_indices):
             screen = screens[i]
             mask_x = np.isfinite(sigx[:, i])
             mask_y = np.isfinite(sigy[:, i])
-
-            ax1.plot(K1L_values[mask_x], sigx[mask_x, i], 'o-', label=screen)
-            ax2.plot(K1L_values[mask_y], sigy[mask_y, i], 'o-', label=screen)
-
-        if session_to_plot.get("is_conventional_em", False):
-            title = f"Conventional multi-screen EM: {quad_name}"
-        else:
-            title = f"Quadrupole scan: {quad_name}"
-        ax1.set_title(title)
+            color = color_cycle[plot_i % len(color_cycle)]
+            ax1.plot(K1L_values[mask_x], sigx[mask_x, i], 'o--', color=color, label=screen)
+            ax2.plot(K1L_values[mask_y], sigy[mask_y, i], 'o--', color=color, label=screen)
+        ax1.set_title(f"Quadrupole scan: {quad_name}")
         ax1.set_ylabel(f"sigx [{em_sigma_unit}]")
         ax2.set_ylabel(f"sigy [{em_sigma_unit}]")
         ax2.set_xlabel("K1L [1/m]")
@@ -651,32 +648,29 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         fig = self.canvas.figure
         fig.clear()
 
-
-        def lighten_color(color, amount=0.45):
-            import matplotlib.colors as mcolors
-            rgb = np.array(mcolors.to_rgb(color), dtype=float)
-            return tuple(rgb + (1.0 - rgb) * amount)
-
         ax1 = fig.add_subplot(211)
         ax2 = fig.add_subplot(212, sharex=ax1)
 
-        color_cycle = (matplotlib.rcParams["axes.prop_cycle"].by_key().get("color", []))
-
-        if not color_cycle:
-            color_cycle = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9"]
+        color_cycle = [
+                        "#E69F00",  # orange
+                        "#0072B2",  # blue
+                        "#009E73",  # green
+                        "#D55E00",  # red
+                        "#CC79A7",  # reddish purple
+                        "#56B4E9",  # light blue
+                        "#F0E442",  # yellow
+                        "#000000",  # black
+                        ]
 
         for prediction_i, screen in enumerate(screens):
             session_i = session_screens.index(screen)
-
-            base_color = color_cycle[prediction_i % len(color_cycle)]
-            fit_color = lighten_color(base_color, amount=0.45)
-            ax1.plot(K1L_values, sigx[:, session_i], "o", color=base_color, label=f"{screen} data")
+            color = color_cycle[prediction_i % len(color_cycle)]
+            ax1.plot(K1L_values, sigx[:, session_i], "o--", color=color, linewidth=1.0, label=f"{screen} data")
             fit_x = pred_x[:, prediction_i] if prediction_observable == "sigma" else np.sqrt(np.maximum(pred_x[:, prediction_i], 0.0))
-            ax1.plot(fit_K1L_values, fit_x, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
-            ax2.plot(K1L_values, sigy[:, session_i], "o", color=base_color, label=f"{screen} data")
-
+            ax1.plot(fit_K1L_values, fit_x, "-", color=color, linewidth=2.0, label=f"{screen} fit")
+            ax2.plot(K1L_values, sigy[:, session_i], "o--", color=color, linewidth=1.0, label=f"{screen} data")
             fit_y = pred_y[:, prediction_i] if prediction_observable == "sigma" else np.sqrt(np.maximum(pred_y[:, prediction_i], 0.0))
-            ax2.plot(fit_K1L_values, fit_y, "-", color=fit_color, linewidth=2.0, label=f"{screen} fit")
+            ax2.plot(fit_K1L_values, fit_y, "-", color=color, linewidth=2.0, label=f"{screen} fit")
 
         unit = self.session.get("sigma_unit", self._get_interface_units())
 
@@ -906,7 +900,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.session["optimization_pred_y"] = pred_y.tolist()
         self._update_fit_panel(result)
         self._plot_fit_overlay(pred_x, pred_y, result, screens = optimization_screens, fit_k1l_values = fit_k1l_values)
-        self.save_emittance_measurement_session(initial_points_xopt=int(self.xopt_initial_points_spin.value()), xopt_steps=int(self.xopt_steps_spin.value()), ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()))
+        self.save_emittance_measurement_session(session = self.session, initial_points_xopt=int(self.xopt_initial_points_spin.value()), xopt_steps=int(self.xopt_steps_spin.value()), ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()))
         self._set_progress(100)
 
         elapsed = time.perf_counter() - self._optimization_t0

@@ -30,6 +30,17 @@ class QuadrupoleScan(SaveOrLoad):
     # 3 screens: no need for scan, but no coupling terms
     # 4+ screens: no need for scan
 
+    def _new_scan_session_dir(self, quad_names, is_quad_scan):
+        time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        root_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
+        if is_quad_scan and quad_names:
+            name = f"Quadrupole_scan_{'-'.join(quad_names)}_{time_str}"
+        else:
+            name = f"EM_{self.interface.get_name()}{time_str}_session_settings"
+        session_dir = os.path.join(root_dir, name)
+        os.makedirs(session_dir, exist_ok=True)
+        return session_dir
+
     def run_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, reference_screen=None, progress_callback=None):
         steps = int(steps)
         if isinstance(quad_name, str):
@@ -39,6 +50,9 @@ class QuadrupoleScan(SaveOrLoad):
 
         if len(quad_names) == 0:
             raise ValueError("At least one quadrupole must be provided")
+
+        self.dir_name = self._new_scan_session_dir(quad_names=quad_names, is_quad_scan=(steps > 0))
+        self.session_directory.setText(self.dir_name)
 
         if steps == 0:
             if len(quad_names) != 1:

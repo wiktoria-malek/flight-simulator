@@ -5,7 +5,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_DR",
             "class_name": "InterfaceATF2_DR",
             "settings": {"nsamples": 3},
-            "actions": [],
             "units":
             {
                 "corrector_strength":"T*mm",
@@ -26,7 +25,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_DR_RFTrack",
             "class_name": "InterfaceATF2_DR_RFTrack",
             "settings": {"jitter":0.0, "bpm_resolution":0.0, "nsamples":1},
-            "actions": ["align_everything", "misalign_bpms"],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -47,7 +45,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_Ext",
             "class_name": "InterfaceATF2_Ext",
             "settings": {"nsamples": 3},
-            "actions": [],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -70,7 +67,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_Ext_RFTrack",
             "class_name": "InterfaceATF2_Ext_RFTrack",
             "settings": {"jitter":0.0, "bpm_resolution":0.00, "nsamples":1},
-            "actions": ["align_everything"],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -135,7 +131,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_Linac",
             "class_name": "InterfaceATF2_Linac",
             "settings": {"nsamples":3},
-            "actions": [],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -156,7 +151,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_LinacBT",
             "class_name": "InterfaceATF2_LinacBT",
             "settings": {"nsamples": 3},
-            "actions": [],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -177,7 +171,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.ATF2.InterfaceATF2_Linac_RFTrack",
             "class_name": "InterfaceATF2_Linac_RFTrack",
             "settings": {"jitter": 0.00, "bpm_resolution": 0.00},
-            "actions": ["align_everything"],
             "units":
                 {
                     "corrector_strength": "T*mm",
@@ -201,7 +194,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.FACET2.InterfaceFACET2_Linac_RFTrack",
             "class_name": "InterfaceFACET2_Linac_RFTrack",
             "settings": {"jitter":0.0, "bpm_resolution":0.0, "nsamples":1},
-            "actions": ["align_everything"],
             "units":
                 {
                     "corrector_strength": "gauss*m",
@@ -222,7 +214,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.FACET2.InterfaceFACET2_Linac",
             "class_name": "InterfaceFACET2_Linac",
             "settings": {"nsamples":10},
-            "actions": [],
             "units":
                 {
                     "corrector_strength": "gauss*m",
@@ -245,7 +236,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.CLEAR.InterfaceCLEAR",
             "class_name": "CLEAR_real_machine",
             "settings": {"nsamples":3},
-            "actions": [],
             "units":
                 {
                     "corrector_strength": "gauss*m",
@@ -267,7 +257,6 @@ INTERFACE_SETUP = {
             "module": "Interfaces.CLEAR.InterfaceCLEAR_RFTrack",
             "class_name": "InterfaceCLEAR_RFTrack",
             "settings": {"jitter": 0.0, "bpm_resolution": 0.0, "nsamples": 1},
-            "actions": ["align_everything","misalign_quadrupoles","misalign_bpms"],
             "units":
                 {
                     "corrector_strength": "gauss*m",

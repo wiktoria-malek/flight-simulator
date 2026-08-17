@@ -93,17 +93,35 @@ class SelectAcc(QDialog):
         self.selected_machine = None
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Choose one of the following accelerators:"))
+
+        prompt_label = QLabel("Choose one of the following accelerators:")
+        prompt_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+            if hasattr(Qt, "AlignmentFlag")
+            else Qt.AlignCenter
+        )
+        layout.addWidget(prompt_label)
 
         self.radio_buttons = []
         self.button_group = QButtonGroup(self)
         self.button_group.setExclusive(True)
+
+        radio_column = QVBoxLayout()
+
         for index, acc in enumerate(machines):
             rb = QRadioButton(acc)
             rb.setFocusPolicy(_no_focus_policy())
             self.radio_buttons.append(rb)
             self.button_group.addButton(rb, index)
-            layout.addWidget(rb)
+
+            radio_column.addWidget(rb)
+
+        centered_radio_block = QHBoxLayout()
+        centered_radio_block.addStretch()
+        centered_radio_block.addLayout(radio_column)
+        centered_radio_block.addStretch()
+
+        layout.addLayout(centered_radio_block)
 
         if self.radio_buttons:
             self.radio_buttons[0].setChecked(True) #default ATF2
@@ -167,21 +185,38 @@ class InterfaceSelectionDialog(QDialog):
         self.available_interface_setup = get_available_interface_setup()
         self.are_more_machines = len(self.available_interface_setup.keys()) > 1
         self.entries = self.available_interface_setup.get(selected_acc, [])
+
         layout = QVBoxLayout(self)
+
         branding_header = _branding_header(selected_acc)
         if branding_header is not None:
             layout.addLayout(branding_header)
-        layout.addWidget(QLabel("Choose one of the following Interfaces:"))
-
+        prompt_label = QLabel("Choose one of the following Interfaces:")
+        prompt_label.setAlignment(Qt.AlignmentFlag.AlignCenter
+            if hasattr(Qt, "AlignmentFlag")
+            else Qt.AlignCenter
+        )
+        layout.addWidget(prompt_label)
         self.radio_buttons = []
         self.button_group = QButtonGroup(self)
         self.button_group.setExclusive(True)
+
+        radio_column = QVBoxLayout()
+
         for index, entry in enumerate(self.entries):
             rb = QRadioButton(entry["display_name"])
             rb.setFocusPolicy(_no_focus_policy())
             self.radio_buttons.append(rb)
             self.button_group.addButton(rb, index)
-            layout.addWidget(rb)
+
+            radio_column.addWidget(rb)
+
+        centered_radio_block = QHBoxLayout()
+        centered_radio_block.addStretch()
+        centered_radio_block.addLayout(radio_column)
+        centered_radio_block.addStretch()
+
+        layout.addLayout(centered_radio_block)
 
         if self.radio_buttons:
             self.radio_buttons[0].setChecked(True)
@@ -221,17 +256,11 @@ class InterfaceSelectionDialog(QDialog):
         module_name = selected_entry["module"]
         class_name = selected_entry["class_name"]
         settings = dict(selected_entry.get("settings", {}))
-        actions = list(selected_entry.get("actions", []))
 
         try:
             module = importlib.import_module(module_name)
             cls = getattr(module, class_name)
             self.selected_interface = cls(**settings)
-
-            for action_name in actions:
-                action = getattr(self.selected_interface, action_name, None)
-                if callable(action):
-                    action()
 
             super().accept()
 

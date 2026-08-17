@@ -44,6 +44,11 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
         self._saved_sextupoles_state = None
         self.sextupoles = self._get_element_names_from_twiss_types({"SEXTUPOLE"})
         self.machine_name = "ATF2"
+        self.lattice.align_elements()
+        '''Uncomment lines below to scatter elements in the lattice.'''
+        # self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        # self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+
 
     def _get_element_names_from_twiss_types(self, allowed_types): # because rf track doesn't have get sextupoles
         with open(self.twiss_path, "r") as file:
@@ -393,18 +398,6 @@ class InterfaceATF2_DR_RFTrack(AbstractMachineInterface):
                 self.lattice[corr].vary_strength(val / 10, 0.0)
             elif corr[:2] == "ZV":
                 self.lattice[corr].vary_strength(0.0, val / 10)
-        self.__track_bunch()
-
-    def align_everything(self):
-        self.lattice.align_elements()
-        self.__track_bunch()
-
-    def misalign_quadrupoles(self,sigma_x=0.02,sigma_y=0.02):
-        self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch()
-
-    def misalign_bpms(self,sigma_x=0.100,sigma_y=0.100):
-        self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
     def get_sextupoles(self, names = None):

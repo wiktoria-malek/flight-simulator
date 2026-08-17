@@ -378,6 +378,8 @@ class MLInterface:
         if self.trainer.target_observable == "sigma2":
             print(f"Legacy ML model predicts sigma^2; retrain {self.model_file} to use direct sigma predictions.")
 
+        self._screen_indices = [self.trainer.screens.index(screen) for screen in self.screens]
+
     def __getattr__(self, name):
         return getattr(self.interface, name) # if there is a function that MLInterface doesn't have (almost all of them), it gets them form the
                                             # interface, but has predict_emittance_scan_response, so uses that
@@ -412,13 +414,14 @@ class MLInterface:
 
         X = np.asarray(X, dtype=float)
         Y = self.predict_array(X) # pytorch model
-        n_screens = len(screens)
+        n_trained_screens = len(self.trainer.screens)
 
-        if Y.shape[1] != 2*n_screens:
+        if Y.shape[1] != 2*n_trained_screens:
             raise RuntimeError(f"ML model output has wrong size.")
 
-        prediction_sigx = Y[:, :n_screens]
-        prediction_sigy = Y[:, n_screens:]
+        # Y holds predictions for every trained screen; pick out only the requested ones, in order.
+        prediction_sigx = Y[:, :n_trained_screens][:, self._screen_indices]
+        prediction_sigy = Y[:, n_trained_screens:][:, self._screen_indices]
 
         if self.trainer.target_observable == "sigma2":
             prediction_sigx = np.sqrt(np.maximum(prediction_sigx, 0.0))

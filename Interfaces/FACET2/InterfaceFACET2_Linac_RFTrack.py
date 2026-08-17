@@ -37,6 +37,11 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         self._saved_sextupoles_state = None
         self.electronmass = rft.electronmass
         self.machine_name = "FACET"
+        self.lattice.align_elements()
+        '''Uncomment lines below to scatter elements in the lattice.'''
+        # self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        # self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+
 
     def log_messages(self,console):
         self.log=console or print
@@ -413,18 +418,6 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
                 self.lattice[corr].vary_strength(val/10, 0.0)  # T*mm
             elif corr[:2] == "YC":
                 self.lattice[corr].vary_strength(0.0, val/10)  # T*mm
-        self.__track_bunch()
-
-    def align_everything(self):
-        self.lattice.align_elements()
-        self.__track_bunch()
-
-    def misalign_quadrupoles(self,sigma_x=0.100,sigma_y=0.100):
-        self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch()
-
-    def misalign_bpms(self,sigma_x=0.100,sigma_y=0.100):
-        self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
         self.__track_bunch()
 
     def _get_elements_positions(self, names=None):

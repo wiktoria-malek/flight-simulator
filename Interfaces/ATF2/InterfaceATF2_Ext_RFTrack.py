@@ -7,31 +7,6 @@ from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 # from . import ipbsm_calc
 # from .knobs import KnobSystem
 class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
-
-# For QD18X end:
-# emit x 5.2
-# beta x 1.661025619
-# alpha x -2.142952966
-# emit y 0.03
-# beta y 10.4249046
-# alpha y 3.181594115
-
-# For QF17X start:
-#     "emit_x": 5.2,
-#     "beta_x0": 4.868043658,
-#     "alpha_x0": 0.001450331482 ,
-#     "emit_y": 0.03,
-#     "beta_y0": 0.6796808288 ,
-#     "alpha_y0": 0.1019908616 ,
-
-# For QD16X end:
-#     "emit_x": 5.2,
-#     "beta_x0": 0.920270374,
-#     "alpha_x0": -0.5756879401 ,
-#     "emit_y": 0.03,
-#     "beta_y0": 5.215595754,
-#     "alpha_y0": 2.942907679,
-
     def get_name(self):
         return 'ATF2_Ext_RFT'
 
@@ -77,6 +52,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         #self.qm_list = [s for s in self.interface.get_sequence() if str(s).upper().startswith("Q")]
         self.bg_shots = int(bg_shots)
         self.machine_name = "ATF2"
+        self.lattice.align_elements()
+        '''Uncomment lines below to scatter elements in the lattice.'''
+        # self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        # self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
 
         # ----------------------------
         # Knobs (linear / nonlinear)
@@ -768,18 +747,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "names": all_names,
             "S": np.array(all_s, dtype=float),
         }
-
-    def align_everything(self):
-        self.lattice.align_elements()
-        self.__track_bunch()
-
-    def misalign_quadrupoles(self, sigma_x=0.100, sigma_y=0.100):
-        self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch() # when u create the lattice, das shitty
-
-    def misalign_bpms(self, sigma_x=0.100, sigma_y=0.100):
-        self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch()
 
     def _build_bunch_from_guesses(self, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
         T = rft.Bunch6d_twiss()

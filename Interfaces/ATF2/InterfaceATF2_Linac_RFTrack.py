@@ -36,6 +36,11 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
         self.__setup_beam0()
         self.__track_bunch()
         self.machine_name = "ATF2"
+        self.lattice.align_elements()
+        '''Uncomment lines below to scatter elements in the lattice.'''
+        # self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        # self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+
 
     def get_beam_factors(self):
         gamma_rel = np.sqrt((self.Pref0 / self.electronmass) ** 2 + 1.0)
@@ -643,18 +648,6 @@ class InterfaceATF2_Linac_RFTrack(AbstractMachineInterface):
             "bety": float(optics["bety"][i]),
             "alfy": float(optics["alfy"][i]),
         }
-
-    def align_everything(self):
-        self.lattice.align_elements()
-        self.__track_bunch()
-
-    def misalign_quadrupoles(self, sigma_x=0.02, sigma_y=0.02):
-        self.lattice.scatter_elements('quadrupole', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch()
-
-    def misalign_bpms(self, sigma_x=0.100, sigma_y=0.100):
-        self.lattice.scatter_elements('bpm', sigma_x, sigma_y, 0, 0, 0, 0, 'center')
-        self.__track_bunch()
 
     def _get_optics_from_twiss_file(self,names=None):
 

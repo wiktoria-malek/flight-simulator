@@ -7,7 +7,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from Interfaces.interface_setup import INTERFACE_SETUP
 import numpy as np
 
-OUTPUT_FILE = PROJECT_ROOT / "MachineLearning" / "ATF2" / "QD18X"/ "Linear_Response_dataset.npz"
+OUTPUT_FILE = PROJECT_ROOT / "MachineLearning" / "ATF2" / "QF17X"/ "Linear_Response_dataset.npz"
 N_SAMPLES = 5000
 RANDOM_SEED = 2137
 
@@ -72,8 +72,7 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
     output_file.parent.mkdir(parents=True, exist_ok=True)
     K1L_nominal = get_nominal_K1L(interface, quad_name)
     bounds = _get_interface_bounds(interface)
-    gamma_rel, beta_rel = interface.get_beam_factors()
-    beta_gamma = float(gamma_rel) * float(beta_rel)
+    gamma_rel, beta_rel, beta_gamma = interface.get_beam_factors()
 
     if not np.isfinite(beta_gamma) or beta_gamma <= 0:
         raise RuntimeError(f"Invalid beta_gamma from interface: {beta_gamma}")
