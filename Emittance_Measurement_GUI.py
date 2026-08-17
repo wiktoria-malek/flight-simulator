@@ -79,14 +79,12 @@ class OptimizationWorker(QObject):
     info = pyqtSignal(str)
     ml_not_found_rft_fallback = pyqtSignal()
 
-    def __init__(self, interface, session, selected_screens = None, n_starts = 3, xopt_initial_points = None, xopt_steps = None, nm_steps = None, fit_quadrupole_strength = False, computing_method = "Linear R-response model"):
+    def __init__(self, interface, session, selected_screens = None, bounds = None, nm_steps = None, fit_quadrupole_strength = False, computing_method = "Linear R-response model"):
         super().__init__()
         self.interface = interface
         self.session = session
         self.selected_screens = list(selected_screens or [])
-        self.n_starts = n_starts
-        self.xopt_initial_points = xopt_initial_points
-        self.xopt_steps = xopt_steps
+        self.bounds = bounds
         self.nm_steps = nm_steps
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
         self.computing_method = computing_method
@@ -106,6 +104,8 @@ class OptimizationWorker(QObject):
         return None
 
     def _get_interface_bounds(self):
+        if self.bounds is not None:
+            return dict(self.bounds)
         interface_defaults=self._get_interface_initial_settings()
         if interface_defaults is None:
             return {}
@@ -142,9 +142,9 @@ class OptimizationWorker(QObject):
             bounds = self._get_interface_bounds()
             session_for_opt = self._cut_session_to_detected_devices()
             tool = EmittanceComputingEngineSelector.create(method=self.computing_method, interface=self.interface,
-                session=session_for_opt, machine_name=machine_name, info_callback=self.info.emit, n_starts=self.n_starts,
-                xopt_initial_points=self.xopt_initial_points, xopt_steps=self.xopt_steps, nm_steps=self.nm_steps,
-                fit_quadrupole_strength=self.fit_quadrupole_strength, progress_callback=self._emit_progress, fallback_callback = self. ml_not_found_rft_fallback.emit)
+                session=session_for_opt, machine_name=machine_name, info_callback=self.info.emit,
+                nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength,
+                progress_callback=self._emit_progress, fallback_callback = self. ml_not_found_rft_fallback.emit)
             self.optimizer_ready.emit(tool)
             output = tool.fit_from_session(session_for_opt, bounds=bounds)
             self.finished.emit(output)
@@ -224,6 +224,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._scan_is_paused = False
         self._optimization_paused = False
         self._last_scan_status = None
+        self._populate_default_bounds()
         self.computation_mode = ComputationMode(self.computing_method_combo.currentText())
         self.computing_method_combo.currentTextChanged.connect(self._on_computation_mode_changed)
         self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
@@ -309,6 +310,30 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         em_sigma_unit = units_settings.get("em_sigma_unit", "mm")
         return em_sigma_unit
 
+    BOUND_PARAMS = ("emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0")
+
+    def _get_interface_default_bounds(self):
+        interface_defaults = self._get_interface_initial_settings()
+        if interface_defaults is None:
+            return {}
+        return dict(interface_defaults.get("bounds", {}))
+
+    def _populate_default_bounds(self):
+        default_bounds = self._get_interface_default_bounds()
+        for param in self.BOUND_PARAMS:
+            low, high = default_bounds.get(param, (0.0, 0.0))
+            getattr(self, f"bound_{param}_min").setValue(float(low))
+            getattr(self, f"bound_{param}_max").setValue(float(high))
+
+    def _get_bounds_from_gui(self):
+        return {
+            param: [
+                float(getattr(self, f"bound_{param}_min").value()),
+                float(getattr(self, f"bound_{param}_max").value()),
+            ]
+            for param in self.BOUND_PARAMS
+        }
+
     def _on_computation_mode_changed(self, text):
         self.computation_mode = ComputationMode(text)
         is_linear_mode = self.computation_mode == ComputationMode.LRM
@@ -319,7 +344,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             self.steps_settings.setValue(5)
             self._on_nsteps_scan_changed(self.steps_settings.value())
 
-        widgets_to_disable = [self.xoptSettingsGroup,self.localOptimizationSettingsGroup]
+        widgets_to_disable = [self.boundsSettingsGroup,self.localOptimizationSettingsGroup]
         for widget in widgets_to_disable:
             widget.setEnabled(not is_linear_mode)
 
@@ -824,9 +849,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
     def _run_optimization(self):
         self.log("Fitting emittance and twiss parameters at scanned quadrupole started...")
-        xopt_initial_points = int(self.xopt_initial_points_spin.value())
-        xopt_steps = int(self.xopt_steps_spin.value())
         nm_steps = int(self.nm_steps_spin.value())
+        bounds = self._get_bounds_from_gui()
         if self.session is None:
             data_folder = self.load_screens_data_database.text().strip()
             if data_folder and os.path.isdir(data_folder):
@@ -853,7 +877,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         computing_method = self.computing_method_combo.currentText().strip()
         _, selected_screens = self._get_selection()
-        worker = OptimizationWorker(self.interface, self.session, selected_screens = selected_screens, n_starts=3, xopt_initial_points=xopt_initial_points, xopt_steps=xopt_steps, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), computing_method=computing_method)
+        worker = OptimizationWorker(self.interface, self.session, selected_screens = selected_screens, bounds = bounds, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), computing_method=computing_method)
         worker.info.connect(self.log)
 
         worker.moveToThread(thread)
@@ -877,10 +901,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         total = max(int(total), 1)
         current = max(0, min(int(current), total))
 
-        if str(phase).lower().startswith("xopt"):
-            value = 30 + 40 * current / total
-        else:
-            value = 70 + 25 * current / total
+        value = 30 + 65 * current / total
 
         self._set_progress(value)
         self.progressBar.setFormat(f"{phase}: {current}/{total}")
@@ -900,7 +921,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.session["optimization_pred_y"] = pred_y.tolist()
         self._update_fit_panel(result)
         self._plot_fit_overlay(pred_x, pred_y, result, screens = optimization_screens, fit_k1l_values = fit_k1l_values)
-        self.save_emittance_measurement_session(session = self.session, initial_points_xopt=int(self.xopt_initial_points_spin.value()), xopt_steps=int(self.xopt_steps_spin.value()), ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()))
+        self.save_emittance_measurement_session(session = self.session, ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()), bounds=self._get_bounds_from_gui())
         self._set_progress(100)
 
         elapsed = time.perf_counter() - self._optimization_t0

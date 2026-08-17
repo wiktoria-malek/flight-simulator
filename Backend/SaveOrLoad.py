@@ -373,12 +373,8 @@ class SaveOrLoad():
 
         print(f"Nshots: {nshots}, Scan steps: {scan_steps}")
 
-        initial_points_xopt = int(self.xopt_initial_points_spin.value())
-        xopt_steps = int(self.xopt_steps_spin.value())
         ls_steps = int(self.nm_steps_spin.value())
         is_fit_quad_strength_checked = bool(self.fit_quadrupole_strength_checkbox.isChecked())
-
-
 
         self.emittance_settings = {
             "delta_min": delta_min,
@@ -387,10 +383,9 @@ class SaveOrLoad():
             "nshots": nshots,
             "nscreens": nscreens,
             "is_quad_scan": is_quad_scan,
-            "initial_points_xopt": initial_points_xopt,
-            "xopt_steps": xopt_steps,
             "ls_steps": ls_steps,
             "is_fit_quad_strength_checked": is_fit_quad_strength_checked,
+            "bounds": self._get_bounds_from_gui(),
             "screens": screens if screens is not None else [],
             "quad_name": quad_selected if quad_selected else None,
         }
@@ -453,14 +448,17 @@ class SaveOrLoad():
                 self.steps_settings.setValue(int(self.emittance_settings["scan_steps"]))
             if "nshots" in self.emittance_settings:
                 self.meas_per_step.setValue(int(self.emittance_settings["nshots"]))
-            if "initial_points_xopt" in self.emittance_settings:
-                self.xopt_initial_points_spin.setValue(int(self.emittance_settings["initial_points_xopt"]))
-            if "xopt_steps" in self.emittance_settings:
-                self.xopt_steps_spin.setValue(int(self.emittance_settings["xopt_steps"]))
             if "ls_steps" in self.emittance_settings:
                 self.nm_steps_spin.setValue(int(self.emittance_settings["ls_steps"]))
             if "is_fit_quad_strength_checked" in self.emittance_settings:
                 self.fit_quadrupole_strength_checkbox.setChecked(bool(self.emittance_settings["is_fit_quad_strength_checked"]))
+            saved_bounds = self.emittance_settings.get("bounds")
+            if saved_bounds:
+                for param in self.BOUND_PARAMS:
+                    if param in saved_bounds:
+                        low, high = saved_bounds[param]
+                        getattr(self, f"bound_{param}_min").setValue(float(low))
+                        getattr(self, f"bound_{param}_max").setValue(float(high))
             self.session = self._get_session_data_from_database()
 
             if self.session is None:
@@ -588,7 +586,7 @@ class SaveOrLoad():
             if "max_vertical_range" in settings:
                 self.max_vertical_current_spinbox.setValue(settings["max_vertical_range"])
 
-    def save_emittance_measurement_session(self, session=None, initial_points_xopt=None, xopt_steps=None, ls_steps=None, is_fit_quad_strength_checked=None):
+    def save_emittance_measurement_session(self, session=None, ls_steps=None, is_fit_quad_strength_checked=None, bounds=None):
         save_session_dir = getattr(self, "dir_name", None) or self.session_directory.text()
         os.makedirs(save_session_dir, exist_ok=True)
         self.session_directory.setText(save_session_dir)
@@ -628,17 +626,14 @@ class SaveOrLoad():
                 "sigma_unit": session.get("sigma_unit", "mm"),
             })
 
-            if initial_points_xopt is not None:
-                self.emittance_settings["initial_points_xopt"] = int(initial_points_xopt)
-
-            if xopt_steps is not None:
-                self.emittance_settings["xopt_steps"] = int(xopt_steps)
-
             if ls_steps is not None:
                 self.emittance_settings["ls_steps"] = int(ls_steps)
 
             if is_fit_quad_strength_checked is not None:
                 self.emittance_settings["is_fit_quad_strength_checked"] = bool(is_fit_quad_strength_checked)
+
+            if bounds is not None:
+                self.emittance_settings["bounds"] = dict(bounds)
 
             if "optimization_result" in session:
                 optimization_result_path = os.path.join(save_session_dir, "optimization_result.pkl")

@@ -1,11 +1,6 @@
 import numpy as np
-from scipy.stats import qmc
-from scipy.optimize import minimize, least_squares
+from scipy.optimize import least_squares
 import pandas as pd
-from xopt import Xopt
-from xopt.vocs import VOCS, select_best
-from xopt.evaluator import Evaluator
-from xopt.generators.bayesian import ExpectedImprovementGenerator
 from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable
 
 class OptimizationStopped(Exception):
@@ -19,24 +14,14 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization:
-    def __init__(self, interface, n_starts=1, rng_seed=42, xopt_initial_points = 8, xopt_steps = 50, nm_steps = 100, fit_quadrupole_strength=False, progress_callback=None, use_linear_optics=True):
+    def __init__(self, interface, nm_steps=100, fit_quadrupole_strength=False, progress_callback=None):
         self.progress_callback = progress_callback
         self.interface = interface
-        self.use_linear_optics = bool(use_linear_optics)
-        self.n_starts = int(n_starts)
-        self.rng = np.random.default_rng(rng_seed)
         self._stop_requested = False
         self._pause_requested = False
         self.best_out_so_far = None
         self._last_completed_output = None
-        self.xopt_initial_points = xopt_initial_points
-        self.xopt_steps = xopt_steps
         self.nm_steps = int(nm_steps)
-        self.xopt_local_seed_fraction = 0.25
-        self.xopt_use_global_seed = True
-        self.xopt_local_alpha_sigma = 0.8
-        self.xopt_local_refine = False
-        self.xopt_local_refine_maxiter = 25
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
 
     def _emit_progress(self, phase, current, total):
@@ -80,7 +65,7 @@ class Optimization:
         try:
             J = np.asarray(ls_result.jac, dtype=float) # that's the information about how narrow the minimum region is, it's an array with derivatives
             r = np.asarray(ls_result.fun, dtype=float) # residual sigma predicted - sigma meas
-            p = np.asarray(ls_result.x, dtype=float) # best set of parameters that least squares have found after Xopt
+            p = np.asarray(ls_result.x, dtype=float) # best set of parameters that least squares have found
         except AttributeError:
             return {
                 "param_errors": np.full(n_default, np.nan),
@@ -363,8 +348,6 @@ class Optimization:
             high = 1.3 * K1L_0_readback
             bounds["quad_k1l_0"] = [min(low,high), max(low,high)]
 
-        # degrees of freedom
-        vocs = VOCS(variables = {i: [float(vals[0]), float(vals[1])] for i, vals in bounds.items()}, objectives={"f": "MINIMIZE"})
         params_order = ["emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0"]
 
         if self.fit_quadrupole_strength:
@@ -423,138 +406,40 @@ class Optimization:
 
             return chi2, pred_x, pred_y
 
-        def evaluate(inputs):
-            if self._stop_requested or self._pause_requested:
-                return {"f": 12.0}
-            quad_k1l_0 = float(inputs["quad_k1l_0"]) if self.fit_quadrupole_strength else None
-            try:
-                f, _, _= compute_cost(float(inputs["emit_x_norm"]), float(inputs["beta_x0"]), float(inputs["alpha_x0"]),
-                                    float(inputs["emit_y_norm"]), float(inputs["beta_y0"]), float(inputs["alpha_y0"]), allow_stop = False, quad_k1l_0 = quad_k1l_0)
-            except Exception as e:
-                print(f"Joint fit evaluation failed, assigning large cost: {type(e).__name__}: {e}")
-                return {"f": 12.0}
-
-            print(
-                "Joint fit solution: "
-                f"emit_x_norm={float(inputs['emit_x_norm']):.6g}, beta_x0={float(inputs['beta_x0']):.6g}, alpha_x0={float(inputs['alpha_x0']):.6g}, "
-                f"emit_y_norm={float(inputs['emit_y_norm']):.6g}, beta_y0={float(inputs['beta_y0']):.6g}, alpha_y0={float(inputs['alpha_y0']):.6g}, "
-                f"cost={f:.6g}"
-            )
-            return {"f": f}
-
         original_low_bounds = low_bounds.copy()
         original_high_bounds = high_bounds.copy()
-        X = None
         best_row = None
         best_cost = np.inf
         stopped_during_fit = False
-        use_global_search = True
 
-        if self.use_linear_optics:
-            try:
-                linear_optics = estimate_twiss_use_linear_optics_start(self.interface, quad_name, screens, K1L_values, sig_x, sig_y, u_x, u_y, valid_x, valid_y, beta_gamma)
-                x0_linear_optics_values = [linear_optics[p] for p in ("emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0")]
-                if self.fit_quadrupole_strength: x0_linear_optics_values.append(K1L_0_readback)
-                x0_linear_optics = np.clip(np.array(x0_linear_optics_values, dtype=float), original_low_bounds, original_high_bounds)
-                cost_linear_optics, _, _ = compute_cost(*x0_linear_optics[:6], allow_stop=False, quad_k1l_0=(float(x0_linear_optics[6]) if self.fit_quadrupole_strength else None))
+        try:
+            linear_optics = estimate_twiss_use_linear_optics_start(self.interface, quad_name, screens, K1L_values, sig_x, sig_y, u_x, u_y, valid_x, valid_y, beta_gamma)
+        except CheckLinearOpticsUnavailable as e:
+            raise RuntimeError(f"Fit will not converge: {e} Try a different K1L scan range/number of steps, or scan a different quadrupole.") from e
+        except Exception as e:
+            raise RuntimeError(f"Fit will not converge: could not compute a linear-optics starting estimate. {e} Try a different K1L scan range/number of steps, or scan a different quadrupole.") from e
 
-                if np.isfinite(cost_linear_optics):
-                    use_global_search = False
-                    row_values = dict(zip(params_order, x0_linear_optics))
-                    row_values["f"] = float(cost_linear_optics)
-                    best_row = pd.Series(row_values)
-                    best_cost = float(cost_linear_optics)
-                    rel_window = 0.15
-                    half_width = rel_window * (original_high_bounds - original_low_bounds)
-                    if self.fit_quadrupole_strength:
-                        half_width[-1] = original_high_bounds[-1] - original_low_bounds[-1]
-                    low_bounds = np.maximum(original_low_bounds, x0_linear_optics - half_width)
-                    high_bounds = np.minimum(original_high_bounds, x0_linear_optics + half_width)
-                    low_bounds = np.minimum(low_bounds, x0_linear_optics - 1e-9)
-                    high_bounds = np.maximum(high_bounds, x0_linear_optics + 1e-9)
-                    print(f"Linear optics cost: cost={cost_linear_optics:.6g}, x0={row_values}")
-                else:
-                    print(f"Something went wrong, using Xopt now...")
-            except CheckLinearOpticsUnavailable as e:
-                print(f"Something went wrong, using Xopt now...")
-            except Exception as e:
-                print(f"Something went wrong, using Xopt now...")
+        x0_linear_optics_values = [linear_optics[p] for p in ("emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0")]
+        if self.fit_quadrupole_strength: x0_linear_optics_values.append(K1L_0_readback)
+        x0_linear_optics = np.clip(np.array(x0_linear_optics_values, dtype=float), original_low_bounds, original_high_bounds)
+        cost_linear_optics, _, _ = compute_cost(*x0_linear_optics[:6], allow_stop=False, quad_k1l_0=(float(x0_linear_optics[6]) if self.fit_quadrupole_strength else None))
 
-        if use_global_search:
-            evaluator = Evaluator(function = evaluate) # how to calculate merit function
-            generator = ExpectedImprovementGenerator(vocs = vocs) # how to choose the next point
-            X = Xopt(generator = generator, evaluator = evaluator, vocs = vocs)
-            total_initial = max(1, int(self.xopt_initial_points))
+        if not np.isfinite(cost_linear_optics):
+            raise RuntimeError("Fit will not converge: the linear-optics starting estimate does not reproduce the measured beam sizes. Try a different K1L scan range/number of steps, or scan a different quadrupole.")
 
-            def update_best_from_data():
-                nonlocal best_row, best_cost # it allows the inner function to overwrite best_row, best_cost, not create it again
-                data = getattr(X, "data", None)
-                if data is None or len(data) == 0:
-                    return
-                good = data.copy()
-                if "xopt_error" in good.columns:
-                    try:
-                        good = good[~good["xopt_error"].astype(bool)] # chooses only points where there was no xopt_error
-                    except Exception:
-                        pass
-                if len(good) == 0 or "f" not in good.columns:
-                    return
-                idx = good["f"].astype(float).idxmin() # change each value to float
-                row = good.loc[idx]
-                cost = float(row["f"])
-
-                if np.isfinite(cost) and cost < best_cost: # updates best solution using the real, not log-transformed, cost
-                    best_cost = cost
-                    best_row = row
-
-            try:
-                lhs_seed = int(self.rng.integers(0, 2**31 - 1))
-                sampler = qmc.LatinHypercube(d=len(params_order), seed = lhs_seed)
-                unit_samples = sampler.random(n=total_initial)
-                lhs_samples = qmc.scale(unit_samples, low_bounds, high_bounds)
-                lhs_df = pd.DataFrame(lhs_samples, columns=params_order)
-                print(f"Joint Xopt init: {total_initial} samples in {len(params_order)} degrees of freedom")
-                X.evaluate_data(lhs_df)
-                update_best_from_data()
-
-                for i in range(self.xopt_steps):
-                    print(f"Joint Xopt step {i + 1}/{self.xopt_steps}")
-                    self._emit_progress("Xopt", i + 1, self.xopt_steps)
-                    if self._stop_requested:
-                        if best_row is not None:
-                            stopped_during_fit = True
-                            break
-                        raise OptimizationStopped("Optimization stopped.")
-                    if self._pause_requested:
-                        if best_row is not None:
-                            stopped_during_fit = True
-                            break
-                        raise OptimizationPaused("Optimization paused.")
-
-                    X.step()
-                    update_best_from_data()
-                    if self._stop_requested or self._pause_requested:
-                        stopped_during_fit = True
-                        break
-
-            except OptimizationStopped:
-                if best_row is not None:
-                    stopped_during_fit = True
-                else:
-                    raise
-            except OptimizationPaused:
-                if best_row is not None:
-                    stopped_during_fit = True
-                else:
-                    raise
-            if best_row is None:
-                raise RuntimeError("Joint Xopt failed to find best fit solution.")
-
-            print(
-                f"Joint Xopt finished. "
-                f"evaluations={0 if getattr(X, 'data', None) is None else len(X.data)}, "
-                f"best_found={best_row is not None}, stopped={stopped_during_fit}"
-            )
+        row_values = dict(zip(params_order, x0_linear_optics))
+        row_values["f"] = float(cost_linear_optics)
+        best_row = pd.Series(row_values)
+        best_cost = float(cost_linear_optics)
+        rel_window = 0.15
+        half_width = rel_window * (original_high_bounds - original_low_bounds)
+        if self.fit_quadrupole_strength:
+            half_width[-1] = original_high_bounds[-1] - original_low_bounds[-1]
+        low_bounds = np.maximum(original_low_bounds, x0_linear_optics - half_width)
+        high_bounds = np.minimum(original_high_bounds, x0_linear_optics + half_width)
+        low_bounds = np.minimum(low_bounds, x0_linear_optics - 1e-9)
+        high_bounds = np.maximum(high_bounds, x0_linear_optics + 1e-9)
+        print(f"Linear optics cost: cost={cost_linear_optics:.6g}, x0={row_values}")
 
         emit_x_norm_best = float(best_row["emit_x_norm"])
         beta_x0_best = float(best_row["beta_x0"])
@@ -575,7 +460,6 @@ class Optimization:
 
         if not run_local_ls:
             solution = self._build_joint_partial_output(screens=screens, sigma_x=sig_x, sigma_y=sig_y, pred_x=pred_x, pred_y=pred_y, best_row=best_row, best_cost=best_cost)
-            solution["message"] = "Joint x+y Xopt only. No least squares."
             solution["stopped"] = bool(stopped_during_fit)
             return solution
 
@@ -586,40 +470,13 @@ class Optimization:
 
         x0 = np.array(x0_values, dtype=float)
         x0 = np.clip(x0, low_bounds, high_bounds)
-        ls_starts = []
 
         def _move_away_from_bounds_edges(point):
             point = np.asarray(point, dtype=float)
             margin = 0.03 * (high_bounds - low_bounds)
             return np.clip(point, low_bounds + margin, high_bounds - margin)
 
-        data_for_starts = getattr(X, "data", None)
-        good = pd.DataFrame(columns=list(params_order) + ["f"])
-        if data_for_starts is not None and len(data_for_starts) > 0:
-            good = data_for_starts.copy()
-            if "xopt_error" in good.columns: good = good[~good["xopt_error"].astype(bool)]
-
         ls_starts = [_move_away_from_bounds_edges(x0)]
-        if len(good) > 0 and "f" in good.columns:
-            good = good.sort_values("f", ascending=True)
-            number_of_ls_tries = good.head(self.n_starts)
-        else:
-            number_of_ls_tries = good.iloc[0:0]
-
-        for _, row in number_of_ls_tries.iterrows():
-            parameter = np.array([float(row[p]) for p in params_order], dtype=float)
-            parameter = _move_away_from_bounds_edges(parameter)
-            is_duplicate_in_chosen_points = any(np.allclose(parameter, existing) for existing in ls_starts)
-            if is_duplicate_in_chosen_points: continue
-            ls_starts.append(parameter)
-
-        unique_starts = []
-        for candidate in ls_starts:
-            if not np.all(np.isfinite(candidate)):
-                continue
-            if not any(np.allclose(candidate, other, rtol=1e-5, atol=1e-8) for other in unique_starts):
-                unique_starts.append(candidate)
-        ls_starts = unique_starts
         ls_best_cost = [float(best_cost)]
         ls_best_params = [x0.copy()]
         ls_stopped = [False]
@@ -669,7 +526,6 @@ class Optimization:
         good_fit_final_cost = 5e-11
 
         try:
-            ls_starts = ls_starts[:1]
             for start_idx, x0_try in enumerate(ls_starts):
                 print(f"Starting LS multi-start {start_idx + 1}/{len(ls_starts)} from {x0_try}")
                 best_cost_in_this_start = [np.inf]
@@ -713,7 +569,7 @@ class Optimization:
                     print(
                         f"  LS start {start_idx + 1}/{len(ls_starts)} finished: "
                         f"cost={float(f_try):.4g}, success={res_try.success}, "
-                        f"nfev={res_try.nfev}/{self.nm_steps}, message={res_try.message}"
+                        f"nfev={res_try.nfev}/{self.nm_steps}."
                     )
                     if reason_to_stop[0] is not None:
                         print(f"Stopping LS: {reason_to_stop[0]}.")

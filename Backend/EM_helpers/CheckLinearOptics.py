@@ -17,23 +17,23 @@ def _solve_plane(R1, R2, sigma, u, valid):
                                     R2 ** 2])
     relative_uncertainty = u_v / np.maximum(np.abs(sigma_v), 1e-9)
     row_weight = 1.0 / np.maximum(relative_uncertainty, 1e-3) # it checks if the point is more precise
-    coefficients_w = coefficients * row_weight[:, None] 
+    coefficients_w = coefficients * row_weight[:, None]
     sigma_w = sigma2 * row_weight
 
     twiss_parameters_joint, residuals, rank, _ = np.linalg.lstsq(coefficients_w, sigma_w, rcond=None)
-    if rank < 3: raise CheckLinearOpticsUnavailable("K1L scan is too small. Please do a wider scan.")
+    if rank < 3: raise CheckLinearOpticsUnavailable("K1L scan is too small or too few distinct points. Please do a wider scan, or with more steps.")
 
     predicted_w_sigmas2 = coefficients_w @ twiss_parameters_joint
     degrees_of_freedom = max(len(sigma_w) - 3, 1) # because we fit eps*beta, -eps*alpha, eps*gamma
     reduced_chi2 = float(np.sum((sigma_w - predicted_w_sigmas2) ** 2) / degrees_of_freedom) # sigma measured - sigma modeled
-    if not np.isfinite(reduced_chi2) or reduced_chi2 > 5.0: # here we set the parameter that says if we should fallback to Xopt
-        raise CheckLinearOpticsUnavailable(f"Linear model doesn't fit the scan well with chi_2 = {reduced_chi2:.3g}. There is probably dispersion and nonlinearities in between the elements.")
+    if not np.isfinite(reduced_chi2) or reduced_chi2 > 5.0: # threshold for how well a linear (no sextupole nonlinearity) model must fit the scan
+        raise CheckLinearOpticsUnavailable(f"Linear model doesn't fit the scan well (chi_2 = {reduced_chi2:.3g}). There is probably dispersion or nonlinearities (e.g. sextupoles) between the elements: try a narrower K1L range, or scan a different quadrupole.")
 
     eps_beta, eps_alpha, eps_gamma = twiss_parameters_joint
     # beta*gamma - alpha^2 = 1 ---- * eps^2
     # eps^2 * beta * gamma - alpha^2*eps^2 = eps^2 (geom)
     eps_squared = eps_beta * eps_gamma - eps_alpha ** 2
-    if not np.isfinite(eps_squared) or eps_squared <= 0 or eps_beta <= 0 or eps_gamma <= 0: raise CheckLinearOpticstUnavailable(f"Linear estimate is unphysical (eps_beta={eps_beta:.4g}, eps_gamma={eps_gamma:.4g}, det={eps_squared:.4g}).")
+    if not np.isfinite(eps_squared) or eps_squared <= 0 or eps_beta <= 0 or eps_gamma <= 0: raise CheckLinearOpticsUnavailable(f"Linear estimate is unphysical (eps_beta={eps_beta:.4g}, eps_gamma={eps_gamma:.4g}, det={eps_squared:.4g}): try a different K1L scan range, more steps, or a different quadrupole.")
 
     emit_geom = float(np.sqrt(eps_squared))
     beta0 = float(eps_beta / emit_geom)
