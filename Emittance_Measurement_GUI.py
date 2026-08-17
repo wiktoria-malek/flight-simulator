@@ -267,7 +267,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.interface.bg_shots = max(0, int(value))
 
     def _load_screens_data(self):
-        self.load_screens_data()
+        loaded_states = self.load_screens_data()
+        if loaded_states is None:
+            return
         self.session = self._get_session_data_from_database()
         if self.session is None:
             QMessageBox.information(self, "Emittance Measurement Session Error", "Session not found.")
