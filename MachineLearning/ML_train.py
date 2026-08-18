@@ -431,11 +431,3 @@ class MLInterface:
             prediction_sigy = np.maximum(prediction_sigy, 0.0)
 
         return prediction_sigx, prediction_sigy
-
-if __name__ == "__main__":
-    trainer = TrainModel(
-        machine_name="ATF2",
-        quad_name="QD16X",
-        screens=["OTR0X", "OTR1X", "OTR2X", "OTR3X"],
-    )
-    trainer.train()

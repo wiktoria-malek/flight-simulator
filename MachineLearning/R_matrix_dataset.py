@@ -7,8 +7,6 @@ if str(PROJECT_ROOT) not in sys.path:
 from Interfaces.interface_setup import INTERFACE_SETUP
 import numpy as np
 
-OUTPUT_FILE = PROJECT_ROOT / "MachineLearning" / "ATF2" / "QF17X"/ "Linear_Response_dataset.npz"
-N_SAMPLES = 5000
 RANDOM_SEED = 2137
 
 PARAMETER_NAMES = [
@@ -187,19 +185,3 @@ def generate_dataset(quad_name, screens, interface, k1l_relative_change, n_sampl
         "valid": int(X.shape[0]),
         "K1L_fixed": float(fixed_k1l),
     }
-
-def main():
-    from Interfaces.ATF2.InterfaceATF2_Ext_RFTrack import InterfaceATF2_Ext_RFTrack
-    interface = InterfaceATF2_Ext_RFTrack()
-    quad_name = "QF17X"
-    screens = list(getattr(interface, "screens", []))
-    print("Generating R-matrix fixed-K1L dataset")
-
-    generate_dataset(quad_name=quad_name, screens=screens, interface=interface,
-        k1l_relative_change=(0.0, 0.0), n_samples=N_SAMPLES, output_file=OUTPUT_FILE,
-        log_callback=print, progress_callback=None, stop_checker=None,
-    )
-
-
-if __name__ == "__main__":
-    main()
