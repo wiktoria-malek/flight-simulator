@@ -433,7 +433,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.wake_fig, self.wake_canvas, self.wake_ax = install(self.plot_widget_5)
 
     def _plot_series(self, ax, canvas, values_x, values_y, vals, title=None, error_x=None, error_y=None,
-                     error_all=None):
+                     error_all=None, transmission_values = None):
         ylabel = f"Residual norm [{self.bpm_unit}]"
         if canvas is None or ax is None:
             return
@@ -466,6 +466,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             err_all = matching_yerr(error_all, vals)
             ax.errorbar(range(len(vals)), vals, yerr=err_all, linestyle="dashed", color='black', label="combined norm",
                         capsize=6, elinewidth=2, capthick=2, markersize=4)
+
+        if transmission_values:
+            ax.plot(range(len(transmission_values)), transmission_values, linestyle="dashed", color="green", marker="o", label="transmission during correction", markersize=4)
+
         if values_x or values_y:
             ax.legend(fontsize=7, loc="upper right")
         if title is not None:
@@ -762,6 +766,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 return result
 
             plt.ion()
+            transmission_values = []
 
             for it in range(iters):
                 if self._cancel:
@@ -809,17 +814,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 if it==0:
                     B0x = O0x
                     B0y = O0y
+                    initial_transmission = min(O0["tmit"])
 
-                # if it == 0:
-                #     B0x = np.asarray(B0x, dtype=float).reshape(-1, 1)
-                #     B0y = np.asarray(B0y, dtype=float).reshape(-1, 1)
-                #     print("||O0x - B0x|| =", np.linalg.norm(O0x - B0x))
-                #     print("||O0y - B0y|| =", np.linalg.norm(O0y - B0y))
-                #     self.log(
-                #         f"Initial orbit error from reference: "
-                #         f"x={np.linalg.norm(O0x - B0x):.6g}, "
-                #         f"y={np.linalg.norm(O0y - B0y):.6g}"
-                #     )
+                transmission_values.append(min(O0["tmit"]))
 
                 if self.reset_ref_orb == True:
                     B0x = O0x.copy()
@@ -836,6 +833,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     state1 = self._apply_jitter_subtraction_to_state(state1)
                     self.interface.reset_energy()
                     O1 = state1.get_orbit(bpms)
+                    #transmission_values.append(min(O1["tmit"]))
                     O1x = np.asarray(O1['x'], dtype=float).reshape(-1, 1)
                     O1y = np.asarray(O1['y'], dtype=float).reshape(-1, 1)
                     bpms1 = state1.get_bpms(bpms)
@@ -858,6 +856,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     state2 = self._apply_jitter_subtraction_to_state(state2)
                     self.interface.reset_intensity()
                     O2 = state2.get_orbit(bpms)
+                    #transmission_values.append(min(O2["tmit"]))
+                    self.transmission_wfs_value = min(O2["tmit"])
                     O2x = np.asarray(O2['x'], dtype=float).reshape(-1, 1)
                     O2y = np.asarray(O2['y'], dtype=float).reshape(-1, 1)
                     bpms2 = state2.get_bpms(bpms)
@@ -1023,8 +1023,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                 # current_bdes + delta -> clamp(final_bdes) -> set_correctors(final_bdes)
 
                 if w1 > 0:
-                    mean_orbit_x, mean_orbit_y, err_x_orbit, err_y_orbit, mean_orbit_all, err_orbit_all = self._calc_error(
-                        x0_vals, y0_vals, ref_x=B0x.ravel(), ref_y=B0y.ravel())  # ravel makes data a vector
+                    mean_orbit_x, mean_orbit_y, err_x_orbit, err_y_orbit, mean_orbit_all, err_orbit_all = self._calc_error(x0_vals, y0_vals, ref_x=B0x.ravel(), ref_y=B0y.ravel())  # ravel makes data a vector
                     self._hist_orbit_x.append(mean_orbit_x)
                     self._hist_orbit_y.append(mean_orbit_y)
                     self._hist_orbit.append(mean_orbit_all)
@@ -1057,9 +1056,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
                     self._hist_wake_y_err.append(err_wake_y)
                     self._hist_wake_err.append(err_wake_all)
 
+
                 self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,
                                   values_y=self._hist_orbit_y, vals=self._hist_orbit, error_x=self._hist_orbit_x_err,
-                                  error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None)
+                                  error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None, transmission_values = transmission_values)
                 self._plot_series(ax=self.disp_ax, canvas=self.disp_canvas, values_x=self._hist_disp_x,
                                   values_y=self._hist_disp_y, vals=self._hist_disp, error_x=self._hist_disp_x_err,
                                   error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None)
