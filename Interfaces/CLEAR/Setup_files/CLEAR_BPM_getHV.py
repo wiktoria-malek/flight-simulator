@@ -186,3 +186,30 @@ def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW):
         raise ValueError(f"Unknown mode '{mode}'. " "Choose from: 'peak', 'baseline_peak', " "'integral', 'integral_window', 'integral_threshold'.")
 
     return H, V #S
+
+def process_bpm_signal(samples, mode, window=DEFAULT_WINDOW):
+
+    if mode == "peak":
+        value, _ = find_peak(samples)
+
+    elif mode == "baseline_peak":
+        samples = baseline_correct(samples)
+        value, _ = find_peak(samples)
+
+    elif mode == "integral":
+        samples = baseline_correct(samples)
+        value = trapezoid(samples)
+
+    elif mode == "integral_window":
+        samples = baseline_correct(samples)
+        window_start, window_end = window
+        value = trapezoid(samples[window_start:window_end])
+
+    elif mode == "integral_threshold":
+        samples = baseline_correct(samples)
+        value, _, _, _ = threshold_integral(samples)
+
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
+    return value

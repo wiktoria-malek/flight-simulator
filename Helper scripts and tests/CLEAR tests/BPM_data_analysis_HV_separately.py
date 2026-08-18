@@ -10,12 +10,12 @@ while not (project_root_path / "Interfaces").exists() and project_root_path.pare
     project_root_path = project_root_path.parent
 sys.path.insert(0, str(project_root_path))
 os.chdir(project_root_path)
-from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, change_inverted_bpm_polarity
+from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import change_inverted_bpm_polarity, process_bpm_signal
 
 path_to_datafiles = "/Users/wiktoriamalek/CERN-Flight_Simulator-Data/20260729_BPMtests"
 bpms = ["BPM0530", "BPM0595", "BPM0690", "BPM0820", "BPM0890"]
 
-def analyze_data(filename, bpm, show=False):
+def analyze_data(filename, bpm, mode):
     file_path = os.path.join(path_to_datafiles, filename)
     with h5py.File(file_path, "r") as f:
 
@@ -23,25 +23,11 @@ def analyze_data(filename, bpm, show=False):
         V_SA = change_inverted_bpm_polarity(f["CLEAREventData"][f"CA.{bpm}V-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
         S_SA = change_inverted_bpm_polarity(f["CLEAREventData"][f"CA.{bpm}S-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
 
-        H_b_samples = baseline_correct(H_SA)
-        V_b_samples = baseline_correct(V_SA)
-        S_b_samples = baseline_correct(S_SA)
+        H = process_bpm_signal(H_SA, mode)
+        V = process_bpm_signal(V_SA, mode)
+        S = process_bpm_signal(S_SA, mode)
 
-        H, H_idx = find_peak(H_b_samples)
-        V, V_idx = find_peak(V_b_samples)
-        S, S_idx = find_peak(S_b_samples)
         print(f"{bpm}: H = {H}, V = {V}")
-
-    if show==True:
-        plt.figure()
-        plt.plot(H_SA, label="H")
-        plt.plot(V_SA, label="V")
-        plt.plot(S_SA, label="S")
-        plt.xlabel("Sample number")
-        plt.ylabel("Signal amplitude [mV]")
-        plt.title(f"{bpm}: H = {H}, V = {V}")
-        plt.legend()
-        plt.show()
 
     return {
         "file": filename,
@@ -55,10 +41,14 @@ list_to_datafiles = "/Users/wiktoriamalek/CERN-Flight_Simulator-Data/20260729_BP
 list_of_files = sorted(filename for filename in os.listdir(list_to_datafiles) if filename.endswith(".h5"))
 all_results = []
 
+'''Here you change the method from Sara's script'''
+# done: baseline_peak, integral, integral_window, integral_threshold, peak
+mode = "peak"
+
 for orbit_number, filename in enumerate(list_of_files, start=1):
     print(f"=====================ORBIT {orbit_number}====================")
     for bpm in bpms:
-        result = analyze_data(filename, bpm)
+        result = analyze_data(filename, bpm, mode=mode)
         all_results.append(result)
 
 plt.figure()
@@ -69,7 +59,7 @@ for bpm in bpms:
     plt.plot(event_numbers, H_values, label=f"{bpm} H")
     plt.title("H values [mV]")
     plt.xlabel("Event number")
-    plt.ylabel("Signal amplitude [mV]")
+    plt.ylabel("Integrated signal [mV * sample]")
     plt.legend()
 plt.show()
 
@@ -82,7 +72,7 @@ for bpm in bpms:
     plt.plot(event_numbers, V_values, label=f"{bpm} V")
     plt.title("V values [mV]")
     plt.xlabel("Event number")
-    plt.ylabel("Signal amplitude [mV]")
+    plt.ylabel("Integrated signal [mV * sample]")
     plt.legend()
 plt.show()
 
@@ -94,7 +84,7 @@ for bpm in bpms:
     plt.plot(event_numbers, S_values, label=f"{bpm} S")
     plt.title("S values")
     plt.xlabel("Event number")
-    plt.ylabel("Signal amplitude [mV]")
+    plt.ylabel("Integrated signal [mV * sample]")
     plt.legend()
 plt.show()
 
@@ -113,15 +103,16 @@ U_h, singular_values_h, Vt_h = np.linalg.svd(M_h, full_matrices=False)
 print(f"Singular values for H: {singular_values_h}")
 variance_percent_h = singular_values_h**2 / np.sum(singular_values_h**2) * 100
 print("Singular values for H in %: ", variance_percent_h)
-
 print("First mode:", Vt_h[0])
 print("Second mode:", Vt_h[1])
 
-# plt.figure()
-# plt.xlabel("S")
-# plt.ylabel("H")
-# plt.scatter(S_values, H_values)
-# plt.show()
+M_v = M_v - np.mean(M_v, axis=0)
+U_v, singular_values_v, Vt_v = np.linalg.svd(M_v, full_matrices=False)
+print(f"Singular values for V: {singular_values_v}")
+variance_percent_v = singular_values_v**2 / np.sum(singular_values_v**2) * 100
+print("Singular values for V in %: ", variance_percent_v)
+print("First mode:", Vt_v[0])
+print("Second mode:", Vt_v[1])
 
 fig1 = plt.figure()
 nh_events, nh_bpms = M_h.shape
@@ -153,7 +144,7 @@ plt.plot(x, std_h, label='H')
 plt.plot(x, std_v, label='V')
 plt.xticks(x, bpms)
 plt.xlabel("BPM")
-plt.ylabel("Std [mV]")
+plt.ylabel("Std [mV * sample]")
 plt.title("Std of BPM signals")
 plt.legend()
 plt.show()
@@ -194,19 +185,25 @@ ax2.set_ylabel(r"$U_v[:, 0]$")
 ax2.grid(True)
 plt.tight_layout()
 plt.show()
-'''========U==========='''
 
-'''========V==========='''
 fig = plt.figure()
 ax1 = fig.add_subplot(1, 2, 1, projection="3d")
 ax2 = fig.add_subplot(1, 2, 2, projection="3d")
 n_events_h, n_modes_h = Vt_h.shape
 X_h, Y_h = np.meshgrid(np.arange(1, n_modes_h + 1), np.arange(1, n_events_h + 1))
 ax1.plot_surface(X_h, Y_h, Vt_h, cmap="viridis")
-ax1.set_title(r"$Vt_hv$ matrix from SVD")
+ax1.set_title(r"$Vt_h$ matrix from SVD")
 ax1.set_xlabel("SVD mode")
 ax1.set_ylabel("BPM")
 ax1.set_zlabel(r"$Vt_h$ coefficient value")
+
+n_events_v, n_modes_v = Vt_v.shape
+X_v, Y_v = np.meshgrid(np.arange(1, n_modes_v + 1), np.arange(1, n_events_v + 1))
+ax2.plot_surface(X_v, Y_v, Vt_v, cmap="viridis")
+ax2.set_title(r"$Vt_v$ matrix from SVD")
+ax2.set_xlabel("SVD mode")
+ax2.set_ylabel("BPM")
+ax2.set_zlabel(r"$Vt_v$ coefficient value")
 plt.tight_layout()
 plt.show()
 
@@ -219,10 +216,16 @@ ax1.set_ylabel("Mode coefficient value")
 ax1.set_xticks(x)
 ax1.set_xticklabels(bpms)
 ax1.axhline(0, linewidth=1)
+
+ax2.plot(x, Vt_v[0], marker="o")
+ax2.set_title(r"$V_v^T$ first row")
+ax2.set_xlabel("BPM")
+ax2.set_ylabel("Mode coefficient value")
+ax2.set_xticks(x)
+ax2.set_xticklabels(bpms)
+ax2.axhline(0, linewidth=1)
 plt.tight_layout()
 plt.show()
-'''========V==========='''
-
 
 plt.figure()
 modes = np.arange(1, len(singular_values_v) + 1)
@@ -248,8 +251,7 @@ for bpm in bpms:
     std_s.append(np.std(s_values))
 plt.errorbar(bpms, mean_s, yerr=std_s, fmt='o-', capsize = 5, linewidth=1.5)
 plt.xlabel("BPM")
-plt.ylabel("Mean S value from 97 orbits [mV]")
+plt.ylabel("Mean S integral from 97 orbits [mV * sample]")
 plt.title(r"Mean BPM total signal $\pm 1\sigma$")
 plt.grid(True)
-plt.legend()
 plt.show()

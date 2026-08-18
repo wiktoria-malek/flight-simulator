@@ -9,11 +9,14 @@ while not (project_root_path / "Interfaces").exists() and project_root_path.pare
     project_root_path = project_root_path.parent
 sys.path.insert(0, str(project_root_path))
 os.chdir(project_root_path)
-from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, change_inverted_bpm_polarity, find_peak
+from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import change_inverted_bpm_polarity, process_bpm_signal
 path_to_datafiles = "/Users/wiktoriamalek/CERN-Flight_Simulator-Data/20260729_BPMtests"
 bpms = ["BPM0530", "BPM0595", "BPM0690", "BPM0820", "BPM0890"]
 
-def analyze_data(filename, bpm, show=False):
+'''Here you change the method from Sara's script'''
+mode = "peak"
+
+def analyze_data(filename, bpm, mode, show=False):
     file_path = os.path.join(path_to_datafiles, filename)
     with h5py.File(file_path, "r") as f:
         event_data = f["CLEAREventData"]
@@ -21,9 +24,9 @@ def analyze_data(filename, bpm, show=False):
         V_SA = change_inverted_bpm_polarity(event_data[f"CA.{bpm}V-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
         S_SA = change_inverted_bpm_polarity(event_data[f"CA.{bpm}S-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
 
-    H, _ = find_peak(baseline_correct(H_SA))
-    V, _ = find_peak(baseline_correct(V_SA))
-    S, _ = find_peak(baseline_correct(S_SA))
+    H = process_bpm_signal(H_SA, mode)
+    V = process_bpm_signal(V_SA, mode)
+    S = process_bpm_signal(S_SA, mode)
     print(f"{bpm}: H = {H}, V = {V}")
 
     if show:
@@ -45,7 +48,7 @@ all_results = []
 for orbit_number, filename in enumerate(list_of_files, start=1):
     print(f"===================== ORBIT {orbit_number} =====================")
     for bpm in bpms:
-        all_results.append(analyze_data(filename, bpm))
+        all_results.append(analyze_data(filename, bpm, mode=mode))
 
 M_h = np.array([
     [next(result["H"] for result in all_results if result["bpm"] == bpm and result["file"]==filename)
