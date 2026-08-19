@@ -385,7 +385,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return float(default)
 
     def change_energy(self):
-        self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] #changes value globally
+        self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] # changes value globally
         self.log(f"Value before changing energy: {self.energy_readback}")
         new_energy = 0.9 * self.energy_readback # as a test!
         self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
@@ -944,6 +944,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def get_R_matrix_scan(self, *args, **kwargs):
         return self.tracking_interface.get_R_matrix_scan(*args, **kwargs)
+
+    def get_phase_space_transport_to_screens(self, *args, **kwargs):
+        return self.tracking_interface.get_phase_space_transport_to_screens(*args, **kwargs)
+
+    def get_twiss_evolution(self, *args, **kwargs):
+        return self.tracking_interface.get_twiss_evolution(*args, **kwargs)
 
     def get_target_dispersion(self, names=None):
         if names is None:

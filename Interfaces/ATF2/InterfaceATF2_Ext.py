@@ -455,11 +455,20 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
     def get_movable_magnets_names(self):
         return self.movable_magnets
 
+    def get_quadrupole_movers_names(self):
+        return list(self.qmags)
+
     def predict_emittance_scan_response(self, *args, **kwargs): # from optimizer, delegates all variables to the simulation
         return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
 
     def get_R_matrix_scan(self, *args, **kwargs):
         return self.tracking_interface.get_R_matrix_scan(*args, **kwargs)
+
+    def get_phase_space_transport_to_screens(self, *args, **kwargs):
+        return self.tracking_interface.get_phase_space_transport_to_screens(*args, **kwargs)
+
+    def get_twiss_evolution(self, *args, **kwargs):
+        return self.tracking_interface.get_twiss_evolution(*args, **kwargs)
 
     def _quadrupole_current_pv_name(self,name):
         if name.startswith("M") and name[1:].startswith(("QF", "QD", "QM")):
