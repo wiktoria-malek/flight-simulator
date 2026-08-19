@@ -78,6 +78,22 @@ class PhaseSpaces(QDialog):
 
         return np.isfinite(beta0) and np.isfinite(alpha0) and beta0 > 0.0
 
+    @staticmethod
+    def propagate_twiss(beta0, alpha0, R11, R12, R21, R22):
+        try:
+            beta0 = float(beta0)
+            alpha0 = float(alpha0)
+            R11 = float(R11)
+            R12 = float(R12)
+            R21 = float(R21)
+            R22 = float(R22)
+        except Exception:
+            return np.nan, np.nan
+        gamma0 = (1.0 + alpha0 ** 2) / beta0
+        beta_i = R11 ** 2 * beta0 - 2.0 * R11 * R12 * alpha0 + R12 ** 2 * gamma0
+        alpha_i = -R11 * R21 * beta0 + (R11 * R22 + R12 * R21) * alpha0 - R12 * R22 * gamma0
+        return float(beta_i), float(alpha_i)
+
     def plot_from_result(self, result, reference_name=None, screen_parameters = None):
         self.figure.clear()
 
@@ -336,41 +352,38 @@ class PhaseSpaces(QDialog):
                 "sigma_over_sqrt_emit": sigy[i] / np.sqrt(emit_y_geom),
             })
 
-        def propagate_twiss(beta0, alpha0, R11, R12, R21, R22):
-            try:
-                beta0 = float(beta0)
-                alpha0 = float(alpha0)
-                R11 = float(R11)
-                R12 = float(R12)
-                R21 = float(R21)
-                R22 = float(R22)
-            except Exception:
-                return np.nan, np.nan
-            if not all(np.isfinite(v) for v in [beta0, alpha0, R11, R12, R21, R22]) or beta0 <= 0.0:
-                return np.nan, np.nan
-            gamma0 = (1.0 + alpha0 ** 2) / beta0
-            beta_i = R11 ** 2 * beta0 - 2.0 * R11 * R12 * alpha0 + R12 ** 2 * gamma0
-            alpha_i = -R11 * R21 * beta0 + (R11 * R22 + R12 * R21) * alpha0 - R12 * R22 * gamma0
-            return float(beta_i), float(alpha_i)
+        propagate_twiss = self.propagate_twiss
 
         beta_x0 = result.get("beta_x0", np.nan)
         alpha_x0 = result.get("alpha_x0", np.nan)
         beta_y0 = result.get("beta_y0", np.nan)
         alpha_y0 = result.get("alpha_y0", np.nan)
 
-        R21 = np.asarray(tx.get("R21", []), dtype=float)
-        R22 = np.asarray(tx.get("R22", []), dtype=float)
-        R43 = np.asarray(ty.get("R43", []), dtype=float)
-        R44 = np.asarray(ty.get("R44", []), dtype=float)
+        # beta_x0/alpha_x0 are fitted at the quadrupole entrance (Optimization._fit_6d builds the
+        # synthetic bunch there), not at reference_screen, so this propagation must start there too -
+        # it is a separate transport call from the one used for the projection_lines above, which are
+        # deliberately expressed in the reference_screen frame.
+        quad_name = session.get("quad_name")
+        transport_from_quad = transport
+        if quad_name and quad_name != reference_screen:
+            get_transport = getattr(interface, "get_phase_space_transport_to_screens", None)
+            if callable(get_transport):
+                transport_from_quad = get_transport(reference_screen=quad_name, screens=screens)
+        txq, tyq = transport_from_quad["x"], transport_from_quad["y"]
+
+        R21 = np.asarray(txq.get("R21", []), dtype=float)
+        R22 = np.asarray(txq.get("R22", []), dtype=float)
+        R43 = np.asarray(tyq.get("R43", []), dtype=float)
+        R44 = np.asarray(tyq.get("R44", []), dtype=float)
 
         screens_twiss = []
         for i, screen in enumerate(screens):
             beta_x_i, alpha_x_i = np.nan, np.nan
             beta_y_i, alpha_y_i = np.nan, np.nan
-            if i < len(tx["R11"]) and i < len(tx["R12"]) and i < R21.size and i < R22.size:
-                beta_x_i, alpha_x_i = propagate_twiss(beta_x0, alpha_x0, tx["R11"][i], tx["R12"][i], R21[i], R22[i])
-            if i < len(ty["R33"]) and i < len(ty["R34"]) and i < R43.size and i < R44.size:
-                beta_y_i, alpha_y_i = propagate_twiss(beta_y0, alpha_y0, ty["R33"][i], ty["R34"][i], R43[i], R44[i])
+            if i < len(txq["R11"]) and i < len(txq["R12"]) and i < R21.size and i < R22.size:
+                beta_x_i, alpha_x_i = propagate_twiss(beta_x0, alpha_x0, txq["R11"][i], txq["R12"][i], R21[i], R22[i])
+            if i < len(tyq["R33"]) and i < len(tyq["R34"]) and i < R43.size and i < R44.size:
+                beta_y_i, alpha_y_i = propagate_twiss(beta_y0, alpha_y0, tyq["R33"][i], tyq["R34"][i], R43[i], R44[i])
             screens_twiss.append((
                 str(screen),
                 {
@@ -385,7 +398,7 @@ class PhaseSpaces(QDialog):
 
         if len(screens_twiss) == 0:
             screens_twiss = [(
-                str(reference_screen),
+                str(quad_name or reference_screen),
                 {
                     "beta_x": beta_x0,
                     "beta_y": beta_y0,
