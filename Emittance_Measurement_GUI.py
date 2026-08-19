@@ -25,6 +25,7 @@ from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEn
 from Backend.EM_helpers.QuadrupoleScan import QuadrupoleScan
 from Backend.LogConsole import LogConsole
 from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
+from Backend.EM_helpers.BeamEvolution import BeamEvolution
 from Backend.EM_helpers.ShowBeamline import ShowBeamline
 from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 class ComputationMode(Enum):
@@ -79,7 +80,7 @@ class OptimizationWorker(QObject):
     info = pyqtSignal(str)
     ml_not_found_rft_fallback = pyqtSignal()
 
-    def __init__(self, interface, session, selected_screens = None, bounds = None, nm_steps = None, fit_quadrupole_strength = False, computing_method = "Linear R-response model"):
+    def __init__(self, interface, session, selected_screens = None, bounds = None, nm_steps = None, fit_quadrupole_strength = False, fit_quad_offset = False, fit_quad_roll = False, computing_method = "Linear R-response model"):
         super().__init__()
         self.interface = interface
         self.session = session
@@ -87,6 +88,8 @@ class OptimizationWorker(QObject):
         self.bounds = bounds
         self.nm_steps = nm_steps
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
+        self.fit_quad_offset = bool(fit_quad_offset)
+        self.fit_quad_roll = bool(fit_quad_roll)
         self.computing_method = computing_method
 
     def _emit_progress(self, phase, current, total):
@@ -125,7 +128,12 @@ class OptimizationWorker(QObject):
         cut_session = dict(self.session)
         cut_session["screens"] = [session_screens[i] for i in selected_indices]
 
-        for key in ("sigx_mean", "sigy_mean", "sigxy_mean", "sigx_std", "sigy_std", "sigxy_std"):
+        for key in ("sigx_mean", "sigy_mean", "sigxy_mean", "sigx_std", "sigy_std", "sigxy_std", "sigx_shots", "sigy_shots"):
+            values = np.asarray(self.session[key], dtype=float)
+            cut_session[key] = values[:, selected_indices, ...].tolist()
+        for key in ("sigxy_shots", "x_mean", "y_mean", "x_std", "y_std", "x_shots", "y_shots"):
+            if key not in self.session:
+                continue
             values = np.asarray(self.session[key], dtype=float)
             cut_session[key] = values[:, selected_indices, ...].tolist()
         cut_session["images"] = [[self.session["images"][step_index][screen_index] for screen_index in selected_indices] for step_index in range(len(self.session["images"]))]
@@ -144,6 +152,7 @@ class OptimizationWorker(QObject):
             tool = EmittanceComputingEngineSelector.create(method=self.computing_method, interface=self.interface,
                 session=session_for_opt, machine_name=machine_name, info_callback=self.info.emit,
                 nm_steps=self.nm_steps, fit_quadrupole_strength=self.fit_quadrupole_strength,
+                fit_quad_offset=self.fit_quad_offset, fit_quad_roll=self.fit_quad_roll,
                 progress_callback=self._emit_progress, fallback_callback = self. ml_not_found_rft_fallback.emit)
             self.optimizer_ready.emit(tool)
             output = tool.fit_from_session(session_for_opt, bounds=bounds)
@@ -160,6 +169,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         super().__init__()
         self.interface = interface
         self.dir_name = dir_name
+        self._general_session_dir = dir_name
         self.is_simulation = is_simulation
         self.session = None
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
@@ -215,9 +225,13 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.phase_spaces = None
         self.screen_images = None
         self.beamline_view = None
+        self.beta_evolution_window = None
+        self.emittance_evolution_window = None
         self.log_console_button.clicked.connect(self._show_console_log)
-        self.phase_spaces_button.clicked.connect(self._show_phase_spaces)
+        #self.phase_spaces_button.clicked.connect(self._show_phase_spaces)
         self.display_screen_images_button.clicked.connect(self._show_screen_images)
+        #self.beta_function_button.clicked.connect(self._show_beta_function_evolution)
+        #self.emittance_evolution_button.clicked.connect(self._show_emittance_evolution)
         self.pause_button.clicked.connect(self._pause_task)
         self.resume_button.clicked.connect(self._resume_task)
         self._scan_pause_requested = False
@@ -240,6 +254,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         else:
             self.download_quads_button.setEnabled(True)
             self.download_quads_button.clicked.connect(self._download_all_quads_status)
+
 
     def _download_all_quads_status(self):
         try:
@@ -500,6 +515,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_alpha_x0.setText("-")
         self.result_beta_y0.setText("-")
         self.result_alpha_y0.setText("-")
+        self.result_quad_dx0.setText("-")
+        self.result_quad_dy0.setText("-")
+        self.result_quad_roll.setText("-")
         self.result_reference_screen.setText("-")
 
     def _update_fit_panel(self, result):
@@ -538,6 +556,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_alpha_x0.setText(formatted_result(result.get("alpha_x0"), result.get("alpha_x0_err")))
         self.result_beta_y0.setText(formatted_result(result.get("beta_y0"), result.get("beta_y0_err"), "m"))
         self.result_alpha_y0.setText(formatted_result(result.get("alpha_y0"), result.get("alpha_y0_err")))
+        self.result_quad_dx0.setText(formatted_result(result.get("quad_dx0"), result.get("quad_dx0_err"), "mm") if result.get("quad_offset_is_fitted") else "-")
+        self.result_quad_dy0.setText(formatted_result(result.get("quad_dy0"), result.get("quad_dy0_err"), "mm") if result.get("quad_offset_is_fitted") else "-")
+        self.result_quad_roll.setText(formatted_result(result.get("quad_roll"), result.get("quad_roll_err"), "mrad") if result.get("quad_roll_is_fitted") else "-")
         self.result_reference_screen.setText(result["screen0"])
 
         print("Errors of the fit:")
@@ -628,11 +649,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             else:
                 screen_indices = list(range(len(screens)))
 
-        for plot_i, i in enumerate(screen_indices):
+        for i in screen_indices:
             screen = screens[i]
             mask_x = np.isfinite(sigx[:, i])
             mask_y = np.isfinite(sigy[:, i])
-            color = color_cycle[plot_i % len(color_cycle)]
+            color = color_cycle[i % len(color_cycle)]
             ax1.plot(K1L_values[mask_x], sigx[mask_x, i], 'o--', color=color, label=screen)
             ax2.plot(K1L_values[mask_y], sigy[mask_y, i], 'o--', color=color, label=screen)
         ax1.set_title(f"Quadrupole scan: {quad_name}")
@@ -689,7 +710,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         for prediction_i, screen in enumerate(screens):
             session_i = session_screens.index(screen)
-            color = color_cycle[prediction_i % len(color_cycle)]
+            color = color_cycle[session_i % len(color_cycle)]
             ax1.plot(K1L_values, sigx[:, session_i], "o--", color=color, linewidth=1.0, label=f"{screen} data")
             fit_x = pred_x[:, prediction_i] if prediction_observable == "sigma" else np.sqrt(np.maximum(pred_x[:, prediction_i], 0.0))
             ax1.plot(fit_K1L_values, fit_x, "-", color=color, linewidth=2.0, label=f"{screen} fit")
@@ -699,6 +720,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         unit = self.session.get("sigma_unit", self._get_interface_units())
 
+        ax1.set_title(f"Quadrupole scan: {self.session.get('quad_name', '-')}")
         ax1.set_ylabel(f"sigx [{unit}]")
         ax2.set_ylabel(f"sigy [{unit}]")
         ax2.set_xlabel("K1L [1/m]")
@@ -877,7 +899,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         computing_method = self.computing_method_combo.currentText().strip()
         _, selected_screens = self._get_selection()
-        worker = OptimizationWorker(self.interface, self.session, selected_screens = selected_screens, bounds = bounds, nm_steps = nm_steps, fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()), computing_method=computing_method)
+        worker = OptimizationWorker(self.interface, self.session, selected_screens = selected_screens, bounds = bounds, nm_steps = nm_steps,
+            fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()),
+            fit_quad_offset = bool(self.fit_quad_offset_checkbox.isChecked()),
+            fit_quad_roll = bool(self.fit_quad_roll_checkbox.isChecked()),
+            computing_method=computing_method)
         worker.info.connect(self.log)
 
         worker.moveToThread(thread)
@@ -921,7 +947,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.session["optimization_pred_y"] = pred_y.tolist()
         self._update_fit_panel(result)
         self._plot_fit_overlay(pred_x, pred_y, result, screens = optimization_screens, fit_k1l_values = fit_k1l_values)
-        self.save_emittance_measurement_session(session = self.session, ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()), bounds=self._get_bounds_from_gui())
+        self.save_emittance_measurement_session(session = self.session, ls_steps=int(self.nm_steps_spin.value()), is_fit_quad_strength_checked=bool( self.fit_quadrupole_strength_checkbox.isChecked()), bounds=self._get_bounds_from_gui(), target_dir=getattr(self, "_general_session_dir", None))
         self._set_progress(100)
 
         elapsed = time.perf_counter() - self._optimization_t0
@@ -1265,6 +1291,43 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.phase_spaces.raise_()
         self.phase_spaces.activateWindow()
 
+    def _get_evolution_plot_inputs(self, dialog_title):
+        result = self.session.get("optimization_result") if isinstance(self.session, dict) else None
+        if not isinstance(result, dict):
+            QMessageBox.information(self, dialog_title, "Run the emittance/Twiss optimization first.")
+            return None
+        session_to_plot = self._get_session_for_selected_quad(self.session)
+        if not isinstance(session_to_plot, dict) or not session_to_plot.get("screens"):
+            QMessageBox.information(self, dialog_title, "No scan session with screens available.")
+            return None
+        screens = list(session_to_plot.get("screens", []))
+        screen_positions, position_kind = self._get_element_order_values(screens)
+        return result, session_to_plot, screen_positions, position_kind
+
+    def _show_beta_function_evolution(self):
+        inputs = self._get_evolution_plot_inputs("Beta function evolution")
+        if inputs is None:
+            return
+        result, session_to_plot, screen_positions, position_kind = inputs
+        if self.beta_evolution_window is None:
+            self.beta_evolution_window = BeamEvolution(self, title="Beta function evolution")
+        self.beta_evolution_window.plot_beta_evolution(result, session_to_plot, self.interface, screen_positions=screen_positions, position_kind=position_kind)
+        self.beta_evolution_window.show()
+        self.beta_evolution_window.raise_()
+        self.beta_evolution_window.activateWindow()
+
+    def _show_emittance_evolution(self):
+        inputs = self._get_evolution_plot_inputs("Emittance evolution")
+        if inputs is None:
+            return
+        result, session_to_plot, screen_positions, position_kind = inputs
+        if self.emittance_evolution_window is None:
+            self.emittance_evolution_window = BeamEvolution(self, title="Emittance evolution")
+        self.emittance_evolution_window.plot_emittance_evolution(result, session_to_plot, self.interface, screen_positions=screen_positions, position_kind=position_kind)
+        self.emittance_evolution_window.show()
+        self.emittance_evolution_window.raise_()
+        self.emittance_evolution_window.activateWindow()
+
     def _show_screen_images(self):
         if self.screen_images is None:
             self.screen_images = DisplayScreenImages(self)
@@ -1296,6 +1359,7 @@ if __name__ == "__main__":
     project_name = I.get_name()
     is_simulation = bool(getattr(I, "is_simulation"))
     bg_shots = 10
+    
     if  is_simulation:
         bg_shots = 0
     print(f"Selected interface: {project_name}")
