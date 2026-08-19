@@ -586,8 +586,8 @@ class SaveOrLoad():
             if "max_vertical_range" in settings:
                 self.max_vertical_current_spinbox.setValue(settings["max_vertical_range"])
 
-    def save_emittance_measurement_session(self, session=None, ls_steps=None, is_fit_quad_strength_checked=None, bounds=None):
-        save_session_dir = getattr(self, "dir_name", None) or self.session_directory.text()
+    def save_emittance_measurement_session(self, session=None, ls_steps=None, is_fit_quad_strength_checked=None, bounds=None, target_dir=None):
+        save_session_dir = target_dir or getattr(self, "dir_name", None) or self.session_directory.text()
         os.makedirs(save_session_dir, exist_ok=True)
         self.session_directory.setText(save_session_dir)
         self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt", saving_name="Save quadrupoles", use_dialog=False, base_dir=save_session_dir)
