@@ -53,9 +53,18 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         self.bg_shots = int(bg_shots)
         self.machine_name = "ATF2"
         self.lattice.align_elements()
-        '''Uncomment lines below to scatter elements in the lattice.'''
-        # self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
-        # self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        '''Uncomment lines below to scatter elements in the lattice.
+            L.scatter_elements(type, dX, dY, dZ, roll, pitch, yaw, reference=’entrance’);
+        '''
+        #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center') # done
+        #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0.100, 0, 0, 0, 'center')
+        #self.lattice.scatter_elements('quadrupole', 0.500, 0.500, 0, 0, 0, 0, 'center')
+        #self.lattice.scatter_elements('quadrupole', 0.500, 0.500, 0.500, 0, 0, 0, 'center')
+        #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+
+        for el in self._map_quadrupoles_names_from_lattice("QD18X"):
+            el.set_offsets(0.0003, 0.0005, 0.0004, 0.0, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
+
 
         # ----------------------------
         # Knobs (linear / nonlinear)
@@ -774,54 +783,45 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             sigy[i] = float(screen_data["sigy"][idx])
         return sigx, sigy
 
-    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
         screens = list(screens)
         K1L_values = np.asarray(K1L_values, dtype=float)
-        screens = list(screens)
-        if len(screens) == 0:
-            raise RuntimeError("No screens provided for emittance scan prediction.")
-        if reference_screen is None:
-            reference_screen = screens[0]
-        if reference_screen not in screens:
-            raise RuntimeError("reference_screen must be one of the selected screens.")
-
-        start_element_name = str(quad_name)
+        if reference_screen is None: reference_screen = screens[0]
         end_element_name = str(screens[-1])
-
-        if quad_name not in self.quadrupoles:
-            raise ValueError(f"Quadrupole {quad_name} not found in quadrupoles")
-        if len(screens) == 0:
-            raise ValueError("No screens")
-
         original_quads = self.get_quadrupoles(names=[quad_name])
-        if len(original_quads["bdes"]) == 0:
-            raise RuntimeError(f"Could not find original strength for quad {quad_name}")
         K1L_original = float(original_quads["bdes"][0])
+        quad_elements = self._map_quadrupoles_names_from_lattice(quad_name)
+        if not isinstance(quad_elements, list): quad_elements = [quad_elements]
+        start_element = quad_elements[0]
+
+        override_offsets = quad_dx0 is not None or quad_dy0 is not None or quad_roll is not None
+        new_dx = float(quad_dx0) if quad_dx0 is not None else 0.0
+        new_dy = float(quad_dy0) if quad_dy0 is not None else 0.0
+        new_roll = float(quad_roll) if quad_roll is not None else 0.0
 
         B0_original = self.B0
-        output_x = np.full((len(K1L_values),len(screens)), np.nan, dtype=float)
-        output_y = np.full((len(K1L_values),len(screens)), np.nan, dtype=float)
+        nK1L, nscreens = len(K1L_values), len(screens)
+        sigma_x = np.full((nK1L, nscreens), np.nan, dtype=float)
+        sigma_y = np.full((nK1L, nscreens), np.nan, dtype=float)
+        x_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
+        y_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
+        sigma_xy = np.full((nK1L, nscreens), np.nan, dtype=float)
 
         try:
+            if override_offsets:
+                for element in quad_elements:
+                    element.set_offsets(new_dx, new_dy, 0.0, new_roll, 0.0, 0.0, "center")
+
             for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
                 self.set_quadrupoles([quad_name], [float(K1L)], track=False)
-                start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
-                start_element = start_elements[0]
-                if isinstance(start_element, list):
-                    start_element = start_element[0]
 
                 end_element = self.lattice[end_element_name]
                 if isinstance(end_element, list):
                     end_element = end_element[-1]
 
-                temp_bunch = self._build_bunch_from_guesses(
-                    emit_x=float(emit_x), emit_y=float(emit_y),
-                    beta_x0=float(beta_x0), beta_y0=float(beta_y0),
-                    alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
-                )
-
+                temp_bunch = self._build_bunch_from_guesses(emit_x=float(emit_x), emit_y=float(emit_y), beta_x0=float(beta_x0), beta_y0=float(beta_y0), alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0))
                 lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
                 tracked_to_last_screen = lattice_view.track(temp_bunch)
 
@@ -829,26 +829,94 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                     screen_elem = self.lattice[screen_name]
                     if isinstance(screen_elem, list):
                         screen_elem = screen_elem[-1]
-                    bunch_at_screen = None
-                    try:
-                        bunch_at_screen = screen_elem.get_bunch()
-                    except Exception:
-                        bunch_at_screen = None
+                    bunch_at_screen = screen_elem.get_bunch()
                     if bunch_at_screen is None and str(screen_name) == end_element_name:
                         bunch_at_screen = tracked_to_last_screen
-                    if bunch_at_screen is None:
-                        continue
                     m = bunch_at_screen.get_phase_space('%x %y')
                     if m is not None and len(m) > 0:
-                        output_x[k, si] = float(np.std(m[:, 0]))
-                        output_y[k, si] = float(np.std(m[:, 1]))
+                        xs = m[:, 0]
+                        ys = m[:, 1]
+                        xm = float(np.mean(xs))
+                        ym = float(np.mean(ys))
+                        sigma_x[k, si] = float(np.std(xs))
+                        sigma_y[k, si] = float(np.std(ys))
+                        x_mean[k, si] = xm
+                        y_mean[k, si] = ym
+                        sigma_xy[k, si] = float(np.mean((xs - xm) * (ys - ym)))
 
         finally:
             self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
             self.B0 = B0_original
             self.__track_bunch()
 
-        return output_x, output_y
+        return {
+            "sigma_x": sigma_x, "sigma_y": sigma_y,
+            "x_mean": x_mean, "y_mean": y_mean,
+            "sigma_xy": sigma_xy,
+        }
+
+    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+        full = self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker=stop_checker, reference_screen=reference_screen)
+        return full["sigma_x"], full["sigma_y"]
+
+    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
+        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, stop_checker=stop_checker, reference_screen=reference_screen)
+
+    def get_twiss_evolution(self, quad_name, screens, K1L, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
+        screens = list(screens)
+        end_element_name = str(screens[-1])
+        original_quads = self.get_quadrupoles(names=[quad_name])
+
+        K1L_original = float(original_quads["bdes"][0])
+
+        B0_original = self.B0
+        evolution = []
+        try:
+            self.set_quadrupoles([quad_name], [float(K1L)], track=False)
+            start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
+            start_element = start_elements[0]
+            if isinstance(start_element, list):
+                start_element = start_element[0]
+            end_element = self.lattice[end_element_name]
+            if isinstance(end_element, list):
+                end_element = end_element[-1]
+
+            temp_bunch = self._build_bunch_from_guesses(
+                emit_x=float(emit_x), emit_y=float(emit_y),
+                beta_x0=float(beta_x0), beta_y0=float(beta_y0),
+                alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
+            )
+
+            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+            tracked_to_last_screen = lattice_view.track(temp_bunch)
+
+            for screen_name in screens:
+                screen_elem = self.lattice[screen_name]
+                if isinstance(screen_elem, list):
+                    screen_elem = screen_elem[-1]
+                bunch_at_screen = None
+                try:
+                    bunch_at_screen = screen_elem.get_bunch()
+                except Exception:
+                    bunch_at_screen = None
+                if bunch_at_screen is None and str(screen_name) == end_element_name:
+                    bunch_at_screen = tracked_to_last_screen
+                if bunch_at_screen is None:
+                    evolution.append({"screen": str(screen_name), "beta_x": np.nan, "alpha_x": np.nan, "emit_x": np.nan,
+                                       "beta_y": np.nan, "alpha_y": np.nan, "emit_y": np.nan})
+                    continue
+                info = bunch_at_screen.get_info()
+                evolution.append({
+                    "screen": str(screen_name),
+                    "beta_x": float(info.beta_x), "alpha_x": float(info.alpha_x), "emit_x": float(info.emitt_x),
+                    "beta_y": float(info.beta_y), "alpha_y": float(info.alpha_y), "emit_y": float(info.emitt_y),
+                })
+        finally:
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
+            self.B0 = B0_original
+            self.__track_bunch()
+
+        return evolution
 
     def get_twiss_at_screen(self, name): # for printing emittance after bba using rft interface, can be deleted later
         if name not in self.screens:

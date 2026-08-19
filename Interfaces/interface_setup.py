@@ -126,6 +126,7 @@ INTERFACE_SETUP = {
 
 
         },
+
         {
             "display_name": "ATF2 Linac",
             "module": "Interfaces.ATF2.InterfaceATF2_Linac",
