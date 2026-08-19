@@ -181,12 +181,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.machine_name = "CLEAR"
         self.lattice.align_elements()
         '''Uncomment lines below to scatter elements in the lattice.'''
-        # self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
-        # self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
-
         T.emitt_x = 12.7000 # mm.mrad normalised emittance
         T.emitt_y = 4.3400   # mm.mrad
         T.beta_x = 46.1766 # m
@@ -590,6 +589,69 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             self.__track_bunch()
 
         return output_x, output_y
+
+    def get_twiss_evolution(self, quad_name, screens, K1L, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
+        screens = list(screens)
+        if len(screens) == 0:
+            raise RuntimeError("No screens provided for twiss evolution.")
+        if quad_name not in self.quadrupoles:
+            raise ValueError(f"Quadrupole {quad_name} not found in quadrupoles")
+
+        start_element_name = str(quad_name)
+        end_element_name = str(screens[-1])
+
+        original_quads = self.get_quadrupoles(names=[quad_name])
+        if len(original_quads["bdes"]) == 0:
+            raise RuntimeError(f"Could not find original strength for quad {quad_name}")
+        K1L_original = float(original_quads["bdes"][0])
+
+        B0_original = self.B0
+        evolution = []
+        try:
+            self.set_quadrupoles([quad_name], [float(K1L)], track=False)
+            start_element = self.lattice[start_element_name]
+            if isinstance(start_element, list):
+                start_element = start_element[0]
+            end_element = self.lattice[end_element_name]
+            if isinstance(end_element, list):
+                end_element = end_element[-1]
+
+            temp_bunch = self._build_bunch_from_guesses(
+                emit_x=float(emit_x), emit_y=float(emit_y),
+                beta_x0=float(beta_x0), beta_y0=float(beta_y0),
+                alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
+            )
+
+            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+            tracked_to_last_screen = lattice_view.track(temp_bunch)
+
+            for screen_name in screens:
+                screen_elem = self.lattice[screen_name]
+                if isinstance(screen_elem, list):
+                    screen_elem = screen_elem[-1]
+                bunch_at_screen = None
+                try:
+                    bunch_at_screen = screen_elem.get_bunch()
+                except Exception:
+                    bunch_at_screen = None
+                if bunch_at_screen is None and str(screen_name) == end_element_name:
+                    bunch_at_screen = tracked_to_last_screen
+                if bunch_at_screen is None:
+                    evolution.append({"screen": str(screen_name), "beta_x": np.nan, "alpha_x": np.nan, "emit_x": np.nan,
+                                       "beta_y": np.nan, "alpha_y": np.nan, "emit_y": np.nan})
+                    continue
+                info = bunch_at_screen.get_info()
+                evolution.append({
+                    "screen": str(screen_name),
+                    "beta_x": float(info.beta_x), "alpha_x": float(info.alpha_x), "emit_x": float(info.emitt_x),
+                    "beta_y": float(info.beta_y), "alpha_y": float(info.alpha_y), "emit_y": float(info.emitt_y),
+                })
+        finally:
+            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
+            self.B0 = B0_original
+            self.__track_bunch()
+
+        return evolution
 
     def get_phase_space_transport_to_screens(self, reference_screen=None, screens=None):
         if screens is None:
