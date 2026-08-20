@@ -63,7 +63,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
 
         for el in self._map_quadrupoles_names_from_lattice("QD18X"):
-            el.set_offsets(0.0003, 0.0005, 0.0004, 0.0, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
+                            # dx   # dy   #dz  # roll  # pitch # yaw
+            el.set_offsets(0.0003, 0.0005, 0, 0.0004, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
 
 
         # ----------------------------
@@ -451,26 +452,13 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             m = s.get_bunch().get_phase_space('%x %y')
-            if m is None or len(m) == 0:  # empty bunch
-                xb_list.append(np.nan)
-                yb_list.append(np.nan)
-                sigx_list.append(np.nan)
-                sigy_list.append(np.nan)
-                sigxy_list.append(np.nan)
-                tilt_list.append(np.nan)
-                sum_list.append(0)
-                images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0, hpixel]))
-                vedges_all.append(np.array([0, vpixel]))
-                continue
-
             sumw = len(m[:, 0])  # number of particles in the screen; intensity
-            x_mean = float(np.mean(m[:,0]))
-            y_mean = float(np.mean(m[:,1]))
-            x_centered = m[:,0] - x_mean
+            x_mean = float(np.mean(m[:,0])) # beam x centroid, mean position of particles
+            y_mean = float(np.mean(m[:,1])) # beam y centroid
+            x_centered = m[:,0] - x_mean # particles positions with respect to centroid
             y_centered = m[:,1] - y_mean
 
-            sigx = float(np.std(m[:, 0])) # RMS x beam size
+            sigx = float(np.std(m[:, 0])) # RMS x beam size, it tells us how much the particles are distributed around the centroid
             sigy = float(np.std(m[:, 1])) # RMS y beam size
             sigxy = float(np.mean(x_centered * y_centered))
             tilt = float(0.5 * np.arctan2(2.0 * sigxy, sigx ** 2 - sigy ** 2))  # ellipse angle
@@ -842,7 +830,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                         sigma_y[k, si] = float(np.std(ys))
                         x_mean[k, si] = xm
                         y_mean[k, si] = ym
-                        sigma_xy[k, si] = float(np.mean((xs - xm) * (ys - ym)))
+                        sigma_xy[k, si] = float(np.mean((xs - xm) * (ys - ym))) # covariance
 
         finally:
             self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
@@ -861,62 +849,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
     def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
         return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, stop_checker=stop_checker, reference_screen=reference_screen)
-
-    def get_twiss_evolution(self, quad_name, screens, K1L, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
-        screens = list(screens)
-        end_element_name = str(screens[-1])
-        original_quads = self.get_quadrupoles(names=[quad_name])
-
-        K1L_original = float(original_quads["bdes"][0])
-
-        B0_original = self.B0
-        evolution = []
-        try:
-            self.set_quadrupoles([quad_name], [float(K1L)], track=False)
-            start_elements = self._map_quadrupoles_names_from_lattice(quad_name)
-            start_element = start_elements[0]
-            if isinstance(start_element, list):
-                start_element = start_element[0]
-            end_element = self.lattice[end_element_name]
-            if isinstance(end_element, list):
-                end_element = end_element[-1]
-
-            temp_bunch = self._build_bunch_from_guesses(
-                emit_x=float(emit_x), emit_y=float(emit_y),
-                beta_x0=float(beta_x0), beta_y0=float(beta_y0),
-                alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
-            )
-
-            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
-            tracked_to_last_screen = lattice_view.track(temp_bunch)
-
-            for screen_name in screens:
-                screen_elem = self.lattice[screen_name]
-                if isinstance(screen_elem, list):
-                    screen_elem = screen_elem[-1]
-                bunch_at_screen = None
-                try:
-                    bunch_at_screen = screen_elem.get_bunch()
-                except Exception:
-                    bunch_at_screen = None
-                if bunch_at_screen is None and str(screen_name) == end_element_name:
-                    bunch_at_screen = tracked_to_last_screen
-                if bunch_at_screen is None:
-                    evolution.append({"screen": str(screen_name), "beta_x": np.nan, "alpha_x": np.nan, "emit_x": np.nan,
-                                       "beta_y": np.nan, "alpha_y": np.nan, "emit_y": np.nan})
-                    continue
-                info = bunch_at_screen.get_info()
-                evolution.append({
-                    "screen": str(screen_name),
-                    "beta_x": float(info.beta_x), "alpha_x": float(info.alpha_x), "emit_x": float(info.emitt_x),
-                    "beta_y": float(info.beta_y), "alpha_y": float(info.alpha_y), "emit_y": float(info.emitt_y),
-                })
-        finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
-            self.B0 = B0_original
-            self.__track_bunch()
-
-        return evolution
 
     def get_twiss_at_screen(self, name): # for printing emittance after bba using rft interface, can be deleted later
         if name not in self.screens:

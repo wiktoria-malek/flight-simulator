@@ -60,7 +60,6 @@ class Optimization:
             return {
                 "param_errors": np.full(n_default, np.nan, dtype=float),
                 "cov": None,
-                "reduced_chi2": np.nan,
                 "chi2": np.nan,
             }
 
@@ -72,19 +71,15 @@ class Optimization:
             return {
                 "param_errors": np.full(n_default, np.nan),
                 "cov": None,
-                "reduced_chi2": np.nan,
                 "chi2": np.nan,
             }
 
-        ndata = len(r) # number of measurements
         npar = len(p) # number of parameters
-        dof = max(ndata - npar, 1) # degrees of freedom
 
         """
         Sum of the residuals:
         """
         chi2 = float(np.sum(r ** 2)) # the smaller, the better the model, the bigger, the worse
-        reduced_chi2 = chi2 / dof # average error per 1 measurement
 
         try:
             """
@@ -101,14 +96,8 @@ class Optimization:
             NOTE: r is already weighted by the per-point measurement uncertainty (u_x, u_y are the
             absolute standard errors of the mean sigma, see _fit_6d), so J is the Jacobian of
             *weighted* residuals. That is the "absolute_sigma=True" case (see scipy.optimize.curve_fit
-            docs): the parameter covariance is pinv(J.T @ J) directly, with NO extra reduced_chi2
-            rescaling. Multiplying by reduced_chi2 (the "absolute_sigma=False" convention, meant for
-            when sigma_i are only relative weights of unknown overall scale) double-counts the
-            uncertainty: whenever the model happens to fit the data almost perfectly - e.g. because an
-            unmodelled systematic bias such as a BPM/quad misalignment gets silently absorbed into
-            beta0/alpha0/emit rather than showing up as residual - reduced_chi2 collapses towards 0 and
-            was dragging every reported error down to a misleading ~0.000 with it, even though the
-            reconstructed values were visibly biased.
+            docs): the parameter covariance is pinv(J.T @ J) directly, without any additional
+            goodness-of-fit rescaling.
             """
             cov = np.linalg.pinv(J.T @ J) # if you invert it, it becomes the opposite. Narrow region -> small cov matrix -> small errors; Wide region -> big cov matrix -> big errors;
             param_errors = np.sqrt(np.maximum(np.diag(cov), 0.0))
@@ -121,7 +110,6 @@ class Optimization:
         return {
             "param_errors": param_errors,
             "cov": cov,
-            "reduced_chi2": reduced_chi2,
             "chi2": chi2,
         }
 
@@ -133,12 +121,7 @@ class Optimization:
         screens = list(session.get("screens", []))
         quad_name = session.get("quad_name")
         K1L_values = np.asarray(session.get("K1L_values", []), dtype=float)
-
-        try:
-            quad_k1l_0_readback = np.asarray(session.get("K1L_0", K1L_values[len(K1L_values)//2] if K1L_values.size else np.nan))
-        except Exception:
-            quad_k1l_0_readback = np.nan
-
+        quad_k1l_0_readback = np.asarray(session.get("K1L_0", K1L_values[len(K1L_values)//2] if K1L_values.size else np.nan))
         sigx = np.asarray(session.get("sigx_mean", []), dtype=float)
         sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
         sigx_shots = np.asarray(session.get("sigx_shots", []), dtype=float)
@@ -218,11 +201,9 @@ class Optimization:
         emit_y_geom = fit_y["emit"]
 
         err_dict = {}
-        reduced_chi2 = np.nan
         chi2 = np.nan
         if isinstance(joint_fit, dict):
             err_dict = dict(joint_fit.get("param_errors") or {})
-            reduced_chi2 = float(joint_fit.get("reduced_chi2", np.nan))
             chi2 = float(joint_fit.get("chi2", np.nan))
 
         emit_x_norm_err = float(err_dict.get("emit_x_norm", np.nan))
@@ -257,20 +238,19 @@ class Optimization:
             "fit_x_cost": fit_x["cost"],
             "fit_y_cost": fit_y["cost"],
             "fit_quadrupole_strength": bool(self.fit_quadrupole_strength),
+            "fit_quad_offset": bool(self.fit_quad_offset),
+            "fit_quad_roll": bool(self.fit_quad_roll),
             "quad_k1l_0": (
                 float(joint_fit.get("quad_k1l_0", np.nan))
                 if bool(self.fit_quadrupole_strength) and isinstance(joint_fit, dict)
                 else quad_k1l_0_readback
             ),
-            "quad_k1l_0_is_fitted": bool(self.fit_quadrupole_strength),
             "quad_dx0": (float(joint_fit.get("quad_dx0", np.nan)) * 1e3 if bool(self.fit_quad_offset) and isinstance(joint_fit, dict) else np.nan),  # mm
             "quad_dy0": (float(joint_fit.get("quad_dy0", np.nan)) * 1e3 if bool(self.fit_quad_offset) and isinstance(joint_fit, dict) else np.nan),  # mm
             "quad_dx0_err": quad_dx0_err,
             "quad_dy0_err": quad_dy0_err,
-            "quad_offset_is_fitted": bool(self.fit_quad_offset),
             "quad_roll": (float(joint_fit.get("quad_roll", np.nan)) * 1e3 if bool(self.fit_quad_roll) and isinstance(joint_fit, dict) else np.nan),  # mrad
             "quad_roll_err": quad_roll_err,
-            "quad_roll_is_fitted": bool(self.fit_quad_roll),
             "emit_x_norm_err": emit_x_norm_err,
             "emit_y_norm_err": emit_y_norm_err,
             "emit_x_geom_err": emit_x_geom_err,
@@ -280,9 +260,7 @@ class Optimization:
             "beta_y0_err": beta_y0_err,
             "alpha_y0_err": alpha_y0_err,
             "quad_k1l_0_err": quad_k1l_0_err,
-            "fit_reduced_chi2": reduced_chi2,
             "fit_chi2": chi2,
-            "prediction_observable": "sigma",
         }
 
         output = {
@@ -571,7 +549,7 @@ class Optimization:
             margin = 0.03 * (high_bounds - low_bounds)
             return np.clip(point, low_bounds + margin, high_bounds - margin)
 
-        ls_starts = [_move_away_from_bounds_edges(x0)]
+        x0_try = _move_away_from_bounds_edges(x0)
         ls_best_cost = [float(best_cost)]
         ls_best_params = [x0.copy()]
         ls_stopped = [False]
@@ -605,81 +583,63 @@ class Optimization:
 
             ls_eval[0] += 1
             self._emit_progress("Least squares", min(ls_eval[0], self.nm_steps), self.nm_steps)
-            print(f" LS {ls_eval[0]}: best_f={ls_best_cost[0]:.4g}, " + ", ".join(f"{k}={v:.6g}" for k, v in params.items()))
+            print(f"Least squares {ls_eval[0]}: best_f={ls_best_cost[0]:.4g}, " + ", ".join(f"{k}={v:.6g}" for k, v in params.items()))
 
             return residuals
 
         best_res_ls = None
         best_res_ls_cost = np.inf
-        stagnant_starts = 0
         stagnation_patience = 25
         min_improvement_of_cost = 1e-3
         good_fit_final_cost = 5e-11
+        best_cost_in_this_fit = [np.inf]
+        steps_without_improvement = [0]
+        reason_to_stop = [None]
+
+        def exit_ls_if_no_improvement_or_reached_goal(intermediate_result):
+            current_cost = 2.0 * float(intermediate_result.cost)
+            if not np.isfinite(current_cost):
+                return
+            if current_cost <= good_fit_final_cost:
+                reason_to_stop[0] = "target cost reached"
+                raise StopIteration
+            if not np.isfinite(best_cost_in_this_fit[0]):
+                best_cost_in_this_fit[0] = current_cost
+                return
+            if current_cost < best_cost_in_this_fit[0]:
+                relative_improvement = ((best_cost_in_this_fit[0] - current_cost) / max(abs(best_cost_in_this_fit[0]), 1e-12))
+                best_cost_in_this_fit[0] = current_cost
+                if relative_improvement >= min_improvement_of_cost:
+                    steps_without_improvement[0] = 0
+                else:
+                    steps_without_improvement[0] += 1
+            else:
+                steps_without_improvement[0] += 1
+
+            if steps_without_improvement[0] >= stagnation_patience:
+                reason_to_stop[0] = "no meaningful improvement"
+                raise StopIteration
 
         try:
-            for start_idx, x0_try in enumerate(ls_starts):
-                print(f"Starting LS multi-start {start_idx + 1}/{len(ls_starts)} from {x0_try}")
-                best_cost_in_this_start = [np.inf]
-                steps_without_improvement = [0]
-                reason_to_stop = [None]
+            res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=self.nm_steps, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
+            p_try = np.asarray(res_try.x, dtype=float)
+            f_try, _ = compute_cost(dict(zip(params_order, p_try)), allow_stop=False)
+            if np.isfinite(f_try) and f_try < best_res_ls_cost:
+                best_res_ls_cost = float(f_try)
+                best_res_ls = res_try
+            if np.isfinite(f_try) and f_try < ls_best_cost[0]:
+                ls_best_cost[0] = float(f_try)
+                ls_best_params[0] = p_try.copy()
+            print(
+                f"Least squares fit: cost={float(f_try):.4g}")
+            if reason_to_stop[0] is not None:
+                print(f"Stopping LS: {reason_to_stop[0]}.")
 
-                def exit_ls_if_no_improvement_or_reached_goal(intermediate_result):
-                    current_cost = 2.0 * float(intermediate_result.cost)
-                    if not np.isfinite(current_cost):
-                        return
-                    if current_cost <= good_fit_final_cost:
-                        reason_to_stop[0] = "target cost reached"
-                        raise StopIteration
-                    if not np.isfinite(best_cost_in_this_start[0]):
-                        best_cost_in_this_start[0] = current_cost
-                        return
-                    if current_cost < best_cost_in_this_start[0]:
-                        relative_improvement = (best_cost_in_this_start[0] - current_cost) / max(abs(best_cost_in_this_start[0]), 1e-12)
-                        best_cost_in_this_start[0] = current_cost
-                        if relative_improvement >= min_improvement_of_cost:
-                            steps_without_improvement[0] = 0
-                        else:
-                            steps_without_improvement[0] += 1
-                    else:
-                        steps_without_improvement[0] += 1
-
-                    if steps_without_improvement[0] >= stagnation_patience:
-                        reason_to_stop[0] = "no meaningful improvement"
-                        raise StopIteration
-
-                try:
-                    res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=self.nm_steps, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
-                    p_try = np.asarray(res_try.x, dtype=float)
-                    f_try, _ = compute_cost(dict(zip(params_order, p_try)), allow_stop=False)
-                    if np.isfinite(f_try) and f_try < best_res_ls_cost:
-                        best_res_ls_cost = float(f_try)
-                        best_res_ls = res_try
-                    if np.isfinite(f_try) and f_try < ls_best_cost[0]:
-                        ls_best_cost[0] = float(f_try)
-                        ls_best_params[0] = p_try.copy()
-                    print(
-                        f"  LS start {start_idx + 1}/{len(ls_starts)} finished: "
-                        f"cost={float(f_try):.4g}, success={res_try.success}, "
-                        f"nfev={res_try.nfev}/{self.nm_steps}."
-                    )
-                    if reason_to_stop[0] is not None:
-                        print(f"Stopping LS: {reason_to_stop[0]}.")
-                        break
-
-                except StopIteration:
-                    ls_stopped[0] = True
-                    print("  LS interrupted.")
-                    break
-                except Exception as e:
-                    print(f"  LS start {start_idx + 1}/{len(ls_starts)} failed ({e}).")
-
-            if best_res_ls is not None:
-                print(f"  Best LS multi-start cost={ls_best_cost[0]:.4g}")
-            else:
-                print(f"  No LS start improved BO result; using BO cost={ls_best_cost[0]:.4g}")
-
+        except StopIteration:
+            ls_stopped[0] = True
+            print("  LS interrupted.")
         except Exception as e:
-            print(f"  LS multi-start failed ({e}), using BO result.")
+            print(f"  LS failed ({e}).")
 
         p_final = ls_best_params[0]
         best_cost_final = ls_best_cost[0]
@@ -708,14 +668,13 @@ class Optimization:
             err_dict = {p: float(e) for p, e in zip(params_order, param_errors)}
 
         solution["param_errors"] = err_dict
-        solution["reduced_chi2"] = fit_error["reduced_chi2"]
         solution["chi2"] = fit_error["chi2"]
         solution["param_cov"] = fit_error["cov"]
 
         print(
             f"Fit parameter errors: "
             + ", ".join(f"{k}={v:.4g}" for k, v in err_dict.items())
-            + f", reduced_chi2={fit_error['reduced_chi2']:.4g}"
+            + f", chi2={fit_error['chi2']:.4g}"
         )
 
         return solution

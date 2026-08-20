@@ -123,25 +123,16 @@ class QuadrupoleScan(SaveOrLoad):
 
     def _run_single_scan(self, quad_name, screens, delta_min, delta_max, steps, nshots, reference_screen=None, progress_callback=None):
         screens = list(screens)
-        if len(screens) == 0:
-            raise ValueError("At least one screen is required")
         if reference_screen is None:
             reference_screen = screens[0]
-        if reference_screen not in screens:
-            raise ValueError("reference_screen must be one of the selected screens")
         steps_requested = int(steps)
         if steps_requested > 0 and delta_max <= delta_min:
             raise ValueError("delta_max must be larger than delta_min")
         screens = [reference_screen] + [s for s in screens if s != reference_screen] # so that reference screen is first on the list
 
         quad_names = list(getattr(self.interface, "quadrupoles", []))
-        if not quad_name or quad_name not in quad_names:
-            raise ValueError("Choose a quadrupole from the machine quadrupole list.")
-
         quadrupoles = self.interface.get_quadrupoles([quad_name])
         bdes = np.asarray(quadrupoles.get("bdes", []), dtype=float)
-        if bdes.size != 1 or not np.isfinite(bdes[0]):
-            raise RuntimeError(f"Could not read the initial strength of quadrupole {quad_name}.")
         K1L_0 = float(bdes[0])
 
         if steps_requested > 0 and np.isclose(K1L_0, 0.0):
@@ -159,11 +150,9 @@ class QuadrupoleScan(SaveOrLoad):
         sigx_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigy_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigxy_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
-        #tilt_mean = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigx_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigxy_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
-        #tilt_std = np.full((nsteps_scan, nscreens), np.nan, dtype=float)
         sigx_shots = np.full((nsteps_scan, nscreens, nshots), np.nan, dtype=float)
         sigy_shots = np.full((nsteps_scan, nscreens, nshots), np.nan, dtype=float)
         sigxy_shots = np.full((nsteps_scan, nscreens, nshots), np.nan, dtype=float)

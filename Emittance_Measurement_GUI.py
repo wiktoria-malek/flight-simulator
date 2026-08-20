@@ -543,7 +543,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             return f"{value_text} ± {error_text} {unit}".rstrip()
 
         quad_strength_text = fmt_value(result.get("quad_k1l_0"), " 1/m")
-        if result.get("quad_k1l_0_is_fitted", False) and quad_strength_text != "-":
+        if result.get("fit_quadrupole_strength", False) and quad_strength_text != "-":
             quad_strength_text += " (fit)"
         elif quad_strength_text != "-":
             quad_strength_text += " (nominal)"
@@ -556,9 +556,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_alpha_x0.setText(formatted_result(result.get("alpha_x0"), result.get("alpha_x0_err")))
         self.result_beta_y0.setText(formatted_result(result.get("beta_y0"), result.get("beta_y0_err"), "m"))
         self.result_alpha_y0.setText(formatted_result(result.get("alpha_y0"), result.get("alpha_y0_err")))
-        self.result_quad_dx0.setText(formatted_result(result.get("quad_dx0"), result.get("quad_dx0_err"), "mm") if result.get("quad_offset_is_fitted") else "-")
-        self.result_quad_dy0.setText(formatted_result(result.get("quad_dy0"), result.get("quad_dy0_err"), "mm") if result.get("quad_offset_is_fitted") else "-")
-        self.result_quad_roll.setText(formatted_result(result.get("quad_roll"), result.get("quad_roll_err"), "mrad") if result.get("quad_roll_is_fitted") else "-")
+        self.result_quad_dx0.setText(formatted_result(result.get("quad_dx0"), result.get("quad_dx0_err"), "mm") if result.get("fit_quad_offset") else "-")
+        self.result_quad_dy0.setText(formatted_result(result.get("quad_dy0"), result.get("quad_dy0_err"), "mm") if result.get("fit_quad_offset") else "-")
+        self.result_quad_roll.setText(formatted_result(result.get("quad_roll"), result.get("quad_roll_err"), "mrad") if result.get("fit_quad_roll") else "-")
         self.result_reference_screen.setText(result["screen0"])
 
         print("Errors of the fit:")
@@ -1290,43 +1290,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.phase_spaces.show()
         self.phase_spaces.raise_()
         self.phase_spaces.activateWindow()
-
-    def _get_evolution_plot_inputs(self, dialog_title):
-        result = self.session.get("optimization_result") if isinstance(self.session, dict) else None
-        if not isinstance(result, dict):
-            QMessageBox.information(self, dialog_title, "Run the emittance/Twiss optimization first.")
-            return None
-        session_to_plot = self._get_session_for_selected_quad(self.session)
-        if not isinstance(session_to_plot, dict) or not session_to_plot.get("screens"):
-            QMessageBox.information(self, dialog_title, "No scan session with screens available.")
-            return None
-        screens = list(session_to_plot.get("screens", []))
-        screen_positions, position_kind = self._get_element_order_values(screens)
-        return result, session_to_plot, screen_positions, position_kind
-
-    def _show_beta_function_evolution(self):
-        inputs = self._get_evolution_plot_inputs("Beta function evolution")
-        if inputs is None:
-            return
-        result, session_to_plot, screen_positions, position_kind = inputs
-        if self.beta_evolution_window is None:
-            self.beta_evolution_window = BeamEvolution(self, title="Beta function evolution")
-        self.beta_evolution_window.plot_beta_evolution(result, session_to_plot, self.interface, screen_positions=screen_positions, position_kind=position_kind)
-        self.beta_evolution_window.show()
-        self.beta_evolution_window.raise_()
-        self.beta_evolution_window.activateWindow()
-
-    def _show_emittance_evolution(self):
-        inputs = self._get_evolution_plot_inputs("Emittance evolution")
-        if inputs is None:
-            return
-        result, session_to_plot, screen_positions, position_kind = inputs
-        if self.emittance_evolution_window is None:
-            self.emittance_evolution_window = BeamEvolution(self, title="Emittance evolution")
-        self.emittance_evolution_window.plot_emittance_evolution(result, session_to_plot, self.interface, screen_positions=screen_positions, position_kind=position_kind)
-        self.emittance_evolution_window.show()
-        self.emittance_evolution_window.raise_()
-        self.emittance_evolution_window.activateWindow()
 
     def _show_screen_images(self):
         if self.screen_images is None:

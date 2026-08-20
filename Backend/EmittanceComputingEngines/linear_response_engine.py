@@ -70,8 +70,9 @@ class LinearResponseEngine(AbstractComputingEngine):
             "paused": False,
             "stopped": False,
             "fit_quadrupole_strength": False,
+            "fit_quad_offset": False,
+            "fit_quad_roll": False,
             "quad_k1l_0": quad_k1l_0_readback,
-            "quad_k1l_0_is_fitted": False,
             "fit_method": self.name,
             "prediction_observable": "sigma2",
         }
