@@ -3,6 +3,23 @@ from scipy.optimize import least_squares
 import pandas as pd
 from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable
 
+def _finite_diff_jacobian(residual_func, x, low, high, rel_step=np.sqrt(np.finfo(float).eps)):
+    x = np.asarray(x, dtype=float)
+    r0 = np.asarray(residual_func(x), dtype=float)
+    J = np.empty((r0.size, x.size), dtype=float)
+    for i in range(x.size):
+        h = rel_step * max(abs(x[i]), 1.0)
+        x_step = x.copy()
+        if x[i] + h <= high[i]:
+            x_step[i] += h
+            step = h
+        else:
+            x_step[i] -= h
+            step = -h
+        r1 = np.asarray(residual_func(x_step), dtype=float)
+        J[:, i] = (r1 - r0) / step
+    return J, r0
+
 class OptimizationStopped(Exception):
     def __init__(self, message = "Optimization stopped", solution = None):
         super().__init__(message)
@@ -46,35 +63,32 @@ class Optimization:
         self._last_completed_output = None
         self._pause_requested = False
 
-    def _calculate_optimalization_errors(self, ls_result, n_params=None):
+    def _calculate_optimalization_errors(self, J, r, n_params=None):
         """
         Estimates how sure the model is, e.g. if the minimum region is big, then you can change the emittance
         by several percent and the cost will be the same -> not sure what emittance is, and the cost is big.
 
         If the minimum region found is narrow, then if you move the e.g. emittance value by small percent,
         the cost grows by a lot. -> it means that the error is small and value is well estimated.
+
+        J, r must be the Jacobian and residuals evaluated AT the reported best-fit point (p_final),
+        not at whatever point the local optimizer happened to stop at - those can differ (see
+        _finite_diff_jacobian call site in _fit_6d), which previously made the reported error bars
+        inconsistent with the reported parameter values.
         """
         n_default = int(n_params) if n_params is not None else 6
 
-        if ls_result is None:
-            return {
-                "param_errors": np.full(n_default, np.nan, dtype=float),
-                "cov": None,
-                "chi2": np.nan,
-            }
-
         try:
-            J = np.asarray(ls_result.jac, dtype=float) # that's the information about how narrow the minimum region is, it's an array with derivatives
-            r = np.asarray(ls_result.fun, dtype=float) # residual sigma predicted - sigma meas
-            p = np.asarray(ls_result.x, dtype=float) # best set of parameters that least squares have found
-        except AttributeError:
+            J = np.asarray(J, dtype=float) # that's the information about how narrow the minimum region is, it's an array with derivatives
+            r = np.asarray(r, dtype=float) # residual sigma predicted - sigma meas
+        except Exception:
             return {
                 "param_errors": np.full(n_default, np.nan),
                 "cov": None,
                 "chi2": np.nan,
             }
 
-        npar = len(p) # number of parameters
+        npar = J.shape[1] if J.ndim == 2 else n_default
 
         """
         Sum of the residuals:
@@ -99,7 +113,7 @@ class Optimization:
             docs): the parameter covariance is pinv(J.T @ J) directly, without any additional
             goodness-of-fit rescaling.
             """
-            cov = np.linalg.pinv(J.T @ J) # if you invert it, it becomes the opposite. Narrow region -> small cov matrix -> small errors; Wide region -> big cov matrix -> big errors;
+            cov = np.linalg.pinv(J.T @ J, rcond = 0.001) # if you invert it, it becomes the opposite. Narrow region -> small cov matrix -> small errors; Wide region -> big cov matrix -> big errors;
             param_errors = np.sqrt(np.maximum(np.diag(cov), 0.0))
             print("Covariance matrix:")
             print(cov)
@@ -562,19 +576,21 @@ class Optimization:
         n_sigxy = max(int(np.count_nonzero(valid_sigxy)), 1) if self.fit_quad_roll else 0
         n_residuals_total = n_x + n_y + n_dx + n_dy + n_sigxy
 
+        def _raw_residuals(p_c):
+            params = dict(zip(params_order, np.asarray(p_c, dtype=float)))
+            pred = predict_from_params(params, allow_stop=False)
+            return np.concatenate([block.ravel() for block in _residual_blocks(pred)])
+
         def _ls_residuals(z):
             if self._stop_requested or self._pause_requested:
                 ls_stopped[0] = True
                 raise StopIteration("Local least-squares stop requested")
 
             p_c = np.asarray(z, dtype=float)
-            params = dict(zip(params_order, p_c))
             try:
-                pred = predict_from_params(params, allow_stop=False)
+                residuals = _raw_residuals(p_c)
             except Exception:
                 return np.full(n_residuals_total, 1e3, dtype=float)
-
-            residuals = np.concatenate([block.ravel() for block in _residual_blocks(pred)])
 
             f = float(np.sum(residuals ** 2))
             if np.isfinite(f) and f < ls_best_cost[0]:
@@ -583,12 +599,11 @@ class Optimization:
 
             ls_eval[0] += 1
             self._emit_progress("Least squares", min(ls_eval[0], self.nm_steps), self.nm_steps)
+            params = dict(zip(params_order, p_c))
             print(f"Least squares {ls_eval[0]}: best_f={ls_best_cost[0]:.4g}, " + ", ".join(f"{k}={v:.6g}" for k, v in params.items()))
 
             return residuals
 
-        best_res_ls = None
-        best_res_ls_cost = np.inf
         stagnation_patience = 25
         min_improvement_of_cost = 1e-3
         good_fit_final_cost = 5e-11
@@ -624,9 +639,6 @@ class Optimization:
             res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=self.nm_steps, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
             p_try = np.asarray(res_try.x, dtype=float)
             f_try, _ = compute_cost(dict(zip(params_order, p_try)), allow_stop=False)
-            if np.isfinite(f_try) and f_try < best_res_ls_cost:
-                best_res_ls_cost = float(f_try)
-                best_res_ls = res_try
             if np.isfinite(f_try) and f_try < ls_best_cost[0]:
                 ls_best_cost[0] = float(f_try)
                 ls_best_params[0] = p_try.copy()
@@ -660,7 +672,12 @@ class Optimization:
         pred_final = predict_from_params(best_row[params_order].to_dict(), allow_stop=True)
 
         solution = self._build_joint_partial_output(screens=screens, sigma_x=sig_x, sigma_y=sig_y, pred_x=pred_final["sigma_x"], pred_y=pred_final["sigma_y"], best_row=best_row, best_cost=best_cost_final)
-        fit_error = self._calculate_optimalization_errors(best_res_ls, n_params=len(params_order))
+        try:
+            J_at_p_final, r_at_p_final = _finite_diff_jacobian(_raw_residuals, p_final, low_bounds, high_bounds)
+            fit_error = self._calculate_optimalization_errors(J_at_p_final, r_at_p_final, n_params=len(params_order))
+        except Exception as e:
+            print(f"Couldn't calculate optimalization error: {e}.")
+            fit_error = {"param_errors": np.full(len(params_order), np.nan), "cov": None, "chi2": np.nan}
         param_errors = fit_error["param_errors"]
         if param_errors is None or len(param_errors) != len(params_order):
             err_dict = {p: np.nan for p in params_order}

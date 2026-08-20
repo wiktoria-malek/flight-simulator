@@ -142,7 +142,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         lattice = get_lattice(start, end, self.Pref, quad_currents)
         return lattice, element_descriptions, start, end
 
-    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
+    def __init__(self, population=300 * rft.pC, jitter=0.01, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 2.0
         self.Pref = 198 # MeV/c
         self.Q=-1
@@ -181,8 +181,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.machine_name = "CLEAR"
         self.lattice.align_elements()
         '''Uncomment lines below to scatter elements in the lattice.'''
-        self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
-        self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+            # dx   # dy   #dz  # roll  # pitch # yaw
+        self.lattice["CA.QFD520"].set_offsets(0.0003, 0.0005, 0, 0.0004, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
+
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
@@ -243,9 +246,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.P0 = rft.Bunch6d_QR(rft.electronmass, population,  1, self.Pref, T, self.nparticles, self.sigmaCut)
 
     def get_screens(self, names=None):
-        if isinstance(names, str):
-            names = [names]
-
+        if isinstance(names, str): names = [names]
         hpixel = 0.001
         vpixel = 0.001
         selected_screens = [screen for screen in self.screens if names is None or screen in names]
@@ -255,6 +256,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         yb_list = []
         sigx_list = []
         sigy_list = []
+        sigxy_list = []
         sum_list = []
         images = []
         hedges_all = []
@@ -265,41 +267,22 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         for screen_name in selected_screens:
             screen = self.screen_elements[screen_name]
             screen_names.append(screen_name)
-
             elem = self.element_descriptions.get(screen_name, {})
             s_list.append(elem.get("s_start", np.nan))
-
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
-
             bunch = screen.get_bunch()
-            if bunch is None:
-                xb_list.append(np.nan)
-                yb_list.append(np.nan)
-                sigx_list.append(np.nan)
-                sigy_list.append(np.nan)
-                sum_list.append(0.0)
-                images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0.0, hpixel]))
-                vedges_all.append(np.array([0.0, vpixel]))
-                continue
-
             m = bunch.get_phase_space('%x %y')
-            if m is None or len(m) == 0:
-                xb_list.append(np.nan)
-                yb_list.append(np.nan)
-                sigx_list.append(np.nan)
-                sigy_list.append(np.nan)
-                sum_list.append(0.0)
-                images.append(np.zeros((1, 1)))
-                hedges_all.append(np.array([0.0, hpixel]))
-                vedges_all.append(np.array([0.0, vpixel]))
-                continue
+            x_mean = float(np.mean(m[:, 0]))
+            y_mean = float(np.mean(m[:, 1]))
+            x_centered = m[:, 0] - x_mean # deviation from center of the beam; if the beam centroid changes, this will stay the same
+            y_centered = m[:, 1] - y_mean # it has information about the tilt of ellipse
 
             xb_list.append(float(np.mean(m[:, 0])))
             yb_list.append(float(np.mean(m[:, 1])))
             sigx_list.append(float(np.std(m[:, 0])))
             sigy_list.append(float(np.std(m[:, 1])))
+            sigxy_list.append(float(np.mean(x_centered * y_centered)))
             sum_list.append(float(len(m[:, 0])))
 
             nx = int(np.ceil(np.ptp(m[:, 0]) / hpixel)) if np.ptp(m[:, 0]) > 0 else 1
@@ -312,7 +295,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             hedges_all.append(hedges)
             vedges_all.append(vedges)
 
-        return {
+        screens = {
             "names": screen_names,
             "hpixel": np.array(hpixel_list, dtype=float),
             "vpixel": np.array(vpixel_list, dtype=float),
@@ -320,12 +303,15 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             "y": np.array(yb_list, dtype=float),
             "sigx": np.array(sigx_list, dtype=float),
             "sigy": np.array(sigy_list, dtype=float),
+            "sigxy": np.array(sigxy_list, dtype=float),
             "sum": np.array(sum_list, dtype=float),
             "hedges": hedges_all,
             "vedges": vedges_all,
             "images": images,
             "S": np.array(s_list, dtype=float),
         }
+
+        return screens
 
     def __track_bunch(self):
         I0 = self.B0.get_info()
@@ -521,19 +507,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         screens = list(screens)
         K1L_values = np.asarray(K1L_values, dtype=float)
         screens = list(screens)
-        if len(screens) == 0:
-            raise RuntimeError("No screens provided for emittance scan prediction.")
         if reference_screen is None:
             reference_screen = screens[0]
-
         start_element_name = str(quad_name)
         end_element_name = str(screens[-1])
-
-        if quad_name not in self.quadrupoles:
-            raise ValueError(f"Quadrupole {quad_name} not found in quadrupoles")
-        if len(screens) == 0:
-            raise ValueError("No screens")
-
         original_quads = self.get_quadrupoles(names=[quad_name])
         if len(original_quads["bdes"]) == 0:
             raise RuntimeError(f"Could not find original strength for quad {quad_name}")
@@ -590,68 +567,82 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return output_x, output_y
 
-    def get_twiss_evolution(self, quad_name, screens, K1L, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
+    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
         screens = list(screens)
-        if len(screens) == 0:
-            raise RuntimeError("No screens provided for twiss evolution.")
-        if quad_name not in self.quadrupoles:
-            raise ValueError(f"Quadrupole {quad_name} not found in quadrupoles")
-
-        start_element_name = str(quad_name)
+        K1L_values = np.asarray(K1L_values, dtype=float)
+        if reference_screen is None: reference_screen = screens[0]
         end_element_name = str(screens[-1])
-
-        original_quads = self.get_quadrupoles(names=[quad_name])
-        if len(original_quads["bdes"]) == 0:
-            raise RuntimeError(f"Could not find original strength for quad {quad_name}")
-        K1L_original = float(original_quads["bdes"][0])
-
+        start_element_name = str(quad_name)
         B0_original = self.B0
-        evolution = []
+        lattice_reference = self.lattice
+        self.lattice = lattice_reference.clone()
+        start_element = self.lattice[start_element_name]
+        if isinstance(start_element, list):
+            start_element = start_element[0]
+        override_offsets = any(value is not None for value in (quad_dx0, quad_dy0, quad_roll))
+        dx = 0.0 if quad_dx0 is None else float(quad_dx0)
+        dy = 0.0 if quad_dy0 is None else float(quad_dy0)
+        roll = 0.0 if quad_roll is None else float(quad_roll)
+        nK1L, nscreens = len(K1L_values), len(screens)
+        sigma_x = np.full((nK1L, nscreens), np.nan, dtype=float)
+        sigma_y = np.full((nK1L, nscreens), np.nan, dtype=float)
+        x_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
+        y_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
+        sigma_xy = np.full((nK1L, nscreens), np.nan, dtype=float)
+
         try:
-            self.set_quadrupoles([quad_name], [float(K1L)], track=False)
-            start_element = self.lattice[start_element_name]
-            if isinstance(start_element, list):
-                start_element = start_element[0]
-            end_element = self.lattice[end_element_name]
-            if isinstance(end_element, list):
-                end_element = end_element[-1]
+            if override_offsets:
+                start_element.set_offsets(dx, dy, 0.0, roll, 0.0, 0.0, "center")
+            for k,K1L in enumerate(K1L_values):
+                if callable(stop_checker) and stop_checker():
+                    raise RuntimeError("__OPTIMIZATION_STOP__")
+                self.set_quadrupoles([quad_name], [float(K1L)], track=False)
 
-            temp_bunch = self._build_bunch_from_guesses(
-                emit_x=float(emit_x), emit_y=float(emit_y),
-                beta_x0=float(beta_x0), beta_y0=float(beta_y0),
-                alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0),
-            )
+                end_element = self.lattice[end_element_name]
+                if isinstance(end_element, list):
+                    end_element = end_element[-1]
 
-            lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
-            tracked_to_last_screen = lattice_view.track(temp_bunch)
+                temp_bunch = self._build_bunch_from_guesses(emit_x=float(emit_x), emit_y=float(emit_y), beta_x0=float(beta_x0), beta_y0=float(beta_y0), alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0))
+                lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
+                tracked_to_last_screen = lattice_view.track(temp_bunch)
 
-            for screen_name in screens:
-                screen_elem = self.lattice[screen_name]
-                if isinstance(screen_elem, list):
-                    screen_elem = screen_elem[-1]
-                bunch_at_screen = None
-                try:
+                for si, screen_name in enumerate(screens):
+                    screen_elem = self.lattice[screen_name]
+                    if isinstance(screen_elem, list):
+                        screen_elem = screen_elem[-1]
                     bunch_at_screen = screen_elem.get_bunch()
-                except Exception:
-                    bunch_at_screen = None
-                if bunch_at_screen is None and str(screen_name) == end_element_name:
-                    bunch_at_screen = tracked_to_last_screen
-                if bunch_at_screen is None:
-                    evolution.append({"screen": str(screen_name), "beta_x": np.nan, "alpha_x": np.nan, "emit_x": np.nan,
-                                       "beta_y": np.nan, "alpha_y": np.nan, "emit_y": np.nan})
-                    continue
-                info = bunch_at_screen.get_info()
-                evolution.append({
-                    "screen": str(screen_name),
-                    "beta_x": float(info.beta_x), "alpha_x": float(info.alpha_x), "emit_x": float(info.emitt_x),
-                    "beta_y": float(info.beta_y), "alpha_y": float(info.alpha_y), "emit_y": float(info.emitt_y),
-                })
+                    if bunch_at_screen is None and str(screen_name) == end_element_name:
+                        bunch_at_screen = tracked_to_last_screen
+                    m = bunch_at_screen.get_phase_space('%x %y')
+                    if m is not None and len(m) > 0:
+                        xs = m[:, 0]
+                        ys = m[:, 1]
+                        xm = float(np.mean(xs))
+                        ym = float(np.mean(ys))
+                        sigma_x[k, si] = float(np.std(xs))
+                        sigma_y[k, si] = float(np.std(ys))
+                        x_mean[k, si] = xm
+                        y_mean[k, si] = ym
+                        sigma_xy[k, si] = float(np.mean((xs - xm) * (ys - ym))) # covariance
+
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
+            self.lattice = lattice_reference
             self.B0 = B0_original
             self.__track_bunch()
 
-        return evolution
+        return {
+            "sigma_x": sigma_x, "sigma_y": sigma_y,
+            "x_mean": x_mean, "y_mean": y_mean,
+            "sigma_xy": sigma_xy,
+        }
+
+    def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
+        full = self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker=stop_checker, reference_screen=reference_screen)
+        return full["sigma_x"], full["sigma_y"]
+
+    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
+        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, stop_checker=stop_checker, reference_screen=reference_screen)
+
 
     def get_phase_space_transport_to_screens(self, reference_screen=None, screens=None):
         if screens is None:

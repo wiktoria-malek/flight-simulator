@@ -27,10 +27,11 @@ class QuadrupoleScan(SaveOrLoad):
     def _new_scan_session_dir(self, quad_names, is_quad_scan):
         time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         root_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
+        interface_name = self.interface.get_name()
         if is_quad_scan and quad_names:
-            name = f"Quadrupole_scan_{'-'.join(quad_names)}_{time_str}"
+            name = f"Quadrupole_scan_{interface_name}_{'-'.join(quad_names)}_{time_str}"
         else:
-            name = f"EM_{self.interface.get_name()}{time_str}_session_settings"
+            name = f"EM_{interface_name}{time_str}_session_settings"
         session_dir = os.path.join(root_dir, name)
         os.makedirs(session_dir, exist_ok=True)
         return session_dir

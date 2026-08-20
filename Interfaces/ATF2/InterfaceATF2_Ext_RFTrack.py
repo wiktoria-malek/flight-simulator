@@ -539,51 +539,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         return quadrupoles
 
-    def apply_qmag_xyroll(self, names, x_um, y_um, roll_m, wait=True, max_attempts=5, attempt_timeout=30.0, settle_dt=0.5, tol_um=15.0):
-        if isinstance(names, str):
-            names = [names]
-
-        nmag = len(names)
-
-        def _expand(values):
-            if np.isscalar(values):
-                return np.full(nmag, float(values), dtype=float)
-            arr = np.asarray(values, dtype=float).reshape(-1)
-            if arr.size != nmag:
-                raise ValueError(f"Length mismatch in apply_qmag_xyroll: expected {nmag}, got {arr.size}")
-            return arr
-
-        xs = _expand(x_um)
-        ys = _expand(y_um)
-        rolls = _expand(roll_m)
-
-        for name, x_target, y_target, roll_target in zip(names, xs, ys, rolls):
-            if name not in self.quadrupoles:
-                raise ValueError(f"Quadrupole {name} not found in RFTrack interface.")
-
-            elements = self._map_quadrupoles_names_from_lattice(name)
-            if not isinstance(elements, list):
-                elements = [elements]
-
-            x_offset = float(x_target) * 1e-6
-            y_offset = float(y_target) * 1e-6
-            roll_rad = float(roll_target)
-            roll_mrad = roll_rad * 1e3
-
-            for element in elements:
-                element.set_offsets(x_offset, y_offset, 0.0, roll_mrad, 0.0, 0.0, "center")
-
-            self.qmag_xdes[name] = float(x_target)
-            self.qmag_ydes[name] = float(y_target)
-            self.qmag_rolldes[name] = float(roll_target)
-
-            print(
-                f"Simulated mover {name}: "
-                f"x={float(x_target):.3f} um, y={float(y_target):.3f} um, roll={float(roll_target):.6g} rad"
-            )
-
-        self.__track_bunch()
-
     def set_quadrupoles(self, names, values_range, track=True):
         if isinstance(names, str):
             names = [names]
@@ -758,7 +713,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
         return bunch
 
-    def _read_tracked_bunch_screen_screensigmas(self, screens):
+    def _read_tracked_bunch_screen_sigmas(self, screens):
         screen_data = self.get_screens(names = screens)
         name_to_index = {name: i for i, name in enumerate(screen_data["names"])}
         sigx = np.full(len(screens), np.nan, dtype=float)
@@ -776,18 +731,22 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         K1L_values = np.asarray(K1L_values, dtype=float)
         if reference_screen is None: reference_screen = screens[0]
         end_element_name = str(screens[-1])
-        original_quads = self.get_quadrupoles(names=[quad_name])
-        K1L_original = float(original_quads["bdes"][0])
+        B0_original = self.B0
+        lattice_reference = self.lattice
+        self.lattice = lattice_reference.clone()
+
+        # Each least-squares trial must modify an isolated lattice.  In this
+        # RF-Track binding get_offsets() returns a Frame, not a six-number
+        # vector, so never try to index or reconstruct it here.
         quad_elements = self._map_quadrupoles_names_from_lattice(quad_name)
-        if not isinstance(quad_elements, list): quad_elements = [quad_elements]
+        if not isinstance(quad_elements, list):
+            quad_elements = [quad_elements]
         start_element = quad_elements[0]
 
-        override_offsets = quad_dx0 is not None or quad_dy0 is not None or quad_roll is not None
-        new_dx = float(quad_dx0) if quad_dx0 is not None else 0.0
-        new_dy = float(quad_dy0) if quad_dy0 is not None else 0.0
-        new_roll = float(quad_roll) if quad_roll is not None else 0.0
-
-        B0_original = self.B0
+        override_offsets = any(value is not None for value in (quad_dx0, quad_dy0, quad_roll))
+        dx = 0.0 if quad_dx0 is None else float(quad_dx0)
+        dy = 0.0 if quad_dy0 is None else float(quad_dy0)
+        roll = 0.0 if quad_roll is None else float(quad_roll)
         nK1L, nscreens = len(K1L_values), len(screens)
         sigma_x = np.full((nK1L, nscreens), np.nan, dtype=float)
         sigma_y = np.full((nK1L, nscreens), np.nan, dtype=float)
@@ -798,8 +757,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         try:
             if override_offsets:
                 for element in quad_elements:
-                    element.set_offsets(new_dx, new_dy, 0.0, new_roll, 0.0, 0.0, "center")
-
+                    element.set_offsets(dx, dy, 0.0, roll, 0.0, 0.0, "center")
             for k,K1L in enumerate(K1L_values):
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("__OPTIMIZATION_STOP__")
@@ -833,7 +791,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                         sigma_xy[k, si] = float(np.mean((xs - xm) * (ys - ym))) # covariance
 
         finally:
-            self.set_quadrupoles([quad_name], [float(K1L_original)], track=False)
+            self.lattice = lattice_reference
             self.B0 = B0_original
             self.__track_bunch()
 
@@ -1088,6 +1046,51 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
     '''
     SATO-SAN'S METHODS:
     '''
+
+    def apply_qmag_xyroll(self, names, x_um, y_um, roll_m, wait=True, max_attempts=5, attempt_timeout=30.0, settle_dt=0.5, tol_um=15.0):
+        if isinstance(names, str):
+            names = [names]
+
+        nmag = len(names)
+
+        def _expand(values):
+            if np.isscalar(values):
+                return np.full(nmag, float(values), dtype=float)
+            arr = np.asarray(values, dtype=float).reshape(-1)
+            if arr.size != nmag:
+                raise ValueError(f"Length mismatch in apply_qmag_xyroll: expected {nmag}, got {arr.size}")
+            return arr
+
+        xs = _expand(x_um)
+        ys = _expand(y_um)
+        rolls = _expand(roll_m)
+
+        for name, x_target, y_target, roll_target in zip(names, xs, ys, rolls):
+            if name not in self.quadrupoles:
+                raise ValueError(f"Quadrupole {name} not found in RFTrack interface.")
+
+            elements = self._map_quadrupoles_names_from_lattice(name)
+            if not isinstance(elements, list):
+                elements = [elements]
+
+            x_offset = float(x_target) * 1e-6
+            y_offset = float(y_target) * 1e-6
+            roll_rad = float(roll_target)
+            roll_mrad = roll_rad * 1e3
+
+            for element in elements:
+                element.set_offsets(x_offset, y_offset, 0.0, roll_mrad, 0.0, 0.0, "center")
+
+            self.qmag_xdes[name] = float(x_target)
+            self.qmag_ydes[name] = float(y_target)
+            self.qmag_rolldes[name] = float(roll_target)
+
+            print(
+                f"Simulated mover {name}: "
+                f"x={float(x_target):.3f} um, y={float(y_target):.3f} um, roll={float(roll_target):.6g} rad"
+            )
+
+        self.__track_bunch()
 
     # ----------------------------
     # Knobs (linear / nonlinear)

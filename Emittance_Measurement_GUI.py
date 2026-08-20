@@ -255,7 +255,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             self.download_quads_button.setEnabled(True)
             self.download_quads_button.clicked.connect(self._download_all_quads_status)
 
-
     def _download_all_quads_status(self):
         try:
             output_file_name = os.path.join(self.dir_name, "quadrupoles_status.npz")
