@@ -56,15 +56,15 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         '''Uncomment lines below to scatter elements in the lattice.
             L.scatter_elements(type, dX, dY, dZ, roll, pitch, yaw, reference=’entrance’);
         '''
-        #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center') # done
+        #self.lattice.scatter_elements('quadrupole', 0, 0, 0, 0.100, 0, 0, 'center')
         #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0.100, 0, 0, 0, 'center')
         #self.lattice.scatter_elements('quadrupole', 0.500, 0.500, 0, 0, 0, 0, 'center')
         #self.lattice.scatter_elements('quadrupole', 0.500, 0.500, 0.500, 0, 0, 0, 'center')
         #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
 
-        for el in self._map_quadrupoles_names_from_lattice("QD18X"):
-                            # dx   # dy   #dz  # roll  # pitch # yaw
-            el.set_offsets(0.0003, 0.0005, 0, 0.0004, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
+        # for el in self._map_quadrupoles_names_from_lattice("QD18X"):
+        #                     # dx   # dy   #dz  # roll  # pitch # yaw
+        #     el.set_offsets(0.0003, 0.0005, 0, 0.0004, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
 
 
         # ----------------------------

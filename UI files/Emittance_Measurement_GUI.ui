@@ -915,6 +915,29 @@ QToolButton#bounds_info_button:hover {
         </widget>
        </item>
        <item>
+        <widget class="QGroupBox" name="bounds_quad_group">
+         <property name="title"><string>Quadrupole fit parameters</string></property>
+         <layout class="QGridLayout" name="boundsQuadGrid">
+          <property name="horizontalSpacing"><number>10</number></property>
+          <property name="verticalSpacing"><number>6</number></property>
+          <item row="0" column="1"><widget class="QLabel" name="label_bounds_quad_min"><property name="text"><string>Min</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+          <item row="0" column="2"><widget class="QLabel" name="label_bounds_quad_max"><property name="text"><string>Max</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+          <item row="1" column="0"><widget class="QLabel" name="label_bound_quad_k1l_0_title"><property name="text"><string>K1L₀ [1/m]</string></property></widget></item>
+          <item row="1" column="1"><widget class="QDoubleSpinBox" name="bound_quad_k1l_0_min"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property></widget></item>
+          <item row="1" column="2"><widget class="QDoubleSpinBox" name="bound_quad_k1l_0_max"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="label_bound_quad_dx0_title"><property name="text"><string>quad Δx [mm]</string></property></widget></item>
+          <item row="2" column="1"><widget class="QDoubleSpinBox" name="bound_quad_dx0_min"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property><property name="value"><double>-2.000000000000000</double></property></widget></item>
+          <item row="2" column="2"><widget class="QDoubleSpinBox" name="bound_quad_dx0_max"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property><property name="value"><double>2.000000000000000</double></property></widget></item>
+          <item row="3" column="0"><widget class="QLabel" name="label_bound_quad_dy0_title"><property name="text"><string>quad Δy [mm]</string></property></widget></item>
+          <item row="3" column="1"><widget class="QDoubleSpinBox" name="bound_quad_dy0_min"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property><property name="value"><double>-2.000000000000000</double></property></widget></item>
+          <item row="3" column="2"><widget class="QDoubleSpinBox" name="bound_quad_dy0_max"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property><property name="value"><double>2.000000000000000</double></property></widget></item>
+          <item row="4" column="0"><widget class="QLabel" name="label_bound_quad_roll_title"><property name="text"><string>quad roll [mrad]</string></property></widget></item>
+          <item row="4" column="1"><widget class="QDoubleSpinBox" name="bound_quad_roll_min"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property><property name="value"><double>-50.000000000000000</double></property></widget></item>
+          <item row="4" column="2"><widget class="QDoubleSpinBox" name="bound_quad_roll_max"><property name="decimals"><number>5</number></property><property name="minimum"><double>-100000.000000000000000</double></property><property name="maximum"><double>100000.000000000000000</double></property><property name="singleStep"><double>0.001000000000000</double></property><property name="value"><double>50.000000000000000</double></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
         <widget class="QGroupBox" name="localOptimizationSettingsGroup">
          <property name="styleSheet">
           <string notr="true">QGroupBox#localOptimizationSettingsGroup {
@@ -931,7 +954,7 @@ QGroupBox#localOptimizationSettingsGroup::title {
 }</string>
          </property>
          <property name="title">
-          <string>Local optimization settings</string>
+          <string>Additional fit parameters</string>
          </property>
          <layout class="QGridLayout" name="gridLocalOptimizationSettings">
           <property name="horizontalSpacing">
@@ -940,20 +963,7 @@ QGroupBox#localOptimizationSettingsGroup::title {
           <property name="verticalSpacing">
            <number>6</number>
           </property>
-          <item row="0" column="1">
-           <widget class="QSpinBox" name="nm_steps_spin">
-            <property name="minimum">
-             <number>0</number>
-            </property>
-            <property name="maximum">
-             <number>5000</number>
-            </property>
-            <property name="value">
-             <number>200</number>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
+          <item row="0" column="0">
            <layout class="QHBoxLayout" name="fitK1ScaleLabelHBox">
             <item>
              <widget class="QCheckBox" name="fit_quadrupole_strength_checkbox">
@@ -1016,43 +1026,7 @@ QToolButton#fit_k1_scale_info_button:hover {
             </item>
            </layout>
           </item>
-          <item row="0" column="0">
-           <layout class="QHBoxLayout" name="horizontalLayout_6">
-            <item>
-             <widget class="QLabel" name="label_nm_steps">
-              <property name="text">
-               <string>Least squares steps</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QToolButton" name="ls_steps_tooltip">
-              <property name="toolTip">
-               <string>Maximum number of local least-squares iterations performed after Bayesian optimization.</string>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">QToolButton#ls_steps_tooltip {
-    border: 1px solid #888;
-    border-radius: 11px;
-    min-width: 22px;
-    max-width: 22px;
-    min-height: 22px;
-    max-height: 22px;
-    padding: 0px;
-    font-weight: bold;
-}
-QToolButton#ls_steps_tooltip:hover {
-    background-color: #e6e6e6;
-}</string>
-              </property>
-              <property name="text">
-               <string>?</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item row="2" column="0" colspan="2">
+          <item row="1" column="0" colspan="2">
            <layout class="QHBoxLayout" name="fitMisalignmentHBox">
             <item>
              <widget class="QCheckBox" name="fit_quad_offset_checkbox">
@@ -1068,6 +1042,46 @@ QToolButton#ls_steps_tooltip:hover {
              </widget>
             </item>
             <item>
+             <widget class="QToolButton" name="fit_quad_offset_info_button">
+              <property name="minimumSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="cursor">
+               <cursorShape>PointingHandCursor</cursorShape>
+              </property>
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fits the horizontal and vertical displacement of the scanned quadrupole relative to the beamline (Δx and Δy).&lt;/p&gt;&lt;p&gt;It uses how the beam centroid on each screen changes with K1L. Enable it only when those centroid measurements are reliable.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QToolButton#fit_quad_offset_info_button {
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#fit_quad_offset_info_button:hover {
+    background-color: #e6e6e6;
+}</string>
+              </property>
+              <property name="text">
+               <string>?</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QCheckBox" name="fit_quad_roll_checkbox">
               <property name="toolTip">
                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fit the scanned quadrupole's roll (quad_roll) together with emittance and Twiss parameters, from the x-y coupling (sigma_xy) on each screen vs K1L.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1077,6 +1091,46 @@ QToolButton#ls_steps_tooltip:hover {
               </property>
               <property name="checked">
                <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="fit_quad_roll_info_button">
+              <property name="minimumSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>24</width>
+                <height>24</height>
+               </size>
+              </property>
+              <property name="cursor">
+               <cursorShape>PointingHandCursor</cursorShape>
+              </property>
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Fits a rotation of the scanned quadrupole around the beam axis.&lt;/p&gt;&lt;p&gt;A rolled quadrupole couples the horizontal and vertical planes; the fit uses the measured x-y covariance (σxy) as K1L changes.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QToolButton#fit_quad_roll_info_button {
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#fit_quad_roll_info_button:hover {
+    background-color: #e6e6e6;
+}</string>
+              </property>
+              <property name="text">
+               <string>?</string>
               </property>
              </widget>
             </item>
@@ -1612,29 +1666,36 @@ QGroupBox#fit_results_group::title {
                        </property>
                       </widget>
                      </item>
-                     <item row="5" column="0">
-                      <widget class="QLabel" name="label_quad_roll_title">
-                       <property name="font">
-                        <font>
-                         <pointsize>13</pointsize>
-                        </font>
-                       </property>
-                       <property name="text">
-                        <string>quad roll</string>
-                       </property>
-                      </widget>
-                     </item>
-                     <item row="5" column="1">
-                      <widget class="QLabel" name="result_quad_roll">
-                       <property name="text">
-                        <string>-</string>
-                       </property>
-                      </widget>
-                     </item>
                     </layout>
                    </widget>
                   </item>
                  </layout>
+                </item>
+                <item>
+                 <widget class="QGroupBox" name="fit_results_coupling_group">
+                  <property name="title">
+                   <string>Coupling</string>
+                  </property>
+                  <layout class="QGridLayout" name="fitResultsCouplingGrid">
+                   <property name="horizontalSpacing">
+                    <number>10</number>
+                   </property>
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="label_quad_roll_title">
+                     <property name="text">
+                      <string>quad roll [mrad]</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <widget class="QLabel" name="result_quad_roll">
+                     <property name="text">
+                      <string>-</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
                 </item>
                </layout>
               </widget>

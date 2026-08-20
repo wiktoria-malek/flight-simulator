@@ -383,6 +383,9 @@ class QuadrupoleScan(SaveOrLoad):
             "nscreens": len(screens),
         }
 
+        set_default_quad_strength_bounds = getattr(self, "_set_default_quad_strength_bounds_from_session", None)
+        if callable(set_default_quad_strength_bounds):
+            set_default_quad_strength_bounds(session)
         self.save_emittance_measurement_session(session)
         return session
 

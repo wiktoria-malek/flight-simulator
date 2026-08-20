@@ -142,7 +142,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         lattice = get_lattice(start, end, self.Pref, quad_currents)
         return lattice, element_descriptions, start, end
 
-    def __init__(self, population=300 * rft.pC, jitter=0.01, bpm_resolution=0.0, nsamples=1, nparticles=10000):
+    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 2.0
         self.Pref = 198 # MeV/c
         self.Q=-1
@@ -183,12 +183,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         '''Uncomment lines below to scatter elements in the lattice.'''
         #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
         #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
-            # dx   # dy   #dz  # roll  # pitch # yaw
-        # qfd520_elements = list(self.lattice["CA.QFD0520"])
-        #
-        # for el in qfd520_elements:
-        #     el.set_offsets(0.0003, 0.0005, 0, 0.0004, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
-        #
+
+        qfd520 = self.lattice["CA.QFD0520"]
+                            # dx   # dy   #dz  # roll  # pitch # yaw
+        qfd520.set_offsets(0.0, 0.0, 0.0, 0, 0.0, 0.0, "center")
+
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
@@ -199,8 +198,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.alpha_x = 1.3126
         T.alpha_y = 7.2462
 
-        T.sigma_t = 0#10*rft.ps #or 37*rft.ps # mm/c
-        T.sigma_pt = 0 # permille
+        T.sigma_t = 0#10*rft.ps # mm/c
+        T.sigma_pt = 0#10 # permille
         T.mean_xp = 0.0
         T.mean_yp = 0.0
         sigmaCut = 2.0
@@ -222,8 +221,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.alpha_x = 1.314308
         T.alpha_y = 7.248155
 
-        T.sigma_t = 10*rft.ps #or 37*rft.ps # mm/c
-        T.sigma_pt = 10 # permille
+        T.sigma_t = 0#10*rft.ps # mm/c
+        T.sigma_pt = 0#10 # permille
         T.mean_xp=0.0
         T.mean_yp=0.0
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q , Pref, T, self.nparticles, self.sigmaCut)
@@ -241,8 +240,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.alpha_x = 1.314308
         T.alpha_y = 7.248155
 
-        T.sigma_t = 10*rft.ps #or 37*rft.ps # mm/c
-        T.sigma_pt = 10 # permille
+        T.sigma_t = 0#10*rft.ps # mm/c
+        T.sigma_pt = 0#10 # permille
         T.mean_xp=0.0
         T.mean_yp=0.0
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
@@ -484,8 +483,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.beta_y = float(beta_y0)
         T.alpha_x = float(alpha_x0)
         T.alpha_y = float(alpha_y0)
-        T.sigma_t = 10 * rft.ps
-        T.sigma_pt = 10
+        T.sigma_t = 0#10*rft.ps # mm/c
+        T.sigma_pt = 0#10 # permille
         T.mean_xp = 0.0
         T.mean_yp = 0.0
         return rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)

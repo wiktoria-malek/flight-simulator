@@ -3,12 +3,18 @@ from scipy.optimize import least_squares
 import pandas as pd
 from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable
 
-def _finite_diff_jacobian(residual_func, x, low, high, rel_step=np.sqrt(np.finfo(float).eps)):
+def _finite_diff_jacobian(residual_func, x, low, high, param_scale=None, rel_step=1e-4):
     x = np.asarray(x, dtype=float)
+    if param_scale is None:
+        scale = np.maximum(np.abs(x), 1.0)
+    else:
+        scale = np.asarray(param_scale, dtype=float)
+        fallback_scale = np.maximum(np.abs(x), 1.0)
+        scale = np.where(np.isfinite(scale) & (scale > 0), scale, fallback_scale)
     r0 = np.asarray(residual_func(x), dtype=float)
     J = np.empty((r0.size, x.size), dtype=float)
     for i in range(x.size):
-        h = rel_step * max(abs(x[i]), 1.0)
+        h = rel_step * scale[i]
         x_step = x.copy()
         if x[i] + h <= high[i]:
             x_step[i] += h
@@ -31,14 +37,13 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization:
-    def __init__(self, interface, nm_steps=100, fit_quadrupole_strength=False, fit_quad_offset=False, fit_quad_roll=False, progress_callback=None):
+    def __init__(self, interface, fit_quadrupole_strength=False, fit_quad_offset=False, fit_quad_roll=False, progress_callback=None):
         self.progress_callback = progress_callback
         self.interface = interface
         self._stop_requested = False
         self._pause_requested = False
         self.best_out_so_far = None
         self._last_completed_output = None
-        self.nm_steps = int(nm_steps)
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
         self.fit_quad_offset = bool(fit_quad_offset)
         self.fit_quad_roll = bool(fit_quad_roll)
@@ -63,19 +68,7 @@ class Optimization:
         self._last_completed_output = None
         self._pause_requested = False
 
-    def _calculate_optimalization_errors(self, J, r, n_params=None):
-        """
-        Estimates how sure the model is, e.g. if the minimum region is big, then you can change the emittance
-        by several percent and the cost will be the same -> not sure what emittance is, and the cost is big.
-
-        If the minimum region found is narrow, then if you move the e.g. emittance value by small percent,
-        the cost grows by a lot. -> it means that the error is small and value is well estimated.
-
-        J, r must be the Jacobian and residuals evaluated AT the reported best-fit point (p_final),
-        not at whatever point the local optimizer happened to stop at - those can differ (see
-        _finite_diff_jacobian call site in _fit_6d), which previously made the reported error bars
-        inconsistent with the reported parameter values.
-        """
+    def _calculate_optimalization_errors(self, J, r, n_params=None, param_scale=None):
         n_default = int(n_params) if n_params is not None else 6
 
         try:
@@ -90,30 +83,18 @@ class Optimization:
 
         npar = J.shape[1] if J.ndim == 2 else n_default
 
-        """
-        Sum of the residuals:
-        """
+        if param_scale is None:
+            scale = np.ones(npar, dtype=float)
+        else:
+            scale = np.asarray(param_scale, dtype=float)
+            scale = np.where(np.isfinite(scale) & (scale > 0), scale, 1.0)
+
         chi2 = float(np.sum(r ** 2)) # the smaller, the better the model, the bigger, the worse
 
         try:
-            """
-            Cov = (J.T * J)^(-1)
-            on diagonal line of cov matrix are variances of parameters: => calculating the relative difference to the average value for every measurement, making it squared, then taking the average of those values. For this method is means, taking it from J.
-            e.g. |0.04   0.01  -0.02|   0   0   0               |
-                 |0.01   0.25   0.03|   0   0   0               |  => var(emit_x) = 0.04, var(beta_x) = 0.25, var(alpha_x) = 0.16, other elements indicate coupling
-                 |-0.02  0.03   0.16|   0   0   0               |
-                 |  0     0       0
-                 |   0     0       0     other values, for y plane
-                 |  0     0       0
-                 std of those are the errors, so np.sqrt(emit_x = 0.04) = 0.2 is the estimated error
-
-            NOTE: r is already weighted by the per-point measurement uncertainty (u_x, u_y are the
-            absolute standard errors of the mean sigma, see _fit_6d), so J is the Jacobian of
-            *weighted* residuals. That is the "absolute_sigma=True" case (see scipy.optimize.curve_fit
-            docs): the parameter covariance is pinv(J.T @ J) directly, without any additional
-            goodness-of-fit rescaling.
-            """
-            cov = np.linalg.pinv(J.T @ J, rcond = 0.001) # if you invert it, it becomes the opposite. Narrow region -> small cov matrix -> small errors; Wide region -> big cov matrix -> big errors;
+            J_scaled = J * scale[np.newaxis, :]
+            cov_scaled = np.linalg.pinv(J_scaled.T @ J_scaled) # default rcond; narrow region -> small cov -> small errors, wide region -> big cov -> big errors
+            cov = cov_scaled * np.outer(scale, scale)
             param_errors = np.sqrt(np.maximum(np.diag(cov), 0.0))
             print("Covariance matrix:")
             print(cov)
@@ -346,8 +327,11 @@ class Optimization:
         fallback_u_y = np.maximum(0.08 * np.abs(sig_y), 1e-12)
         u_x = np.where(n_x_sum >= 2, s_sigx / np.sqrt(n_x_sum), fallback_u_x)
         u_y = np.where(n_y_sum >= 2, s_sigy / np.sqrt(n_y_sum), fallback_u_y)
-        u_x = np.where(np.isfinite(u_x) & (u_x > 0), u_x, fallback_u_x)
-        u_y = np.where(np.isfinite(u_y) & (u_y > 0), u_y, fallback_u_y)
+        # u_x > 0 alone would accept float64 round-off noise (~1e-16) from nanstd on
+        # bit-identical shots (a deterministic model) as if it were a real, tiny
+        # measurement uncertainty, instead of falling back to the 8% heuristic.
+        u_x = np.where(np.isfinite(u_x) & (u_x > 1e-9), u_x, fallback_u_x)
+        u_y = np.where(np.isfinite(u_y) & (u_y > 1e-9), u_y, fallback_u_y)
 
         # points usable in statistical chi2
         valid_x = np.isfinite(sig_x) & np.isfinite(u_x) & (u_x > 0) & (n_x_sum >= 1)
@@ -372,7 +356,7 @@ class Optimization:
             dx_meas = np.nanmean(x_shots_arr, axis=2)
             s_dx = np.nanstd(x_shots_arr, axis=2, ddof=1)
             u_dx = np.where(n_dx_sum >= 2, s_dx / np.sqrt(n_dx_sum), fallback_u_dx)
-            u_dx = np.where(np.isfinite(u_dx) & (u_dx > 0), u_dx, fallback_u_dx)
+            u_dx = np.where(np.isfinite(u_dx) & (u_dx > 1e-9), u_dx, fallback_u_dx)
             valid_dx = np.isfinite(dx_meas) & np.isfinite(u_dx) & (u_dx > 0) & (n_dx_sum >= 1)
         else:
             dx_meas = np.full(sig_x.shape, np.nan, dtype=float)
@@ -384,7 +368,7 @@ class Optimization:
             dy_meas = np.nanmean(y_shots_arr, axis=2)
             s_dy = np.nanstd(y_shots_arr, axis=2, ddof=1)
             u_dy = np.where(n_dy_sum >= 2, s_dy / np.sqrt(n_dy_sum), fallback_u_dy)
-            u_dy = np.where(np.isfinite(u_dy) & (u_dy > 0), u_dy, fallback_u_dy)
+            u_dy = np.where(np.isfinite(u_dy) & (u_dy > 1e-9), u_dy, fallback_u_dy)
             valid_dy = np.isfinite(dy_meas) & np.isfinite(u_dy) & (u_dy > 0) & (n_dy_sum >= 1)
         else:
             dy_meas = np.full(sig_x.shape, np.nan, dtype=float)
@@ -396,7 +380,7 @@ class Optimization:
             sigxy_meas = np.nanmean(sigxy_shots_arr, axis=2)
             s_sigxy = np.nanstd(sigxy_shots_arr, axis=2, ddof=1)
             u_sigxy = np.where(n_sigxy_sum >= 2, s_sigxy / np.sqrt(n_sigxy_sum), fallback_u_sigxy)
-            u_sigxy = np.where(np.isfinite(u_sigxy) & (u_sigxy > 0), u_sigxy, fallback_u_sigxy)
+            u_sigxy = np.where(np.isfinite(u_sigxy) & (u_sigxy > 1e-9), u_sigxy, fallback_u_sigxy)
             valid_sigxy = np.isfinite(sigxy_meas) & np.isfinite(u_sigxy) & (u_sigxy > 0) & (n_sigxy_sum >= 1)
         else:
             sigxy_meas = np.full(sig_x.shape, np.nan, dtype=float)
@@ -413,18 +397,6 @@ class Optimization:
         K1L_values = np.asarray(K1L_values, dtype=float)
         K1L_0_readback = float(K1L_values[len(K1L_values)//2])
         deltas_for_fit = K1L_values / K1L_0_readback - 1.0
-
-        if self.fit_quadrupole_strength:
-            low = 0.7 * K1L_0_readback
-            high = 1.3 * K1L_0_readback
-            bounds["quad_k1l_0"] = [min(low,high), max(low,high)]
-
-        if self.fit_quad_offset:
-            bounds.setdefault("quad_dx0", [-2e-3, 2e-3])
-            bounds.setdefault("quad_dy0", [-2e-3, 2e-3])
-
-        if self.fit_quad_roll:
-            bounds.setdefault("quad_roll", [-0.05, 0.05])
 
         params_order = ["emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0"]
         n_core_params = len(params_order)
@@ -547,13 +519,6 @@ class Optimization:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             return solution
         pred = predict_from_params(best_row[params_order].to_dict(), allow_stop=True)
-        run_local_ls = self.nm_steps > 0
-
-        if not run_local_ls:
-            solution = self._build_joint_partial_output(screens=screens, sigma_x=sig_x, sigma_y=sig_y, pred_x=pred["sigma_x"], pred_y=pred["sigma_y"], best_row=best_row, best_cost=best_cost)
-            solution["stopped"] = bool(stopped_during_fit)
-            return solution
-
         print(f"Starting local optimization from f={best_cost:.4g}...")
         x0 = np.array([float(best_row[p]) for p in params_order], dtype=float)
         x0 = np.clip(x0, low_bounds, high_bounds)
@@ -598,7 +563,7 @@ class Optimization:
                 ls_best_params[0] = p_c.copy()
 
             ls_eval[0] += 1
-            self._emit_progress("Least squares", min(ls_eval[0], self.nm_steps), self.nm_steps)
+            self._emit_progress("Least squares", min(ls_eval[0], 200), 200)
             params = dict(zip(params_order, p_c))
             print(f"Least squares {ls_eval[0]}: best_f={ls_best_cost[0]:.4g}, " + ", ".join(f"{k}={v:.6g}" for k, v in params.items()))
 
@@ -636,7 +601,7 @@ class Optimization:
                 raise StopIteration
 
         try:
-            res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=self.nm_steps, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
+            res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=200, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
             p_try = np.asarray(res_try.x, dtype=float)
             f_try, _ = compute_cost(dict(zip(params_order, p_try)), allow_stop=False)
             if np.isfinite(f_try) and f_try < ls_best_cost[0]:
@@ -673,8 +638,9 @@ class Optimization:
 
         solution = self._build_joint_partial_output(screens=screens, sigma_x=sig_x, sigma_y=sig_y, pred_x=pred_final["sigma_x"], pred_y=pred_final["sigma_y"], best_row=best_row, best_cost=best_cost_final)
         try:
-            J_at_p_final, r_at_p_final = _finite_diff_jacobian(_raw_residuals, p_final, low_bounds, high_bounds)
-            fit_error = self._calculate_optimalization_errors(J_at_p_final, r_at_p_final, n_params=len(params_order))
+            param_scale = np.maximum(high_bounds - low_bounds, 1e-12)  # same scale least_squares used as x_scale
+            J_at_p_final, r_at_p_final = _finite_diff_jacobian(_raw_residuals, p_final, low_bounds, high_bounds, param_scale=param_scale)
+            fit_error = self._calculate_optimalization_errors(J_at_p_final, r_at_p_final, n_params=len(params_order), param_scale=param_scale)
         except Exception as e:
             print(f"Couldn't calculate optimalization error: {e}.")
             fit_error = {"param_errors": np.full(len(params_order), np.nan), "cov": None, "chi2": np.nan}

@@ -373,7 +373,6 @@ class SaveOrLoad():
 
         print(f"Nshots: {nshots}, Scan steps: {scan_steps}")
 
-        ls_steps = int(self.nm_steps_spin.value())
         is_fit_quad_strength_checked = bool(self.fit_quadrupole_strength_checkbox.isChecked())
 
         self.emittance_settings = {
@@ -383,7 +382,6 @@ class SaveOrLoad():
             "nshots": nshots,
             "nscreens": nscreens,
             "is_quad_scan": is_quad_scan,
-            "ls_steps": ls_steps,
             "is_fit_quad_strength_checked": is_fit_quad_strength_checked,
             "bounds": self._get_bounds_from_gui(),
             "screens": screens if screens is not None else [],
@@ -448,22 +446,18 @@ class SaveOrLoad():
                 self.steps_settings.setValue(int(self.emittance_settings["scan_steps"]))
             if "nshots" in self.emittance_settings:
                 self.meas_per_step.setValue(int(self.emittance_settings["nshots"]))
-            if "ls_steps" in self.emittance_settings:
-                self.nm_steps_spin.setValue(int(self.emittance_settings["ls_steps"]))
             if "is_fit_quad_strength_checked" in self.emittance_settings:
                 self.fit_quadrupole_strength_checkbox.setChecked(bool(self.emittance_settings["is_fit_quad_strength_checked"]))
             saved_bounds = self.emittance_settings.get("bounds")
             if saved_bounds:
-                for param in self.BOUND_PARAMS:
-                    if param in saved_bounds:
-                        low, high = saved_bounds[param]
-                        getattr(self, f"bound_{param}_min").setValue(float(low))
-                        getattr(self, f"bound_{param}_max").setValue(float(high))
+                self._set_bounds_from_saved_settings(saved_bounds)
             self.session = self._get_session_data_from_database()
 
             if self.session is None:
                 QMessageBox.warning(self,"Load session settings", "Could not reconstruct the scan session from the saved State files.")
                 return
+            if not saved_bounds or "quad_k1l_0" not in saved_bounds:
+                self._set_default_quad_strength_bounds_from_session(self.session)
 
             self._refresh_plot_comboboxes_from_session(self.session)
             self._draw_live_scan(self.session)
@@ -586,7 +580,7 @@ class SaveOrLoad():
             if "max_vertical_range" in settings:
                 self.max_vertical_current_spinbox.setValue(settings["max_vertical_range"])
 
-    def save_emittance_measurement_session(self, session=None, ls_steps=None, is_fit_quad_strength_checked=None, bounds=None, target_dir=None):
+    def save_emittance_measurement_session(self, session=None, is_fit_quad_strength_checked=None, bounds=None, target_dir=None):
         save_session_dir = target_dir or getattr(self, "dir_name", None) or self.session_directory.text()
         os.makedirs(save_session_dir, exist_ok=True)
         self.session_directory.setText(save_session_dir)
@@ -602,6 +596,7 @@ class SaveOrLoad():
                 self.emittance_settings = {}
         else:
             self.emittance_settings = {}
+        self.emittance_settings.pop("ls_steps", None)
 
         if session is not None:
             state_files = []
@@ -625,9 +620,6 @@ class SaveOrLoad():
                 "K1L_values": session.get("K1L_values"),
                 "sigma_unit": session.get("sigma_unit", "mm"),
             })
-
-            if ls_steps is not None:
-                self.emittance_settings["ls_steps"] = int(ls_steps)
 
             if is_fit_quad_strength_checked is not None:
                 self.emittance_settings["is_fit_quad_strength_checked"] = bool(is_fit_quad_strength_checked)
