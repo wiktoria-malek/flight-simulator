@@ -615,14 +615,14 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_reference_screen.setText(result["screen0"])
 
         print("Errors of the fit:")
-        print("Error of emit_x_norm: ", fmt_value(result.get("emit_x_norm_err")))
-        print("Error of emit_y_norm: ", fmt_value(result.get("emit_y_norm_err")))
-        print("Error of emit_x_geom: ", fmt_value(result.get("emit_x_geom_err")))
-        print("Error of emit_y_geom: ", fmt_value(result.get("emit_y_geom_err")))
-        print("Error of beta_x0: ", fmt_value(result.get("beta_x0_err")))
-        print("Error of alpha_x0: ", fmt_value(result.get("alpha_x0_err")))
-        print("Error of beta_y0: ", fmt_value(result.get("beta_y0_err")))
-        print("Error of alpha_y0: ", fmt_value(result.get("alpha_y0_err")))
+        print("Error of emit_x_norm: ", result.get("emit_x_norm_err"))
+        print("Error of emit_y_norm: ", result.get("emit_y_norm_err"))
+        print("Error of emit_x_geom: ", result.get("emit_x_geom_err"))
+        print("Error of emit_y_geom: ", result.get("emit_y_geom_err"))
+        print("Error of beta_x0: ", result.get("beta_x0_err"))
+        print("Error of alpha_x0: ", result.get("alpha_x0_err"))
+        print("Error of beta_y0: ", result.get("beta_y0_err"))
+        print("Error of alpha_y0: ", result.get("alpha_y0_err"))
 
 
     def _reset_canvas(self):

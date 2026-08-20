@@ -24,7 +24,7 @@ def _finite_diff_jacobian(residual_func, x, low, high, param_scale=None, rel_ste
             step = -h
         r1 = np.asarray(residual_func(x_step), dtype=float)
         J[:, i] = (r1 - r0) / step
-    return J, r0
+    return J
 
 class OptimizationStopped(Exception):
     def __init__(self, message = "Optimization stopped", solution = None):
@@ -68,17 +68,15 @@ class Optimization:
         self._last_completed_output = None
         self._pause_requested = False
 
-    def _calculate_optimalization_errors(self, J, r, n_params=None, param_scale=None):
+    def _calculate_optimalization_errors(self, J, n_params=None, param_scale=None):
         n_default = int(n_params) if n_params is not None else 6
 
         try:
             J = np.asarray(J, dtype=float) # that's the information about how narrow the minimum region is, it's an array with derivatives
-            r = np.asarray(r, dtype=float) # residual sigma predicted - sigma meas
         except Exception:
             return {
                 "param_errors": np.full(n_default, np.nan),
                 "cov": None,
-                "chi2": np.nan,
             }
 
         npar = J.shape[1] if J.ndim == 2 else n_default
@@ -88,8 +86,6 @@ class Optimization:
         else:
             scale = np.asarray(param_scale, dtype=float)
             scale = np.where(np.isfinite(scale) & (scale > 0), scale, 1.0)
-
-        chi2 = float(np.sum(r ** 2)) # the smaller, the better the model, the bigger, the worse
 
         try:
             J_scaled = J * scale[np.newaxis, :]
@@ -105,7 +101,6 @@ class Optimization:
         return {
             "param_errors": param_errors,
             "cov": cov,
-            "chi2": chi2,
         }
 
     def fit_from_session(self, session, bounds):
@@ -196,10 +191,8 @@ class Optimization:
         emit_y_geom = fit_y["emit"]
 
         err_dict = {}
-        chi2 = np.nan
         if isinstance(joint_fit, dict):
             err_dict = dict(joint_fit.get("param_errors") or {})
-            chi2 = float(joint_fit.get("chi2", np.nan))
 
         emit_x_norm_err = float(err_dict.get("emit_x_norm", np.nan))
         emit_y_norm_err = float(err_dict.get("emit_y_norm", np.nan))
@@ -255,7 +248,6 @@ class Optimization:
             "beta_y0_err": beta_y0_err,
             "alpha_y0_err": alpha_y0_err,
             "quad_k1l_0_err": quad_k1l_0_err,
-            "fit_chi2": chi2,
         }
 
         output = {
@@ -333,7 +325,7 @@ class Optimization:
         u_x = np.where(np.isfinite(u_x) & (u_x > 1e-9), u_x, fallback_u_x)
         u_y = np.where(np.isfinite(u_y) & (u_y > 1e-9), u_y, fallback_u_y)
 
-        # points usable in statistical chi2
+        # Points usable in the weighted least-squares residual vector.
         valid_x = np.isfinite(sig_x) & np.isfinite(u_x) & (u_x > 0) & (n_x_sum >= 1)
         valid_y = np.isfinite(sig_y) & np.isfinite(u_y) & (u_y > 0) & (n_y_sum >= 1)
 
@@ -473,8 +465,8 @@ class Optimization:
             if np.any(valid_y) and not np.all(np.isfinite(pred["sigma_y"][valid_y])): return 1e12, pred
 
             residuals = np.concatenate([block.ravel() for block in _residual_blocks(pred)])
-            chi2 = float(np.sum(residuals ** 2))
-            return chi2, pred
+            cost = float(np.sum(residuals ** 2))
+            return cost, pred
 
         original_low_bounds = low_bounds.copy()
         original_high_bounds = high_bounds.copy()
@@ -639,11 +631,11 @@ class Optimization:
         solution = self._build_joint_partial_output(screens=screens, sigma_x=sig_x, sigma_y=sig_y, pred_x=pred_final["sigma_x"], pred_y=pred_final["sigma_y"], best_row=best_row, best_cost=best_cost_final)
         try:
             param_scale = np.maximum(high_bounds - low_bounds, 1e-12)  # same scale least_squares used as x_scale
-            J_at_p_final, r_at_p_final = _finite_diff_jacobian(_raw_residuals, p_final, low_bounds, high_bounds, param_scale=param_scale)
-            fit_error = self._calculate_optimalization_errors(J_at_p_final, r_at_p_final, n_params=len(params_order), param_scale=param_scale)
+            J_at_p_final = _finite_diff_jacobian(_raw_residuals, p_final, low_bounds, high_bounds, param_scale=param_scale)
+            fit_error = self._calculate_optimalization_errors(J_at_p_final, n_params=len(params_order), param_scale=param_scale)
         except Exception as e:
             print(f"Couldn't calculate optimalization error: {e}.")
-            fit_error = {"param_errors": np.full(len(params_order), np.nan), "cov": None, "chi2": np.nan}
+            fit_error = {"param_errors": np.full(len(params_order), np.nan), "cov": None}
         param_errors = fit_error["param_errors"]
         if param_errors is None or len(param_errors) != len(params_order):
             err_dict = {p: np.nan for p in params_order}
@@ -651,13 +643,11 @@ class Optimization:
             err_dict = {p: float(e) for p, e in zip(params_order, param_errors)}
 
         solution["param_errors"] = err_dict
-        solution["chi2"] = fit_error["chi2"]
         solution["param_cov"] = fit_error["cov"]
 
         print(
             f"Fit parameter errors: "
             + ", ".join(f"{k}={v:.4g}" for k, v in err_dict.items())
-            + f", chi2={fit_error['chi2']:.4g}"
         )
 
         return solution
