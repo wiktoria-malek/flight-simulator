@@ -184,8 +184,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
         #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
             # dx   # dy   #dz  # roll  # pitch # yaw
-        self.lattice["CA.QFD520"].set_offsets(0.0003, 0.0005, 0, 0.0004, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
-
+        # qfd520_elements = list(self.lattice["CA.QFD0520"])
+        #
+        # for el in qfd520_elements:
+        #     el.set_offsets(0.0003, 0.0005, 0, 0.0004, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
+        #
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
