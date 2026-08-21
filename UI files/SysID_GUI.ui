@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1512</width>
-    <height>810</height>
+    <height>782</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -262,14 +262,7 @@ QGroupBox#bpmsGroup::title {
            <number>2</number>
           </property>
           <item>
-           <widget class="QWidget" name="topRowWidget">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <layout class="QHBoxLayout" name="topRowLayout">
+           <layout class="QHBoxLayout" name="topRowLayout">
             <property name="spacing">
              <number>8</number>
             </property>
@@ -658,6 +651,9 @@ QGroupBox::title {
                    <property name="decimals">
                     <number>5</number>
                    </property>
+                   <property name="maximum">
+                    <double>5000.000000000000000</double>
+                   </property>
                    <property name="singleStep">
                     <double>0.100000000000000</double>
                    </property>
@@ -683,6 +679,9 @@ QGroupBox::title {
                    </property>
                    <property name="decimals">
                     <number>5</number>
+                   </property>
+                   <property name="maximum">
+                    <double>5000.000000000000000</double>
                    </property>
                    <property name="singleStep">
                     <double>0.100000000000000</double>
@@ -754,8 +753,7 @@ QGroupBox::title {
               </property>
              </widget>
             </item>
-            </layout>
-           </widget>
+           </layout>
           </item>
           <item>
            <spacer name="verticalSpacer">
