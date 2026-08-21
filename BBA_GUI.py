@@ -86,7 +86,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.interface = interface
         self.dir_name = dir_name
         self.nominal_state = nominal_state
-        self.start_state = start_state if start_state is not None else interface.get_state(include_screens=False)
+        self.start_state = start_state if start_state is not None else interface.get_state()
         self.restore_state = self.start_state
         self.initial_state = self.start_state
         self.measurement_start_state = None
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
         self._session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_session_settings")
         os.makedirs(self._session_dir, exist_ok=True)
-        machine_state = self.interface.get_state(include_screens=False)
+        machine_state = self.interface.get_state()
         machine_state.save(filename=os.path.join(self._session_dir, "machine_status.pkl"))
         self.session_database_3.setText(self._session_dir)
         return machine_state
@@ -370,11 +370,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._running = True
             self._step = True
             completed = False
-            try:
-                self._start_correction()
-                completed = True
-            finally:
-                self._running = False
+            self._start_correction()
         else:
             self._step = True
 
@@ -407,7 +403,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.wake_fig, self.wake_canvas, self.wake_ax = install(self.plot_widget_5)
 
     def _plot_series(self, ax, canvas, values_x, values_y, vals, title=None, error_x=None, error_y=None,
-                     error_all=None, transmission_values = None):
+                     error_all=None):
         ylabel = f"Residual norm [{self.bpm_unit}]"
         if canvas is None or ax is None:
             return
@@ -440,10 +436,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             err_all = matching_yerr(error_all, vals)
             ax.errorbar(range(len(vals)), vals, yerr=err_all, linestyle="dashed", color='black', label="combined norm",
                         capsize=6, elinewidth=2, capthick=2, markersize=4)
-
-        if transmission_values:
-            ax.plot(range(len(transmission_values)), transmission_values, linestyle="dashed", color="green", marker="o", label="transmission during correction", markersize=4)
-
         if values_x or values_y:
             ax.legend(fontsize=7, loc="upper right")
         if title is not None:
@@ -740,7 +732,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 return result
 
             plt.ion()
-            transmission_values = []
 
             for it in range(iters):
                 if self._cancel:
@@ -750,10 +741,22 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 # nominal
                 print("Measuring orbit")
                 self.log("Measuring orbit")
-                state0 = self.interface.get_state(include_screens=False)
+                state0 = self.interface.get_state()
                 state0 = self._apply_jitter_subtraction_to_state(state0)
                 if it == 0:
                     self.measurement_start_state = state0
+                    screens0 = state0.get_screens()
+                    print("Screen values before correction:")
+                    print(f"Sigx: {screens0['sigx']}")
+                    print(f"Sigy: {screens0['sigy']}")
+                    print("Emittance before correction:")
+                    for screen_name in screens0["names"]:
+                        if hasattr(self.interface, "get_twiss_at_screen"):
+                            tw = self.interface.get_twiss_at_screen(screen_name)
+                            print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
+                            print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
+                        else:
+                            pass
                 O0 = state0.get_orbit(bpms)  # because axis=1 is mean from one whole measurement, not for 1 bpm
                 O0x = np.asarray(O0['x'], dtype=float).reshape(-1, 1)
                 O0y = np.asarray(O0['y'], dtype=float).reshape(-1, 1)
@@ -776,9 +779,17 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 if it==0:
                     B0x = O0x
                     B0y = O0y
-                    initial_transmission = min(O0["tmit"])
 
-                transmission_values.append(min(O0["tmit"]))
+                # if it == 0:
+                #     B0x = np.asarray(B0x, dtype=float).reshape(-1, 1)
+                #     B0y = np.asarray(B0y, dtype=float).reshape(-1, 1)
+                #     print("||O0x - B0x|| =", np.linalg.norm(O0x - B0x))
+                #     print("||O0y - B0y|| =", np.linalg.norm(O0y - B0y))
+                #     self.log(
+                #         f"Initial orbit error from reference: "
+                #         f"x={np.linalg.norm(O0x - B0x):.6g}, "
+                #         f"y={np.linalg.norm(O0y - B0y):.6g}"
+                #     )
 
                 if self.reset_ref_orb == True:
                     B0x = O0x.copy()
@@ -791,11 +802,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     print("Measuring dispersion")
                     self.log("Measuring dispersion")
                     dP_P = self.interface.change_energy()
-                    state1 = self.interface.get_state(include_screens=False)
+                    state1 = self.interface.get_state()
                     state1 = self._apply_jitter_subtraction_to_state(state1)
                     self.interface.reset_energy()
                     O1 = state1.get_orbit(bpms)
-                    #transmission_values.append(min(O1["tmit"]))
                     O1x = np.asarray(O1['x'], dtype=float).reshape(-1, 1)
                     O1y = np.asarray(O1['y'], dtype=float).reshape(-1, 1)
                     bpms1 = state1.get_bpms(bpms)
@@ -814,12 +824,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     print("Measuring wakefield")
                     self.log("Measuring wakefield")
                     self.interface.change_intensity()
-                    state2 = self.interface.get_state(include_screens=False)
+                    state2 = self.interface.get_state()
                     state2 = self._apply_jitter_subtraction_to_state(state2)
                     self.interface.reset_intensity()
                     O2 = state2.get_orbit(bpms)
-                    #transmission_values.append(min(O2["tmit"]))
-                    self.transmission_wfs_value = min(O2["tmit"])
                     O2x = np.asarray(O2['x'], dtype=float).reshape(-1, 1)
                     O2y = np.asarray(O2['y'], dtype=float).reshape(-1, 1)
                     bpms2 = state2.get_bpms(bpms)
@@ -985,7 +993,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 # current_bdes + delta -> clamp(final_bdes) -> set_correctors(final_bdes)
 
                 if w1 > 0:
-                    mean_orbit_x, mean_orbit_y, err_x_orbit, err_y_orbit, mean_orbit_all, err_orbit_all = self._calc_error(x0_vals, y0_vals, ref_x=B0x.ravel(), ref_y=B0y.ravel())  # ravel makes data a vector
+                    mean_orbit_x, mean_orbit_y, err_x_orbit, err_y_orbit, mean_orbit_all, err_orbit_all = self._calc_error(
+                        x0_vals, y0_vals, ref_x=B0x.ravel(), ref_y=B0y.ravel())  # ravel makes data a vector
                     self._hist_orbit_x.append(mean_orbit_x)
                     self._hist_orbit_y.append(mean_orbit_y)
                     self._hist_orbit.append(mean_orbit_all)
@@ -1018,10 +1027,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self._hist_wake_y_err.append(err_wake_y)
                     self._hist_wake_err.append(err_wake_all)
 
-
                 self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,
                                   values_y=self._hist_orbit_y, vals=self._hist_orbit, error_x=self._hist_orbit_x_err,
-                                  error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None, transmission_values = transmission_values)
+                                  error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None)
                 self._plot_series(ax=self.disp_ax, canvas=self.disp_canvas, values_x=self._hist_disp_x,
                                   values_y=self._hist_disp_y, vals=self._hist_disp, error_x=self._hist_disp_x_err,
                                   error_y=self._hist_disp_y_err, error_all=self._hist_disp_err, title=None)
@@ -1033,7 +1041,19 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.setWindowTitle("BBA GUI")
             if not silent:
                 QMessageBox.information(self, "Correction", "Correction finished.")
-            final_state = self.interface.get_state(include_screens=False)
+            final_state = self.interface.get_state()
+            screens_f = final_state.get_screens()
+            print("Screen values after correction:")
+            print(f"Sigx: {screens_f['sigx']}")
+            print(f"Sigy: {screens_f['sigy']}")
+            if hasattr(self.interface, "get_twiss_at_screen"):
+                print("Emittance after correction:")
+                for screen_name in screens_f["names"]:
+                    tw = self.interface.get_twiss_at_screen(screen_name)
+                    print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
+                    print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
+            else:
+                pass
             final_bpms = final_state.get_bpms(bpms)
             final_x_vals = np.asarray(final_bpms["x"], dtype=float)
             final_y_vals = np.asarray(final_bpms["y"], dtype=float)
@@ -1230,7 +1250,7 @@ if __name__ == "__main__":
     I = dialog
     project_name = I.get_name()
     nominal_state = None
-    start_state = I.get_state(include_screens=False)
+    start_state = I.get_state()
 
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")

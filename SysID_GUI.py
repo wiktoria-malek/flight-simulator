@@ -436,7 +436,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.working_directory_input.setEnabled(enabled)
         self.working_directory_dialog.setEnabled(enabled)
 
-
     def _available_actuators(self):
         return self._sort_elements(list(self.interface.get_correctors()['names']), which='corrs')
 
