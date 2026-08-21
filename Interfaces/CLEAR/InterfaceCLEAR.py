@@ -156,7 +156,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         lattice = get_lattice(start, end, self.Pref, quad_currents)
         return lattice, element_descriptions, start, end
 
-    def __init__(self, nsamples=3, bg_shots=10.0 ):
+    def __init__(self, nsamples=1, bg_shots=10.0 ):
         self.screen_backgrounds = {}
         self.chosen_ict = "CA.BCMTHZ/Acquisition#charge"
         self.steps_readback_position = 0.0
