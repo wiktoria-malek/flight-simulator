@@ -32,6 +32,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.Q=-1
         self.twiss_path = os.path.join(os.path.dirname(__file__), 'Setup_files', 'twissinit.tfs')
         self.lattice = rft.Lattice(self.twiss_path)
+        print(self.lattice)
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples

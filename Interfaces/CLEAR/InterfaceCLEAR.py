@@ -12,8 +12,16 @@ from scipy.integrate import trapezoid
 from enum import Enum
 try:
     from Interfaces.CLEAR import config
+    try:
+        from Interfaces.CLEAR import clear_lattice
+    except Exception:
+        clear_lattice = None
 except ImportError:
     import config
+    try:
+        import clear_lattice
+    except Exception:
+        clear_lattice = None
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class BPMsMode(Enum):
@@ -27,6 +35,127 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def get_name(self):
         return 'CLEAR'
 
+    def __build(self, filename):
+        with open(filename) as file:
+            lines = file.readlines()
+        element_descriptions = {}
+        previous_name = None
+        quad_index = 0
+        corr_index = 0
+        for line in lines:
+            if line[0:2] != ' "':
+                continue
+
+            text = re.findall(r'"([A-Za-z0-9.$_]+)"', line)
+            numbers = re.findall(r'\d+\.\d+', line)
+            name = text[0]
+
+            if name == 'CA.BTV0800':
+                continue
+            element_type = None
+            if 'QFD' in name or 'QDD' in name:
+                element_type = 'Quadrupole'
+            elif 'BTV' in name:
+                element_type = 'Screen'
+            elif 'DHG' in name or 'DHJ' in name or 'SDV' in name:
+                element_type = 'Corrector'
+            elif 'BPC' in name or 'BPM' in name:
+                element_type = 'BPM'
+            elif len(text) > 1 and text[1] == 'MARKER':
+                element_type = 'Marker'
+
+            if element_type is None:
+                continue
+
+            s_end = float(numbers[0])
+            L = float(numbers[1])
+            s_start = s_end - L
+
+            L = round(L, 4)
+            s_start = round(s_start, 4)
+            s_end = round(s_end, 4)
+
+            if previous_name is not None:
+                L_drift = round(s_start - element_descriptions[previous_name]['s_end'], 4)
+                if L_drift != 0:
+                    element_descriptions[previous_name + ' Drift'] = {
+                        'element_type': 'Drift',
+                        'L': L_drift,
+                        's_start': element_descriptions[previous_name]['s_end'],
+                        's_end': s_start,
+                        'quad_index': None,
+                        'corr_index': None,
+                    }
+
+            element_descriptions[name] = {
+                'element_type': element_type,
+                'L': L,
+                's_start': s_start,
+                's_end': s_end,
+                'quad_index': quad_index if element_type == 'Quadrupole' else None,
+                'corr_index': corr_index if element_type == 'Corrector' else None,
+            }
+
+            if element_type == 'Quadrupole':
+                quad_index += 1
+            if element_type == 'Corrector':
+                corr_index += 1
+
+            previous_name = name
+
+        def get_lattice(start, end, Pref, quad_currents, include_end=True):
+            start_index = list(element_descriptions.keys()).index(start)
+            end_index = list(element_descriptions.keys()).index(end)
+            if include_end:
+                end_index += 1
+            lattice = rft.Lattice()
+            names = list(element_descriptions.keys())
+            elements = list(element_descriptions.values())
+            for name, element_description in zip(names[start_index:end_index], elements[start_index:end_index]):
+                element_type = element_description['element_type']
+                L = element_description['L']
+                quad_index = element_description['quad_index']
+
+                if element_type == 'Drift':
+                    element = rft.Drift(L)
+                elif element_type == 'Quadrupole':
+                    if 'QFD' in name:
+                        K = self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                    elif 'QDD' in name:
+                        K = - self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                    element = rft.Quadrupole(L, Pref / self.Q, K)
+                elif element_type == 'Corrector':
+                    element = rft.Corrector(L)
+                elif element_type == 'BPM':
+                    element = rft.Bpm(L)
+                elif element_type == 'Screen' or element_type == 'Marker':
+                    element = rft.Screen()
+                else:
+                    continue
+                element.set_name(name)
+                lattice.append(element)
+            return lattice
+        start = 'CA.STLINE$START'
+        end = 'CA.STLINE$END'
+        quad_currents = np.array([
+            0,  # QFD350
+            0,  # QDD355
+            0,  # QFD360
+
+            20,  # QFD510
+            40.96551724137931,  # QDD515
+            20,  # QFD520
+
+            0,  # QFD760
+            0,  # QDD765
+            0,  # QFD770
+
+            0,  # QDD870
+            0  # QFD880
+        ])  # A
+        lattice = get_lattice(start, end, self.Pref, quad_currents)
+        return lattice, element_descriptions, start, end
+
     def __init__(self, nsamples=1, bg_shots=10.0 ):
         self.screen_backgrounds = {}
         self.steps_readback_position = 0.0
@@ -34,7 +163,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.bpm_mode = BPMsMode.integral_threshold
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
-        self.Pref = 200 # MeV/c
+        self.Pref = 198 # MeV/c
         self.machine_name = "CLEAR"
         self.tracking_interface = InterfaceCLEAR_RFTrack()
         self.energy_param = [
@@ -140,7 +269,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.quad_set_params = dict(zip(config.quad_names, config.current_set_params))
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
         self.quad_status_params = dict(zip(config.quad_names, config.current_status_params))
-        self.twiss_path = self.tracking_interface.twiss_path
+        self.twiss_path = None
         self.cam_props = self.CamList() # Load camera configuration from assets/cameras.json
         self.camList = list(self.cam_props.keys())
         self.lattice = self.tracking_interface.lattice
@@ -214,9 +343,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def _get_twiss_s_positions(self, names):
         names = list(names)
 
-        if self.element_descriptions:
+        if clear_lattice is not None and hasattr(clear_lattice, 'element_descriptions'):
             s_pos = {}
-            for elem_name, elem_data in self.element_descriptions.items():
+            for elem_name, elem_data in clear_lattice.element_descriptions.items():
                 if isinstance(elem_data, dict) and 's_center' in elem_data:
                     s_pos[elem_name] = elem_data['s_center']
             return [s_pos.get(name.rstrip('LH'), s_pos.get(name, np.nan)) for name in names]
@@ -435,10 +564,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
                     V, V_idx = find_peak(V_b_samples)
                     # plot_peak([H_b_samples, V_b_samples], [H_idx, V_idx], [H, V], ["H", "V"], BPM, )
 
-                elif mode == BPMsMode.window_sum: # Raw pulse-only sum, as in lookatBPMsignal.ipynb
-                    H = self._bpm_window_sum(H_samples, self.bpm_signal_window)
-                    V = self._bpm_window_sum(V_samples, self.bpm_signal_window)
-
                 elif mode == BPMsMode.integral: # Integration of full BPM signal with baseline correction
                     H = trapezoid(H_b_samples)
                     V = trapezoid(V_b_samples)
@@ -451,14 +576,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
                     # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM, starts=[window_start, window_start], ends=[window_end, window_end], )
 
                 elif mode == BPMsMode.integral_threshold: # Integration between 5% of the peak threshold region with baseline correction
-                    H, H_start, H_end, H_peak_idx = integral_threshold(H_b_samples)
-                    V, V_start, V_end, V_peak_idx = integral_threshold(V_b_samples)
+                    H, H_start, H_end, H_peak_idx = threshold_integral(H_b_samples)
+                    V, V_start, V_end, V_peak_idx = threshold_integral(V_b_samples)
                     # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM, starts=[H_start, V_start], ends=[H_end, V_end], )
 
                 else:
                     raise ValueError(
-                        f"Unknown mode '{mode}'. " "Choose from: 'peak', 'baseline_peak', "
-                        "'window_sum', 'integral', 'integral_window', 'integral_threshold'.")
+                        f"Unknown mode '{mode}'. " "Choose from: 'peak', 'baseline_peak', " "'integral', 'integral_window', 'integral_threshold'.")
 
                 x_sample.append(H)
                 y_sample.append(V)
@@ -786,6 +910,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def current_to_k1l(self, name, current_A, pref_mev_c=None):
         current_A = float(current_A)
         pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
+        if not np.isfinite(current_A) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
+            return np.nan
+
         length = self.tracking_interface.element_descriptions[name]["L"]
         k1 = self.tracking_interface.get_Quad_K_from_I(current_A, length, pref_mev_c)
         return self._quad_sign(name) * k1 * length
@@ -793,6 +920,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def k1l_to_current(self, name, k1l, pref_mev_c=None):
         k1l = float(k1l)
         pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
+        if not np.isfinite(k1l) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
+            raise ValueError(f"Invalid K1L or reference momentum for {name}")
         a = float(self.tracking_interface.get_ITF(0.0))
         b = float(a - self.tracking_interface.get_ITF(1.0))
         target = self._quad_sign(name) * k1l * pref_mev_c / 299.8
