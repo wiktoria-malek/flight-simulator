@@ -68,7 +68,7 @@ def update_amplitude(current_amp, observed, target, max_range):
     return max(float(new_amp), 1e-6)
 
 class Worker(QObject):
-    plot_data = pyqtSignal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, object,str)
+    plot_data = pyqtSignal(np.ndarray, np.ndarray, np.ndarray, np.ndarray, object, str)
     progress=pyqtSignal(int)
     finished = pyqtSignal()
 
@@ -101,7 +101,6 @@ class Worker(QObject):
         I = self.interface
         vkicks = self.vkicks
         hkicks = self.hkicks
-        #tmit_reference = np.asarray(I.get_state().get_orbit(self.bpms)['tmit'], dtype=float)
         pending_steps=0
         for iter in range(self.Niter):
             for corrector in self.correctors:
@@ -202,13 +201,7 @@ class Worker(QObject):
                 Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
                 if measured_this_corr:
-                    # tmit_plus = np.asarray(Op['tmit'])
-                    # tmit_minus = np.asarray(Om['tmit'])
-                    # orbit_for_plot = {
-                    #     'tmit_plus': np.divide(100.0 * tmit_plus, tmit_reference, out=np.full_like(tmit_plus, np.nan, dtype=float), where=np.isfinite(tmit_reference) & (tmit_reference != 0.0)),
-                    #     'tmit_minus': np.divide(100.0 * tmit_minus, tmit_reference, out=np.full_like(tmit_minus, np.nan, dtype=float), where=np.isfinite(tmit_reference) & (tmit_reference != 0.0)),
-                    # }
-                    self.plot_data.emit(orbit_for_plot, Diff_x, Err_x, Diff_y, Err_y, self.bpms, corrector)
+                    self.plot_data.emit(Diff_x, Err_x, Diff_y, Err_y, self.bpms, corrector)
                     self.progress_value=self.progress_value + 1
                     percent = int(self.progress_value / total_steps * 100)
                     self.progress.emit(percent)
@@ -846,8 +839,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         Diff_y=np.asarray(Diff_y).ravel()
         Err_x=np.asarray(Err_x).ravel()
         Err_y=np.asarray(Err_y).ravel()
-        # tmit_plus=np.asarray(tmit_plus).ravel()
-        # tmit_minus=np.asarray(tmit_minus).ravel()
         bpm_names=[str(x) for x in bpm_names]
 
         plot.figure.clear()
@@ -856,12 +847,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         scale=np.arange(n) # np.arange(start,stop,step) -> 0,n,1
         plot.axes.errorbar(scale, Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
         plot.axes.errorbar(scale, Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
-        # tmit_axis = plot.axes.twinx()
-        # tmit_axis.plot(scale[:len(tmit_plus)], tmit_plus[:n], 'g--', label="Transmission +")
-        # tmit_axis.plot(scale[:len(tmit_minus)], tmit_minus[:n], color='limegreen', linestyle=':', label="Transmission -")
-        # tmit_axis.set_ylabel("Transmission", color="green")
-        # tmit_axis.tick_params(axis="y", colors="green")
-        # tmit_axis.legend(loc='upper right')
         device_x = self._device_position_on_bpm_axis(corrector.split(":")[0], bpm_names)
         plot.axes.axvline(device_x, linestyle='--', linewidth=2, color = "purple")
         plot.axes.text(device_x, plot.axes.get_ylim()[1], corrector, rotation=90, va="top", ha="right")
@@ -874,14 +859,12 @@ class MainWindow(QMainWindow, SaveOrLoad):
         plot.draw()
         plot.repaint()
 
-    def __update_plot(self, Op, Diff_x, Err_x, Diff_y, Err_y, bpm_names,corrector):
+    def __update_plot(self, Diff_x, Err_x, Diff_y, Err_y, bpm_names,corrector):
         self._last_plot_data = (
             np.asarray(Diff_x).copy(),
             np.asarray(Err_x).copy(),
             np.asarray(Diff_y).copy(),
             np.asarray(Err_y).copy(),
-            # np.asarray(Op.get("tmit_plus", [])).copy(),
-            # np.asarray(Op.get("tmit_minus", [])).copy(),
             [str(name) for name in bpm_names],
             str(corrector),
         )
