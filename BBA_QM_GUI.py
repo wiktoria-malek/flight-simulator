@@ -142,7 +142,7 @@ def main():
     dir_name = os.path.expanduser(
         f"~/CERN-Flight_Simulator-Data/BBA_QM_{interface.get_name()}_{time_str}_session_settings"
     )
-    window = MainWindow(interface, dir_name, start_state=interface.get_state())
+    window = MainWindow(interface, dir_name, start_state=interface.get_state(include_screens=False))
     if hasattr(interface, "log_messages"):
         interface.log_messages(window.log)
     window.show()

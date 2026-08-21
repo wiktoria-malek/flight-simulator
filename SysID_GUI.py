@@ -91,7 +91,7 @@ class Worker(QObject):
         self.running = False
         self.paused = False
         self.progress_value=0
-        self.state_class = state_class if state_class is not None else interface.get_state().__class__
+        self.state_class = state_class if state_class is not None else interface.get_state(include_screens=False).__class__
 
     @pyqtSlot()
     def run(self):
@@ -161,7 +161,7 @@ class Worker(QObject):
                     if not self.running: break
                     if self.paused:      self._await_user()
                     measured_this_corr=True
-                    state_p=I.get_state()
+                    state_p=I.get_state(include_screens=False)
                     state_p.save(filename=filename_p)
                 else:
                     state_p=self.state_class(filename=filename_p)
@@ -178,7 +178,7 @@ class Worker(QObject):
                     if self.paused:      self._await_user()
                     measured_this_corr=True
 
-                    state_m=I.get_state()
+                    state_m=I.get_state(include_screens=False)
                     state_m.save(filename=filename_m)
                 else:
                     state_m=self.state_class(filename=filename_m)
@@ -349,7 +349,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.horizontal_excursion_spinbox.setSingleStep(0.1)
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
-        self.state_class = interface.get_state().__class__
+        self.state_class = interface.get_state(include_screens=False).__class__
         self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
         self.__set_status_in_title("[Idle]")
         interface_name=interface.get_name()
@@ -654,9 +654,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
             self._set_directory_edit_enabled(True)
             return
 
-        selected_correctors = self._sort_actuators(
-            [item.text() for item in self.correctors_list.selectedItems()]
-        )
+        selected_correctors = self._sort_actuators([item.text() for item in self.correctors_list.selectedItems()])
 
         if not selected_correctors:
             for i in range(self.correctors_list.count()):
@@ -695,7 +693,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 d = os.path.join(base, f"{project_name}_{time_str}_{self.actuator_mode.name}_{mode.name}")
             os.makedirs(d, exist_ok=True)
             self.mode_dirs[mode] = d
-
             self._save_names_if_missing(d, self._actuator_selection_filename(), selected_correctors)
             self._save_names_if_missing(d,'bpms.txt',selected_bpms)
 
@@ -705,7 +702,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
             if not os.path.isfile(os.path.join(d, 'machine_status.pkl'))
         ]
         if missing_machine_status:
-            machine_state = self.interface.get_state()
+            machine_state = self.interface.get_state(include_screens=False)
             for machine_status in missing_machine_status:
                 machine_state.save(filename=machine_status)
 

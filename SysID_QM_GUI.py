@@ -151,7 +151,7 @@ class QMWorker(CorrectorWorker):
             interface.apply_qmag_xyroll(magnet, x0 + displacement, y0, roll0)
         else:
             interface.apply_qmag_xyroll(magnet, x0, y0 + displacement, roll0)
-        state = interface.get_state()
+        state = interface.get_state(include_screens=False)
         state.save(filename=filename)
         return state, True
 

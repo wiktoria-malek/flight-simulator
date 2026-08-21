@@ -86,7 +86,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.interface = interface
         self.dir_name = dir_name
         self.nominal_state = nominal_state
-        self.start_state = start_state if start_state is not None else interface.get_state()
+        self.start_state = start_state if start_state is not None else interface.get_state(include_screens=False)
         self.restore_state = self.start_state
         self.initial_state = self.start_state
         self.measurement_start_state = None
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
         self._session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_session_settings")
         os.makedirs(self._session_dir, exist_ok=True)
-        machine_state = self.interface.get_state()
+        machine_state = self.interface.get_state(include_screens=False)
         machine_state.save(filename=os.path.join(self._session_dir, "machine_status.pkl"))
         self.session_database_3.setText(self._session_dir)
         return machine_state
@@ -750,22 +750,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 # nominal
                 print("Measuring orbit")
                 self.log("Measuring orbit")
-                state0 = self.interface.get_state()
+                state0 = self.interface.get_state(include_screens=False)
                 state0 = self._apply_jitter_subtraction_to_state(state0)
                 if it == 0:
                     self.measurement_start_state = state0
-                    screens0 = state0.get_screens()
-                    print("Screen values before correction:")
-                    print(f"Sigx: {screens0['sigx']}")
-                    print(f"Sigy: {screens0['sigy']}")
-                    print("Emittance before correction:")
-                    for screen_name in screens0["names"]:
-                        if hasattr(self.interface, "get_twiss_at_screen"):
-                            tw = self.interface.get_twiss_at_screen(screen_name)
-                            print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
-                            print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
-                        else:
-                            pass
                 O0 = state0.get_orbit(bpms)  # because axis=1 is mean from one whole measurement, not for 1 bpm
                 O0x = np.asarray(O0['x'], dtype=float).reshape(-1, 1)
                 O0y = np.asarray(O0['y'], dtype=float).reshape(-1, 1)
@@ -803,7 +791,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     print("Measuring dispersion")
                     self.log("Measuring dispersion")
                     dP_P = self.interface.change_energy()
-                    state1 = self.interface.get_state()
+                    state1 = self.interface.get_state(include_screens=False)
                     state1 = self._apply_jitter_subtraction_to_state(state1)
                     self.interface.reset_energy()
                     O1 = state1.get_orbit(bpms)
@@ -826,7 +814,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     print("Measuring wakefield")
                     self.log("Measuring wakefield")
                     self.interface.change_intensity()
-                    state2 = self.interface.get_state()
+                    state2 = self.interface.get_state(include_screens=False)
                     state2 = self._apply_jitter_subtraction_to_state(state2)
                     self.interface.reset_intensity()
                     O2 = state2.get_orbit(bpms)
@@ -1045,19 +1033,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.setWindowTitle("BBA GUI")
             if not silent:
                 QMessageBox.information(self, "Correction", "Correction finished.")
-            final_state = self.interface.get_state()
-            screens_f = final_state.get_screens()
-            print("Screen values after correction:")
-            print(f"Sigx: {screens_f['sigx']}")
-            print(f"Sigy: {screens_f['sigy']}")
-            if hasattr(self.interface, "get_twiss_at_screen"):
-                print("Emittance after correction:")
-                for screen_name in screens_f["names"]:
-                    tw = self.interface.get_twiss_at_screen(screen_name)
-                    print(f"Emitt x for screen {screen_name}: {tw['emitt_x']}")
-                    print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
-            else:
-                pass
+            final_state = self.interface.get_state(include_screens=False)
             final_bpms = final_state.get_bpms(bpms)
             final_x_vals = np.asarray(final_bpms["x"], dtype=float)
             final_y_vals = np.asarray(final_bpms["y"], dtype=float)
@@ -1254,7 +1230,7 @@ if __name__ == "__main__":
     I = dialog
     project_name = I.get_name()
     nominal_state = None
-    start_state = I.get_state()
+    start_state = I.get_state(include_screens=False)
 
     print(f"Selected interface: {project_name}")
     time_str = datetime.now().strftime("%Y%m%d_%H%M%S")

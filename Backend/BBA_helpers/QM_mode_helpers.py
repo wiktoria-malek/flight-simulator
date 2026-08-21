@@ -258,7 +258,7 @@ class QM_mode_helpers:
             if self._cancel:
                 break
 
-            state = self.interface.get_state()
+            state = self.interface.get_state(include_screens=False)
             state = self._apply_jitter_subtraction_to_state(state)
             orbit = state.get_orbit(bpms)
 
@@ -388,7 +388,7 @@ class QM_mode_helpers:
 
             QApplication.processEvents()
 
-        final_state = self.interface.get_state()
+        final_state = self.interface.get_state(include_screens=False)
         final_state = self._apply_jitter_subtraction_to_state(final_state)
         final_bpms = final_state.get_bpms(bpms)
         final_x_vals = np.asarray(final_bpms["x"], dtype=float)
