@@ -175,8 +175,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
-        self.rf_phase_nominal = 110
-        self.rf_phase_test = 90
+        self.rf_phase_nominal = 95
+        self.rf_phase_test = 85
         # Bpms and correctors in beamline order
         sequence = [
             'CA.DHG0130', 'CA.DVG0130', #'CA.BPC0220',
