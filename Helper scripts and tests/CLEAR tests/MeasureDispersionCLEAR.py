@@ -8,8 +8,8 @@ while (not (project_root_path / "Interfaces").exists() and project_root_path.par
     project_root_path = project_root_path.parent
 sys.path.insert(0, str(project_root_path))
 os.chdir(project_root_path)
-#from Interfaces.CLEAR.InterfaceCLEAR import CLEAR_real_machine
-from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
+from Interfaces.CLEAR.InterfaceCLEAR import CLEAR_real_machine
+#from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
 import matplotlib.pyplot as plt
 #I = InterfaceCLEAR_RFTrack()
 I = CLEAR_real_machine(nsamples=20)
