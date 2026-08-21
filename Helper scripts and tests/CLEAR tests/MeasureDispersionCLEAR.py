@@ -43,7 +43,7 @@ for i in range(5):
     output_file = output_dir / f"disp_measurement_{i:03d}.txt"
 
     with open(output_file, "w") as file:
-        file.write("BPM\tx0\ty0\tx1\ty1\tdx\tdy\n")
+        file.write("# BPM\tx0\ty0\tx1\ty1\tdx\tdy\n")
         for name, a, b, c, d, e, f in zip(bpms, x0, y0, x1, y1, dx, dy):
             file.write(
                 f"{name}\t{a:.8g}\t{b:.8g}\t{c:.8g}\t{d:.8g}\t"
