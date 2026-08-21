@@ -9,8 +9,11 @@ while (not (project_root_path / "Interfaces").exists() and project_root_path.par
 sys.path.insert(0, str(project_root_path))
 os.chdir(project_root_path)
 from Interfaces.CLEAR.InterfaceCLEAR import CLEAR_real_machine
+
 #from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
+
 import matplotlib.pyplot as plt
+
 #I = InterfaceCLEAR_RFTrack()
 I = CLEAR_real_machine(nsamples=20)
 bpms = I.bpms
@@ -18,7 +21,7 @@ bpm0 = I.get_bpms(bpms)
 output_dir = Path.home() / "CERN-Flight_Simulator-Data" / "CLEAR_dispersion"
 output_dir.mkdir(parents=True, exist_ok=True)
 
-for i in range(100):
+for i in range(5):
     bpm0 = I.get_bpms(bpms)
     I.change_energy()
     bpm1 = I.get_bpms(bpms)
