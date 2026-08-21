@@ -102,6 +102,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
         self._hist_orbit, self._hist_disp, self._hist_wake = [], [], []
         self._hist_orbit_x, self._hist_orbit_y = [], []
+        self._hist_transmission = []
         self._hist_disp_x, self._hist_disp_y = [], []
         self._hist_wake_x, self._hist_wake_y = [], []
         self._hist_orbit_x_err, self._hist_orbit_y_err, self._hist_orbit_err = [], [], []
@@ -142,6 +143,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.actuator_mode = ActuatorMode.Kicker
         self._setup_corrector_controls()
         self.restore_machine_status_button.clicked.connect(self._pick_and_load_machine_status_file)
+        self.initial_charge_value = None
 
     def _save_machine_status(self):
         time_str = datetime.now().strftime("%y%m%d%H%M%S")
@@ -409,6 +411,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             return
         if getattr(self, "_suppress_main_plots", False):
             return
+        if ax is self.traj_ax and getattr(self, "traj_transmission_ax", None) is not None:
+            self.traj_transmission_ax.remove()
+            self.traj_transmission_ax = None
         ax.clear()
 
         def matching_yerr(errors, values):
@@ -436,6 +441,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             err_all = matching_yerr(error_all, vals)
             ax.errorbar(range(len(vals)), vals, yerr=err_all, linestyle="dashed", color='black', label="combined norm",
                         capsize=6, elinewidth=2, capthick=2, markersize=4)
+        if ax is self.traj_ax and self._hist_transmission:
+            transmission = np.asarray(self._hist_transmission, dtype=float)
+            if np.any(np.isfinite(transmission)):
+                self.traj_transmission_ax = ax.twinx()
+                self.traj_transmission_ax.plot(range(len(transmission)), transmission, "g--", label="Transmission")
+                self.traj_transmission_ax.set_ylabel("Transmission", color="green")
+                self.traj_transmission_ax.tick_params(axis="y", colors="green")
+                self.traj_transmission_ax.legend(fontsize=7, loc="lower right")
         if values_x or values_y:
             ax.legend(fontsize=7, loc="upper right")
         if title is not None:
@@ -742,6 +755,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self.log("Measuring orbit")
                 state0 = self.interface.get_state()
                 state0 = self._apply_jitter_subtraction_to_state(state0)
+                if hasattr(self.interface, "chosen_ict"):
+                    charge = np.asarray(state0.get_icts(self.interface.chosen_ict)["charge"], dtype=float).ravel()
+                    if charge.size and np.isfinite(charge[0]) and charge[0] != 0:
+                        if self.initial_charge_value is None:
+                            self.initial_charge_value = charge[0]
+                        reference = float(self.initial_charge_value)
+                        self._hist_transmission.append(100.0 * charge[0] / reference)
+                    else:
+                        self._hist_transmission.append(np.nan)
                 if it == 0:
                     self.measurement_start_state = state0
                     screens0 = state0.get_screens()
@@ -1158,6 +1180,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         # it doesnt do fresh start, it only clears the graphs
         self._cancel = True
         self._hist_orbit_x.clear(), self._hist_orbit_y.clear()
+        self._hist_transmission.clear()
+        self.initial_charge_value = None
         self._hist_disp_x.clear(), self._hist_disp_y.clear()
         self._hist_wake_x.clear(), self._hist_wake_y.clear()
         self._hist_orbit.clear(), self._hist_disp.clear(), self._hist_wake.clear()

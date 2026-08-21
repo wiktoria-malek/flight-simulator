@@ -158,8 +158,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def __init__(self, nsamples=1, bg_shots=10.0 ):
         self.screen_backgrounds = {}
+        self.chosen_ict = "CA.BCMTHZ/Acquisition#charge"
         self.steps_readback_position = 0.0
-        self.energy_readback = 0.0
         self.bpm_mode = BPMsMode.integral_threshold
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
@@ -175,7 +175,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
-
+        self.rf_phase_nominal = 110
+        self.rf_phase_test = 90
         # Bpms and correctors in beamline order
         sequence = [
             'CA.DHG0130', 'CA.DVG0130', #'CA.BPC0220',
@@ -285,6 +286,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
             data = json.load(f)
         return data['devices']
 
+    def _get_charge_reference(self):
+        value = self.get_icts(names = self.chosen_ict)
+        return value["charge"]
+
     def _give_elements_to_show_beamline(self, quad_selected):
         start_quad_element_name = quad_selected
         return start_quad_element_name
@@ -385,9 +390,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return float(default)
 
     def change_energy(self):
-        self.energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] # changes value globally
-        self.log(f"Value before changing energy: {self.energy_readback}")
-        new_energy = self.energy_readback - 20 # as a test!
+        energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] # changes value globally
+        self.log(f"Value before changing energy: {energy_readback}")
+        new_energy = self.rf_phase_test
         self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
         self.log(f"Value after changing energy: {new_energy}")
         self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', new_energy)
@@ -396,10 +401,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return after_energy_change
 
     def reset_energy(self):
-        print(f"Resetting energy to {self.energy_readback}...")
-        self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : self.energy_readback})
-        self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', self.energy_readback)
-        print(f"Energy has been reset to {self.energy_readback}...")
+        print(f"Resetting energy to {self.rf_phase_nominal}...")
+        self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : self.rf_phase_nominal})
+        self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', self.rf_phase_nominal)
+        print(f"Energy has been reset to {self.rf_phase_nominal}...")
         after_energy_reset = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
         print(after_energy_reset)
 
@@ -498,6 +503,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.client.set(f'{japc_camera}.DigiCam/Setting', {"screenSelect": screen_value})
 
     def get_icts(self, names=None):
+        #BCM_THZ = ('CA.BCMTHZ/Acquisition#charge', 'SCT.USER.SETUP')
         self.log("Reading ict's...")
         if names is None:
             names = self.ict_names
@@ -507,7 +513,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for name in names:
             property_address, field = name.rsplit("#", 1)
             try:
-                value = self.client.get(property_address, context=self.context_empty).data[field]
+                value = self.client.get(property_address, context=self.context_acquisition).data[field]
             except Exception:
                 value = np.nan
             charge.append(self.make_safe_float(value))

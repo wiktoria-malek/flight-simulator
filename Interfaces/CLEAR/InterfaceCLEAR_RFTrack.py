@@ -144,6 +144,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
     def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 2.0
+        self.chosen_ict = "nazwa_ict"
         self.Pref = 198 # MeV/c
         self.Q=-1
         self.population = population
