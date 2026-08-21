@@ -156,7 +156,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         lattice = get_lattice(start, end, self.Pref, quad_currents)
         return lattice, element_descriptions, start, end
 
-    def __init__(self, nsamples=1, bg_shots=10.0 ):
+    def __init__(self, nsamples=3, bg_shots=10.0 ):
         self.screen_backgrounds = {}
         self.chosen_ict = "CA.BCMTHZ/Acquisition#charge"
         self.steps_readback_position = 0.0
@@ -249,11 +249,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.screen_names = list(config.cameras.keys())
         self.screens = self.screen_names
         self.screen_config = config.cameras # it consists also screens that we should not use!
+        3K
         # ["CA.BTV0125","CA.BTV0215","CA.BTV0235", "CA.BTV0390", "CAS.BTV0420", "CAS.BTV0440", "CAS.CAMVESPER1",
         #  "CA.BTV0545","CA.BTV0620", "CA.BTV0730","CA.BTV0800", "CA.BTV0805", "CA.BTV0810" , "CA.BTV0875",
         #  "CA.BTV0910", "CAS.BTV0930","CA.CAMAIR1", "CA.CAMAIR2", "CA.CAMAIR3","CA.CAMAIR4", "CS.BTV0120", "CS.BTV0305",
         #  "CS.BTV0420","CS.BTV0520", "CS.BTVVAC1","CS.CAMVAC1","CS.CAMAIR1","CS.CAMAIR2","CS.CAMAIR3","CS.CAMAIR4",
         #  "PHIN.BTV01","PHIN.BTV.Spectro","PHIN.VCAT"]
+
         self.bpm_indexes = [index for index, string in enumerate(sequence) if string in self.bpms]
 
         # Bunch current monitors
