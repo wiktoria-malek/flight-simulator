@@ -24,8 +24,7 @@ from Backend.SaveOrLoad import SaveOrLoad
 from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
 from Backend.EM_helpers.QuadrupoleScan import QuadrupoleScan
 from Backend.LogConsole import LogConsole
-from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
-from Backend.EM_helpers.BeamEvolution import BeamEvolution
+#from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
 from Backend.EM_helpers.ShowBeamline import ShowBeamline
 from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 class ComputationMode(Enum):
