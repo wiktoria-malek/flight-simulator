@@ -14,11 +14,9 @@ I = CLEAR_real_machine(nsamples=3)
 bpms = I.bpms
 bpm0 = I.get_bpms(bpms)
 
-try:
-    I.change_energy()
-    bpm1 = I.get_bpms(bpms)
-finally:
-    I.reset_energy()
+I.change_energy()
+bpm1 = I.get_bpms(bpms)
+I.reset_energy()
 
 x0_samples = np.asarray(bpm0["x"], dtype=float)
 y0_samples = np.asarray(bpm0["y"], dtype=float)
