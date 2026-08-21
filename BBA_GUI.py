@@ -717,7 +717,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             w_xy_bpms = np.sqrt(W_xy)
 
             self.setWindowTitle("BBA GUI - [Correction running]")
-
             target_disp_x, target_disp_y = self.interface.get_target_dispersion(bpms)
             max_curr_h = self.max_horizontal_current_spinbox.value()  # gauss * m
             max_curr_v = self.max_vertical_current_spinbox.value()  # gauss * m

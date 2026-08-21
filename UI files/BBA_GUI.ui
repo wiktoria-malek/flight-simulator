@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1512</width>
-    <height>909</height>
+    <height>838</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -1585,13 +1585,6 @@ QToolButton#jitter_subtraction_tooltip:hover {
                       </widget>
                      </item>
                     </layout>
-                   </item>
-                   <item>
-                    <widget class="QCheckBox" name="disable_sextupoles_button">
-                     <property name="text">
-                      <string>Disable sextupoles and do orbit correction after BBA</string>
-                     </property>
-                    </widget>
                    </item>
                   </layout>
                  </widget>
