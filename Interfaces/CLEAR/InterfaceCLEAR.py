@@ -949,41 +949,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def get_twiss_evolution(self, *args, **kwargs):
         return self.tracking_interface.get_twiss_evolution(*args, **kwargs)
 
-    def get_target_dispersion(self, names=None):
-        if names is None:
-            names = self.bpms
-        if isinstance(names, str):
-            names = [names]
-
-        if self.twiss_path is None:
-            return [np.nan] * len(names), [np.nan] * len(names)
-
-        lines, columns, dollar_sign = self._read_twiss_file()
-        try:
-            dx_column = columns.index('DX')
-            dy_column = columns.index('DY')
-            name_column = columns.index('NAME')
-        except ValueError:
-            return [np.nan] * len(names), [np.nan] * len(names)
-
-        disp_values = {}
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            if len(data) <= max(dx_column, dy_column, name_column):
-                continue
-            elem_name = data[name_column].strip('"')
-            try:
-                disp_values[elem_name] = (float(data[dx_column]), float(data[dy_column]))
-            except ValueError:
-                continue
-
-        target_disp_x, target_disp_y = [], []
-        for bpm in names:
-            dx, dy = disp_values.get(bpm, (np.nan, np.nan))
-            target_disp_x.append(dx)
-            target_disp_y.append(dy)
-        return target_disp_x, target_disp_y
-
     def _screen_data_from_image(self, image, hpixel, vpixel): # better be subtracted!
         if image is None or np.asarray(image, dtype=float).ndim!=2 or np.asarray(image, dtype=float).size==0:
             return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
