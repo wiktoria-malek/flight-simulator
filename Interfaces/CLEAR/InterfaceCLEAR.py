@@ -31,7 +31,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.screen_backgrounds = {}
         self.steps_readback_position = 0.0
         self.energy_readback = 0.0
-        self.bpm_mode = BPMsMode.threshold_integral
+        self.bpm_mode = BPMsMode.integral_threshold
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
         self.Pref = 200 # MeV/c
@@ -451,8 +451,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
                     # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM, starts=[window_start, window_start], ends=[window_end, window_end], )
 
                 elif mode == BPMsMode.integral_threshold: # Integration between 5% of the peak threshold region with baseline correction
-                    H, H_start, H_end, H_peak_idx = threshold_integral(H_b_samples)
-                    V, V_start, V_end, V_peak_idx = threshold_integral(V_b_samples)
+                    H, H_start, H_end, H_peak_idx = integral_threshold(H_b_samples)
+                    V, V_start, V_end, V_peak_idx = integral_threshold(V_b_samples)
                     # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM, starts=[H_start, V_start], ends=[H_end, V_end], )
 
                 else:
