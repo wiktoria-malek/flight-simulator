@@ -835,6 +835,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     bpms1 = state1.get_bpms(bpms)
                     x1_vals = np.asarray(bpms1["x"], dtype=float)
                     y1_vals = np.asarray(bpms1["y"], dtype=float)
+                    err_dx = np.sqrt(np.square(np.asarray(O0["stdx"], dtype=float)) / x0_vals.shape[0] + np.square(np.asarray(O1["stdx"], dtype=float)) / x1_vals.shape[0])
+                    err_dy = np.sqrt(np.square(np.asarray(O0["stdy"], dtype=float)) / y0_vals.shape[0] + np.square(np.asarray(O1["stdy"], dtype=float)) / y1_vals.shape[0])
                     Dx = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1, 1)
                     Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1, 1)
                     plt.clf()
@@ -900,8 +902,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     By.append(wgt_orb * (O0y - B0y))
 
                 if w2 > 0 and O1x is not None:
-                    plt.plot((O1x - O0x), color='tab:blue', label="measured x")
-                    plt.plot((O1y - O0y), color='tab:orange', label="measured y")
+
+                    plt.errorbar(range(len(O1x)), (O1x - O0x).ravel(), yerr=err_dx,
+                                 color='tab:blue', label="measured x", capsize=3)
+                    plt.errorbar(range(len(O1y)), (O1y - O0y).ravel(), yerr=err_dy,
+                                 color='tab:orange', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
                     plt.title("DFS: measured orbit difference vs target dispersion (x, y)")
