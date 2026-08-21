@@ -119,7 +119,7 @@ class AbstractMachineInterface(ABC):
             self.change_intensity()
         return True
 
-    def get_state(self, include_screens=True):
+    def get_state(self):
         return State(
             correctors=self.get_correctors(),
             bpms=self.get_bpms(),
@@ -127,7 +127,6 @@ class AbstractMachineInterface(ABC):
             sequence=self.get_sequence(),
             hcorrectors_names=self.get_hcorrectors_names(),
             vcorrectors_names=self.get_vcorrectors_names(),
-            screens=self.get_screens() if include_screens else None,
             quadrupoles=self.get_quadrupoles(),
             sextupoles=self.get_sextupoles(),
             beam_settings=self.get_beam_settings(),

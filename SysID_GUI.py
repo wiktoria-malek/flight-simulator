@@ -91,7 +91,7 @@ class Worker(QObject):
         self.running = False
         self.paused = False
         self.progress_value=0
-        self.state_class = state_class if state_class is not None else interface.get_state(include_screens=False).__class__
+        self.state_class = state_class if state_class is not None else interface.get_state().__class__
 
     @pyqtSlot()
     def run(self):
@@ -101,7 +101,7 @@ class Worker(QObject):
         I = self.interface
         vkicks = self.vkicks
         hkicks = self.hkicks
-        tmit_reference = np.asarray(I.get_state(include_screens=False).get_orbit(self.bpms)['tmit'], dtype=float)
+        tmit_reference = np.asarray(I.get_state().get_orbit(self.bpms)['tmit'], dtype=float)
         pending_steps=0
         for iter in range(self.Niter):
             for corrector in self.correctors:
@@ -162,7 +162,7 @@ class Worker(QObject):
                     if not self.running: break
                     if self.paused:      self._await_user()
                     measured_this_corr=True
-                    state_p=I.get_state(include_screens=False)
+                    state_p=I.get_state()
                     state_p.save(filename=filename_p)
                 else:
                     state_p=self.state_class(filename=filename_p)
@@ -179,7 +179,7 @@ class Worker(QObject):
                     if self.paused:      self._await_user()
                     measured_this_corr=True
 
-                    state_m=I.get_state(include_screens=False)
+                    state_m=I.get_state()
                     state_m.save(filename=filename_m)
                 else:
                     state_m=self.state_class(filename=filename_m)
@@ -202,9 +202,12 @@ class Worker(QObject):
                 Err_x = np.sqrt(np.square(Op['stdx']) + np.square(Om['stdx'])) / np.sqrt(nsamples)
                 Err_y = np.sqrt(np.square(Op['stdy']) + np.square(Om['stdy'])) / np.sqrt(nsamples)
                 if measured_this_corr:
-                    orbit_for_plot = dict(Op)
-                    tmit = 0.5 * (np.asarray(Op['tmit']) + np.asarray(Om['tmit']))
-                    orbit_for_plot['tmit'] = np.divide(100.0 * tmit, tmit_reference, out=np.full_like(tmit, np.nan, dtype=float), where=np.isfinite(tmit_reference) & (tmit_reference != 0.0))
+                    tmit_plus = np.asarray(Op['tmit'])
+                    tmit_minus = np.asarray(Om['tmit'])
+                    orbit_for_plot = {
+                        'tmit_plus': np.divide(100.0 * tmit_plus, tmit_reference, out=np.full_like(tmit_plus, np.nan, dtype=float), where=np.isfinite(tmit_reference) & (tmit_reference != 0.0)),
+                        'tmit_minus': np.divide(100.0 * tmit_minus, tmit_reference, out=np.full_like(tmit_minus, np.nan, dtype=float), where=np.isfinite(tmit_reference) & (tmit_reference != 0.0)),
+                    }
                     self.plot_data.emit(orbit_for_plot, Diff_x, Err_x, Diff_y, Err_y, self.bpms, corrector)
                     self.progress_value=self.progress_value + 1
                     percent = int(self.progress_value / total_steps * 100)
@@ -315,7 +318,11 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.right_layout.removeWidget(self.plot_widget)
         self.plot_widget.deleteLater()
         self.plot_widget = MatplotlibWidget(self)
-        self.right_layout.addWidget(self.plot_widget)
+        self.plot_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.right_layout.addWidget(self.plot_widget, 1)
+        self.right_layout.setStretch(0, 0)
+        self.right_layout.setStretch(1, 0)
+        self.right_layout.setStretch(2, 1)
         self.plot_widget.mpl_connect("button_press_event", self._handle_plot_double_click)
 
         # Setting up the interface
@@ -347,7 +354,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.horizontal_excursion_spinbox.setSingleStep(0.1)
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
-        self.state_class = interface.get_state(include_screens=False).__class__
+        self.state_class = interface.get_state().__class__
         self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
         self.__set_status_in_title("[Idle]")
         interface_name=interface.get_name()
@@ -696,7 +703,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
             if not os.path.isfile(os.path.join(d, 'machine_status.pkl'))
         ]
         if missing_machine_status:
-            machine_state = self.interface.get_state(include_screens=False)
+            machine_state = self.interface.get_state()
             for machine_status in missing_machine_status:
                 machine_state.save(filename=machine_status)
 
@@ -834,12 +841,13 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 return i - 0.5
         return len(bpm_position) - 0.5
 
-    def _draw_sysid_plot(self, plot, Diff_x, Err_x, Diff_y, Err_y, tmit, bpm_names, corrector):
+    def _draw_sysid_plot(self, plot, Diff_x, Err_x, Diff_y, Err_y, tmit_plus, tmit_minus, bpm_names, corrector):
         Diff_x=np.asarray(Diff_x).ravel()
         Diff_y=np.asarray(Diff_y).ravel()
         Err_x=np.asarray(Err_x).ravel()
         Err_y=np.asarray(Err_y).ravel()
-        tmit=np.asarray(tmit).ravel()
+        tmit_plus=np.asarray(tmit_plus).ravel()
+        tmit_minus=np.asarray(tmit_minus).ravel()
         bpm_names=[str(x) for x in bpm_names]
 
         plot.figure.clear()
@@ -849,9 +857,10 @@ class MainWindow(QMainWindow, SaveOrLoad):
         plot.axes.errorbar(scale, Diff_x, yerr=Err_x, lw=2, capsize=5, capthick=2, label="X")
         plot.axes.errorbar(scale, Diff_y, yerr=Err_y, lw=2, capsize=5, capthick=2, label="Y")
         tmit_axis = plot.axes.twinx()
-        tmit_axis.plot(scale[:len(tmit)], tmit[:n], 'g--', label="Transmission")
-        tmit_axis.set_ylabel("Transmission [%]", color="black")
-        tmit_axis.tick_params(axis="y", colors="black")
+        tmit_axis.plot(scale[:len(tmit_plus)], tmit_plus[:n], 'g--', label="Transmission +")
+        tmit_axis.plot(scale[:len(tmit_minus)], tmit_minus[:n], color='limegreen', linestyle=':', label="Transmission -")
+        tmit_axis.set_ylabel("Transmission", color="green")
+        tmit_axis.tick_params(axis="y", colors="green")
         tmit_axis.legend(loc='upper right')
         device_x = self._device_position_on_bpm_axis(corrector.split(":")[0], bpm_names)
         plot.axes.axvline(device_x, linestyle='--', linewidth=2, color = "purple")
@@ -871,7 +880,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
             np.asarray(Err_x).copy(),
             np.asarray(Diff_y).copy(),
             np.asarray(Err_y).copy(),
-            np.asarray(Op.get("tmit", [])).copy(),
+            np.asarray(Op.get("tmit_plus", [])).copy(),
+            np.asarray(Op.get("tmit_minus", [])).copy(),
             [str(name) for name in bpm_names],
             str(corrector),
         )
