@@ -196,7 +196,7 @@ INTERFACE_SETUP = {
             "display_name": "CLEAR",
             "module": "Interfaces.CLEAR.InterfaceCLEAR",
             "class_name": "CLEAR_real_machine",
-            "settings": {"nsamples":1},
+            "settings": {"nsamples":3},
             "units":
                 {
                     "corrector_strength": "gauss*m",
