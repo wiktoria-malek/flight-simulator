@@ -25,7 +25,7 @@ def analyze_data(filename, bpm, mode):
 
         H = process_bpm_signal(H_SA, mode)
         V = process_bpm_signal(V_SA, mode)
-        S = process_bpm_signal(S_SA, mode)
+        S = np.sum(S_SA[320:330])
 
         print(f"{bpm}: H = {H}, V = {V}")
 

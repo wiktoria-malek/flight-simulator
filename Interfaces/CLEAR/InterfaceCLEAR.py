@@ -543,6 +543,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for sample in range(self.nsamples):
             self.log(f'Sample = {sample}')
             x_sample, y_sample, tmit_sample = [], [], []
+            #H_SA1[320:330]
             for bpm in selected_names:
                 hsamples = self.client.get(f"{bpm}H-SA/SamplesFromTrigger", context = self.context_acquisition).data
                 vsamples = self.client.get(f"{bpm}V-SA/SamplesFromTrigger", context=self.context_acquisition).data
@@ -552,8 +553,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 S_samples = change_inverted_bpm_polarity(np.asarray(ssamples["samples"], dtype=float).ravel(), bpm)
                 H_b_samples = baseline_correct(H_samples)
                 V_b_samples = baseline_correct(V_samples)
-                #s_sum = abs(np.sum(S_samples))
-                s_sum = np.sum(S_samples)
+                s_sum = np.sum(S_samples[320:330])
 
                 if mode == BPMsMode.peak: # Find peak (largest magnitude, keeping the sign)
                     H, H_idx = find_peak(H_samples)
@@ -564,6 +564,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
                     H, H_idx = find_peak(H_b_samples)
                     V, V_idx = find_peak(V_b_samples)
                     # plot_peak([H_b_samples, V_b_samples], [H_idx, V_idx], [H, V], ["H", "V"], BPM, )
+
+                elif mode == BPMsMode.window_sum: # Raw pulse-only sum, as in lookatBPMsignal.ipynb
+                    H = self._bpm_window_sum(H_samples, self.bpm_signal_window)
+                    V = self._bpm_window_sum(V_samples, self.bpm_signal_window)
 
                 elif mode == BPMsMode.integral: # Integration of full BPM signal with baseline correction
                     H = trapezoid(H_b_samples)
@@ -583,7 +587,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
                 else:
                     raise ValueError(
-                        f"Unknown mode '{mode}'. " "Choose from: 'peak', 'baseline_peak', " "'integral', 'integral_window', 'integral_threshold'.")
+                        f"Unknown mode '{mode}'. " "Choose from: 'peak', 'baseline_peak', "
+                        "'window_sum', 'integral', 'integral_window', 'integral_threshold'.")
 
                 x_sample.append(H)
                 y_sample.append(V)
