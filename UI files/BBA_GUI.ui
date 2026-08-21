@@ -1645,20 +1645,6 @@ QGroupBox#correction_controls_group::title {
                     </widget>
                    </item>
                    <item>
-                    <widget class="QPushButton" name="show_orbit_RMS_button">
-                     <property name="text">
-                      <string>Show Orbit RMS</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item>
-                    <widget class="QPushButton" name="sextupole_restoration_button">
-                     <property name="text">
-                      <string>Sextupole restoration summary</string>
-                     </property>
-                    </widget>
-                   </item>
-                   <item>
                     <widget class="QPushButton" name="pushButton_reset_ref_orbit">
                      <property name="styleSheet">
                       <string notr="true">background-color: red; color: white;</string>

@@ -160,10 +160,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.screen_backgrounds = {}
         self.steps_readback_position = 0.0
         self.energy_readback = 0.0
-        self.bpm_mode = BPMsMode.peak
+        self.bpm_mode = BPMsMode.threshold_integral
         self.nsamples = nsamples
         self.electronmass = 0.51099895 # MeV/c^2
-        self.Pref = 198 # MeV/c
+        self.Pref = 200 # MeV/c
         self.machine_name = "CLEAR"
         self.tracking_interface = InterfaceCLEAR_RFTrack()
         self.energy_param = [
@@ -269,7 +269,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.quad_set_params = dict(zip(config.quad_names, config.current_set_params))
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
         self.quad_status_params = dict(zip(config.quad_names, config.current_status_params))
-        self.twiss_path = None
+        self.twiss_path = self.tracking_interface.twiss_path
         self.cam_props = self.CamList() # Load camera configuration from assets/cameras.json
         self.camList = list(self.cam_props.keys())
         self.lattice = self.tracking_interface.lattice
@@ -343,9 +343,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def _get_twiss_s_positions(self, names):
         names = list(names)
 
-        if clear_lattice is not None and hasattr(clear_lattice, 'element_descriptions'):
+        if self.element_descriptions:
             s_pos = {}
-            for elem_name, elem_data in clear_lattice.element_descriptions.items():
+            for elem_name, elem_data in self.element_descriptions.items():
                 if isinstance(elem_data, dict) and 's_center' in elem_data:
                     s_pos[elem_name] = elem_data['s_center']
             return [s_pos.get(name.rstrip('LH'), s_pos.get(name, np.nan)) for name in names]
@@ -915,9 +915,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def current_to_k1l(self, name, current_A, pref_mev_c=None):
         current_A = float(current_A)
         pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
-        if not np.isfinite(current_A) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
-            return np.nan
-
         length = self.tracking_interface.element_descriptions[name]["L"]
         k1 = self.tracking_interface.get_Quad_K_from_I(current_A, length, pref_mev_c)
         return self._quad_sign(name) * k1 * length
@@ -925,8 +922,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def k1l_to_current(self, name, k1l, pref_mev_c=None):
         k1l = float(k1l)
         pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
-        if not np.isfinite(k1l) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
-            raise ValueError(f"Invalid K1L or reference momentum for {name}")
         a = float(self.tracking_interface.get_ITF(0.0))
         b = float(a - self.tracking_interface.get_ITF(1.0))
         target = self._quad_sign(name) * k1l * pref_mev_c / 299.8
