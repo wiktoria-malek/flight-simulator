@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import RF_Track as rft
-import os
+from scipy.optimize import minimize
+import re, os
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
@@ -8,9 +10,6 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return 'CLEAR_RFT'
 
     def get_ITF(self, I):
-        #ITF(I)=a-bI
-        # a =
-        # b =
         return 1.29404711e-2 - 2.59458259e-07 * I  # T/A
 
     def get_grad(self, I, Lquad=0.226):
@@ -26,60 +25,145 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         K = self.get_Quad_K(G_0, Pref)
         return K # 1/m^2
 
+    def __build(self, filename):
+        with open(filename) as file:
+            lines = file.readlines()
+        element_descriptions = {}
+        previous_name = None
+        quad_index = 0
+        corr_index = 0
+        for line in lines:
+            if line[0:2] != ' "':
+                continue
+
+            text = re.findall(r'"([A-Za-z0-9.$_]+)"', line)
+            numbers = re.findall(r'\d+\.\d+', line)
+            name = text[0]
+
+            if name == 'CA.BTV0800':
+                continue
+            element_type = None
+            if 'QFD' in name or 'QDD' in name:
+                element_type = 'Quadrupole'
+            elif 'BTV' in name:
+                element_type = 'Screen'
+            elif 'DHG' in name or 'DHJ' in name:
+                element_type = 'Corrector'
+            elif 'BPC' in name or 'BPM' in name:
+                element_type = 'BPM'
+            elif len(text) > 1 and text[1] == 'MARKER':
+                element_type = 'Marker'
+            if element_type is None:
+                continue
+
+            s_end = float(numbers[0])
+            L = float(numbers[1])
+            s_start = s_end - L
+
+            L = round(L, 4)
+            s_start = round(s_start, 4)
+            s_end = round(s_end, 4)
+
+            if previous_name is not None:
+                L_drift = round(s_start - element_descriptions[previous_name]['s_end'], 4)
+                if L_drift != 0:
+                    element_descriptions[previous_name + ' Drift'] = {
+                        'element_type': 'Drift',
+                        'L': L_drift,
+                        's_start': element_descriptions[previous_name]['s_end'],
+                        's_end': s_start,
+                        'quad_index': None,
+                        'corr_index': None,
+                    }
+
+            element_descriptions[name] = {
+                'element_type': element_type,
+                'L': L,
+                's_start': s_start,
+                's_end': s_end,
+                'quad_index': quad_index if element_type == 'Quadrupole' else None,
+                'corr_index': corr_index if element_type == 'Corrector' else None,
+            }
+
+            if element_type == 'Quadrupole':
+                quad_index += 1
+            if element_type == 'Corrector':
+                corr_index += 1
+
+            previous_name = name
+
+        def get_lattice(start, end, Pref, quad_currents, include_end=True):
+            start_index = list(element_descriptions.keys()).index(start)
+            end_index = list(element_descriptions.keys()).index(end)
+            if include_end:
+                end_index += 1
+            lattice = rft.Lattice()
+            names = list(element_descriptions.keys())
+            elements = list(element_descriptions.values())
+            for name, element_description in zip(names[start_index:end_index], elements[start_index:end_index]):
+                element_type = element_description['element_type']
+                L = element_description['L']
+                quad_index = element_description['quad_index']
+
+                if element_type == 'Drift':
+                    element = rft.Drift(L)
+                elif element_type == 'Quadrupole':
+                    if 'QFD' in name:
+                        K1 = self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                    elif 'QDD' in name:
+                        K1 = - self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
+                    element = rft.Quadrupole(L, Pref / self.Q, K1)
+                elif element_type == 'Corrector':
+                    element = rft.Corrector(L)
+                elif element_type == 'BPM':
+                    element = rft.Bpm(L)
+                elif element_type == 'Screen' or element_type == 'Marker':
+                    element = rft.Screen()
+                else:
+                    continue
+                element.set_name(name)
+                lattice.append(element)
+            return lattice
+        start = 'CA.STLINE$START'
+        end = 'CA.STLINE$END'
+        quad_currents = np.array([1,  # QFD350
+                                  0,  # QDD355
+                                  0,  # QFD360
+                                  20,  # QFD510
+                                  42.3,  # QDD515
+                                  20,  # QFD520
+                                  0,  # QFD760
+                                  0,  # QDD765
+                                  0,  # QFD770
+                                  0,  # QDD870
+                                  0  # QFD880
+                                  ])  # A
+
+        lattice = get_lattice(start, end, self.Pref, quad_currents)
+        return lattice, element_descriptions, start, end
+
     def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 2.0
-        self.Pref = 200.0  # MeV/c, matching PC in twissinit.tfs
+        self.Pref = 198 # MeV/c
         self.Q=-1
-        self.twiss_path = os.path.join(os.path.dirname(__file__), 'Setup_files', 'twissinit.tfs')
-        self.lattice = rft.Lattice(self.twiss_path)
-        print(self.lattice)
         self.population = population
         self.jitter = jitter
         self.nsamples = nsamples
         self.nparticles = nparticles
         self.electronmass=rft.electronmass
         self.is_simulation = True
-
-        for element in list(self.lattice['*']):
-            if 'BTV' in element.get_name():
-                screen = rft.Screen()
-                screen.set_name(element.get_name())
-                screen.set_length(element.get_length())
-                element.replace_with(screen)
-
+        survey_path = os.path.join(os.path.dirname(__file__), "clear.survey0_filtered.tfs")
+        self.lattice, self.element_descriptions, self.start, self.end = self.__build(filename=survey_path)
         self.lattice.set_bpm_resolution(bpm_resolution)
         self.lattice.set_tt_nsteps(0)
         self.log = print
         elements_in_lattice=list(self.lattice['*'])
-        self.sequence = [element.get_name() for element in elements_in_lattice]
-        self.start, self.end = self.sequence[0], self.sequence[-1]
-        self.element_descriptions = {}
-        quad_index = corr_index = 0
-        type_names = {
-            'Quadrupole': 'Quadrupole', 'Corrector': 'Corrector',
-            'Bpm': 'BPM', 'Screen': 'Screen', 'Drift': 'Drift',
-        }
-        for element in elements_in_lattice:
-            element_type = type_names.get(type(element).__name__, type(element).__name__)
-            length = float(element.get_length())
-            s_start = float(element.get_S('entrance'))
-            s_center = float(element.get_S('center'))
-            s_end = float(element.get_S('exit'))
-            self.element_descriptions[element.get_name()] = {
-                'element_type': element_type,
-                'L': length,
-                's_start': s_start,
-                's_center': s_center,
-                's_end': s_end,
-                'quad_index': quad_index if element_type == 'Quadrupole' else None,
-                'corr_index': corr_index if element_type == 'Corrector' else None,
-            }
-            if element_type == 'Quadrupole':
-                quad_index += 1
-            if element_type == 'Corrector':
-                corr_index += 1
+        names_all=list(self.element_descriptions.keys())
+        i0=names_all.index(self.start)
+        i1=names_all.index(self.end)
+        self.sequence = names_all[i0:i1 + 1]
         self._by_name=dict(zip(self.sequence,elements_in_lattice))
-        self.bpms=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'BPM' and ('BPM' in n or 'BPC' in n)]
+        self.bpms=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'BPM']
         self.corrs=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'Corrector']
         self.screens=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'Screen']
         self.quadrupoles = [n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'Quadrupole']
@@ -107,12 +191,13 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
-        T.emitt_x = 7.5 # mm.mrad normalised emittance
-        T.emitt_y = 7.5   # mm.mrad
-        T.beta_x = 12.12616787  # m
-        T.beta_y = 17.44399237   # m; back-propagated from QFD350 entrance
-        T.alpha_x = 11.63710832
-        T.alpha_y = -14.95295729
+        T.emitt_x = 12.7000 # mm.mrad normalised emittance
+        T.emitt_y = 4.3400   # mm.mrad
+        T.beta_x = 46.1766 # m
+        T.beta_y = 109.1117  # m; back-propagated from QFD350 entrance
+        T.alpha_x = 1.3126
+        T.alpha_y = 7.2462
+
         T.sigma_t = 0#10*rft.ps # mm/c
         T.sigma_pt = 0#10 # permille
         T.mean_xp = 0.0
@@ -128,12 +213,14 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         # Beam for DFS - Reduced energy
         Pref = self.dfs_test_energy * self.Pref
         T = rft.Bunch6d_twiss()
-        T.emitt_x = 7.5 # mm.mrad normalised emittance
-        T.emitt_y = 7.5   # mm.mrad
-        T.beta_x = 12.12616787  # m
-        T.beta_y = 17.44399237   # m; back-propagated from QFD350 entrance
-        T.alpha_x = 11.63710832
-        T.alpha_y = -14.95295729
+
+        T.emitt_x = 12.7000 # mm.mrad normalised emittance
+        T.emitt_y = 4.3400   # mm.mrad
+        T.beta_x = 46.244900 # m
+        T.beta_y = 109.143468  # m; back-propagated from QFD350 entrance
+        T.alpha_x = 1.314308
+        T.alpha_y = 7.248155
+
         T.sigma_t = 0#10*rft.ps # mm/c
         T.sigma_pt = 0#10 # permille
         T.mean_xp=0.0
@@ -145,12 +232,14 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         # Beam for WFS - Reduced bunch charge
         population = self.wfs_test_charge * self.population
         T = rft.Bunch6d_twiss()
-        T.emitt_x = 7.5 # mm.mrad normalised emittance
-        T.emitt_y = 7.5   # mm.mrad
-        T.beta_x = 12.12616787  # m
-        T.beta_y = 17.44399237   # m; back-propagated from QFD350 entrance
-        T.alpha_x = 11.63710832
-        T.alpha_y = -14.95295729
+
+        T.emitt_x = 12.7000 # mm.mrad normalised emittance
+        T.emitt_y = 4.3400   # mm.mrad
+        T.beta_x = 46.244900 # m
+        T.beta_y = 109.143468  # m; back-propagated from QFD350 entrance
+        T.alpha_x = 1.314308
+        T.alpha_y = 7.248155
+
         T.sigma_t = 0#10*rft.ps # mm/c
         T.sigma_pt = 0#10 # permille
         T.mean_xp=0.0
@@ -293,7 +382,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.log("Reading ict's...")
         icts = {
             "names": self.bpms,
-            "charge": np.array([self.bpm_elements[name].get_total_charge() for name in self.bpms])
+            "charge": np.array([bpm.get_total_charge() for bpm in self.lattice.get_bpms()])
         }
 
         if isinstance(names, str):
