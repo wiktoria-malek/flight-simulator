@@ -1,5 +1,5 @@
-import os, sys, pyjapc, time
-import pyda, pyda_japc
+import os, sys, time
+import pyda, pyda_japc, pyjapc
 import os, sys
 from pathlib import Path
 import numpy as np
@@ -41,8 +41,8 @@ for i in range(100):
 
     with open(output_file, "w") as file:
         file.write("BPM\tx0\ty0\tx1\ty1\tdx\tdy\n")
-        for name, a, b, c, d, e, f, g in zip(bpms, x0, y0, x1, y1, dx, dy):
+        for name, a, b, c, d, e, f in zip(bpms, x0, y0, x1, y1, dx, dy):
             file.write(
                 f"{name}\t{a:.8g}\t{b:.8g}\t{c:.8g}\t{d:.8g}\t"
-                f"{e:.8g}\t{f:.8g}\t{g:.8g}\n"
+                f"{e:.8g}\t{f:.8g}\n"
             )
