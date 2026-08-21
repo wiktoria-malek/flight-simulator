@@ -337,8 +337,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.log("Restoring initial settings...")
         self._cancel = True
         self._running = False
-        self.interface.reset_energy()
-        self.interface.reset_intensity()
+        w1, w2, w3, rcond, iters, gain, beta = self._read_params()
+        if w2 >0:
+            self.interface.reset_energy()
+        if w3 > 0:
+            self.interface.reset_intensity()
         self.interface.restore_correctors_state(self.restore_state)
         self.reset_ref_orb = True
         self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
@@ -1141,6 +1144,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             QMessageBox.critical(self, "Correction error", str(e))
             self.log(f"Correction error: {e}")
             print_exception(e)  # it shows even the line that generated that error
+        finally:
+            self._running = False
 
     def _stop_correction(self):
         self._cancel = True
