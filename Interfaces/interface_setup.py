@@ -201,7 +201,7 @@ INTERFACE_SETUP = {
                 {
                     "corrector_strength": "gauss*m",
                     "bpm_position": "mV",
-                    "sysid_corrector_kick": 0.0001
+                    "sysid_corrector_kick": 1
                 },
             "bounds":
                 {

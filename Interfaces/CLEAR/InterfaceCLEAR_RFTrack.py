@@ -181,6 +181,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.nominal_K=0.7752883624676146 #3.35  # 1/m
         self.machine_name = "CLEAR"
         self.lattice.align_elements()
+        self.chosen_ict = "CA.BPM0530"
         '''Uncomment lines below to scatter elements in the lattice.'''
         #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
         #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
