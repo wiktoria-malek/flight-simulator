@@ -236,10 +236,6 @@ class SaveOrLoad():
             pickle.dump(correction_matrices, f)
 
     def _find_matching_emittance_settings(self, states_dir):
-        # emittance_settings.json is written as a sibling of the states_.../screens_data_...
-        # folder it describes (see save_emittance_measurement_session / _get_scan_dir). Only trust
-        # it if it actually points back at this exact states folder, to avoid picking up settings
-        # left over from a different scan that happened to share the same parent directory.
         states_dir = os.path.normpath(states_dir)
         parent_dir = os.path.dirname(states_dir)
         settings_path = os.path.join(parent_dir, "emittance_settings.json")
@@ -496,7 +492,6 @@ class SaveOrLoad():
             QMessageBox.warning(self,"Load session",f"Couldn't read correction_settings.json: {e}")
             return
 
-        # Set actuator mode in combo if present
         if hasattr(self, "actuator_mode_combo"):
             mode_text = "Quadrupole movers" if actuator_mode == "QM" else "Correctors"
             idx = self.actuator_mode_combo.findText(mode_text)

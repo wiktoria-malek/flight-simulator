@@ -1011,7 +1011,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 print("current_bdes =", current_bdes)
                 print("new_bdes =", new_bdes)
                 print("after_bdes =", after_bdes)
-                print("applied_delta =", after_bdes - current_bdes)
+                applied_delta = after_bdes - current_bdes
+                print("applied_delta =", applied_delta)
+                kicks_path = os.path.join(self._session_dir, "kicks.txt")
+                write_header = not os.path.exists(kicks_path)
+                with open(kicks_path, "a") as file:
+                    if write_header:
+                        file.write("time\titeration\tcorrector\tbdes_before\tapplied_kick\tbdes_after\n")
+                    time = datetime.now().isoformat(timespec="seconds")
+                    for corrector, before, kick, after in zip(selected_correctors, current_bdes, applied_delta, after_bdes):
+                        file.write(f"{time}\t{it + 1}\t{corrector}\t{before:.12g}\t{kick:.12g}\t{after:.12g}\n")
                 # new bdes and after bdes should be the same
 
                 vals = new_bdes - current_bdes
