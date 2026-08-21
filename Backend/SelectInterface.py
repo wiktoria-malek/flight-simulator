@@ -257,15 +257,23 @@ class InterfaceSelectionDialog(QDialog):
         class_name = selected_entry["class_name"]
         settings = dict(selected_entry.get("settings", {}))
 
-        try:
-            module = importlib.import_module(module_name)
-            cls = getattr(module, class_name)
-            self.selected_interface = cls(**settings)
+        # try:
+        #     module = importlib.import_module(module_name)
+        #     cls = getattr(module, class_name)
+        #     self.selected_interface = cls(**settings)
+        #
+        #     super().accept()
+        #
+        # except Exception as e:
+        #     QMessageBox.critical(self,"Interface unavailable",f"This interface is unavailable. {e}")
 
-            super().accept()
 
-        except Exception as e:
-            QMessageBox.critical(self,"Interface unavailable",f"This interface is unavailable. {e}")
+        module = importlib.import_module(module_name)
+        cls = getattr(module, class_name)
+        self.selected_interface = cls(**settings)
+
+        super().accept()
+
 
     def _move_selection(self, step):
         if not self.radio_buttons:
