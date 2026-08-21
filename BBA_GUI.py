@@ -449,7 +449,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             if np.any(np.isfinite(transmission)):
                 self.traj_transmission_ax = ax.twinx()
                 self.traj_transmission_ax.plot(range(len(transmission)), transmission, "g--", label="Transmission")
-                self.traj_transmission_ax.set_ylabel("Transmission", color="green")
+                self.traj_transmission_ax.set_ylabel("Transmission [%]", color="green")
                 self.traj_transmission_ax.tick_params(axis="y", colors="green")
                 self.traj_transmission_ax.legend(fontsize=7, loc="lower right")
         if values_x or values_y:
