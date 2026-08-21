@@ -23,8 +23,11 @@ def analyze_data(filename, bpm, mode):
         V_SA = change_inverted_bpm_polarity(f["CLEAREventData"][f"CA.{bpm}V-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
         S_SA = change_inverted_bpm_polarity(f["CLEAREventData"][f"CA.{bpm}S-SA"]["SamplesFromTrigger"]["samples"][0], bpm)
 
-        H = process_bpm_signal(H_SA, mode)
-        V = process_bpm_signal(V_SA, mode)
+        # H = process_bpm_signal(H_SA, mode)
+        # V = process_bpm_signal(V_SA, mode)
+        # S = process_bpm_signal(S_SA, mode)
+        H = np.sum(H_SA[320:330])
+        V = np.sum(V_SA[320:330])
         S = np.sum(S_SA[320:330])
 
         print(f"{bpm}: H = {H}, V = {V}")
@@ -59,7 +62,7 @@ for bpm in bpms:
     plt.plot(event_numbers, H_values, label=f"{bpm} H")
     plt.title("H values [mV]")
     plt.xlabel("Event number")
-    plt.ylabel("Integrated signal [mV * sample]")
+    plt.ylabel("Signal [mV]")
     plt.legend()
 plt.show()
 
@@ -72,7 +75,7 @@ for bpm in bpms:
     plt.plot(event_numbers, V_values, label=f"{bpm} V")
     plt.title("V values [mV]")
     plt.xlabel("Event number")
-    plt.ylabel("Integrated signal [mV * sample]")
+    plt.ylabel("Signal [mV]")
     plt.legend()
 plt.show()
 
@@ -84,7 +87,7 @@ for bpm in bpms:
     plt.plot(event_numbers, S_values, label=f"{bpm} S")
     plt.title("S values")
     plt.xlabel("Event number")
-    plt.ylabel("Integrated signal [mV * sample]")
+    plt.ylabel("Signal [mV]")
     plt.legend()
 plt.show()
 

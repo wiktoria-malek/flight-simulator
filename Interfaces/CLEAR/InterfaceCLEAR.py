@@ -543,7 +543,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         for sample in range(self.nsamples):
             self.log(f'Sample = {sample}')
             x_sample, y_sample, tmit_sample = [], [], []
-            #H_SA1[320:330]
             for bpm in selected_names:
                 hsamples = self.client.get(f"{bpm}H-SA/SamplesFromTrigger", context = self.context_acquisition).data
                 vsamples = self.client.get(f"{bpm}V-SA/SamplesFromTrigger", context=self.context_acquisition).data
