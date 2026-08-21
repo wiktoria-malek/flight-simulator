@@ -25,9 +25,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.LogConsole import LogConsole
 from Backend.BBA_helpers.TestOrbits_BBA import TestOrbits
-from Backend.BBA_helpers.RMS_Plots_BBA import RMS_Plots
 from Backend.SaveOrLoad import SaveOrLoad
-from Backend.BBA_helpers.Sextupole_Restoration_Logic import Sextupole_Restoration_Logic
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 import matplotlib.pyplot as plt
 from Backend.BBA_helpers.BPM_weights import BPM_weights
@@ -81,7 +79,7 @@ class BpmWeightsDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
-class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Restoration_Logic):
+class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
     def __init__(self, interface, dir_name, nominal_state=None, start_state=None):
         super().__init__()
         self.cwd = os.getcwd()
@@ -113,9 +111,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.log_console = None
         self.show_response_matrix = None
         self.test_orbits = None
-        self.rms_plots = None
-        self.sextupole_restoration_popup = None
-        self.sextupole_restoration_history = []
         self.traj_popup, self.disp_popup, self.wake_popup = None, None, None
         self._setup_canvases()
         self._plot_double_clicks()
@@ -162,7 +157,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.actuator_mode_label.setVisible(False)
         self.actuator_mode_combo.setVisible(False)
         self.pushButton_11.clicked.connect(self.load_session_settings)
-        self.sextupole_restoration_button.clicked.connect(self._show_sextupole_restoration_popup)
         self.setWindowTitle("BBA GUI")
         self.lineEdit.setText("1")
         self.lineEdit_2.setText("10")
@@ -173,7 +167,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.lineEdit_beta.setText("0")
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
         self.pushButton_reset_ref_orbit.clicked.connect(self._reset_reference_orbit)
-        self.show_orbit_RMS_button.clicked.connect(self._show_orbit_RMS_plots)
         self.reset_ref_orb = False
         self.bpms_list.itemDoubleClicked.connect(self._edit_bpm_weights)
         correctors = self.interface.get_correctors()
@@ -345,7 +338,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self.interface.reset_energy()
         self.interface.reset_intensity()
         self.interface.restore_correctors_state(self.restore_state)
-        self.interface.restore_sextupoles_state(self.restore_state)
         self.reset_ref_orb = True
         self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
         self._clear_graphs()
@@ -377,30 +369,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
             saved_state = self._save_machine_status()
             self._running = True
             self._step = True
-            sextupoles = saved_state.get_sextupoles()
-            sextupoles_to_disable = len(sextupoles["names"]) > 0
             completed = False
             try:
-                if sextupoles_to_disable:
-                    self._start_correction()
-
-                    # self.interface.set_sextupoles(sextupoles["names"], np.zeros(len(sextupoles["names"]), dtype=float))
-                    # self.log("Sextupoles disabled before BBA")
-                    # self._start_correction(silent=True)
-                    # golden_state = self.interface.get_state()
-                    # golden_state = self._apply_jitter_subtraction_to_state(golden_state)
-                    # self.log("BBA finished with sextupoles off. Stored this orbit as the post-BBA reference.")
-                    # self.sextupole_restoration_history = self._restore_sextupoles_one_by_one_with_orbit_correction(saved_state, golden_state, orbit_iters=30)
-                    # self._show_sextupole_restoration_popup()
-                    # QMessageBox.information(self, "Correction", "BBA and sextupole restoration finished.")
-                else:
-                    self._start_correction()
+                self._start_correction()
                 completed = True
             finally:
                 self._running = False
-                if sextupoles_to_disable and not completed:
-                    self.interface.restore_sextupoles_state(saved_state)
-                    self.log("Sextupoles restored after interrupted procedure.")
         else:
             self._step = True
 
@@ -1153,30 +1127,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS, Sextupole_Rest
         self._cancel = True
         QMessageBox.information(self, "Correction", "Stop requested. Finishing current iteration...")
         self.log("Stop requested. Finishing current iteration...")
-
-    def _show_orbit_RMS_plots(self):
-        if self.rms_plots is None:
-            self.rms_plots = RMS_Plots(self)
-        if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
-            QMessageBox.information(self, "Error", "No RMS orbits available.")
-        else:
-            self.rms_plots.plot_all(selected_bpms=self.rms_orbits_data["selected_bpms"],
-                                    start_x=self.rms_orbits_data.get("start_x"),
-                                    start_y=self.rms_orbits_data.get("start_y"),
-                                    current_x=self.rms_orbits_data.get("current_x"),
-                                    current_y=self.rms_orbits_data.get("current_y"),
-                                    final_x=self.rms_orbits_data.get("final_x"),
-                                    final_y=self.rms_orbits_data.get("final_y"),
-                                    x1_vals=self.rms_orbits_data.get("x1_vals"),
-                                    y1_vals=self.rms_orbits_data.get("y1_vals"),
-                                    x2_vals=self.rms_orbits_data.get("x2_vals"),
-                                    y2_vals=self.rms_orbits_data.get("y2_vals"),
-                                    rms_x_iter=self._hist_abs_rms_x, rms_y_iter=self._hist_abs_rms_y,
-                                    rms_xy_iter=self._hist_abs_rms_xy, nominal_x=self.rms_orbits_data.get("nominal_x"),
-                                    nominal_y=self.rms_orbits_data.get("nominal_y"))
-        self.rms_plots.show()
-        self.rms_plots.raise_()
-        self.rms_plots.activateWindow()
 
     def _show_test_orbits(self):
         if self.test_orbits is None:

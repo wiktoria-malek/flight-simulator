@@ -75,27 +75,7 @@ INTERFACE_SETUP = {
                     "em_sigma_unit": "mm"
 
                 },
-            # # QF17X — simulation
-            # "bounds": {
-            #     "emit_x_norm": [4.5, 6.0],
-            #     "beta_x0": [3.5, 6.5],
-            #     "alpha_x0": [-1.0, 1.0],
-            #     "emit_y_norm": [0.01, 0.06],
-            #     "beta_y0": [0.4, 1.0],
-            #     "alpha_y0": [-0.4, 0.6],
-            # }
 
-            # # QD16X — simulation
-            # "bounds": {
-            #     "emit_x_norm": [0.5, 20.0],
-            #     "beta_x0": [0.001, 30.0],
-            #     "alpha_x0": [-1.0, 1.0],
-            #     "emit_y_norm": [0.01, 2.0],
-            #     "beta_y0": [0.001, 30.0],
-            #     "alpha_y0": [-5.0, 5.0],
-            # }
-
-        # QD18X — simulation
         "bounds": {
             "emit_x_norm": [5, 10.0],
             "beta_x0": [0.001, 60.0],
@@ -104,26 +84,6 @@ INTERFACE_SETUP = {
             "beta_y0": [0.001, 60.0],
             "alpha_y0": [-15, 15.0],
         }
-
-        # # QF17X — real machine, initial fit
-        #    # around:
-        #     # ml | rftrack
-        #     # 8.458 | 7.8677
-        #     # 5.280 | 5.782
-        #     # -2.453 | -2.644
-        #     # 0.389 | 0.388
-        #     # 0.631 | 0.63944
-        #     # 0.032 | 0.02945
-        #
-        # "bounds": {
-        #     "emit_x_norm": [5.0, 9.0],
-        #     "beta_x0": [0.001, 50.0],
-        #     "alpha_x0": [-4.0, 4.0],
-        #     "emit_y_norm": [0.01, 1.0],
-        #     "beta_y0": [0.001, 50.0],
-        #     "alpha_y0": [-4.0, 4.0],
-        # }
-
 
         },
 
