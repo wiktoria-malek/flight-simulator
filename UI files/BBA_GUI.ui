@@ -442,151 +442,6 @@ QGroupBox#groupBox_9::title {
             </property>
             <layout class="QVBoxLayout" name="verticalLayout_2">
              <item>
-              <layout class="QHBoxLayout" name="triangular_checkbox_layout">
-               <item>
-                <spacer name="triangular_left_spacer">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeType">
-                  <enum>QSizePolicy::Expanding</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-               <item>
-                <widget class="QCheckBox" name="triangular_checkbox">
-                 <property name="text">
-                  <string>Force triangular matrix</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QToolButton" name="triangular_tooltip">
-                 <property name="minimumSize">
-                  <size>
-                   <width>22</width>
-                   <height>22</height>
-                  </size>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>22</width>
-                   <height>22</height>
-                  </size>
-                 </property>
-                 <property name="focusPolicy">
-                  <enum>Qt::NoFocus</enum>
-                 </property>
-                 <property name="toolTip">
-                  <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;Forces the response matrix to be triangular by setting the response of BPMs upstream of each actuator to zero.&lt;/p&gt;&lt;p&gt;Useful for transport lines or linacs. In a damping ring, the orbit is closed and each corrector can affect every BPM, so this option is usually not needed.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                 </property>
-                 <property name="styleSheet">
-                  <string notr="true">QToolButton#triangular_tooltip {
-    border: 1px solid #888;
-    border-radius: 10px;
-    min-width: 20px;
-    max-width: 20px;
-    min-height: 20px;
-    max-height: 20px;
-    padding: 0px;
-    font-weight: bold;
-}
-QToolButton#triangular_tooltip:hover {
-    background-color: #e6e6e6;
-}</string>
-                 </property>
-                 <property name="text">
-                  <string>?</string>
-                 </property>
-                 <property name="autoRaise">
-                  <bool>true</bool>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="triangular_right_spacer">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeType">
-                  <enum>QSizePolicy::Expanding</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="coupling_layout">
-               <item>
-                <spacer name="horizontalSpacer">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-               <item>
-                <widget class="QCheckBox" name="remove_coupling_checkbox">
-                 <property name="text">
-                  <string>Remove coupling</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QToolButton" name="remove_coupling_tooltip">
-                 <property name="styleSheet">
-                  <string notr="true">QToolButton#remove_coupling_tooltip {
-    border: 1px solid #888;
-    border-radius: 10px;
-    min-width: 20px;
-    max-width: 20px;
-    min-height: 20px;
-    max-height: 20px;
-    padding: 0px;
-    font-weight: bold;
-}
-QToolButton#remove_coupling_tooltip:hover {
-    background-color: #e6e6e6;
-}</string>
-                 </property>
-                 <property name="text">
-                  <string>?</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_2">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
               <layout class="QHBoxLayout" name="actuator_mode_layout">
                <item>
                 <spacer name="actuator_mode_left_spacer">
@@ -1640,6 +1495,93 @@ QToolButton#jitter_subtraction_tooltip:hover {
                        </property>
                        <property name="autoRaise">
                         <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item>
+                    <layout class="QHBoxLayout" name="triangular_checkbox_layout">
+                     <item>
+                      <widget class="QCheckBox" name="triangular_checkbox">
+                       <property name="text">
+                        <string>Force triangular matrix</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QToolButton" name="triangular_tooltip">
+                       <property name="minimumSize">
+                        <size>
+                         <width>22</width>
+                         <height>22</height>
+                        </size>
+                       </property>
+                       <property name="maximumSize">
+                        <size>
+                         <width>22</width>
+                         <height>22</height>
+                        </size>
+                       </property>
+                       <property name="focusPolicy">
+                        <enum>Qt::NoFocus</enum>
+                       </property>
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;body&gt;&lt;p&gt;Forces the response matrix to be triangular by setting the response of BPMs upstream of each actuator to zero.&lt;/p&gt;&lt;p&gt;Useful for transport lines or linacs. In a damping ring, the orbit is closed and each corrector can affect every BPM, so this option is usually not needed.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#triangular_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#triangular_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
+                       </property>
+                       <property name="autoRaise">
+                        <bool>true</bool>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item>
+                    <layout class="QHBoxLayout" name="coupling_layout">
+                     <item>
+                      <widget class="QCheckBox" name="remove_coupling_checkbox">
+                       <property name="text">
+                        <string>Remove coupling</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QToolButton" name="remove_coupling_tooltip">
+                       <property name="styleSheet">
+                        <string notr="true">QToolButton#remove_coupling_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#remove_coupling_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+                       </property>
+                       <property name="text">
+                        <string>?</string>
                        </property>
                       </widget>
                      </item>
