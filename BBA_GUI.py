@@ -710,6 +710,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             Ayy_base = np.array(Ayy, copy=True)
             Axy_base = np.array(Axy, copy=True)
             Ayx_base = np.array(Ayx, copy=True)
+
+            if self.remove_coupling_checkbox.isChecked():
+                Axy_base.fill(0.0)
+                Ayx_base.fill(0.0)
+                
             bpms = list(bpms_common)
 
             n = len(bpms)
