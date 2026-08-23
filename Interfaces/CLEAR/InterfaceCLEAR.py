@@ -977,7 +977,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         proj_y = np.sum(img, axis=1)
 
         # center of each pixel can be expressed as: x_j = (j - (N_x - 1)/2)*hpixel, y_i = (i - (N_i - 1)/2)vhpixel
-
+        # 1.3 mm- 1mm
         '''
         x_centers and y_centers are arrays containing the physical coordinates of the centre of each pixel. 
         They allow to convert the image from pixel intensities into beam position and beam size.

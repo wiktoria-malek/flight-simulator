@@ -6,13 +6,13 @@ from enum import Enum
 try:
     pyqt_version = 6
     from PyQt6 import uic
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea
     from PyQt6.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt6.QtGui import QPainter, QPixmap, QFont
 except ImportError:
     pyqt_version = 5
     from PyQt5 import uic
-    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 import matplotlib
@@ -172,6 +172,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.session = None
         ui_path = os.path.join(os.path.dirname(__file__),"UI files/Emittance_Measurement_GUI.ui")
         uic.loadUi(ui_path, self)
+        self._make_settings_panel_scrollable()
+        QTimer.singleShot(0, self.showMaximized)
         self._load_logo()
         self.load_session_button.clicked.connect(self.load_scan_and_optimization_settings)
         self.session_directory.setText(dir_name)
@@ -258,6 +260,15 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         else:
             self.download_quads_button.setEnabled(True)
             self.download_quads_button.clicked.connect(self._download_all_quads_status)
+
+    def _make_settings_panel_scrollable(self):
+        main_layout = self.centralwidget.layout()
+        settings_panel = self.leftGroup
+        settings_scroll = QScrollArea(self.centralwidget)
+        settings_scroll.setWidgetResizable(True)
+        main_layout.replaceWidget(settings_panel, settings_scroll)
+        settings_scroll.setWidget(settings_panel)
+        self.settings_scroll = settings_scroll
 
     def _download_all_quads_status(self):
         try:
