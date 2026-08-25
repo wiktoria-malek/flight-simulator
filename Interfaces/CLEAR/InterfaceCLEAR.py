@@ -1,6 +1,9 @@
 from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral, change_inverted_bpm_polarity
 from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
 import sys, time, math, os, json
+from scipy.integrate import trapezoid
+from enum import Enum
+from scipy.optimize import curve_fit
 import numpy as np
 try:
     import pyda
@@ -8,8 +11,7 @@ try:
 except ImportError:
     pyda = None
     pyda_japc = None
-from scipy.integrate import trapezoid
-from enum import Enum
+
 try:
     from Interfaces.CLEAR import config
     try:
@@ -479,14 +481,67 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return np.nan
 
     def _acquire_screen_data(self, screen_name):
+        return self._acquire_screen_data_after(screen_name)
+
+    @staticmethod
+    def _camera_frame_id(camera_data):
+        try:
+            timestamp = float(np.asarray(camera_data["imageTimeStamp"]).ravel()[0])
+            if np.isfinite(timestamp):
+                return ("timestamp", timestamp)
+        except (KeyError, TypeError, ValueError, IndexError):
+            pass
+        image = np.asarray(camera_data["image2D"])
+        return ("image", image.shape, image.dtype.str, hash(image.tobytes()))
+
+    def _acquire_screen_data_after(self, screen_name, previous_frame_id=None, timeout=5.0):
         japc_camera = self.screen_config.get(screen_name, {}).get("japc_name", screen_name.rstrip("LH"))
         camera_config = self.screen_config.get(screen_name, {})
         selector = camera_config.get("japc_selector", self.context_empty)
-        try:
-            return self.client.get(f"{japc_camera}.DigiCam/LastImage", context=selector).data
-        except Exception as exc:
-            self.log(f"Could not read camera data from {screen_name}. Reason: {exc}")
+        deadline = time.perf_counter() + timeout
+        camera_data = self.client.get(f"{japc_camera}.DigiCam/LastImage", context=selector).data
+        if previous_frame_id is None or self._camera_frame_id(camera_data) != previous_frame_id:
+            return camera_data
+        if time.perf_counter() >= deadline:
+            self.log(f"No new camera frame for {screen_name} within {timeout:.1f} s; discarding it.")
             return None
+            time.sleep(0.1)
+
+    def _get_screen_pixel_calibration(self, screen_name):
+        camera_config = self.screen_config.get(screen_name, {})
+        fallback = (
+            self.make_safe_float(camera_config.get("s_x_res")),
+            self.make_safe_float(camera_config.get("s_y_res")),
+        )
+        japc_camera = camera_config.get("japc_name", screen_name.rstrip("LH"))
+        selector = camera_config.get("japc_selector", self.context_empty)
+        try:
+            calibration = self.client.get(
+                f"{japc_camera}.DigiCam/CalibrationSetting", context=selector
+            ).data
+            hpixel = self.make_safe_float(calibration.get("pixelCalSet1"))
+            vpixel = self.make_safe_float(calibration.get("pixelCalSet2"))
+            if hpixel > 0 and vpixel > 0:
+                return hpixel, vpixel
+        except Exception as exc:
+            self.log(f"Could not read active pixel calibration for {screen_name}: {exc}")
+        return fallback
+
+    def _orient_screen_image(self, screen_name, image, hpixel, vpixel):
+        camera_config = self.screen_config.get(screen_name, {})
+        japc_camera = camera_config.get("japc_name", screen_name.rstrip("LH"))
+        camera_properties = self.cam_props.get(japc_camera, {})
+        oriented = np.asarray(image, dtype=float)
+        if camera_properties.get("flip_hor", 0):
+            oriented = np.fliplr(oriented)
+        if camera_properties.get("flip_ver", 0):
+            oriented = np.flipud(oriented)
+        rotate = int(camera_properties.get("rotate", 0)) % 4
+        if rotate:
+            oriented = np.rot90(oriented, rotate)
+            if rotate % 2:
+                hpixel, vpixel = vpixel, hpixel
+        return oriented, hpixel, vpixel
 
     def set_screen_camera_on(self, screen_name, on=True):
         japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
@@ -778,21 +833,26 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def acquire_screen_background(self, screen_name, frames = None):
         if frames is None: frames = self.bg_shots
+        previous_data = self._acquire_screen_data(screen_name)
+        previous_frame_id = self._camera_frame_id(previous_data) if previous_data is not None else None
         self.extract_screen(screen_name)
         background_frames = []
         for frame in range(frames):
             self.log(f"Acquiring {frame}/{frames} background frames...")
-            camera_data = self._acquire_screen_data(screen_name)
+            camera_data = self._acquire_screen_data_after(screen_name, previous_frame_id)
             if camera_data is None:
                 continue
+            previous_frame_id = self._camera_frame_id(camera_data)
             image = np.asarray(camera_data['image2D'], dtype=float)
             background_frames.append(image)
             self.log(f"Acquired {frame}/{frames} background frames...")
+            # camgui.bgAction samples its background frames at 100 ms intervals.
+            time.sleep(0.1)
         if not background_frames:
             raise RuntimeError(f"No background frames available for {screen_name}")
-        self.log(f"Acquired {frames} background frames. Calculating the median...")
-        bg_img = np.median(np.stack(background_frames, axis=0), axis=0)
-        self.log(f"Median calculated.")
+        self.log(f"Acquired {frames} background frames. Calculating the mean...")
+        bg_img = np.mean(np.stack(background_frames, axis=0), axis=0)
+        self.log(f"Mean calculated.")
         self.screen_backgrounds[screen_name] = bg_img
         return bg_img
 
@@ -811,14 +871,15 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return False
 
     def acquire_screen_image(self, screen_name):
+        previous_data = self._acquire_screen_data(screen_name)
+        previous_frame_id = self._camera_frame_id(previous_data) if previous_data is not None else None
         self.insert_screen(screen_name)
-        camera_data = self._acquire_screen_data(screen_name)
+        camera_data = self._acquire_screen_data_after(screen_name, previous_frame_id)
         if camera_data is None: raise RuntimeError(f"No camera data available for {screen_name}")
         beam_img = np.asarray(camera_data['image2D'], dtype=float)
         bg_img = self.screen_backgrounds[screen_name]
         subtracted_img = beam_img - bg_img
         subtracted_img[~np.isfinite(subtracted_img)] = 0.0
-        subtracted_img[subtracted_img < 0.0] = 0.0
         return subtracted_img, bg_img.copy(), beam_img
 
     def get_screens(self, names=None):
@@ -841,9 +902,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         inout_list = []
 
         for screen_name in selected_names:
-            camera_config = self.screen_config.get(screen_name, {}) # gets pixel size and resolution
-            hpixel = float(camera_config.get('s_x_res', np.nan))
-            vpixel = float(camera_config.get('s_y_res', np.nan))
+            hpixel, vpixel = self._get_screen_pixel_calibration(screen_name)
 
             try:
                 # image = camera_data["image2D"]
@@ -856,6 +915,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
                     self.log(f"Acquiring background image for {screen_name}.")
                     self.acquire_screen_background(screen_name, frames = 10)
                 subtracted_img, bg_img, beam_img = self.acquire_screen_image(screen_name)
+                raw_hpixel, raw_vpixel = hpixel, vpixel
+                subtracted_img, hpixel, vpixel = self._orient_screen_image(screen_name, subtracted_img, raw_hpixel, raw_vpixel)
+                bg_img, _, _ = self._orient_screen_image(screen_name, bg_img, raw_hpixel, raw_vpixel)
+                beam_img, _, _ = self._orient_screen_image(screen_name, beam_img, raw_hpixel, raw_vpixel)
                 x_mean, y_mean, sigx, sigy, total, img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel)
 
             except Exception as e:
@@ -957,41 +1020,34 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def get_twiss_evolution(self, *args, **kwargs):
         return self.tracking_interface.get_twiss_evolution(*args, **kwargs)
 
+    @staticmethod
+    def _gaussian(x, amplitude, center, sigma, offset):
+        return amplitude * np.exp(-((x - center) ** 2) / (2.0 * sigma ** 2)) + offset
+
+    @classmethod
+    def _fit_projection(cls, axis, projection):
+        baseline_subtracted = projection - np.min(projection)
+        normalisation = baseline_subtracted.sum()
+        centre = baseline_subtracted.dot(axis) / normalisation
+        rms = np.sqrt(baseline_subtracted.dot((axis - centre) ** 2) / normalisation)
+        fitted, _ = curve_fit(cls._gaussian, axis, projection, p0=[np.max(projection) - np.min(projection), centre, rms, np.min(projection)]) # [amplitude, center, sigma, background]
+        return fitted[1], abs(fitted[2]) # sigx, sigy
+
     def _screen_data_from_image(self, image, hpixel, vpixel): # better be subtracted!
-        if image is None or np.asarray(image, dtype=float).ndim!=2 or np.asarray(image, dtype=float).size==0:
-            return np.nan, np.nan, np.nan, np.nan, 0.0, np.zeros((1, 1)), np.array([0.0, 1.0]), np.array([0.0, 1.0])
-
-        # I_xi_yi, I = I_beam - I_background
-        img = np.asarray(image, dtype=float).copy()
+        img = np.flipud(np.asarray(image, dtype=float).copy())
         img[~np.isfinite(img)] = 0.0
-        img[img < 0] = 0.0
         ny, nx = img.shape # e.g. ny = no. of rows, nx = no. of columns
-        j = np.arange(nx)
-        i = np.arange(ny)
+        x_pixels_positions = hpixel * np.linspace(-nx / 2, nx / 2, nx)
+        y_pixels_positions = vpixel * np.linspace(-ny / 2, ny / 2, ny)
         summed_intensity = np.sum(img)
-        if summed_intensity <= 0:
-            hedges = (np.arange(nx + 1) - nx / 2) * hpixel
-            vedges = (np.arange(ny + 1) - ny / 2) * vpixel
-            return np.nan, np.nan, np.nan, np.nan, 0.0, img, hedges, vedges
-        proj_x = np.sum(img, axis=0)
-        proj_y = np.sum(img, axis=1)
+        proj_x = np.mean(img, axis=0)
+        proj_y = np.mean(img, axis=1)
 
-        # center of each pixel can be expressed as: x_j = (j - (N_x - 1)/2)*hpixel, y_i = (i - (N_i - 1)/2)vhpixel
-        # 1.3 mm- 1mm
-        '''
-        x_centers and y_centers are arrays containing the physical coordinates of the centre of each pixel. 
-        They allow to convert the image from pixel intensities into beam position and beam size.
-        '''
-        x_pixels_positions = (j - (nx - 1) / 2) * hpixel # coordinates of centre of each pixel
-        y_pixels_positions = (i - (ny - 1) / 2) * vpixel
-        x_mean_positions = np.sum((x_pixels_positions * proj_x) / summed_intensity)
-        y_mean_positions = np.sum((y_pixels_positions * proj_y) / summed_intensity)
+        x_mean_positions, sigx = self._fit_projection(x_pixels_positions, proj_x)
+        y_mean_positions, sigy = self._fit_projection(y_pixels_positions, proj_y)
 
-        sigx = np.sqrt(np.sum((x_pixels_positions - x_mean_positions)**2 * proj_x) / summed_intensity)
-        sigy = np.sqrt(np.sum((y_pixels_positions - y_mean_positions)**2 * proj_y) / summed_intensity)
-
-        hedges = (np.arange(nx+1) - nx / 2) * hpixel
-        vedges = (np.arange(ny+1) - ny / 2) * vpixel
+        hedges = np.r_[x_pixels_positions - hpixel / 2, x_pixels_positions[-1] + hpixel / 2]
+        vedges = np.r_[y_pixels_positions - vpixel / 2, y_pixels_positions[-1] + vpixel / 2]
 
         return x_mean_positions, y_mean_positions, sigx, sigy, summed_intensity, img, hedges, vedges
 
