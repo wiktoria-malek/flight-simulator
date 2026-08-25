@@ -6,13 +6,13 @@ from enum import Enum
 try:
     pyqt_version = 6
     from PyQt6 import uic
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame
     from PyQt6.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt6.QtGui import QPainter, QPixmap, QFont
 except ImportError:
     pyqt_version = 5
     from PyQt5 import uic
-    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 import matplotlib
@@ -262,13 +262,108 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             self.download_quads_button.clicked.connect(self._download_all_quads_status)
 
     def _make_settings_panel_scrollable(self):
+        """Make the settings panel reflow before falling back to scrolling.
+
+        On a compact screen the controls stay in one column and the scroll area
+        keeps every control reachable.  A wide window instead uses its extra
+        horizontal space for two columns, so the vertical scroll bar naturally
+        disappears once all controls fit.
+        """
         main_layout = self.centralwidget.layout()
         settings_panel = self.leftGroup
         settings_scroll = QScrollArea(self.centralwidget)
         settings_scroll.setWidgetResizable(True)
+        settings_scroll.setFrameShape(QFrame.Shape.NoFrame if pyqt_version == 6 else QFrame.NoFrame)
+        settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded if pyqt_version == 6 else Qt.ScrollBarAsNeeded)
+        settings_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded if pyqt_version == 6 else Qt.ScrollBarAsNeeded)
         main_layout.replaceWidget(settings_panel, settings_scroll)
         settings_scroll.setWidget(settings_panel)
+        main_layout.setStretch(main_layout.indexOf(settings_scroll), 1)
+        main_layout.setStretch(main_layout.indexOf(self.tabs), 1)
         self.settings_scroll = settings_scroll
+
+        # Keep the UI-file layout as the owner of the widgets, but retain its
+        # sections so they can be arranged either vertically or in two columns.
+        self._settings_sections = []
+        while self.leftVBox.count():
+            item = self.leftVBox.takeAt(0)
+            if item.widget() is not None:
+                self._settings_sections.append(item.widget())
+        self._settings_wide_layout = None
+        self._settings_layout_updating = False
+        self._update_settings_layout()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "settings_scroll"):
+            self._update_settings_layout()
+
+    def _settings_can_use_two_columns(self):
+        """Return whether the scroll viewport has room for the compact layout."""
+        if not hasattr(self, "settings_scroll"):
+            return False
+
+        # The database section and the bounds section are the widest pieces in
+        # their respective columns.  Calculating from their size hints keeps the
+        # breakpoint correct with different fonts and platform styles.
+        left_width = max(
+            self.devicesGroup.minimumSizeHint().width(),
+            self.actionsGroup.minimumSizeHint().width(),
+            self.scanGroup.minimumSizeHint().width(),
+        )
+        right_width = max(
+            self.boundsSettingsGroup.minimumSizeHint().width(),
+            self.bounds_quad_group.minimumSizeHint().width(),
+        )
+        layout_margins = self.leftVBox.contentsMargins()
+        required_width = left_width + right_width + self.leftVBox.spacing() + layout_margins.left() + layout_margins.right()
+        return self.settings_scroll.viewport().width() >= required_width
+
+    def _update_settings_layout(self):
+        if self._settings_layout_updating or not hasattr(self, "_settings_sections"):
+            return
+
+        use_two_columns = self._settings_can_use_two_columns()
+        if use_two_columns == self._settings_wide_layout:
+            return
+
+        self._settings_layout_updating = True
+        try:
+            self._clear_layout(self.leftVBox)
+
+            if use_two_columns:
+                columns = QHBoxLayout()
+                columns.setContentsMargins(0, 0, 0, 0)
+                left_column = QVBoxLayout()
+                right_column = QVBoxLayout()
+                left_names = {
+                    "devicesGroup", "computingMethodGroup", "scanGroup",
+                    "localOptimizationSettingsGroup", "actionsGroup", "progressBar",
+                }
+                for section in self._settings_sections:
+                    (left_column if section.objectName() in left_names else right_column).addWidget(section)
+                left_column.addStretch(1)
+                right_column.addStretch(1)
+                columns.addLayout(left_column)
+                columns.addLayout(right_column)
+                self.leftVBox.addLayout(columns)
+            else:
+                for section in self._settings_sections:
+                    self.leftVBox.addWidget(section)
+
+            self._settings_wide_layout = use_two_columns
+        finally:
+            self._settings_layout_updating = False
+
+    @classmethod
+    def _clear_layout(cls, layout):
+        """Detach child widgets before rebuilding a responsive layout."""
+        while layout.count():
+            item = layout.takeAt(0)
+            child_layout = item.layout()
+            if child_layout is not None:
+                cls._clear_layout(child_layout)
+                child_layout.deleteLater()
 
     def _download_all_quads_status(self):
         try:
