@@ -21,7 +21,7 @@ gamma_x = (1.0 + alpha_x**2) / beta_x
 gamma_y = (1.0 + alpha_y**2) / beta_y
 
 def print_twiss_at(element_name: str) -> None:
-    s_target = interface.element_descriptions[element_name]["s_start"]
+    s_target = lattice[element_name].get_S("entrance")
     index = np.argmin(np.abs(s - s_target))
     print(f"\nTwiss parameters at {element_name} (s = {s_target:.4f} m)")
     print(f"  epsilon_x = {emit_x[index]:.4f} mm mrad")
@@ -35,7 +35,7 @@ def print_twiss_at(element_name: str) -> None:
 # The notebook reference Twiss values should be recovered at QFD350.
 print_twiss_at("CA.QFD0350")
 print_twiss_at("CA.QDD0515")
-quad_s = interface.element_descriptions["CA.QDD0515"]["s_start"]
+quad_s = lattice["CA.QDD0515"].get_S("entrance")
 
 fig, axes = plt.subplots(4, 1, figsize=(11, 11), sharex=True)
 ax_sigma, ax_beta, ax_alpha, ax_emit = axes

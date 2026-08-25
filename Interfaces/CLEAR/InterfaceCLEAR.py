@@ -148,7 +148,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.cam_props = self.CamList() # Load camera configuration from assets/cameras.json
         self.camList = list(self.cam_props.keys())
         self.lattice = self.tracking_interface.lattice
-        self.element_descriptions = self.tracking_interface.element_descriptions
         self.start = self.tracking_interface.start
         self.end = self.tracking_interface.end
         self.bg_shots = int(bg_shots)
@@ -171,11 +170,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def _get_elements_positions_show_beamline(self, names=None):
         if isinstance(names, str):
             names = [names]
-        all_names = [name for name in self.element_descriptions if names is None or name in names]
+        all_names = [name for name in self.tracking_interface.get_sequence() if names is None or name in names]
 
         return {
             "names": all_names,
-            "S": np.array([self.element_descriptions[name]["s_start"] for name in all_names], dtype=float),
+            "S": np.array([self._get_tracking_element(name).get_S("entrance") for name in all_names], dtype=float),
         }
 
     def get_beam_factors(self):
@@ -194,11 +193,24 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def _get_twiss_s_positions(self, names):
         positions = []
         for name in names:
-            description = self.element_descriptions.get(name)
-            if description is None:
-                description = self.element_descriptions.get(str(name).rstrip("LH"))
-            positions.append(description["s_end"] if description is not None else np.nan)
+            element = self._get_tracking_element(name)
+            positions.append(float(element.get_S("exit")) if element is not None else np.nan)
         return positions
+
+    def _get_tracking_element(self, name):
+        """Return the model element, including the BTV0390L/H machine aliases."""
+        candidates = (name, str(name).rstrip("LH"))
+        for candidate in dict.fromkeys(candidates):
+            try:
+                element = self.lattice[candidate]
+            except Exception:
+                continue
+            if isinstance(element, list):
+                if not element:
+                    continue
+                element = element[-1]
+            return element
+        return None
 
     @staticmethod
     def make_safe_float(value, default=np.nan):  # so even if japc address returns none, empty array or whatever, interface still works
@@ -802,7 +814,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         if not np.isfinite(current_A) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
             return np.nan
 
-        length = self.tracking_interface.element_descriptions[name]["L"]
+        length = float(self._get_tracking_element(name).get_length())
         k1 = self.tracking_interface.get_Quad_K_from_I(current_A, length, pref_mev_c)
         return self._quad_sign(name) * k1 * length
 

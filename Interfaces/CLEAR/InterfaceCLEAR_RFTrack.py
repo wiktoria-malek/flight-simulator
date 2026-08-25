@@ -26,37 +26,6 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return K # 1/m^2
 
     @staticmethod
-    def _build_element_descriptions(elements):
-        descriptions = {}
-        for element in elements:
-            name = element.get_name()
-            native_type = type(element).__name__
-            if name.startswith("CA.BTV"):
-                element_type = "Screen"
-            elif native_type == "Quadrupole":
-                element_type = "Quadrupole"
-            elif native_type == "Corrector":
-                element_type = "Corrector"
-            elif native_type == "Bpm":
-                element_type = "BPM"
-            elif native_type == "Drift":
-                element_type = "Drift"
-            else:
-                element_type = native_type
-
-            length = float(element.get_length())
-            s_start = float(element.get_S("entrance"))
-            s_end = float(element.get_S("exit"))
-            descriptions[name] = {
-                "element_type": element_type,
-                "L": length,
-                "s_start": s_start,
-                "s_center": (s_start + s_end) / 2.0,
-                "s_end": s_end,
-            }
-        return descriptions
-
-    @staticmethod
     def _replace_btv_monitors_with_screens(lattice):
         for element in list(lattice['*']):
             if not element.get_name().startswith("CA.BTV"):
@@ -82,23 +51,17 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.lattice = rft.Lattice(survey_path)
         self._replace_btv_monitors_with_screens(self.lattice)
         elements_in_lattice = list(self.lattice['*'])
-        self.element_descriptions = self._build_element_descriptions(elements_in_lattice)
         self.sequence = [element.get_name() for element in elements_in_lattice]
         self.start = self.sequence[0]
         self.end = self.sequence[-1]
         self.lattice.set_bpm_resolution(bpm_resolution)
         self.lattice.set_tt_nsteps(0)
         self.log = print
-        self._by_name=dict(zip(self.sequence,elements_in_lattice))
-        self.bpms=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'BPM']
-        self.corrs=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'Corrector']
-        self.screens=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'Screen']
-        self.quadrupoles = [n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'Quadrupole']
+        self.bpms = [element.get_name() for element in self.lattice.get_bpms()]
+        self.corrs = [element.get_name() for element in self.lattice.get_correctors()]
+        self.screens = [element.get_name() for element in self.lattice.get_screens()]
+        self.quadrupoles = [element.get_name() for element in self.lattice.get_quadrupoles()]
         self.sextupoles = []
-        self.bpm_elements={n: self._by_name[n] for n in self.bpms}
-        self.corrector_elements={n: self._by_name[n] for n in self.corrs}
-        self.screen_elements={n: self._by_name[n] for n in self.screens}
-        self.quadrupole_elements = {n: self._by_name[n] for n in self.quadrupoles}
         self.__setup_beam0()
         self.__track_bunch()
         self.freq=2.997e9
@@ -195,10 +158,9 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         s_list = []
 
         for screen_name in selected_screens:
-            screen = self.screen_elements[screen_name]
+            screen = self.lattice[screen_name]
             screen_names.append(screen_name)
-            elem = self.element_descriptions.get(screen_name, {})
-            s_list.append(elem.get("s_start", np.nan))
+            s_list.append(float(screen.get_S("entrance")))
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             bunch = screen.get_bunch()
@@ -290,8 +252,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         selected = [name for name in self.sequence if names is None or name in names]
         return {
             "names": selected,
-            "S": np.array([self.element_descriptions[name]["s_start"] for name in selected], dtype=float),
-            "L": np.array([self.element_descriptions[name]["L"] for name in selected], dtype=float),
+            "S": np.array([self.lattice[name].get_S("entrance") for name in selected], dtype=float),
+            "L": np.array([self.lattice[name].get_length() for name in selected], dtype=float),
         }
 
     def get_sequence(self):
@@ -328,7 +290,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         #self.log("Reading correctors' strengths...")
         bdes = np.zeros(len(self.corrs))
         for i,corrector in enumerate(self.corrs):
-            c=self.corrector_elements[corrector]
+            c=self.lattice[corrector]
             hx,hy=c.get_strength()
             if "DHG" in corrector: #horizontal
                 bdes[i] = (hx*10)  # gauss*m
@@ -356,7 +318,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         for i in range(self.nsamples):
             for j, bpm_name in enumerate(self.bpms):
-                bpm = self.bpm_elements[bpm_name]
+                bpm = self.lattice[bpm_name]
                 reading = bpm.get_reading()
                 x[i, j] = reading[0]
                 y[i, j] = reading[1]
@@ -383,7 +345,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = [corr_vals]
         for corr, val in zip(names, corr_vals):
-            c = self.corrector_elements[corr]
+            c = self.lattice[corr]
             if "DHG" in corr:
                 c.set_strength(val / 10, 0.0)
             elif ("DHJ" in corr) or ("SDV" in corr):
@@ -396,7 +358,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         if not isinstance(corr_vals, (list, tuple, np.ndarray)):
             corr_vals = [corr_vals]
         for corr, val in zip(names, corr_vals):
-            c = self.corrector_elements[corr]
+            c = self.lattice[corr]
             if "DHG" in corr:
                 c.vary_strength(val / 10, 0.0)
             elif ("SDV" in corr) or ("DHJ" in corr):
@@ -785,7 +747,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return {
             "names": all_names,
-            "S": np.array([self.element_descriptions[name]["s_start"] for name in all_names], dtype=float),
+            "S": np.array([self.lattice[name].get_S("entrance") for name in all_names], dtype=float),
         }
 
     def _give_elements_to_show_beamline(self, quad_selected):
