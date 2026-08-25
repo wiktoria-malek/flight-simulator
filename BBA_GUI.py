@@ -26,7 +26,7 @@ from matplotlib.figure import Figure
 from Backend.LogConsole import LogConsole
 from Backend.BBA_helpers.TestOrbits_BBA import TestOrbits
 from Backend.SaveOrLoad import SaveOrLoad
-from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
+from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS, AdaptiveResponseMatrix
 import matplotlib.pyplot as plt
 from Backend.BBA_helpers.BPM_weights import BPM_weights
 from Backend.ActuatorMode import ActuatorMode
@@ -754,6 +754,11 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
             plt.ion()
 
+            self.use_adaptive_R = getattr(self, "use_adaptive_R", True)
+            self._adaptive_R = getattr(self, "_adaptive_R", None)
+            self._adaptive_R_prev_kick = None
+            self._adaptive_R_prev_orbit = None
+
             for it in range(iters):
                 if self._cancel:
                     break
@@ -790,6 +795,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 O0 = state0.get_orbit(bpms)  # because axis=1 is mean from one whole measurement, not for 1 bpm
                 O0x = np.asarray(O0['x'], dtype=float).reshape(-1, 1)
                 O0y = np.asarray(O0['y'], dtype=float).reshape(-1, 1)
+                orbit_now = np.concatenate([O0x, O0y]).ravel()
+                if self.use_adaptive_R and self._adaptive_R is not None and self._adaptive_R_prev_kick is not None:
+                    self._adaptive_R.update(self._adaptive_R_prev_kick, orbit_now - self._adaptive_R_prev_orbit)
                 bpms0 = state0.get_bpms(bpms)
                 x0_vals = np.asarray(bpms0['x'], dtype=float)
                 y0_vals = np.asarray(bpms0['y'], dtype=float)
@@ -967,6 +975,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 A = np.block([[Axx_it, Axy_it],
                               [Ayx_it, Ayy_it]])
 
+                if self.use_adaptive_R:
+                    if self._adaptive_R is None or self._adaptive_R.R0.shape != A.shape:
+                        self._adaptive_R = AdaptiveResponseMatrix(A)  # first use, or corrector/BPM selection changed
+                    else:
+                        A = self._adaptive_R.R
+
                 B = np.vstack([Bx, By])
 
                 A[np.isnan(A)] = 0
@@ -1024,6 +1038,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 print("after_bdes =", after_bdes)
                 applied_delta = after_bdes - current_bdes
                 print("applied_delta =", applied_delta)
+                if self.use_adaptive_R:
+                    self._adaptive_R_prev_kick = applied_delta.copy()
+                    self._adaptive_R_prev_orbit = orbit_now
                 kicks_path = os.path.join(self._session_dir, "kicks.txt")
                 write_header = not os.path.exists(kicks_path)
                 with open(kicks_path, "a") as file:

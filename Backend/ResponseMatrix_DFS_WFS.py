@@ -8,6 +8,33 @@ from Knobs.jitter_subtraction import apply_jitter_subtraction
 Mutual response matrix calculation algorithm.
 '''
 
+class AdaptiveResponseMatrix:
+    def __init__(self, R0, forgetting=0.995, rank=3, p0_scale=100.0):
+        self.R0 = np.array(R0, dtype=float)
+        self.delta = np.zeros_like(self.R0)
+        self.P = None
+        self.p0_scale = p0_scale
+        self.forgetting = forgetting
+        self.rank = rank
+
+    def update(self, u, dx):
+        u = np.asarray(u, dtype=float).ravel()
+        dx = np.asarray(dx, dtype=float).ravel()
+        if self.P is None:
+            self.P = self.p0_scale / max(u @ u, 1e-12) * np.eye(len(u))
+        residual = dx - (self.R0 + self.delta) @ u
+        Pu = self.P @ u
+        denom = self.forgetting + u @ Pu
+        self.P = (self.P - np.outer(Pu, Pu) / denom) / self.forgetting
+        self.delta = self.delta + np.outer(residual, Pu) / denom
+        U, S, Vt = np.linalg.svd(self.delta, full_matrices=False)
+        r = min(self.rank, S.size)
+        self.delta = (U[:, :r] * S[:r]) @ Vt[:r]
+
+    @property
+    def R(self):
+        return self.R0 + self.delta
+
 class ResponseMatrix_DFS_WFS():
 
     def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=1e-3):
@@ -15,10 +42,7 @@ class ResponseMatrix_DFS_WFS():
         if not info["ok"]:
             raise RuntimeError(f"Could not find any valid DATA pairs in {directory}")
 
-        return self._compute_response_matrix(
-            pairs=info["pairs"], correctors=correctors, bpms=bpms,
-            triangular=triangular, actuator_mode=actuator_mode, rcond=rcond,
-        )
+        return self._compute_response_matrix(pairs=info["pairs"], correctors=correctors, bpms=bpms, triangular=triangular, actuator_mode=actuator_mode, rcond=rcond)
 
     def _find_useful_files(self, directory):
         datafiles=sorted(glob.glob(os.path.join(directory, 'DATA*.pkl')))
