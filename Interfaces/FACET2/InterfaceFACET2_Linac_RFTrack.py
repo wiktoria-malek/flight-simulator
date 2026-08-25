@@ -270,19 +270,11 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
             names = [names]
         all_names = []
         all_s = []
-        all_l = []
-        s_pos = 0.0
         for element in self.lattice['*']:
             element_name = element.get_name()
-            try:
-                element_length = float(element.get_length())
-            except Exception:
-                element_length = 0.0
             if names is None or element_name in names:
                 all_names.append(element_name)
-                all_s.append(s_pos)
-                all_l.append(element_length)
-            s_pos += element_length
+                all_s.append(float(element.get_S("entrance")))
         return {
             "names": all_names,
             "S": np.array(all_s, dtype=float),
@@ -298,18 +290,6 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
             screen for screen in self.screens
             if names is None or screen in names
         ]
-
-        s_positions = {}
-        s_pos = 0.0
-
-        for element in self.lattice['*']:
-            element_name = element.get_name()
-            if element_name in selected_screens:
-                s_positions[element_name] = s_pos
-            try:
-                s_pos += element.get_length()
-            except Exception:
-                pass
 
         hpixel_list = []
         vpixel_list = []
@@ -327,7 +307,7 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         for screen_name in selected_screens:
             screen = self.lattice[screen_name]
             screen_names.append(screen_name)
-            s_list.append(s_positions.get(screen_name, np.nan))
+            s_list.append(float(screen.get_S("entrance")))
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             bunch = screen.get_bunch()
@@ -426,21 +406,13 @@ class InterfaceFACET2_Linac_RFTrack(AbstractMachineInterface):
         all_names = []
         all_s = []
         all_l = []
-        s_pos = 0.0
 
         for element in self.lattice['*']:
             element_name = element.get_name()
-            try:
-                element_length = float(element.get_length())
-            except Exception:
-                element_length = 0.0
-
             if names is None or element_name in names:
                 all_names.append(element_name)
-                all_s.append(s_pos)
-                all_l.append(element_length)
-
-            s_pos += element_length
+                all_s.append(float(element.get_S("entrance")))
+                all_l.append(float(element.get_length()))
 
         return {
             "names": all_names,

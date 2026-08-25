@@ -419,36 +419,12 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         screen_names = []
         s_list=[]
 
-        # get S positions of screens
-        with open(self.twiss_path, "r") as file:
-            lines = [line.strip() for line in file if line.strip()]
-
-        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
-        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
-        columns = lines[star_symbol].lstrip("*").split()
-        try:
-            name_column = columns.index("NAME")
-            s_column = columns.index("S")
-        except ValueError as e:
-            raise RuntimeError("There are no such columns in the twiss file")
-
-        s_values = {}
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            if len(data) <= max(name_column, s_column):  # if a line has less column than needed, it is omitted
-                continue
-            screen_name = data[name_column].strip('"')
-            try:
-                s_values[screen_name] = (float(data[s_column]))
-            except ValueError:
-                continue
-
         for s in self.lattice.get_screens():
             screen_name = s.get_name()
             if names is not None and screen_name not in names:
                 continue
             screen_names.append(screen_name)
-            s_list.append(s_values.get(screen_name, np.nan))
+            s_list.append(float(s.get_S("exit")))
             hpixel_list.append(hpixel)
             vpixel_list.append(vpixel)
             m = s.get_bunch().get_phase_space('%x %y')
@@ -650,25 +626,16 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         all_names = []
         all_s = []
         all_l = []
-        s_pos = 0.0
-
         for element in self.lattice['*']:
             element_name = element.get_name()
-            try:
-                element_length = float(element.get_length())
-            except Exception:
-                element_length = 0.0
-
             if names is None or element_name in names:
                 all_names.append(element_name)
-                all_s.append(s_pos)
-                all_l.append(element_length)
-
-            s_pos += element_length
+                all_s.append(float(element.get_S("entrance")))
+                all_l.append(float(element.get_length()))
 
         return {
             "names": all_names,
-            #"S": np.array(all_s, dtype=float),
+            "S": np.array(all_s, dtype=float),
             "L": np.array(all_l, dtype=float),
         }
 
@@ -678,22 +645,11 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         all_names = []
         all_s = []
-        all_l = []
-        s_pos = 0.0
-
         for element in self.lattice['*']:
             element_name = element.get_name()
-            try:
-                element_length = float(element.get_length())
-            except Exception:
-                element_length = 0.0
-
             if names is None or element_name in names:
                 all_names.append(element_name)
-                all_s.append(s_pos)
-                all_l.append(element_length)
-
-            s_pos += element_length
+                all_s.append(float(element.get_S("entrance")))
 
         return {
             "names": all_names,

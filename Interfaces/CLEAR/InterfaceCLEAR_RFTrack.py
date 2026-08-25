@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import RF_Track as rft
 from scipy.optimize import minimize
 import os
-import shlex
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
@@ -27,42 +26,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return K # 1/m^2
 
     @staticmethod
-    def _load_twiss_element_descriptions(twiss_path, elements):
-        with open(twiss_path, encoding="utf-8") as file:
-            lines = [line.strip() for line in file if line.strip()]
-
-        column_line = next(line for line in lines if line.startswith("*"))
-        columns = column_line[1:].split()
-        try:
-            data_start = next(i for i, line in enumerate(lines) if line.startswith("$") ) + 1
-            name_index = columns.index("NAME")
-            keyword_index = columns.index("KEYWORD")
-            s_index = columns.index("S")
-            length_index = columns.index("L")
-        except (StopIteration, ValueError) as exc:
-            raise ValueError(f"CLEAR Twiss file has no usable NAME/KEYWORD/S/L columns: {twiss_path}") from exc
-
-        twiss_rows = {}
-        for line in lines[data_start:]:
-            values = shlex.split(line)
-            if len(values) <= max(name_index, keyword_index, s_index, length_index):
-                continue
-            try:
-                twiss_rows[values[name_index]] = {
-                    "keyword": values[keyword_index],
-                    "s_end": float(values[s_index]),
-                    "L": float(values[length_index]),
-                }
-            except ValueError:
-                continue
-
+    def _build_element_descriptions(elements):
         descriptions = {}
         for element in elements:
             name = element.get_name()
-            row = twiss_rows.get(name)
-            if row is None:
-                raise ValueError(f"Element {name!r} loaded by RF-Track is missing from {twiss_path}")
-
             native_type = type(element).__name__
             if name.startswith("CA.BTV"):
                 element_type = "Screen"
@@ -75,15 +42,16 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             elif native_type == "Drift":
                 element_type = "Drift"
             else:
-                element_type = row["keyword"].title()
+                element_type = native_type
 
-            length = row["L"]
-            s_end = row["s_end"]
+            length = float(element.get_length())
+            s_start = float(element.get_S("entrance"))
+            s_end = float(element.get_S("exit"))
             descriptions[name] = {
                 "element_type": element_type,
                 "L": length,
-                "s_start": s_end - length,
-                "s_center": s_end - length / 2.0,
+                "s_start": s_start,
+                "s_center": (s_start + s_end) / 2.0,
                 "s_end": s_end,
             }
         return descriptions
@@ -111,11 +79,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.electronmass=rft.electronmass
         self.is_simulation = True
         survey_path = os.path.join(os.path.dirname(__file__),"Setup_files", "twissinit.tfs")
-        self.twiss_path = survey_path
         self.lattice = rft.Lattice(survey_path)
         self._replace_btv_monitors_with_screens(self.lattice)
         elements_in_lattice = list(self.lattice['*'])
-        self.element_descriptions = self._load_twiss_element_descriptions(survey_path, elements_in_lattice)
+        self.element_descriptions = self._build_element_descriptions(elements_in_lattice)
         self.sequence = [element.get_name() for element in elements_in_lattice]
         self.start = self.sequence[0]
         self.end = self.sequence[-1]

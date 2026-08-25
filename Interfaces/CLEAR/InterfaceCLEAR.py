@@ -145,7 +145,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.quad_set_params = dict(zip(config.quad_names, config.current_set_params))
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
         self.quad_status_params = dict(zip(config.quad_names, config.current_status_params))
-        self.twiss_path = self.tracking_interface.twiss_path
         self.cam_props = self.CamList() # Load camera configuration from assets/cameras.json
         self.camList = list(self.cam_props.keys())
         self.lattice = self.tracking_interface.lattice
@@ -192,37 +191,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
         beta_gamma = gamma_rel * beta_rel
         return gamma_rel, beta_rel, beta_gamma
 
-    def _read_twiss_file(self):
-        if self.twiss_path is None:
-            raise FileNotFoundError('No CLEAR twiss file configured')
-        with open(self.twiss_path, "r") as file:
-            lines = [line.strip() for line in file if line.strip()]
-        star_symbol = next(i for i, line in enumerate(lines) if line.startswith("*"))
-        dollar_sign = next(i for i, line in enumerate(lines) if line.startswith("$") and i > star_symbol)
-        columns = lines[star_symbol].lstrip("*").split()
-        return lines, columns, dollar_sign
-
     def _get_twiss_s_positions(self, names):
-        names = list(names)
-
-        lines, columns, dollar_sign = self._read_twiss_file()
-        try:
-            name_column = columns.index("NAME")
-            s_column = columns.index("S")
-        except ValueError:
-            return [np.nan] * len(names)
-        s_pos = {}
-
-        for line in lines[dollar_sign + 1:]:
-            data = line.split()
-            if len(data) <= max(name_column, s_column):
-                continue
-            elem_name = data[name_column].strip('"')
-            try:
-                s_pos[elem_name] = float(data[s_column])
-            except ValueError:
-                continue
-        return [s_pos.get(name, s_pos.get(name.rstrip('LH'), np.nan)) for name in names]
+        positions = []
+        for name in names:
+            description = self.element_descriptions.get(name)
+            if description is None:
+                description = self.element_descriptions.get(str(name).rstrip("LH"))
+            positions.append(description["s_end"] if description is not None else np.nan)
+        return positions
 
     @staticmethod
     def make_safe_float(value, default=np.nan):  # so even if japc address returns none, empty array or whatever, interface still works
