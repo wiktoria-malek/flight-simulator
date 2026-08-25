@@ -10,12 +10,15 @@ Mutual response matrix calculation algorithm.
 
 class ResponseMatrix_DFS_WFS():
 
-    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode = "correctors"):
+    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=1e-3):
         info=self._find_useful_files(directory)
         if not info["ok"]:
             raise RuntimeError(f"Could not find any valid DATA pairs in {directory}")
 
-        return self._compute_response_matrix(pairs=info["pairs"],correctors=correctors, bpms=bpms, triangular=triangular, actuator_mode = actuator_mode)
+        return self._compute_response_matrix(
+            pairs=info["pairs"], correctors=correctors, bpms=bpms,
+            triangular=triangular, actuator_mode=actuator_mode, rcond=rcond,
+        )
 
     def _find_useful_files(self, directory):
         datafiles=sorted(glob.glob(os.path.join(directory, 'DATA*.pkl')))
@@ -34,7 +37,7 @@ class ResponseMatrix_DFS_WFS():
 
         return {"ok":bool(pairs), "dir":directory, "pairs":pairs}
 
-    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False, actuator_mode = "correctors"):
+    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=1e-3):
         if not hasattr(self, 'sequence'):
             file = pairs[0][0]
             S = State(filename=file)
@@ -65,7 +68,6 @@ class ResponseMatrix_DFS_WFS():
         By = np.empty((0, len(bpms)))
         Cx = np.empty((0, len(hcorrs)))
         Cy = np.empty((0, len(vcorrs)))
-        B_mask = np.full((1, len(bpms)), True, dtype=bool)
 
         for pair in pairs:
             if len(pair) == 3:
@@ -92,8 +94,6 @@ class ResponseMatrix_DFS_WFS():
             if all_not_finite:
                 print(f"Skipping all-NaN files: {os.path.basename(fp)} / {os.path.basename(fm)}")
                 continue
-
-            B_mask &= np.isfinite(Op['x']) & np.isfinite(Om['x']) & np.isfinite(Op['y']) & np.isfinite(Om['y'])
 
             if actuator_mode == "quadrupole_movers":
                 if str(tag).endswith("_x"):
@@ -142,21 +142,30 @@ class ResponseMatrix_DFS_WFS():
             Cy = np.vstack((Cy, Cy_p))
             Cy = np.vstack((Cy, Cy_m))
 
-        B_mask = B_mask.ravel()
+        Bx, By = Bx.astype(float), By.astype(float)
+        Cx, Cy = Cx.astype(float), Cy.astype(float)
 
-        # Compute the response matrices
-        ones_column_x = np.ones((Cx.shape[0], 1))
-        ones_column_y = np.ones((Cy.shape[0], 1))
+        # Drop unavailable correctors and incomplete shots before fitting.
+        hcol_mask = np.any(np.isfinite(Cx), axis=0)
+        vcol_mask = np.any(np.isfinite(Cy), axis=0)
+        hcorrs = [corr for corr, keep in zip(hcorrs, hcol_mask) if keep]
+        vcorrs = [corr for corr, keep in zip(vcorrs, vcol_mask) if keep]
+        Cx, Cy = Cx[:, hcol_mask], Cy[:, vcol_mask]
 
-        # Add the column of ones to the matrix
-        Cx = np.hstack((Cx, ones_column_x)).astype(float)
-        Cy = np.hstack((Cy, ones_column_y)).astype(float)
+        row_mask = np.all(np.isfinite(Cx), axis=1) & np.all(np.isfinite(Cy), axis=1)
+        if not np.any(row_mask):
+            raise RuntimeError("No complete corrector readbacks available for response-matrix fitting")
+        Bx, By, Cx, Cy = Bx[row_mask], By[row_mask], Cx[row_mask], Cy[row_mask]
 
-        Bx = Bx.astype(float) # facet2 might give objects instead of floats64, like atf2
-        By = By.astype(float) # so we do a conversion of a whole array so that every element is a float and lstsq gets a normal, numeric array
+        B_mask = np.all(np.isfinite(Bx), axis=0) & np.all(np.isfinite(By), axis=0)
+        if not np.any(B_mask):
+            raise RuntimeError("No BPM has complete orbit data for response-matrix fitting")
+
+        Cx = np.hstack((Cx, np.ones((Cx.shape[0], 1))))
+        Cy = np.hstack((Cy, np.ones((Cy.shape[0], 1))))
 
         def lstsq(C, B):
-            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=None)[0])
+            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=rcond)[0])
 
         Rxx_ = lstsq(Cx, Bx)
         Rxy_ = lstsq(Cy, Bx)
