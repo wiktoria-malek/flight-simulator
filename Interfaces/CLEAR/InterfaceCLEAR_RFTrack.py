@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import RF_Track as rft
 from scipy.optimize import minimize
-import re, os
+import os
+import shlex
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
@@ -25,126 +26,82 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         K = self.get_Quad_K(G_0, Pref)
         return K # 1/m^2
 
-    def __build(self, filename):
-        with open(filename) as file:
-            lines = file.readlines()
-        element_descriptions = {}
-        previous_name = None
-        quad_index = 0
-        corr_index = 0
-        for line in lines:
-            if line[0:2] != ' "':
+    @staticmethod
+    def _load_twiss_element_descriptions(twiss_path, elements):
+        with open(twiss_path, encoding="utf-8") as file:
+            lines = [line.strip() for line in file if line.strip()]
+
+        column_line = next(line for line in lines if line.startswith("*"))
+        columns = column_line[1:].split()
+        try:
+            data_start = next(i for i, line in enumerate(lines) if line.startswith("$") ) + 1
+            name_index = columns.index("NAME")
+            keyword_index = columns.index("KEYWORD")
+            s_index = columns.index("S")
+            length_index = columns.index("L")
+        except (StopIteration, ValueError) as exc:
+            raise ValueError(f"CLEAR Twiss file has no usable NAME/KEYWORD/S/L columns: {twiss_path}") from exc
+
+        twiss_rows = {}
+        for line in lines[data_start:]:
+            values = shlex.split(line)
+            if len(values) <= max(name_index, keyword_index, s_index, length_index):
+                continue
+            try:
+                twiss_rows[values[name_index]] = {
+                    "keyword": values[keyword_index],
+                    "s_end": float(values[s_index]),
+                    "L": float(values[length_index]),
+                }
+            except ValueError:
                 continue
 
-            text = re.findall(r'"([A-Za-z0-9.$_]+)"', line)
-            numbers = re.findall(r'\d+\.\d+', line)
-            name = text[0]
+        descriptions = {}
+        for element in elements:
+            name = element.get_name()
+            row = twiss_rows.get(name)
+            if row is None:
+                raise ValueError(f"Element {name!r} loaded by RF-Track is missing from {twiss_path}")
 
-            if name == 'CA.BTV0800':
-                continue
-            element_type = None
-            if 'QFD' in name or 'QDD' in name:
-                element_type = 'Quadrupole'
-            elif 'BTV' in name:
-                element_type = 'Screen'
-            elif 'DHG' in name or 'DHJ' in name:
-                element_type = 'Corrector'
-            elif 'BPC' in name or 'BPM' in name:
-                element_type = 'BPM'
-            elif len(text) > 1 and text[1] == 'MARKER':
-                element_type = 'Marker'
-            if element_type is None:
-                continue
+            native_type = type(element).__name__
+            if name.startswith("CA.BTV"):
+                element_type = "Screen"
+            elif native_type == "Quadrupole":
+                element_type = "Quadrupole"
+            elif native_type == "Corrector":
+                element_type = "Corrector"
+            elif native_type == "Bpm":
+                element_type = "BPM"
+            elif native_type == "Drift":
+                element_type = "Drift"
+            else:
+                element_type = row["keyword"].title()
 
-            s_end = float(numbers[0])
-            L = float(numbers[1])
-            s_start = s_end - L
-
-            L = round(L, 4)
-            s_start = round(s_start, 4)
-            s_end = round(s_end, 4)
-
-            if previous_name is not None:
-                L_drift = round(s_start - element_descriptions[previous_name]['s_end'], 4)
-                if L_drift != 0:
-                    element_descriptions[previous_name + ' Drift'] = {
-                        'element_type': 'Drift',
-                        'L': L_drift,
-                        's_start': element_descriptions[previous_name]['s_end'],
-                        's_end': s_start,
-                        'quad_index': None,
-                        'corr_index': None,
-                    }
-
-            element_descriptions[name] = {
-                'element_type': element_type,
-                'L': L,
-                's_start': s_start,
-                's_end': s_end,
-                'quad_index': quad_index if element_type == 'Quadrupole' else None,
-                'corr_index': corr_index if element_type == 'Corrector' else None,
+            length = row["L"]
+            s_end = row["s_end"]
+            descriptions[name] = {
+                "element_type": element_type,
+                "L": length,
+                "s_start": s_end - length,
+                "s_center": s_end - length / 2.0,
+                "s_end": s_end,
             }
+        return descriptions
 
-            if element_type == 'Quadrupole':
-                quad_index += 1
-            if element_type == 'Corrector':
-                corr_index += 1
-
-            previous_name = name
-
-        def get_lattice(start, end, Pref, quad_currents, include_end=True):
-            start_index = list(element_descriptions.keys()).index(start)
-            end_index = list(element_descriptions.keys()).index(end)
-            if include_end:
-                end_index += 1
-            lattice = rft.Lattice()
-            names = list(element_descriptions.keys())
-            elements = list(element_descriptions.values())
-            for name, element_description in zip(names[start_index:end_index], elements[start_index:end_index]):
-                element_type = element_description['element_type']
-                L = element_description['L']
-                quad_index = element_description['quad_index']
-
-                if element_type == 'Drift':
-                    element = rft.Drift(L)
-                elif element_type == 'Quadrupole':
-                    if 'QFD' in name:
-                        K1 = self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
-                    elif 'QDD' in name:
-                        K1 = - self.get_Quad_K_from_I(quad_currents[quad_index], L, Pref)
-                    element = rft.Quadrupole(L, Pref / self.Q, K1)
-                elif element_type == 'Corrector':
-                    element = rft.Corrector(L)
-                elif element_type == 'BPM':
-                    element = rft.Bpm(L)
-                elif element_type == 'Screen' or element_type == 'Marker':
-                    element = rft.Screen()
-                else:
-                    continue
-                element.set_name(name)
-                lattice.append(element)
-            return lattice
-        start = 'CA.STLINE$START'
-        end = 'CA.STLINE$END'
-        quad_currents = np.array([1,  # QFD350
-                                  0,  # QDD355
-                                  0,  # QFD360
-                                  20,  # QFD510
-                                  42.3,  # QDD515
-                                  20,  # QFD520
-                                  0,  # QFD760
-                                  0,  # QDD765
-                                  0,  # QFD770
-                                  0,  # QDD870
-                                  0  # QFD880
-                                  ])  # A
-
-        lattice = get_lattice(start, end, self.Pref, quad_currents)
-        return lattice, element_descriptions, start, end
+    @staticmethod
+    def _replace_btv_monitors_with_screens(lattice):
+        for element in list(lattice['*']):
+            if not element.get_name().startswith("CA.BTV"):
+                continue
+            if hasattr(element, "get_bunch"):
+                continue
+            screen = rft.Screen()
+            screen.set_name(element.get_name())
+            screen.set_length(element.get_length())
+            element.replace_with(screen)
 
     def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 2.0
-        self.chosen_ict = "nazwa_ict"
         self.Pref = 198 # MeV/c
         self.Q=-1
         self.population = population
@@ -153,16 +110,18 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.nparticles = nparticles
         self.electronmass=rft.electronmass
         self.is_simulation = True
-        survey_path = os.path.join(os.path.dirname(__file__), "clear.survey0_filtered.tfs")
-        self.lattice, self.element_descriptions, self.start, self.end = self.__build(filename=survey_path)
+        survey_path = os.path.join(os.path.dirname(__file__),"Setup_files", "twissinit.tfs")
+        self.twiss_path = survey_path
+        self.lattice = rft.Lattice(survey_path)
+        self._replace_btv_monitors_with_screens(self.lattice)
+        elements_in_lattice = list(self.lattice['*'])
+        self.element_descriptions = self._load_twiss_element_descriptions(survey_path, elements_in_lattice)
+        self.sequence = [element.get_name() for element in elements_in_lattice]
+        self.start = self.sequence[0]
+        self.end = self.sequence[-1]
         self.lattice.set_bpm_resolution(bpm_resolution)
         self.lattice.set_tt_nsteps(0)
         self.log = print
-        elements_in_lattice=list(self.lattice['*'])
-        names_all=list(self.element_descriptions.keys())
-        i0=names_all.index(self.start)
-        i1=names_all.index(self.end)
-        self.sequence = names_all[i0:i1 + 1]
         self._by_name=dict(zip(self.sequence,elements_in_lattice))
         self.bpms=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'BPM']
         self.corrs=[n for n in self.sequence if self.element_descriptions[n]['element_type'] == 'Corrector']
@@ -855,29 +814,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
     def _get_elements_positions_show_beamline(self, names=None):
         if isinstance(names, str):
             names = [names]
-
-        all_names = []
-        all_s = []
-        all_l = []
-        s_pos = 0.0
-
-        for element in self.lattice['*']:
-            element_name = element.get_name()
-            try:
-                element_length = float(element.get_length())
-            except Exception:
-                element_length = 0.0
-
-            if names is None or element_name in names:
-                all_names.append(element_name)
-                all_s.append(s_pos)
-                all_l.append(element_length)
-
-            s_pos += element_length
+        all_names = [name for name in self.sequence if names is None or name in names]
 
         return {
             "names": all_names,
-            "S": np.array(all_s, dtype=float),
+            "S": np.array([self.element_descriptions[name]["s_start"] for name in all_names], dtype=float),
         }
 
     def _give_elements_to_show_beamline(self, quad_selected):
