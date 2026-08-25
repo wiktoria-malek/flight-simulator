@@ -18,18 +18,19 @@ class AdaptiveResponseMatrix:
         self.rank = rank
 
     def update(self, u, dx):
-        u = np.asarray(u, dtype=float).ravel()
-        dx = np.asarray(dx, dtype=float).ravel()
+        u = np.asarray(u, dtype=float).ravel() # vector with corrector kicks
+        dx = np.asarray(dx, dtype=float).ravel() # change of orbits on BPMs [on x, on y]
         if self.P is None:
-            self.P = self.p0_scale / max(u @ u, 1e-12) * np.eye(len(u))
-        residual = dx - (self.R0 + self.delta) @ u
-        Pu = self.P @ u
-        denom = self.forgetting + u @ Pu
+            self.P = self.p0_scale / max(u @ u, 1e-12) * np.eye(len(u)) # how much RLS knows the matrix, if its big, it moves the R faster
+            # self.R0 + self.delta is a currently used response matrix
+        residual = dx - (self.R0 + self.delta) @ u # what bpms saw - what new R predicted, the residual is used to correct delta
+        Pu = self.P @ u # which fragments are not yet fully explored
+        denom = self.forgetting + u @ Pu # normalizes the size of update
         self.P = (self.P - np.outer(Pu, Pu) / denom) / self.forgetting
-        self.delta = self.delta + np.outer(residual, Pu) / denom
-        U, S, Vt = np.linalg.svd(self.delta, full_matrices=False)
-        r = min(self.rank, S.size)
-        self.delta = (U[:, :r] * S[:r]) @ Vt[:r]
+        self.delta = self.delta + np.outer(residual, Pu) / denom # change in R calculated by RLS
+        U, S, Vt = np.linalg.svd(self.delta, full_matrices=False) # strongest known directions
+        r = min(self.rank, S.size) # 3 or biggest S
+        self.delta = (U[:, :r] * S[:r]) @ Vt[:r] # update calculated by RLS
 
     @property
     def R(self):
