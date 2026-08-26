@@ -15,39 +15,39 @@ I = CLEAR_real_machine()
 client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
+#
+# screens = I.get_screens(names=["CA.BTV0390"])
+# print(screens)
 
-screens = I.get_screens(names=["CA.BTV0390"])
-print(screens)
+"""Test of one screen and method get_screens"""
 
-# """Test of one screen and method get_screens"""
-#
-# print("Testing screen CA.BTV0390L, reading its values directly from japc/pyda... ")
-# camera = client.get("CA.BTV0390.DigiCam/LastImage", context=context_empty).data
-#
-# image = camera["image2D"]
-# print(f"image from PyDa = {image}")
-#
-# hpixel = camera["pixelCalSet1"]
-# print(f"hpixel from PyDa = {hpixel}")
-#
-# vpixel = camera["pixelCalSet2"]
-# print(f"vpixel from PyDa = {vpixel}")
-#
-# proj_x = camera["projDataSet1"]
-# print(f"proj_x.shape = {proj_x.shape}")
-#
-# proj_y = camera["projDataSet2"]
-# print(f"proj_y.shape = {proj_y.shape}")
-#
-# x_positions = camera["imagePositionSet1"]
-# print(f"x_positions.shape = {x_positions.shape}")
-#
-# y_positions = camera["imagePositionSet2"]
-# print(f"y_positions.shape = {y_positions.shape}")
-#
-# inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context_empty).data["positionChannel1"]
-# print(f"inout from PyDa = {inout}")
+print("Testing screen CA.BTV0390L, reading its values directly from japc/pyda... ")
+camera = client.get("CA.BTV0390.DigiCam/LastImage", context=context_empty).data
 
+image = camera["image2D"]
+print(f"image from PyDa = {image}")
+
+hpixel = camera["pixelCalSet1"]
+print(f"hpixel from PyDa = {hpixel}")
+
+vpixel = camera["pixelCalSet2"]
+print(f"vpixel from PyDa = {vpixel}")
+
+proj_x = camera["projDataSet1"]
+print(f"proj_x.shape = {proj_x.shape}")
+
+proj_y = camera["projDataSet2"]
+print(f"proj_y.shape = {proj_y.shape}")
+
+x_positions = camera["imagePositionSet1"]
+print(f"x_positions.shape = {x_positions.shape}")
+
+y_positions = camera["imagePositionSet2"]
+print(f"y_positions.shape = {y_positions.shape}")
+
+inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context_empty).data["positionChannel1"]
+print(f"inout from PyDa = {inout}")
+#
 # print("================================================================================")
 # print("Testing screen CA.BTV0390L, reading its values directly from interface, using get_screens method... ")
 # result = I.get_screens(names=["CA.BTV0390"])
@@ -70,16 +70,16 @@ print(screens)
 # print(r2) # prints : ['Screen OUT', 'Screen IN']
 #
 # print("================================================================================")
-#
+
 # print("Testing inserting the screen using the interface method...")
 # I.extract_screen("BTV0215")
 # time.sleep(10)
-
-
-#client.set(f"CS.BTV0305/OPSettingSystem2", data={f"info['get_set_field']": 1})
-
-
-
+#
+#
+# client.set(f"CS.BTV0305/OPSettingSystem2", data={f"info['get_set_field']": 1})
+#
+#
+#
 # client.set('CS.BTV0120_CS.BTV0305/OPSettingSystem2', data={"positionChannel5":1})
 # r3 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
 # print(r3)
