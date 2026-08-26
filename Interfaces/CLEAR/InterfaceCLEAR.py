@@ -37,7 +37,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def get_name(self):
         return 'CLEAR'
 
-    def __init__(self, nsamples=3, bg_shots=10.0 ):
+    def __init__(self, nsamples=15, bg_shots=10.0 ):
         self.screen_backgrounds = {}
         self.chosen_ict = "CA.BCMTHZ/Acquisition#charge"
         self.steps_readback_position = 0.0
