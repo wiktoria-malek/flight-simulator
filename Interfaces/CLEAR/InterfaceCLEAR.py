@@ -189,12 +189,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def get_beam_factors(self):
         pref = self.Pref
-        data = self.client.get("CA.BEAM/Acquisition").data
-        for field in ("momentum", "energy"):
-            value = self.make_safe_float(data.get(field), default=np.nan)
-            if np.isfinite(value) and value > 0:
-                pref = value
-                break
+        # data = self.client.get("CA.BEAM/Acquisition").data
+        # for field in ("momentum", "energy"):
+        #     value = self.make_safe_float(data.get(field), default=np.nan)
+        #     if np.isfinite(value) and value > 0:
+        #         pref = value
+        #         break
+        pref = 195
         gamma_rel = np.sqrt((pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
         beta_gamma = gamma_rel * beta_rel
