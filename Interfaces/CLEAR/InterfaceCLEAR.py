@@ -340,13 +340,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
         camera_config = self.screen_config.get(screen_name, {})
         selector = camera_config.get("japc_selector", self.context_empty)
         deadline = time.perf_counter() + timeout
-        camera_data = self.client.get(f"{japc_camera}.DigiCam/LastImage", context=selector).data
-        if previous_frame_id is None or self._camera_frame_id(camera_data) != previous_frame_id:
-            return camera_data
-        if time.perf_counter() >= deadline:
-            self.log(f"No new camera frame for {screen_name} within {timeout:.1f} s; discarding it.")
-            return None
+        while time.perf_counter() < deadline:
+            camera_data = self.client.get(f"{japc_camera}.DigiCam/LastImage", context=selector).data
+            if previous_frame_id is None or self._camera_frame_id(camera_data) != previous_frame_id:
+                return camera_data
             time.sleep(0.1)
+        self.log(f"No new camera frame for {screen_name} within {timeout:.1f} s; discarding it.")
+        return None
 
     def _get_screen_pixel_calibration(self, screen_name):
         camera_config = self.screen_config.get(screen_name, {})
