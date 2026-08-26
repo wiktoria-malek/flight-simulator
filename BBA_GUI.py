@@ -1326,11 +1326,11 @@ if __name__ == "__main__":
     project_name = I.get_name()
 
 
-    # ================ for a test!!
-    from Backend.State import State
-    state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_BBA_260821/BBA_CLEAR260821163644_session_settings/machine_status.pkl")
-    I.restore_quadrupoles_state(state)
-    # ===============================
+    # # ================ for a test!!
+    # from Backend.State import State
+    # state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_BBA_260821/BBA_CLEAR260821163644_session_settings/machine_status.pkl")
+    # I.restore_quadrupoles_state(state)
+    # # ===============================
 
     nominal_state = None
     start_state = I.get_state()

@@ -895,11 +895,11 @@ def main():
     if interface is None:
         return 1
 
-    # ================ for a test!!
-    from Backend.State import State
-    state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_BBA_260821/BBA_CLEAR260821163644_session_settings/machine_status.pkl")
-    interface.restore_quadrupoles_state(state)
-    # ===============================
+    # # ================ for a test!!
+    # from Backend.State import State
+    # state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_BBA_260821/BBA_CLEAR260821163644_session_settings/machine_status.pkl")
+    # interface.restore_quadrupoles_state(state)
+    # # ===============================
 
     project_name = interface.get_name()
     print(f"Selected interface: {project_name}")
