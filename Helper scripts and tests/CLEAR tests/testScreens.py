@@ -16,6 +16,8 @@ client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 context_acquisition = "SCT.USER.SETUP"
 context_empty = ""
 
+I.get_screens(names=["CA.BTV0390"])
+
 # """Test of one screen and method get_screens"""
 #
 # print("Testing screen CA.BTV0390L, reading its values directly from japc/pyda... ")
@@ -58,19 +60,19 @@ context_empty = ""
 # print(f"sum from get_screens: {result['sum']}")
 # print(f"images from get_screens: {result['images']}")
 # print(f"inout from get_screens: {result['inout']}")
-r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
-print(r.value) # prints just a value
-                # screen out -> value=0
-                # screen in -> value - 1
-print("=================================")
-r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
-print(r2) # prints : ['Screen OUT', 'Screen IN']
-
-print("================================================================================")
-
-print("Testing inserting the screen using the interface method...")
-I.extract_screen("BTV0215")
-time.sleep(10)
+# r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
+# print(r.value) # prints just a value
+#                 # screen out -> value=0
+#                 # screen in -> value - 1
+# print("=================================")
+# r2 =client.get('CS.BTV0120_CS.BTV0305/Description').data['dcm3DriverNames']
+# print(r2) # prints : ['Screen OUT', 'Screen IN']
+#
+# print("================================================================================")
+#
+# print("Testing inserting the screen using the interface method...")
+# I.extract_screen("BTV0215")
+# time.sleep(10)
 
 
 #client.set(f"CS.BTV0305/OPSettingSystem2", data={f"info['get_set_field']": 1})

@@ -56,8 +56,10 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
+
         self.rf_phase_nominal = 120 # degrees
-        self.rf_phase_test = 100
+        self.rf_phase_test = 100 # degrees
+
         # Bpms and correctors in beamline order
         sequence = [
             'CA.DHG0130', 'CA.DVG0130', #'CA.BPC0220',
@@ -752,12 +754,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             hpixel, vpixel = self._get_screen_pixel_calibration(screen_name)
 
             try:
-                # image = camera_data["image2D"]
-                # proj_x = camera_data["projDataSet1"]
-                # proj_y = camera_data["projDataSet2"]
-                # x_positions = camera_data["imagePositionSet1"]
-                # y_positions = camera_data["imagePositionSet2"]
-
                 if screen_name not in self.screen_backgrounds:
                     self.log(f"Acquiring background image for {screen_name}.")
                     self.acquire_screen_background(screen_name, frames = 10)
