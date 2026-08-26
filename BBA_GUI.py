@@ -758,6 +758,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._adaptive_R = getattr(self, "_adaptive_R", None)
             self._adaptive_R_prev_kick = None
             self._adaptive_R_prev_orbit = None
+            # AdaptiveResponseMatrix learns from one measured orbit change
+            # (x and y stacked).  DFS/WFS append additional response blocks
+            # to A, so their row count does not match that measured vector.
+            # Keep the adaptive update for orbit-only correction until it is
+            # extended to model energy and charge changes separately.
+            adaptive_orbit_only = self.use_adaptive_R and w1 > 0 and w2 == 0 and w3 == 0
+            if not adaptive_orbit_only:
+                self._adaptive_R = None
 
             for it in range(iters):
                 if self._cancel:
@@ -796,7 +804,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 O0x = np.asarray(O0['x'], dtype=float).reshape(-1, 1)
                 O0y = np.asarray(O0['y'], dtype=float).reshape(-1, 1)
                 orbit_now = np.concatenate([O0x, O0y]).ravel()
-                if self.use_adaptive_R and self._adaptive_R is not None and self._adaptive_R_prev_kick is not None:
+                if adaptive_orbit_only and self._adaptive_R is not None and self._adaptive_R_prev_kick is not None:
                     self._adaptive_R.update(self._adaptive_R_prev_kick, orbit_now - self._adaptive_R_prev_orbit)
                 bpms0 = state0.get_bpms(bpms)
                 x0_vals = np.asarray(bpms0['x'], dtype=float)
@@ -975,7 +983,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 A = np.block([[Axx_it, Axy_it],
                               [Ayx_it, Ayy_it]])
 
-                if self.use_adaptive_R:
+                if adaptive_orbit_only:
                     if self._adaptive_R is None or self._adaptive_R.R0.shape != A.shape:
                         self._adaptive_R = AdaptiveResponseMatrix(A)  # first use, or corrector/BPM selection changed
                     else:
@@ -1038,7 +1046,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 print("after_bdes =", after_bdes)
                 applied_delta = after_bdes - current_bdes
                 print("applied_delta =", applied_delta)
-                if self.use_adaptive_R:
+                if adaptive_orbit_only:
                     self._adaptive_R_prev_kick = applied_delta.copy()
                     self._adaptive_R_prev_orbit = orbit_now
                 kicks_path = os.path.join(self._session_dir, "kicks.txt")
@@ -1316,6 +1324,14 @@ if __name__ == "__main__":
 
     I = dialog
     project_name = I.get_name()
+
+
+    # ================ for a test!!
+    from Backend.State import State
+    state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_BBA_260821/BBA_CLEAR260821163644_session_settings/machine_status.pkl")
+    I.restore_quadrupoles_state(state)
+    # ===============================
+
     nominal_state = None
     start_state = I.get_state()
 

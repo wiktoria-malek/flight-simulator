@@ -185,7 +185,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             bpms=self.bpms
 
         Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms=self._compute_response_matrix_from_directory(directory=directory, correctors=correctors, bpms=bpms, triangular=bool(self.triangular_checkbox.isChecked()), actuator_mode = self._current_actuator_mode())
-
         R = Response()
         R.bpms = bpms
         R.hcorrs = hcorrs
@@ -194,6 +193,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         R.Rxy = Rxy
         R.Ryx = Ryx
         R.Ryy = Ryy
+        print(R.Rxx)
+        print(R.Rxy)
         R.Bx = Bx
         R.By = By
         return R

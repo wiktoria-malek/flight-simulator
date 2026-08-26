@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import RF_Track as rft
 from scipy.optimize import minimize
 import os
+from Backend.State import State
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
 
 class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
@@ -37,7 +38,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             screen.set_length(element.get_length())
             element.replace_with(screen)
 
-    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
+    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.01, nsamples=1, nparticles=10000):
         self.sigmaCut = 2.0
         self.Pref = 198 # MeV/c
         self.Q=-1
@@ -49,6 +50,14 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.is_simulation = True
         survey_path = os.path.join(os.path.dirname(__file__),"Setup_files", "twissinit.tfs")
         self.lattice = rft.Lattice(survey_path)
+        for element in self.lattice["*ICT*"]:
+            drift = rft.Drift(element.get_length())
+            drift.set_name(element.get_name())
+            element.replace_with(drift)
+        for element in self.lattice["*SCT*"]:
+            drift = rft.Drift(element.get_length())
+            drift.set_name(element.get_name())
+            element.replace_with(drift)
         self._replace_btv_monitors_with_screens(self.lattice)
         elements_in_lattice = list(self.lattice['*'])
         self.sequence = [element.get_name() for element in elements_in_lattice]
@@ -63,7 +72,9 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.quadrupoles = [element.get_name() for element in self.lattice.get_quadrupoles()]
         self.sextupoles = []
         self.__setup_beam0()
-        self.__track_bunch()
+        '''Uncomment lines below to scatter elements in the lattice.'''
+        self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
         self.freq=2.997e9
         self.nr_quad=11
         self.Lquad=0.226 #magnetic length of the quadrupole in [m]
@@ -71,14 +82,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.machine_name = "CLEAR"
         self.lattice.align_elements()
         self.chosen_ict = "CA.BPM0530"
-        '''Uncomment lines below to scatter elements in the lattice.'''
-        #self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
-        #self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
-
-        qfd520 = self.lattice["CA.QFD0520"]
-                            # dx   # dy   #dz  # roll  # pitch # yaw
-        qfd520.set_offsets(0.0, 0.0, 0.0, 0, 0.0, 0.0, "center")
-
+        # qfd520 = self.lattice["CA.QFD0520"]
+        #                     # dx   # dy   #dz  # roll  # pitch # yaw
+        # qfd520.set_offsets(0.0, 0.0, 0.0, 0, 0.0, 0.0, "center")
+        #
+        self.__track_bunch()
 
     def __setup_beam0(self):
         T = rft.Bunch6d_twiss()
@@ -96,7 +104,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         sigmaCut = 2.0
         self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population, 1, self.Pref, T, self.nparticles, sigmaCut) # reference particle
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, sigmaCut) # reference bunch
-        self.dfs_test_energy = 0.98
+        self.dfs_test_energy = 0.90 #0.963
         self.wfs_test_charge = 0.90
         self._beam_mode = "nominal"
 
@@ -361,7 +369,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             c = self.lattice[corr]
             if "DHG" in corr:
                 c.vary_strength(val / 10, 0.0)
-            elif ("SDV" in corr) or ("DHJ" in corr):
+            elif ("DHJ" in corr) or ("SDV" in corr):
                 c.vary_strength(0.0, val / 10)
         self.__track_bunch()
 

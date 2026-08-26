@@ -25,6 +25,14 @@ class BPMsMode(Enum):
     integral_window = "integral_window"
     integral_threshold = "integral_threshold"
 
+scaling_factors = {
+    "BPM0530": {"H": -0.403, "V": -0.396},
+    "BPM0595": {"H": -0.351, "V": -0.374},
+    "BPM0690": {"H": -0.400, "V": -0.410},
+    "BPM0820": {"H": -0.346, "V": -0.392},
+    "BPM0890": {"H": -0.391, "V": -0.417},
+}
+
 class CLEAR_real_machine(AbstractMachineInterface):
     def get_name(self):
         return 'CLEAR'
@@ -48,7 +56,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
-        self.rf_phase_nominal = 95
+        self.rf_phase_nominal = 95 # degrees
         self.rf_phase_test = 85
         # Bpms and correctors in beamline order
         sequence = [
@@ -441,11 +449,15 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 hsamples = self.client.get(f"{bpm}H-SA/SamplesFromTrigger", context = self.context_acquisition).data
                 vsamples = self.client.get(f"{bpm}V-SA/SamplesFromTrigger", context=self.context_acquisition).data
                 ssamples = self.client.get(f"{bpm}S-SA/SamplesFromTrigger", context=self.context_acquisition).data
+
                 H_samples = change_inverted_bpm_polarity(np.asarray(hsamples["samples"], dtype=float).ravel(), bpm)
                 V_samples = change_inverted_bpm_polarity(np.asarray(vsamples["samples"], dtype=float).ravel(), bpm)
-                S_samples = change_inverted_bpm_polarity(np.asarray(ssamples["samples"], dtype=float).ravel(), bpm)
+                S_samples = np.asarray(ssamples["samples"], dtype=float).ravel()
+
                 H_b_samples = baseline_correct(H_samples)
                 V_b_samples = baseline_correct(V_samples)
+                S_b_samples = baseline_correct(S_samples)
+
                 s_sum = np.sum(S_samples[320:330])
 
                 if mode == BPMsMode.peak: # Find peak (largest magnitude, keeping the sign)
@@ -472,7 +484,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 elif mode == BPMsMode.integral_threshold: # Integration between 5% of the peak threshold region with baseline correction
                     H, H_start, H_end, H_peak_idx = threshold_integral(H_b_samples)
                     V, V_start, V_end, V_peak_idx = threshold_integral(V_b_samples)
-                    # plot_integral(signals=[H_b_samples, V_b_samples], integrals=[H, V], labels=["H", "V"], BPM=BPM, starts=[H_start, V_start], ends=[H_end, V_end], )
+                    S, S_start, S_end, S_peak_idx = threshold_integral(S_b_samples)
+                    bpm_key = bpm[3:] if bpm.startswith("CA.") else bpm
+
+                    H = (H / S) / scaling_factors[bpm_key]["H"]
+                    V = (V / S) / scaling_factors[bpm_key]["V"]
 
                 else:
                     raise ValueError(

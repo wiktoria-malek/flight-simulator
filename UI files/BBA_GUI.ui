@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1512</width>
-    <height>810</height>
+    <height>896</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -1565,6 +1565,9 @@ QToolButton#triangular_tooltip:hover {
                      </item>
                      <item>
                       <widget class="QToolButton" name="remove_coupling_tooltip">
+                       <property name="toolTip">
+                        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sets the cross-plane response blocks (Rxy and Ryx) to zero, decoupling horizontal and vertical correction. Use when the measured cross-plane coupling is dominated by noise, or when an uncoupled correction is intended.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                       </property>
                        <property name="styleSheet">
                         <string notr="true">QToolButton#remove_coupling_tooltip {
     border: 1px solid #888;

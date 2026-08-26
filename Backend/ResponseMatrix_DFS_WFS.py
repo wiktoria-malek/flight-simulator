@@ -190,7 +190,7 @@ class ResponseMatrix_DFS_WFS():
         Cy = np.hstack((Cy, np.ones((Cy.shape[0], 1))))
 
         def lstsq(C, B):
-            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=rcond)[0])
+            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=None)[0])
 
         Rxx_ = lstsq(Cx, Bx)
         Rxy_ = lstsq(Cy, Bx)

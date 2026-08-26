@@ -26,6 +26,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             screen.set_name(s.get_name())
             s.replace_with(screen)
         self.sequence = [e.get_name() for e in self.lattice['*']]
+
         self._attach_wake_data_to_elements(wake_scale=0,nsteps=20)
         self.bpms = [e.get_name() for e in self.lattice.get_bpms()]
         self.corrs = [e.get_name() for e in self.lattice.get_correctors()]
