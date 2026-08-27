@@ -21,17 +21,17 @@ context_empty = ""
 
 """Test of one screen and method get_screens"""
 
-print("Testing screen CA.BTV0390L, reading its values directly from japc/pyda... ")
-camera = client.get("CA.BTV0390.DigiCam/LastImage", context=context_empty).data
-
-image = camera["image2D"]
-print(f"image from PyDa = {image}")
-
-hpixel = camera["pixelCalSet1"]
-print(f"hpixel from PyDa = {hpixel}")
-
-vpixel = camera["pixelCalSet2"]
-print(f"vpixel from PyDa = {vpixel}")
+# print("Testing screen CA.BTV0390L, reading its values directly from japc/pyda... ")
+# camera = client.get("CA.BTV0390.DigiCam/LastImage", context=context_empty).data
+#
+# image = camera["image2D"]
+# print(f"image from PyDa = {image}")
+#
+# hpixel = camera["pixelCalSet1"]
+# print(f"hpixel from PyDa = {hpixel}")
+#
+# vpixel = camera["pixelCalSet2"]
+# print(f"vpixel from PyDa = {vpixel}")
 
 # proj_x = camera["projDataSet1"]
 # print(f"proj_x.shape = {proj_x.shape}")
@@ -48,19 +48,19 @@ print(f"vpixel from PyDa = {vpixel}")
 # inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context_empty).data["positionChannel1"]
 # print(f"inout from PyDa = {inout}")
 
-# print("================================================================================")
-# print("Testing screen CA.BTV0390L, reading its values directly from interface, using get_screens method... ")
-# result = I.get_screens(names=["CA.BTV0390"])
-# print(f"names from get_screens: {result['names']}")
-# print(f"hpixel from get_screens: {result['hpixel']}")
-# print(f"vpixel from get_screens: {result['vpixel']}")
-# print(f"x from get_screens: {result['x']}")
-# print(f"y from get_screens: {result['y']}")
-# print(f"sigx from get_screens:  {result['sigx']}")
-# print(f"sigy from get_screens:  {result['sigy']}")
-# print(f"sum from get_screens: {result['sum']}")
-# print(f"images from get_screens: {result['images']}")
-# print(f"inout from get_screens: {result['inout']}")
+print("================================================================================")
+print("Testing screen CA.BTV0390L, reading its values directly from interface, using get_screens method... ")
+result = I.get_screens(names=["CA.BTV0390"])
+print(f"names from get_screens: {result['names']}")
+print(f"hpixel from get_screens: {result['hpixel']}")
+print(f"vpixel from get_screens: {result['vpixel']}")
+print(f"x from get_screens: {result['x']}")
+print(f"y from get_screens: {result['y']}")
+print(f"sigx from get_screens:  {result['sigx']}")
+print(f"sigy from get_screens:  {result['sigy']}")
+print(f"sum from get_screens: {result['sum']}")
+print(f"images from get_screens: {result['images']}")
+print(f"inout from get_screens: {result['inout']}")
 # r =client.get('CS.BTV0120_CS.BTV0305/OPSettingSystem2').data['positionChannel5']
 # print(r.value) # prints just a value
 #                 # screen out -> value=0
