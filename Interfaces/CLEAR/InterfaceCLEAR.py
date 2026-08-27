@@ -627,6 +627,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             print(current_screen_inout_status.value)
             self.log(f"Screen {screen_name} already inserted")
             return
+            return
 
     def extract_screen(self, screen_name):
         screen_name = screen_name.rstrip("LH")
