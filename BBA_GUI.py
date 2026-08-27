@@ -435,12 +435,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
         if values_x:
             err_x = matching_yerr(error_x, values_x)
-            ax.errorbar(range(len(values_x)), values_x, yerr=err_x, marker="o", color='red', label="x", capsize=6,
+            ax.errorbar(range(len(values_x)), values_x, yerr=err_x, marker="o", color='blue', label="x", capsize=6,
                         elinewidth=2, capthick=2,
                         markersize=4)  # yerr - height of the error bar on the plot, capsize - size of the top line on the error bar
         if values_y:
             err_y = matching_yerr(error_y, values_y)
-            ax.errorbar(range(len(values_y)), values_y, yerr=err_y, marker="o", color='blue', label="y", capsize=6,
+            ax.errorbar(range(len(values_y)), values_y, yerr=err_y, marker="o", color='red', label="y", capsize=6,
                         elinewidth=2, capthick=2, markersize=4)
         if vals:
             err_all = matching_yerr(error_all, vals)
