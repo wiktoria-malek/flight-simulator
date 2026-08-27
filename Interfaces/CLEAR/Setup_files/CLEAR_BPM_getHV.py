@@ -37,7 +37,8 @@ def threshold_integral(samples, threshold_fraction=0.05):
         end += 1
 
     # Integrate the pulse
-    integral = trapezoid(samples[start-1:end + 2])
+    #integral = trapezoid(samples[start-1:end + 2]) # that's the new version
+    integral = trapezoid(samples[start:end + 1]) # that's the old one
 
     return integral, start, end, peak_idx
 

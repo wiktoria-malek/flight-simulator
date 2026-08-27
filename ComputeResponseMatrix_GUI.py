@@ -1,5 +1,6 @@
 from Backend.State import State
 from Backend.Response import Response
+import pprint
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 try:
     from PyQt6 import uic
@@ -193,8 +194,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         R.Rxy = Rxy
         R.Ryx = Ryx
         R.Ryy = Ryy
-        print(R.Rxx)
-        print(R.Rxy)
+        print(R.Ryy)
         R.Bx = Bx
         R.By = By
         return R
