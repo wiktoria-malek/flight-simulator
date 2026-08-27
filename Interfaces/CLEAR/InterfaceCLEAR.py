@@ -321,21 +321,13 @@ class CLEAR_real_machine(AbstractMachineInterface):
             self.log(f"Could not read screen status for {screen_name}: {exc}")
             return np.nan
 
-    def _acquire_screen_data(self, screen_name):
-        return self._acquire_screen_data_after(screen_name)
-
     @staticmethod
     def _camera_frame_id(camera_data):
-        try:
-            timestamp = float(np.asarray(camera_data["imageTimeStamp"]).ravel()[0])
-            if np.isfinite(timestamp):
-                return ("timestamp", timestamp)
-        except (KeyError, TypeError, ValueError, IndexError):
-            pass
+        timestamp = float(np.asarray(camera_data["imageTimeStamp"]).ravel()[0])
         image = np.asarray(camera_data["image2D"])
         return ("image", image.shape, image.dtype.str, hash(image.tobytes()))
 
-    def _acquire_screen_data_after(self, screen_name, previous_frame_id=None, timeout=5.0):
+    def _acquire_screen_data(self, screen_name, previous_frame_id=None, timeout=5.0):
         japc_camera = self.screen_config.get(screen_name, {}).get("japc_name", screen_name.rstrip("LH"))
         camera_config = self.screen_config.get(screen_name, {})
         selector = camera_config.get("japc_selector", self.context_empty)
@@ -362,32 +354,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
         japc_camera = camera_config.get("japc_name", screen_name.rstrip("LH"))
         camera_properties = self.cam_props.get(japc_camera, {})
         oriented = np.asarray(image, dtype=float)
-        if camera_properties.get("flip_hor", 0):
-            oriented = np.fliplr(oriented)
-        if camera_properties.get("flip_ver", 0):
-            oriented = np.flipud(oriented)
+        if camera_properties.get("flip_hor", 0): oriented = np.fliplr(oriented)
+        if camera_properties.get("flip_ver", 0): oriented = np.flipud(oriented)
         rotate = int(camera_properties.get("rotate", 0)) % 4
         if rotate:
             oriented = np.rot90(oriented, rotate)
             if rotate % 2:
                 hpixel, vpixel = vpixel, hpixel
         return oriented, hpixel, vpixel
-
-    def set_screen_camera_on(self, screen_name, on=True):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.client.set(f'{japc_camera}.DigiCam/Setting', {"cameraSwitch": int(bool(on))})
-
-    def set_screen_filter(self, screen_name, filter_value):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.client.set(f'{japc_camera}.DigiCam/Setting', {"filterSelect": filter_value})
-
-    def set_screen_video_gain(self, screen_name, gain_value):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.client.set(f'{japc_camera}.DigiCam/Setting', {"videoGain": gain_value})
-
-    def set_screen_select(self, screen_name, screen_value):
-        japc_camera = self.screen_config.get(screen_name, {}).get('japc_name', screen_name.rstrip('LH'))
-        self.client.set(f'{japc_camera}.DigiCam/Setting', {"screenSelect": screen_value})
 
     def get_icts(self, names=None):
         #BCM_THZ = ('CA.BCMTHZ/Acquisition#charge', 'SCT.USER.SETUP')
@@ -504,7 +478,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         def read_value():
             data = self.client.get(property_address, context=context).data
             return self.make_safe_float(data.get(field), default=np.nan)
-
         return self._wait_for_readback(read_value, target, description=f"{property_address}#{field}", tolerance=tolerance, timeout=timeout)
 
     def _wait_for_corrector_readback(self, corrector, target, tolerance=5e-3, timeout=10.0):
@@ -640,21 +613,20 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return screen_props
 
     def insert_screen(self, screen_name):
-        pass
-        # info = self._get_screen_movement_info(screen_name)
-        # current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']] # 0 or not == 0 means screen is out, whatever else means IN
-        # if current_screen_inout_status.value == 0:
-        #     self.log(f"Inserting {screen_name}...")
-        #     self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 1}) # 1, meaning INSERT the screen
-        #     reached_target = self._wait_for_screen_target_position(screen_name, 1)
-        #     if not reached_target: raise RuntimeError(f"Screen {screen_name} was not inserted within time.")
-        #     self.log(f"Inserted {screen_name}!")
-        #     current_screen_inout_status2 = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]
-        #     print("Current Screen Inout Status:", current_screen_inout_status2)
-        # else:
-        #     print(current_screen_inout_status.value)
-        #     self.log(f"Screen {screen_name} already inserted")
-        #     return
+        info = self._get_screen_movement_info(screen_name)
+        current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']] # 0 or not == 0 means screen is out, whatever else means IN
+        if current_screen_inout_status.value == 0:
+            self.log(f"Inserting {screen_name}...")
+            self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 1}) # 1, meaning INSERT the screen
+            reached_target = self._wait_for_screen_target_position(screen_name, 1)
+            if not reached_target: raise RuntimeError(f"Screen {screen_name} was not inserted within time.")
+            self.log(f"Inserted {screen_name}!")
+            current_screen_inout_status2 = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]
+            print("Current Screen Inout Status:", current_screen_inout_status2)
+        else:
+            print(current_screen_inout_status.value)
+            self.log(f"Screen {screen_name} already inserted")
+            return
 
     def extract_screen(self, screen_name):
         screen_name = screen_name.rstrip("LH")
@@ -678,7 +650,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         background_frames = []
         for frame in range(frames):
             self.log(f"Acquiring {frame}/{frames} background frames...")
-            camera_data = self._acquire_screen_data_after(screen_name, previous_frame_id)
+            camera_data = self._acquire_screen_data(screen_name, previous_frame_id)
             if camera_data is None:
                 continue
             previous_frame_id = self._camera_frame_id(camera_data)
@@ -713,7 +685,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         previous_data = self._acquire_screen_data(screen_name)
         previous_frame_id = self._camera_frame_id(previous_data) if previous_data is not None else None
         self.insert_screen(screen_name)
-        camera_data = self._acquire_screen_data_after(screen_name, previous_frame_id)
+        camera_data = self._acquire_screen_data(screen_name, previous_frame_id)
         if camera_data is None: raise RuntimeError(f"No camera data available for {screen_name}")
         beam_img = np.asarray(camera_data['image2D'], dtype=float)
         bg_img = self.screen_backgrounds[screen_name]
