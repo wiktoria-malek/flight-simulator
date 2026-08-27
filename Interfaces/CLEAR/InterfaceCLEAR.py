@@ -56,9 +56,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
-
-        self.rf_phase_nominal = 115 # degrees
-        self.rf_phase_test = 95 # degrees
+        self.rf_phase_nominal = 120 # degrees
+        self.rf_phase_test = 100 # degrees
 
         # Bpms and correctors in beamline order
         sequence = [
@@ -346,28 +345,17 @@ class CLEAR_real_machine(AbstractMachineInterface):
             if previous_frame_id is None or self._camera_frame_id(camera_data) != previous_frame_id:
                 return camera_data
             time.sleep(0.1)
-        self.log(f"No new camera frame for {screen_name} within {timeout:.1f} s; discarding it.")
+        self.log(f"No new camera frame for {screen_name} within {timeout:.1f} s.")
         return None
 
     def _get_screen_pixel_calibration(self, screen_name):
         camera_config = self.screen_config.get(screen_name, {})
-        fallback = (
-            self.make_safe_float(camera_config.get("s_x_res")),
-            self.make_safe_float(camera_config.get("s_y_res")),
-        )
         japc_camera = camera_config.get("japc_name", screen_name.rstrip("LH"))
         selector = camera_config.get("japc_selector", self.context_empty)
-        try:
-            calibration = self.client.get(
-                f"{japc_camera}.DigiCam/CalibrationSetting", context=selector
-            ).data
-            hpixel = self.make_safe_float(calibration.get("pixelCalSet1"))
-            vpixel = self.make_safe_float(calibration.get("pixelCalSet2"))
-            if hpixel > 0 and vpixel > 0:
-                return hpixel, vpixel
-        except Exception as exc:
-            self.log(f"Could not read active pixel calibration for {screen_name}: {exc}")
-        return fallback
+        calibration = self.client.get(f"{japc_camera}.DigiCam/CalibrationSetting", context=selector).data
+        hpixel = self.make_safe_float(calibration.get("pixelCalSet1"))
+        vpixel = self.make_safe_float(calibration.get("pixelCalSet2"))
+        return hpixel, vpixel
 
     def _orient_screen_image(self, screen_name, image, hpixel, vpixel):
         camera_config = self.screen_config.get(screen_name, {})
@@ -653,21 +641,20 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def insert_screen(self, screen_name):
         pass
-        # if 0:
-        #     info = self._get_screen_movement_info(screen_name)
-        #     current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']] # 0 or not == 0 means screen is out, whatever else means IN
-        #     if current_screen_inout_status.value == 0:
-        #         self.log(f"Inserting {screen_name}...")
-        #         self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 1}) # 1, meaning INSERT the screen
-        #         reached_target = self._wait_for_screen_target_position(screen_name, 1)
-        #         if not reached_target: raise RuntimeError(f"Screen {screen_name} was not inserted within time.")
-        #         self.log(f"Inserted {screen_name}!")
-        #         current_screen_inout_status2 = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]
-        #         print("Current Screen Inout Status:", current_screen_inout_status2)
-        #     else:
-        #         print(current_screen_inout_status.value)
-        #         self.log(f"Screen {screen_name} already inserted")
-        #         return
+        # info = self._get_screen_movement_info(screen_name)
+        # current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']] # 0 or not == 0 means screen is out, whatever else means IN
+        # if current_screen_inout_status.value == 0:
+        #     self.log(f"Inserting {screen_name}...")
+        #     self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 1}) # 1, meaning INSERT the screen
+        #     reached_target = self._wait_for_screen_target_position(screen_name, 1)
+        #     if not reached_target: raise RuntimeError(f"Screen {screen_name} was not inserted within time.")
+        #     self.log(f"Inserted {screen_name}!")
+        #     current_screen_inout_status2 = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]
+        #     print("Current Screen Inout Status:", current_screen_inout_status2)
+        # else:
+        #     print(current_screen_inout_status.value)
+        #     self.log(f"Screen {screen_name} already inserted")
+        #     return
 
     def extract_screen(self, screen_name):
         screen_name = screen_name.rstrip("LH")

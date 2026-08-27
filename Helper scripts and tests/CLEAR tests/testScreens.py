@@ -50,7 +50,7 @@ context_empty = ""
 
 print("================================================================================")
 print("Testing screen CA.BTV0390L, reading its values directly from interface, using get_screens method... ")
-result = I.get_screens(names=["CA.BTV0390"])
+result = I.get_screens(names=["CA.BTV0390L"])
 print(f"names from get_screens: {result['names']}")
 print(f"hpixel from get_screens: {result['hpixel']}")
 print(f"vpixel from get_screens: {result['vpixel']}")
