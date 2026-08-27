@@ -480,8 +480,31 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return self.make_safe_float(data.get(field), default=np.nan)
         return self._wait_for_readback(read_value, target, description=f"{property_address}#{field}", tolerance=tolerance, timeout=timeout)
 
-    def _wait_for_corrector_readback(self, corrector, target, tolerance=5e-3, timeout=10.0):
-        return self._wait_for_japc_readback(self.corrector_get_params[corrector], "currentAverage", target, context=self.context_acquisition, tolerance=tolerance, timeout=timeout)
+    def _wait_for_corrector_readbacks(self, names, targets, tolerance=5e-3, timeout=10.0, poll_interval=0.05):
+        targets = {name: float(target) for name, target in zip(names, targets)}
+        pending = set(targets)
+        last_values = {name: np.nan for name in targets}
+        deadline = time.perf_counter() + timeout
+
+        while pending and time.perf_counter() < deadline:
+            for corrector in tuple(pending):
+                try:
+                    data = self.client.get(self.corrector_get_params[corrector], context=self.context_acquisition).data
+                    value = self.make_safe_float(data.get("currentAverage"))
+                except Exception:
+                    value = np.nan
+                last_values[corrector] = value
+                if np.isfinite(value) and abs(value - targets[corrector]) <= tolerance:
+                    pending.remove(corrector)
+            if pending:
+                time.sleep(poll_interval)
+
+        for corrector in pending:
+            self.log(
+                f"Warning: {corrector} did not reach target {targets[corrector]:.6g} "
+                f"within {timeout:.2f}s. Last readback = {last_values[corrector]:.6g}"
+            )
+        return not pending
 
     def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance=5e-3, timeout=10.0):
         readback_param = self.quad_get_params[quadrupole]
@@ -497,9 +520,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
             self.log('Error: len(names) != len(corr_vals) in set_correctors(names, corr_vals)')
             return
         for corrector, corr_val in zip(names, corr_vals):
-            target = corr_val
-            self.client.set(self.corrector_set_params[corrector], data={'current': target})
-            self._wait_for_corrector_readback(corrector, target)
+            self.client.set(self.corrector_set_params[corrector], data={'current': corr_val})
+        return self._wait_for_corrector_readbacks(names, corr_vals)
 
     def vary_correctors(self, names, corr_vals):
         if isinstance(names, str):
