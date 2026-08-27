@@ -57,8 +57,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
 
-        self.rf_phase_nominal = 120 # degrees
-        self.rf_phase_test = 100 # degrees
+        self.rf_phase_nominal = 115 # degrees
+        self.rf_phase_test = 95 # degrees
 
         # Bpms and correctors in beamline order
         sequence = [
@@ -752,31 +752,35 @@ class CLEAR_real_machine(AbstractMachineInterface):
         inout_list = []
 
         for screen_name in selected_names:
-            hpixel, vpixel = self._get_screen_pixel_calibration(screen_name)
+            raw_hpixel, raw_vpixel = self._get_screen_pixel_calibration(screen_name)
+            hpixel, vpixel = raw_hpixel, raw_vpixel
 
-            try:
-                if screen_name not in self.screen_backgrounds:
-                    self.log(f"Acquiring background image for {screen_name}.")
-                    self.acquire_screen_background(screen_name, frames = 10)
-                subtracted_img, bg_img, beam_img = self.acquire_screen_image(screen_name)
-                raw_hpixel, raw_vpixel = hpixel, vpixel
-                subtracted_img, hpixel, vpixel = self._orient_screen_image(screen_name, subtracted_img, raw_hpixel, raw_vpixel)
-                bg_img, _, _ = self._orient_screen_image(screen_name, bg_img, raw_hpixel, raw_vpixel)
-                beam_img, _, _ = self._orient_screen_image(screen_name, beam_img, raw_hpixel, raw_vpixel)
-                x_mean, y_mean, sigx, sigy, total, img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel)
+            for attempt in range(3):  # re-acquire the image if the Gaussian fit came back NaN
+                try:
+                    if screen_name not in self.screen_backgrounds:
+                        self.log(f"Acquiring background image for {screen_name}.")
+                        self.acquire_screen_background(screen_name, frames = 10)
+                    subtracted_img, bg_img, beam_img = self.acquire_screen_image(screen_name)
+                    subtracted_img, hpixel, vpixel = self._orient_screen_image(screen_name, subtracted_img, raw_hpixel, raw_vpixel)
+                    bg_img, _, _ = self._orient_screen_image(screen_name, bg_img, raw_hpixel, raw_vpixel)
+                    beam_img, _, _ = self._orient_screen_image(screen_name, beam_img, raw_hpixel, raw_vpixel)
+                    x_mean, y_mean, sigx, sigy, total, img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel)
+                    if np.isfinite(sigx) and np.isfinite(sigy):
+                        break
+                    self.log(f"Gaussian fit for {screen_name} returned NaN (attempt {attempt + 1}/3); re-acquiring image.")
 
-            except Exception as e:
-                self.log(f"Couldn't acquire screen image for {screen_name}, because: {e}")
-                x_mean = np.nan
-                y_mean = np.nan
-                sigx = np.nan
-                sigy = np.nan
-                total = 0.0
-                subtracted_img = np.zeros((1, 1), dtype=float)
-                bg_img = np.zeros((1, 1), dtype=float)
-                beam_img = np.zeros((1, 1), dtype=float)
-                hedges = np.array([0.0, 1.0], dtype=float)
-                vedges = np.array([0.0, 1.0], dtype=float)
+                except Exception as e:
+                    self.log(f"Couldn't acquire screen image for {screen_name} (attempt {attempt + 1}/3), because: {e}")
+                    x_mean = np.nan
+                    y_mean = np.nan
+                    sigx = np.nan
+                    sigy = np.nan
+                    total = 0.0
+                    subtracted_img = np.zeros((1, 1), dtype=float)
+                    bg_img = np.zeros((1, 1), dtype=float)
+                    beam_img = np.zeros((1, 1), dtype=float)
+                    hedges = np.array([0.0, 1.0], dtype=float)
+                    vedges = np.array([0.0, 1.0], dtype=float)
 
             status = self._read_screen_status(screen_name) # is screen inserted or extracted?
             hpixel_list.append(hpixel)
