@@ -2,15 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import trapezoid
 
-def change_inverted_bpm_polarity(samples, bpm):
-    samples = np.asarray(samples, dtype=float)
-    bpm = str(bpm)
-    if bpm.startswith("CA."):
-        bpm = bpm[3:]
-    if bpm == "BPM0890":
-        return -samples
-    return samples
-
 # Subtract baseline from signal
 def baseline_correct(samples, n_baseline=100):
     baseline = np.mean(samples[:n_baseline])
@@ -132,8 +123,8 @@ def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW):
 
     H_data = japc.getParam(f"CA.{BPM}H-SA/SamplesFromTrigger")
     V_data = japc.getParam(f"CA.{BPM}V-SA/SamplesFromTrigger")
-    H_samples = change_inverted_bpm_polarity(H_data["samples"], BPM)
-    V_samples = change_inverted_bpm_polarity(V_data["samples"], BPM)
+    H_samples = (H_data["samples"], BPM)
+    V_samples = (V_data["samples"], BPM)
 
     H_b_samples = baseline_correct(H_samples)
     V_b_samples = baseline_correct(V_samples)

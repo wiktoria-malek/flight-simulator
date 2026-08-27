@@ -81,11 +81,14 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.nominal_K=0.7752883624676146 #3.35  # 1/m
         self.machine_name = "CLEAR"
         self.lattice.align_elements()
-        self.chosen_ict = "CA.BPM0530"
+        self.chosen_ict = "CA.BPM0890"
         # qfd520 = self.lattice["CA.QFD0520"]
         #                     # dx   # dy   #dz  # roll  # pitch # yaw
         # qfd520.set_offsets(0.0, 0.0, 0.0, 0, 0.0, 0.0, "center")
-        #
+
+        for element in self.lattice['*']:
+            element.set_aperture(2e-3, 2e-3, "circular") # in reality, CLEAR has 40mm, or 30-20mm diameter
+
         self.__track_bunch()
 
     def __setup_beam0(self):
