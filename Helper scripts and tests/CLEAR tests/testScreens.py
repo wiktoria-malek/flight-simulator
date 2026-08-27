@@ -33,21 +33,21 @@ print(f"hpixel from PyDa = {hpixel}")
 vpixel = camera["pixelCalSet2"]
 print(f"vpixel from PyDa = {vpixel}")
 
-proj_x = camera["projDataSet1"]
-print(f"proj_x.shape = {proj_x.shape}")
-
-proj_y = camera["projDataSet2"]
-print(f"proj_y.shape = {proj_y.shape}")
-
-x_positions = camera["imagePositionSet1"]
-print(f"x_positions.shape = {x_positions.shape}")
-
-y_positions = camera["imagePositionSet2"]
-print(f"y_positions.shape = {y_positions.shape}")
-
-inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context_empty).data["positionChannel1"]
-print(f"inout from PyDa = {inout}")
+# proj_x = camera["projDataSet1"]
+# print(f"proj_x.shape = {proj_x.shape}")
 #
+# proj_y = camera["projDataSet2"]
+# print(f"proj_y.shape = {proj_y.shape}")
+
+# x_positions = camera["imagePositionSet1"]
+# print(f"x_positions.shape = {x_positions.shape}")
+#
+# y_positions = camera["imagePositionSet2"]
+# print(f"y_positions.shape = {y_positions.shape}")
+#
+# inout = client.get("CA.BTV0390_CAS.BTV0420/OPSettingSystem1", context = context_empty).data["positionChannel1"]
+# print(f"inout from PyDa = {inout}")
+
 # print("================================================================================")
 # print("Testing screen CA.BTV0390L, reading its values directly from interface, using get_screens method... ")
 # result = I.get_screens(names=["CA.BTV0390"])
