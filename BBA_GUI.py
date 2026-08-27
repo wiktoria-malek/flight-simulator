@@ -168,6 +168,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.lineEdit_5.setText("10")
         self.lineEdit_6.setText("0.4")
         self.lineEdit_beta.setText("0")
+        self.transmission_value.setText("0.65")
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
         self.pushButton_reset_ref_orbit.clicked.connect(self._reset_reference_orbit)
         self.reset_ref_orb = False
@@ -338,7 +339,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.log("Restoring initial settings...")
         self._cancel = True
         self._running = False
-        w1, w2, w3, rcond, iters, gain, beta = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
         if w2 >0:
             self.interface.reset_energy()
         if w3 > 0:
@@ -610,7 +611,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         iters = geti("lineEdit_5", 10)
         gain = getf("lineEdit_6", 0.4)
         beta = getf("lineEdit_beta", 0.0)
-        return orbit_w, disp_w, wake_w, rcond, iters, gain, beta
+        transmission_threshold = getf("transmission_value", 0.65) * 100
+        return orbit_w, disp_w, wake_w, rcond, iters, gain, beta, transmission_threshold
 
     def _reset_reference_orbit(self):
         self.reset_ref_orb = True
@@ -695,7 +697,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.log("Starting correction...")
 
             self._cancel = False
-            w1, w2, w3, rcond, iters, gain, beta = self._read_params()
+            w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
             Cx = [s for s in corrs if self._is_h_corrector(s)]
             Cy = [s for s in corrs if self._is_v_corrector(s)]
@@ -758,11 +760,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._adaptive_R = getattr(self, "_adaptive_R", None)
             self._adaptive_R_prev_kick = None
             self._adaptive_R_prev_orbit = None
-            # AdaptiveResponseMatrix learns from one measured orbit change
-            # (x and y stacked).  DFS/WFS append additional response blocks
-            # to A, so their row count does not match that measured vector.
-            # Keep the adaptive update for orbit-only correction until it is
-            # extended to model energy and charge changes separately.
             adaptive_orbit_only = self.use_adaptive_R and w1 > 0 and w2 == 0 and w3 == 0
             if not adaptive_orbit_only:
                 self._adaptive_R = None
@@ -784,6 +781,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                             self.initial_charge_value = charge[0]
                         reference = float(self.initial_charge_value)
                         self._hist_transmission.append(100.0 * charge[0] / reference)
+                        if self._hist_transmission[-1] <= transmission_threshold:
+                            self._stop_correction()
+                            QMessageBox.warning(self, "Transmission below level!", "Transmission has reached the threshold. Stoping the correction now, and leaving correctors at current values.")
                     else:
                         self._hist_transmission.append(np.nan)
                 if it == 0:

@@ -86,8 +86,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         #                     # dx   # dy   #dz  # roll  # pitch # yaw
         # qfd520.set_offsets(0.0, 0.0, 0.0, 0, 0.0, 0.0, "center")
 
-        for element in self.lattice['*']:
-            element.set_aperture(2e-3, 2e-3, "circular") # in reality, CLEAR has 40mm, or 30-20mm diameter
+        # for element in self.lattice['*']:
+        #     element.set_aperture(2e-3, 2e-3, "circular") # in reality, CLEAR has 40mm, or 30-20mm diameter
 
         self.__track_bunch()
 
