@@ -185,10 +185,6 @@ class QuadrupoleScan(SaveOrLoad):
                 if getattr(self, "_cancel", False):
                     cancel_requested = True
                     break
-                insert_screen = getattr(self.interface, "insert_screen", None)
-                if callable(insert_screen):
-                     insert_screen(screen_name)
-                     time.sleep(10)
                 try:
                     for i, K1L in enumerate(K1L_values):
                         while getattr(self, "_scan_pause_requested", False) and not getattr(self, "_scan_stop_requested", False):
@@ -204,7 +200,7 @@ class QuadrupoleScan(SaveOrLoad):
                         if steps_requested > 0:
                             print("Before set_quadrupoles")
                             self.interface.set_quadrupoles([quad_name], [float(K1L)])
-                            time.sleep(5)
+                            #time.sleep(1)
                             print("After set_quadrupoles")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
@@ -239,11 +235,11 @@ class QuadrupoleScan(SaveOrLoad):
                             if idx is not None:
                                 sx_shots[j] = float(screens_data["sigx"][idx]) * sigma_scale
                                 sy_shots[j] = float(screens_data["sigy"][idx]) * sigma_scale
-                                images[i][k][j]=np.asarray(screens_data["images"][idx]).tolist()
+                                images[i][k][j]=np.asarray(screens_data["images"][idx])
                                 if idx < len(screens_data.get("hedges", [])):
-                                    hedges[i][k][j] = np.asarray(screens_data["hedges"][idx], dtype=float).tolist()
+                                    hedges[i][k][j] = np.asarray(screens_data["hedges"][idx], dtype=float)
                                 if idx < len(screens_data.get("vedges", [])):
-                                    vedges[i][k][j] = np.asarray(screens_data["vedges"][idx], dtype=float).tolist()
+                                    vedges[i][k][j] = np.asarray(screens_data["vedges"][idx], dtype=float)
                                 if "sigxy" in screens_data:
                                     sxy_shots[j] = float(screens_data["sigxy"][idx]) * sigxy_scale
                                 if "x" in screens_data:
@@ -339,7 +335,6 @@ class QuadrupoleScan(SaveOrLoad):
                     extract_screen = getattr(self.interface, "extract_screen", None)
                     if callable(extract_screen):
                         extract_screen(screen_name)
-                        time.sleep(10)
         finally:
             if steps_requested > 0 and np.isfinite(K1L_0):
                 self.interface.set_quadrupoles([quad_name], [float(K1L_0)])
