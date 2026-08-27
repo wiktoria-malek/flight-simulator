@@ -12,13 +12,11 @@ def change_inverted_bpm_polarity(samples, bpm):
         return -samples
     return samples
 
-
 # Subtract baseline from signal
 def baseline_correct(samples, n_baseline=100):
     baseline = np.mean(samples[:n_baseline])
     corrected_samples = samples - baseline
     return corrected_samples
-
 
 # Peak seek
 def find_peak(samples):
@@ -47,7 +45,7 @@ def threshold_integral(samples, threshold_fraction=0.05):
         end += 1
 
     # Integrate the pulse
-    integral = trapezoid(samples[start:end + 1])
+    integral = trapezoid(samples[start-1:end + 2])
 
     return integral, start, end, peak_idx
 
