@@ -1,4 +1,4 @@
-from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral, change_inverted_bpm_polarity
+from Interfaces.CLEAR.Setup_files.CLEAR_BPM_getHV import baseline_correct, find_peak, threshold_integral, plot_peak, plot_integral
 from Interfaces.CLEAR.InterfaceCLEAR_RFTrack import InterfaceCLEAR_RFTrack
 import sys, time, math, os, json
 from scipy.integrate import trapezoid
@@ -755,7 +755,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             raw_hpixel, raw_vpixel = self._get_screen_pixel_calibration(screen_name)
             hpixel, vpixel = raw_hpixel, raw_vpixel
 
-            for attempt in range(3):  # re-acquire the image if the Gaussian fit came back NaN
+            for attempt in range(3):  # re-acquire the image if the Gaussian fit came back as a nan
                 try:
                     if screen_name not in self.screen_backgrounds:
                         self.log(f"Acquiring background image for {screen_name}.")
@@ -767,10 +767,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
                     x_mean, y_mean, sigx, sigy, total, img, hedges, vedges = self._screen_data_from_image(subtracted_img, hpixel, vpixel)
                     if np.isfinite(sigx) and np.isfinite(sigy):
                         break
-                    self.log(f"Gaussian fit for {screen_name} returned NaN (attempt {attempt + 1}/3); re-acquiring image.")
 
                 except Exception as e:
-                    self.log(f"Couldn't acquire screen image for {screen_name} (attempt {attempt + 1}/3), because: {e}")
                     x_mean = np.nan
                     y_mean = np.nan
                     sigx = np.nan
