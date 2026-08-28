@@ -217,7 +217,7 @@ INTERFACE_SETUP = {
             "display_name": "CLEAR RFTrack",
             "module": "Interfaces.CLEAR.InterfaceCLEAR_RFTrack",
             "class_name": "InterfaceCLEAR_RFTrack",
-            "settings": {"jitter": 0.0, "bpm_resolution": 0.01, "nsamples": 1},
+            "settings": {"jitter": 0.0, "bpm_resolution": 0.00, "nsamples": 1},
             "units":
                 {
                     "corrector_strength": "gauss*m",

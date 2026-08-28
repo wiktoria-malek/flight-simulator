@@ -56,8 +56,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
-        self.rf_phase_nominal = 120 # degrees
-        self.rf_phase_test = 100 # degrees
+        self.rf_phase_nominal = 125 # degrees
+        self.rf_phase_test = 145 # degrees
 
         # Bpms and correctors in beamline order
         sequence = [

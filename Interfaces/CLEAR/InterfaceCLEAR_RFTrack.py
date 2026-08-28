@@ -38,7 +38,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             screen.set_length(element.get_length())
             element.replace_with(screen)
 
-    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.01, nsamples=1, nparticles=10000):
+    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 2.0
         self.Pref = 198 # MeV/c
         self.Q=-1
@@ -88,6 +88,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         # for element in self.lattice['*']:
         #     element.set_aperture(2e-3, 2e-3, "circular") # in reality, CLEAR has 40mm, or 30-20mm diameter
+
+        '''test of bpm invertion'''
+        self.invert_bpm = True
+
 
         self.__track_bunch()
 
@@ -331,6 +335,11 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             for j, bpm_name in enumerate(self.bpms):
                 bpm = self.lattice[bpm_name]
                 reading = bpm.get_reading()
+                '''test of inverted bpm'''
+                sign = -1.0 if (self.invert_bpm and bpm_name == "CA.BPM0890") else 1.0
+
+                x[i, j] = sign * reading[0]
+                y[i, j] = sign * reading[1]
                 x[i, j] = reading[0]
                 y[i, j] = reading[1]
                 tmit[i, j] = bpm.get_total_charge()
