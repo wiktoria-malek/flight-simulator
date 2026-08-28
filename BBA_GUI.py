@@ -1022,9 +1022,20 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 current_corrs = self.interface.get_correctors(selected_correctors)
                 returned_names = list(current_corrs["names"])
                 returned_bdes = np.asarray(current_corrs["bdes"], dtype=float).ravel()
+                returned_bact = np.asarray(current_corrs["bact"], dtype=float).ravel()
 
                 bdes_map = {name: val for name, val in zip(returned_names, returned_bdes)}
+                bact_map = {name: val for name, val in zip(returned_names, returned_bact)}
                 current_bdes = np.array([bdes_map[name] for name in selected_correctors], dtype=float)
+                current_bact = np.array([bact_map[name] for name in selected_correctors], dtype=float)
+                readback_tolerance = 0.05
+                if not np.allclose(current_bact, current_bdes, rtol=0.0, atol=readback_tolerance):
+                    failed = [
+                        f"{name} (bdes={target:.6g}, bact={actual:.6g})"
+                        for name, target, actual in zip(selected_correctors, current_bdes, current_bact)
+                        if abs(actual - target) > readback_tolerance
+                    ]
+                    raise RuntimeError("Corrector readback differs from its setpoint before correction: " + ", ".join(failed))
 
                 max_vals_x = np.full(delta_x.shape, max_curr_h, dtype=float)
                 max_vals_y = np.full(delta_y.shape, max_curr_v, dtype=float)
@@ -1032,9 +1043,25 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
                 new_bdes = current_bdes + delta_vals
                 new_bdes = clamp(new_bdes, max_vals)
-                self.interface.set_correctors(selected_correctors, new_bdes)
+                for attempt in range(1, 4):
+                    set_ok = self.interface.set_correctors(selected_correctors, new_bdes)
+                    after_corrs = self.interface.get_correctors(selected_correctors)
+                    after_names = list(after_corrs["names"])
+                    after_bact_map = {
+                        name: val for name, val in zip(after_names, np.asarray(after_corrs["bact"], dtype=float).ravel())
+                    }
+                    after_bact = np.array([after_bact_map[name] for name in selected_correctors], dtype=float)
+                    if set_ok is not False and np.allclose(after_bact, new_bdes, rtol=0.0, atol=readback_tolerance):
+                        break
+                    self.log(f"Corrector readback mismatch after BBA kick (attempt {attempt}/3)")
+                else:
+                    failed = [
+                        f"{name} (target={target:.6g}, bact={actual:.6g})"
+                        for name, target, actual in zip(selected_correctors, new_bdes, after_bact)
+                        if abs(actual - target) > readback_tolerance
+                    ]
+                    raise RuntimeError("BBA stopped: correctors did not reach their requested currents (the correction is not reliable): " + ", ".join(failed))
 
-                after_corrs = self.interface.get_correctors(selected_correctors)
                 after_names = list(after_corrs["names"])
                 after_vals = np.asarray(after_corrs["bdes"], dtype=float).ravel()
                 after_map = {name: val for name, val in zip(after_names, after_vals)}
