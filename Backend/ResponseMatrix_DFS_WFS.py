@@ -93,6 +93,8 @@ class ResponseMatrix_DFS_WFS():
         By = np.empty((0, len(bpms)))
         Cx = np.empty((0, len(hcorrs)))
         Cy = np.empty((0, len(vcorrs)))
+        excited_hcorrs = set()
+        excited_vcorrs = set()
 
         for pair in pairs:
             if len(pair) == 3:
@@ -171,6 +173,10 @@ class ResponseMatrix_DFS_WFS():
                 if np.isfinite(requested) and abs(requested) > 1e-12 and abs(measured) < 0.5 * abs(requested):
                     print(f"Skipping unexecuted excitation {tag}: Δbdes={requested:.6g}, Δbact={measured:.6g}")
                     continue
+                if tag in hcorrs:
+                    excited_hcorrs.add(tag)
+                elif tag in vcorrs:
+                    excited_vcorrs.add(tag)
 
 
             Bx = np.vstack((Bx, Op['x']))
@@ -186,8 +192,10 @@ class ResponseMatrix_DFS_WFS():
         Cx, Cy = Cx.astype(float), Cy.astype(float)
 
         # Drop unavailable correctors and incomplete shots before fitting.
-        hcol_mask = np.any(np.isfinite(Cx), axis=0)
-        vcol_mask = np.any(np.isfinite(Cy), axis=0)
+        # A corrector needs at least one successfully executed excitation;
+        # otherwise its constant readback is collinear with the offset term.
+        hcol_mask = np.array([corr in excited_hcorrs for corr in hcorrs]) & np.any(np.isfinite(Cx), axis=0)
+        vcol_mask = np.array([corr in excited_vcorrs for corr in vcorrs]) & np.any(np.isfinite(Cy), axis=0)
         hcorrs = [corr for corr, keep in zip(hcorrs, hcol_mask) if keep]
         vcorrs = [corr for corr, keep in zip(vcorrs, vcol_mask) if keep]
         Cx, Cy = Cx[:, hcol_mask], Cy[:, vcol_mask]

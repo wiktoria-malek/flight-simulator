@@ -164,8 +164,11 @@ class Worker(QObject):
                     curr_p = corr['bdes'] + kick
                     curr_p = clamp(curr_p, max_curr)
                     if not set_corrector_with_retry(corrector, curr_p):
-                        print(f"Skipping {corrector}: '+' readback failed twice")
-                        I.set_correctors(corrector, corr['bdes'])
+                        print(f"Skipping {corrector}: '+' readback failed after retries")
+                        if not set_corrector_with_retry(corrector, corr['bdes']):
+                            print(f"Stopping SysID: {corrector} did not return to its initial current")
+                            self.running = False
+                            break
                         continue
                     corr_changed = True
                     if not self.running: break
@@ -182,8 +185,11 @@ class Worker(QObject):
                     curr_m = corr['bdes'] - kick
                     curr_m = clamp(curr_m, max_curr)
                     if not set_corrector_with_retry(corrector, curr_m):
-                        print(f"Skipping {corrector}: '-' readback failed twice")
-                        I.set_correctors(corrector, corr['bdes'])
+                        print(f"Skipping {corrector}: '-' readback failed after retries")
+                        if not set_corrector_with_retry(corrector, corr['bdes']):
+                            print(f"Stopping SysID: {corrector} did not return to its initial current")
+                            self.running = False
+                            break
                         continue
                     corr_changed = True
 
@@ -198,7 +204,10 @@ class Worker(QObject):
                 Om = state_m.get_orbit(self.bpms)
 
                 if corr_changed:
-                    I.set_correctors(corrector, corr['bdes'])
+                    if not set_corrector_with_retry(corrector, corr['bdes']):
+                        print(f"Stopping SysID: {corrector} did not return to its initial current")
+                        self.running = False
+                        break
 
                 if not self.running: break
                 if self.paused:      self._await_user()
