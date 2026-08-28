@@ -6,7 +6,6 @@ from scipy.integrate import trapezoid
 def change_inverted_bpm_polarity(samples, bpm):
     return np.asarray(samples, dtype=float)
 
-
 # Subtract baseline from signal
 def baseline_correct(samples, n_baseline=100):
     baseline = np.mean(samples[:n_baseline])

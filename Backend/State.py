@@ -1,6 +1,7 @@
 from datetime import datetime
 import numpy as np
 import pickle
+import gzip
 
 def reject_large_outliers(values, factor=10.0):
     arr = np.asarray(values, dtype=float).copy()
@@ -177,8 +178,12 @@ class State:
         if len(f)==0:
             raise FileNotFoundError(f"Couldn't find state file matching {filename}")
         try:
-            with open(f[0], "rb") as pickle_file:
-                data = pickle.load(pickle_file)
+            try:
+                with gzip.open(f[0], "rb") as pickle_file:
+                    data = pickle.load(pickle_file)
+            except OSError:
+                with open(f[0], "rb") as pickle_file:
+                    data = pickle.load(pickle_file)
             self.sequence = data['sequence']
             self.correctors = data['correctors']
             self.bpms = data['bpms']
@@ -256,6 +261,6 @@ class State:
         }
         if filename is None and basename is None:
             raise ValueError("Either filename or basename is required")
-        with open(filename, "wb") as file:
+        with gzip.open(filename, "wb", compresslevel=6) as file:
             pickle.dump(state, file)
         return filename
