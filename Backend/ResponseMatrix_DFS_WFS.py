@@ -157,6 +157,21 @@ class ResponseMatrix_DFS_WFS():
                 Cx_m = Sm.get_correctors(hcorrs)['bact']
                 Cy_m = Sm.get_correctors(vcorrs)['bact']
 
+                if tag in hcorrs:
+                    index = hcorrs.index(tag)
+                    requested = Sp.get_correctors([tag])['bdes'][0] - Sm.get_correctors([tag])['bdes'][0]
+                    measured = Cx_p[index] - Cx_m[index]
+                elif tag in vcorrs:
+                    index = vcorrs.index(tag)
+                    requested = Sp.get_correctors([tag])['bdes'][0] - Sm.get_correctors([tag])['bdes'][0]
+                    measured = Cy_p[index] - Cy_m[index]
+                else:
+                    requested = measured = np.nan
+
+                if np.isfinite(requested) and abs(requested) > 1e-12 and abs(measured) < 0.5 * abs(requested):
+                    print(f"Skipping unexecuted excitation {tag}: Δbdes={requested:.6g}, Δbact={measured:.6g}")
+                    continue
+
 
             Bx = np.vstack((Bx, Op['x']))
             Bx = np.vstack((Bx, Om['x']))

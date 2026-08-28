@@ -4,19 +4,15 @@ from scipy.integrate import trapezoid
 
 
 def change_inverted_bpm_polarity(samples, bpm):
-    samples = np.asarray(samples, dtype=float)
-    bpm = str(bpm)
-    if bpm.startswith("CA."):
-        bpm = bpm[3:]
-    if bpm == "BPM0890":
-        return -samples
-    return samples
+    return np.asarray(samples, dtype=float)
+
 
 # Subtract baseline from signal
 def baseline_correct(samples, n_baseline=100):
     baseline = np.mean(samples[:n_baseline])
     corrected_samples = samples - baseline
     return corrected_samples
+
 
 # Peak seek
 def find_peak(samples):
@@ -45,7 +41,7 @@ def threshold_integral(samples, threshold_fraction=0.05):
         end += 1
 
     # Integrate the pulse
-    integral = trapezoid(samples[start-1:end + 2])
+    integral = trapezoid(samples[start-1:end + 2])  # that's the new one
 
     return integral, start, end, peak_idx
 
@@ -136,8 +132,8 @@ def get_bpm_hv(BPM, mode, plot=False, window=DEFAULT_WINDOW):
 
     H_data = japc.getParam(f"CA.{BPM}H-SA/SamplesFromTrigger")
     V_data = japc.getParam(f"CA.{BPM}V-SA/SamplesFromTrigger")
-    H_samples = change_inverted_bpm_polarity(H_data["samples"], BPM)
-    V_samples = change_inverted_bpm_polarity(V_data["samples"], BPM)
+    H_samples = np.asarray(H_data["samples"], dtype=float)
+    V_samples = np.asarray(V_data["samples"], dtype=float)
 
     H_b_samples = baseline_correct(H_samples)
     V_b_samples = baseline_correct(V_samples)

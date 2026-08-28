@@ -116,6 +116,13 @@ class Worker(QObject):
                 return val
             return max(-max_val, min(val, max_val))
 
+        def set_corrector_with_retry(corrector, current, attempts=3):
+            for attempt in range(1, attempts + 1):
+                if I.set_correctors(corrector, current) is not False:
+                    return True
+                print(f"{corrector}: readback timeout ({attempt}/{attempts})")
+            return False
+
         for iter in range(self.Niter):
             if not self.running: break
             if self.paused:      self._await_user()
@@ -156,7 +163,10 @@ class Worker(QObject):
                     print('corr[bds] =', corr['bdes'], ' also kick = ', kick)
                     curr_p = corr['bdes'] + kick
                     curr_p = clamp(curr_p, max_curr)
-                    I.set_correctors(corrector, curr_p)
+                    if not set_corrector_with_retry(corrector, curr_p):
+                        print(f"Skipping {corrector}: '+' readback failed twice")
+                        I.set_correctors(corrector, corr['bdes'])
+                        continue
                     corr_changed = True
                     if not self.running: break
                     if self.paused:      self._await_user()
@@ -171,7 +181,10 @@ class Worker(QObject):
                 if not os.path.isfile(filename_m):
                     curr_m = corr['bdes'] - kick
                     curr_m = clamp(curr_m, max_curr)
-                    I.set_correctors(corrector, curr_m)
+                    if not set_corrector_with_retry(corrector, curr_m):
+                        print(f"Skipping {corrector}: '-' readback failed twice")
+                        I.set_correctors(corrector, corr['bdes'])
+                        continue
                     corr_changed = True
 
                     if not self.running: break

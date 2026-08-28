@@ -340,8 +340,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
                 x[i, j] = sign * reading[0]
                 y[i, j] = sign * reading[1]
-                x[i, j] = reading[0]
-                y[i, j] = reading[1]
+                # x[i, j] = reading[0]
+                # y[i, j] = reading[1]
                 tmit[i, j] = bpm.get_total_charge()
 
         bpms = {"names": self.bpms, "x": x, "y": y, "tmit": tmit}
