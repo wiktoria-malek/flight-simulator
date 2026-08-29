@@ -164,18 +164,24 @@ class SaveOrLoad():
         self.log("Restoring energy and intensity from machine status...")
         self.interface.restore_beam_settings(state.get_beam_settings())
         self.log("Energy and intensity restored!")
-        return
 
+        timestamp = state.get_timestamp()
+        if getattr(timestamp, "tzinfo", None) is not None:
+            saved_at = timestamp.isoformat(sep=" ", timespec="seconds")
+        else:
+            saved_at = timestamp.strftime("%Y-%m-%d %H:%M:%S") + " (legacy/local timezone)"
         if hasattr(self, "machine_status_file"):
             self.machine_status_file.setText(filename)
         if hasattr(self, "log"):
-            self.log(f"Machine status restored from {filename}")
-        QMessageBox.information(self, "Restore machine status", "Machine status restored.")
+            self.log(f"Machine status restored from {filename}; saved at {saved_at}")
+        QMessageBox.information(self, "Restore machine status", f"Machine status restored.\nSaved at: {saved_at}")
 
     def save_session_settings(self, w1, w2, w3, rcond, iters, gain, beta, max_horizontal_current,max_vertical_current, is_triangular,bpm_weights,Axx, Ayy,Axy,Ayx, Bx, By, is_jitter_subtraction_checked, machine_state_file=None):
+        clock_now = getattr(self, "_clock_now", datetime.now)
+        saved_at = clock_now()
         save_session_dir = getattr(self, "_session_dir", None)
         if save_session_dir is None:
-            time_str = datetime.now().strftime("%y%m%d%H%M%S")
+            time_str = saved_at.strftime("%y%m%d%H%M%S")
             default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
             save_session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_session_settings")
         os.makedirs(save_session_dir, exist_ok=True)
@@ -188,6 +194,8 @@ class SaveOrLoad():
                           base_dir=save_session_dir)
 
         correction_settings = {
+            "saved_at": saved_at.isoformat(timespec="seconds"),
+            "timezone": getattr(self, "_clock_zone_name", None),
             "actuator_mode": "Kicker",
             "w1": w1,
             "w2": w2,
@@ -528,7 +536,11 @@ class SaveOrLoad():
             else:
                 QMessageBox.warning(self, "Load session", "Data directory not found")
                 return
-        QMessageBox.information(self.session_database_3, "Data directory selected", "Loaded session")
+        saved_at = settings.get("saved_at")
+        message = "Loaded session"
+        if saved_at:
+            message += f"\nSaved at: {saved_at}"
+        QMessageBox.information(self.session_database_3, "Data directory selected", message)
 
         if "w1" in settings: self.lineEdit.setText(str(settings["w1"]))
         if "w2" in settings: self.lineEdit_2.setText(str(settings["w2"]))

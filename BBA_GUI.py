@@ -1,10 +1,11 @@
 import sys, os, re, matplotlib
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import numpy as np
 
 try:
     from PyQt6 import uic
-    from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment
+    from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment, QTimer
     from PyQt6.QtWidgets import (QGroupBox, QApplication, QRadioButton, QSizePolicy, QMainWindow, QFileDialog,
                                  QListWidget, QListWidgetItem, QMessageBox, QProgressDialog, QVBoxLayout, QPushButton,
                                  QDialog, QLabel, QStyledItemDelegate, QWidget, QHBoxLayout)
@@ -13,7 +14,7 @@ try:
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
-    from PyQt5.QtCore import Qt, QProcess, QProcessEnvironment
+    from PyQt5.QtCore import Qt, QProcess, QProcessEnvironment, QTimer
     from PyQt5.QtWidgets import (QGroupBox, QApplication, QRadioButton, QSizePolicy, QMainWindow, QFileDialog,
                                  QListWidget, QListWidgetItem, QMessageBox, QProgressDialog, QVBoxLayout, QPushButton,
                                  QDialog, QLabel, QStyledItemDelegate, QWidget, QHBoxLayout)
@@ -97,6 +98,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.reset_reference_orbit = False
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
         uic.loadUi(ui_path, self)
+        self._clock_zone_name= self._get_clock_zone()
+        self._setup_machine_clock()
         self._load_logo()
         self.bpms_list.setItemDelegate(BpmWeightsDelegate(self.bpms_list))
         self._data_dirs = {"traj": None, "dfs": None, "wfs": None}
@@ -146,14 +149,36 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.initial_charge_value = None
 
     def _save_machine_status(self):
-        time_str = datetime.now().strftime("%y%m%d%H%M%S")
+        saved_at = self._clock_now()
+        time_str = saved_at.strftime("%y%m%d%H%M%S")
         default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
         self._session_dir = os.path.join(default_dir, f"BBA_{self.interface.get_name()}{time_str}_session_settings")
         os.makedirs(self._session_dir, exist_ok=True)
         machine_state = self.interface.get_state()
+        machine_state.timestamp = saved_at
         machine_state.save(filename=os.path.join(self._session_dir, "machine_status.pkl"))
         self.session_database_3.setText(self._session_dir)
         return machine_state
+
+    def _get_clock_zone(self):
+        interface_defaults = self._get_interface_initial_settings() or {}
+        timezone = interface_defaults.get("clock_timezone", "Europe/Zurich")
+        return timezone
+
+    def _clock_now(self):
+        return datetime.now(ZoneInfo(self._clock_zone_name))
+
+    def _setup_machine_clock(self):
+        self._clock_timer = QTimer(self)
+        self._clock_timer.setInterval(250)
+        self._clock_timer.timeout.connect(self._update_machine_clock)
+        self._update_machine_clock()
+        self._clock_timer.start()
+
+    def _update_machine_clock(self):
+        now = self._clock_now()
+        self.machine_clock_label.setText(f""
+                                         f"{now:%Y-%m-%d %H:%M:%S} {now.tzname()}")
 
     def _setup_corrector_controls(self):
         self.groupBox_9.setVisible(False)

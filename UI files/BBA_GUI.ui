@@ -1862,9 +1862,9 @@ QToolButton#max_strength_tooltip:hover {
                      <number>0</number>
                     </property>
                    </widget>
-                  </item>
-                  <item>
-                   <spacer name="logo_right_spacer">
+                 </item>
+                 <item>
+                  <spacer name="logo_right_spacer">
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
                     </property>
@@ -1874,12 +1874,28 @@ QToolButton#max_strength_tooltip:hover {
                       <height>20</height>
                      </size>
                     </property>
-                   </spacer>
-                  </item>
-                 </layout>
-                </item>
-                <item>
-                 <spacer name="controls_vertical_spacer">
+                  </spacer>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <widget class="QLabel" name="machine_clock_label">
+                 <property name="styleSheet">
+                  <string notr="true">QLabel#machine_clock_label {
+    font-weight: 600;
+    padding: 4px 8px;
+}</string>
+                 </property>
+                 <property name="text">
+                  <string>Time: --</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <spacer name="controls_vertical_spacer">
                   <property name="orientation">
                    <enum>Qt::Vertical</enum>
                   </property>
@@ -1906,7 +1922,7 @@ QToolButton#max_strength_tooltip:hover {
       </item>
      </layout>
     </item>
-   </layout>
+  </layout>
   </widget>
  </widget>
  <resources/>

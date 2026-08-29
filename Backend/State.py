@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import numpy as np
 import pickle
 import gzip
@@ -150,6 +151,9 @@ class State:
     def get_interface_id(self):
         return self.interface_id
 
+    def get_timestamp(self):
+        return self.timestamp
+
     def get_screens(self,names=None):
         if isinstance(names, str):
             names = [names]
@@ -198,7 +202,14 @@ class State:
             self.interface_id = data.get('interface_id')
             self.hcorrectors_names = data['hcorrectors_names']
             self.vcorrectors_names = data['vcorrectors_names']
-            self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
+            timestamp_iso = data.get("timestamp_iso")
+            if timestamp_iso:
+                self.timestamp = datetime.fromisoformat(timestamp_iso)
+                timestamp_timezone = data.get("timestamp_timezone")
+                if timestamp_timezone:
+                    self.timestamp = self.timestamp.astimezone(ZoneInfo(timestamp_timezone))
+            else:
+                self.timestamp = datetime.strptime(data['timestamp'], "%Y/%m/%d, %H:%M:%S")
         except Exception:
             raise Exception(f"Could not load {filename}")
 
@@ -257,7 +268,9 @@ class State:
             "interface_id": self.interface_id,
             "hcorrectors_names": self.hcorrectors_names,
             "vcorrectors_names": self.vcorrectors_names,
-            "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S")
+            "timestamp": self.timestamp.strftime("%Y/%m/%d, %H:%M:%S"),
+            "timestamp_iso": self.timestamp.isoformat(timespec="seconds"),
+            "timestamp_timezone": getattr(self.timestamp.tzinfo, "key", None),
         }
         if filename is None and basename is None:
             raise ValueError("Either filename or basename is required")

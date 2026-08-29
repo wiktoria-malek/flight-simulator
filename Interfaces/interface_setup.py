@@ -4,6 +4,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Damping Ring",
             "module": "Interfaces.ATF2.InterfaceATF2_DR",
             "class_name": "InterfaceATF2_DR",
+            "clock_timezone": "Asia/Tokyo",
             "settings": {"nsamples": 3},
             "units":
             {
@@ -24,6 +25,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Damping Ring RFTrack",
             "module": "Interfaces.ATF2.InterfaceATF2_DR_RFTrack",
             "class_name": "InterfaceATF2_DR_RFTrack",
+            "clock_timezone": "Europe/Zurich",
             "settings": {"jitter":0.0, "bpm_resolution":0.0, "nsamples":1},
             "units":
                 {
@@ -44,6 +46,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Extraction Line",
             "module": "Interfaces.ATF2.InterfaceATF2_Ext",
             "class_name": "InterfaceATF2_Ext",
+            "clock_timezone": "Asia/Tokyo",
             "settings": {"nsamples": 3},
             "units":
                 {
@@ -66,6 +69,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Extraction Line RFTrack",
             "module": "Interfaces.ATF2.InterfaceATF2_Ext_RFTrack",
             "class_name": "InterfaceATF2_Ext_RFTrack",
+            "clock_timezone": "Europe/Zurich",
             "settings": {"jitter":0.0, "bpm_resolution":0.00, "nsamples":1},
             "units":
                 {
@@ -91,6 +95,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Linac",
             "module": "Interfaces.ATF2.InterfaceATF2_Linac",
             "class_name": "InterfaceATF2_Linac",
+            "clock_timezone": "Asia/Tokyo",
             "settings": {"nsamples":3},
             "units":
                 {
@@ -111,6 +116,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Linac Beam Transport",
             "module": "Interfaces.ATF2.InterfaceATF2_LinacBT",
             "class_name": "InterfaceATF2_LinacBT",
+            "clock_timezone": "Asia/Tokyo",
             "settings": {"nsamples": 3},
             "units":
                 {
@@ -131,6 +137,7 @@ INTERFACE_SETUP = {
             "display_name": "ATF2 Linac RFTrack",
             "module": "Interfaces.ATF2.InterfaceATF2_Linac_RFTrack",
             "class_name": "InterfaceATF2_Linac_RFTrack",
+            "clock_timezone": "Europe/Zurich",
             "settings": {"jitter": 0.00, "bpm_resolution": 0.00},
             "units":
                 {
@@ -154,6 +161,7 @@ INTERFACE_SETUP = {
             "display_name": "FACET2 Linac RFTrack",
             "module": "Interfaces.FACET2.InterfaceFACET2_Linac_RFTrack",
             "class_name": "InterfaceFACET2_Linac_RFTrack",
+            "clock_timezone": "Europe/Zurich",
             "settings": {"jitter":0.0, "bpm_resolution":0.0, "nsamples":1},
             "units":
                 {
@@ -174,6 +182,7 @@ INTERFACE_SETUP = {
             "display_name": "FACET2 Linac",
             "module": "Interfaces.FACET2.InterfaceFACET2_Linac",
             "class_name": "InterfaceFACET2_Linac",
+            "clock_timezone": "America/Los_Angeles",
             "settings": {"nsamples":10},
             "units":
                 {
@@ -196,6 +205,7 @@ INTERFACE_SETUP = {
             "display_name": "CLEAR",
             "module": "Interfaces.CLEAR.InterfaceCLEAR",
             "class_name": "CLEAR_real_machine",
+            "clock_timezone": "Europe/Zurich",
             "settings": {"nsamples":3},
             "units":
                 {
@@ -217,6 +227,7 @@ INTERFACE_SETUP = {
             "display_name": "CLEAR RFTrack",
             "module": "Interfaces.CLEAR.InterfaceCLEAR_RFTrack",
             "class_name": "InterfaceCLEAR_RFTrack",
+            "clock_timezone": "Europe/Zurich",
             "settings": {"jitter": 0.0, "bpm_resolution": 0.00, "nsamples": 1},
             "units":
                 {
