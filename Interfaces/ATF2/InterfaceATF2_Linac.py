@@ -141,8 +141,10 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
             'ext:EXTcharge', 'linacbt:BTEcharge', 'BIM:DR:nparticles', 'BIM:IP:nparticles'
         ]
         self.phase_kl1 = PV('CM1L:phaseRead').get()
+        self.cm1l_test_phase = self.phase_kl1 + 5
         self.laser_intensity1 = PV('RFGun:LaserIntensity1:Read').get()
         self.laser_intensity2 = PV('RFGun:LaserIntensity2:Read').get()
+        self.test_laser_intensity = 0.15
         self.machine_name = "ATF2"
 
     def log_messages(self,console):
@@ -157,8 +159,7 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
 
     def change_energy(self):
         pv = PV('CM1L:phaseWrite')
-        rel_phase = 5
-        target = self.phase_kl1 + rel_phase
+        target = self.cm1l_test_phase
         pv.put(target)
         self._wait_for_pv_readback('CM1L:phaseRead', target)
         dP_P = 0.0 # we don't really know it
@@ -169,7 +170,9 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         pv.put(self.phase_kl1)
         self._wait_for_pv_readback('CM1L:phaseRead', self.phase_kl1)
 
-    def change_intensity(self, intensity=0.15):
+    def change_intensity(self, intensity=None):
+        if intensity is None:
+            intensity = self.test_laser_intensity
         print(f'Changing laser intensity to {intensity}...')
         laser_intensity1 = 10000 * float(intensity) / self.laser_intensity2
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity1)
@@ -454,4 +457,3 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         else:
             out["Ttot"] = float("nan")
         return out
-

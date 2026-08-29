@@ -147,6 +147,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         ]
         self.nominal_laser_intensity = nominal_intensity
         self.test_laser_intensity = wfs_intensity
+        self.energy_frequency_offset_khz = 4.0
         #self.laser_intensity = PV('RFGun:LasetIntensity1:Read').get()
         self.twiss_path = os.path.join(os.path.dirname(__file__), "DR_ATF2", "ATF_DR_twiss_file.tws")
 
@@ -230,7 +231,7 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         PV('RAMP:CONTROL_ON_SW').put(1)
         self._wait_for_pv_readback('RAMP:CONTROL_ON_SW', 1)
         ### delta_freq MUST MATCH :MI2: to EPICS --> means "MINUS2"
-        delta_freq = +4 # kHz
+        delta_freq = float(self.energy_frequency_offset_khz)  # kHz
         # PV('RAMP:MI2:ONOFF_SW').put(1)
         PV('RAMP:PL4:ONOFF_SW').put(1)
         self._wait_for_pv_readback('RAMP:PL4:ONOFF_SW', 1)
@@ -243,7 +244,9 @@ class InterfaceATF2_DR(AbstractMachineInterface):
         PV('RAMP:CONTROL_OFF_SW').put(0)
         self._wait_for_pv_readback('RAMP:CONTROL_ON_SW', 0)
 
-    def change_intensity(self, intensity=0.1):
+    def change_intensity(self, intensity=None):
+        if intensity is None:
+            intensity = self.test_laser_intensity
         print(f'Changing laser intensity to {intensity}...')
         laser_intensity1 = 10000 * float(intensity) / self.laser_intensity2
         PV('RFGun:LaserIntensity1:Write').put(laser_intensity1)

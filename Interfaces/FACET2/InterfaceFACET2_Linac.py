@@ -92,6 +92,9 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         # initial bunch charge setpoint for reset_intensity
         self.init_charge_setpoint = self.PVs['Q_setpoint'].get()
         self.UVWP_init = self.PVs['UVWP_angle'].get()
+        self.bba_bc11_energy_offset_mev = -3.0
+        self.bba_downstream_energy_offset_mev = -40.0
+        self.bba_uvwp_offset_deg = -2.5
         # initialize bpm data buffer
         self.bpm_buffer = make_bpm_buffer(self.f2m, self.bpms, Npts=self.nsamples)
         print('InterfaceFACET2_Linac is ready')
@@ -182,9 +185,9 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         """ set beam to -2MeV at DL10 and disable downstream feedbacks """
         print('Lowering beam energy starting from BC11')
         targets = {
-            'bc11e_setpoint': -3.0,
-            'bc14e_setpoint': -40.0,
-            'bc20e_setpoint': -40.0,
+            'bc11e_setpoint': self.bba_bc11_energy_offset_mev,
+            'bc14e_setpoint': self.bba_downstream_energy_offset_mev,
+            'bc20e_setpoint': self.bba_downstream_energy_offset_mev,
         }
         for name, target in targets.items():
             self.PVs[name].put(target)
@@ -192,7 +195,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
             self._wait_for_pv_readback(self.PVs[name], target, description=name)
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC11BL_TARGET').put(4400)
         # get_pv(f'PHYS:SYS1:1:F2LFB_BC14BL_TARGET').put(5000)
-        return -(3.0/335.0)
+        return float(self.bba_bc11_energy_offset_mev) / 335.0
 
     def reset_energy(self):
         """ zero dl10 setpoint, re-enable feedbacks """
@@ -208,7 +211,7 @@ class InterfaceFACET2_Linac(AbstractMachineInterface):
         """ lowers bunch charge by ~200pC (2.5deg UV WP angle adjustment) """
         self.UVWP_init = self.PVs['UVWP_angle'].get()
         self.Q_init = self._meascharge()
-        uvwp_target = self.UVWP_init - 2.5
+        uvwp_target = self.UVWP_init + self.bba_uvwp_offset_deg
         self.PVs['UVWP_angle'].put(uvwp_target)
         self._wait_for_pv_readback(self.PVs['UVWP_angle'], uvwp_target, description='UVWP_angle')
         self.Q_new = self._meascharge()

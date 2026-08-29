@@ -145,6 +145,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.subtract_jitter_checkbox.setChecked(False)
         self.actuator_mode = ActuatorMode.Kicker
         self._setup_corrector_controls()
+        self._setup_beam_change_controls()
         self.restore_machine_status_button.clicked.connect(self._pick_and_load_machine_status_file)
         self.initial_charge_value = None
 
@@ -177,8 +178,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
     def _update_machine_clock(self):
         now = self._clock_now()
-        self.machine_clock_label.setText(f""
-                                         f"{now:%Y-%m-%d %H:%M:%S} {now.tzname()}")
+        self.machine_clock_label.setText(f"{now:%Y-%m-%d %H:%M:%S} {now.tzname()}")
 
     def _setup_corrector_controls(self):
         self.groupBox_9.setVisible(False)
@@ -194,6 +194,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.lineEdit_6.setText("0.4")
         self.lineEdit_beta.setText("0")
         self.transmission_value.setText("0.65")
+        self._setup_nsamples_control()
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
         self.pushButton_reset_ref_orbit.clicked.connect(self._reset_reference_orbit)
         self.reset_ref_orb = False
@@ -228,6 +229,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
         self._refresh_metric_plots_for_mode()
+
+    def _setup_nsamples_control(self):
+        self.nsamples_input.setText(str(max(1, int(self.interface.nsamples))))
+        self.nsamples_input.textChanged.connect(self._set_interface_nsamples)
+
+    def _set_interface_nsamples(self, value):
+        self.interface.nsamples = max(1, int(value))
+        self.nsamples_input.setStyleSheet("")
 
     def _load_logo(self):
         self.logo_label.setText("")
@@ -360,6 +369,84 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
         return units_settings, sysid_kick, bpm_unit, corrs_unit
 
+    def _setup_beam_change_controls(self):
+        beam_change = (self._get_interface_initial_settings() or {}).get("beam_change", {})
+        self._beam_change_fields = []
+        self.beam_change_group.setVisible(bool(beam_change))
+        
+        controls = {
+            "energy": (
+                self.energy_change_label,
+                self.energy_nominal_label,
+                self.energy_nominal_input,
+                self.energy_test_label,
+                self.energy_test_input,
+                self.energy_change_tooltip,
+            ),
+            "intensity": (
+                self.intensity_change_label,
+                self.intensity_nominal_label,
+                self.intensity_nominal_input,
+                self.intensity_test_label,
+                self.intensity_test_input,
+                self.intensity_change_tooltip,
+            ),
+        }
+        for kind, widgets in controls.items():
+            title, nominal_label, nominal_input, test_label, test_input, tooltip = widgets
+            settings = beam_change.get(kind)
+            title.setVisible(settings is not None)
+            tooltip.setVisible(settings is not None)
+            if settings is None:
+                for widget in (nominal_label, nominal_input, test_label, test_input):
+                    widget.setVisible(False)
+                continue
+            title.setText(settings["label"])
+            tooltip.setToolTip(settings["tooltip"])
+            for slot, label, input_widget in (
+                ("nominal", nominal_label, nominal_input),
+                ("test", test_label, test_input),
+            ):
+                field = settings.get(slot)
+                label.setVisible(field is not None)
+                input_widget.setVisible(field is not None)
+                if field is None:
+                    continue
+                label.setText(field["label"])
+                value = getattr(self.interface, field["attribute"], field.get("default", ""))
+                input_widget.setText("" if value is None else str(value))
+                input_widget.setPlaceholderText(field.get("placeholder", ""))
+                self._beam_change_fields.append((input_widget, field))
+
+    def _apply_beam_change_controls(self):
+        self._beam_change_values = {}
+        for input_widget, field in self._beam_change_fields:
+            text = input_widget.text().strip()
+            if not text and field.get("allow_empty", False):
+                setattr(self.interface, field["attribute"], None)
+                self._beam_change_values[field["attribute"]] = None
+                input_widget.setStyleSheet("")
+                continue
+            try:
+                value = float(text)
+            except ValueError:
+                input_widget.setStyleSheet("QLineEdit { border: 1px solid #c62828; }")
+                QMessageBox.warning(self, "Invalid beam-change setting", f"{field['label']} must be a number.")
+                return False
+            input_widget.setStyleSheet("")
+            setattr(self.interface, field["attribute"], value)
+            self._beam_change_values[field["attribute"]] = value
+        return True
+
+    def _load_beam_change_values(self, values):
+        for input_widget, field in self._beam_change_fields:
+            attribute = field["attribute"]
+            if attribute not in values:
+                continue
+            value = values[attribute]
+            input_widget.setText("" if value is None else str(value))
+        return self._apply_beam_change_controls()
+
     def _restore_initial_settings(self):
         self.log("Restoring initial settings...")
         self._cancel = True
@@ -398,6 +485,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         print("Starting button clicked...")
         self.log("Starting button clicked...")
         if not self._running:
+            if not self._apply_beam_change_controls():
+                return
             saved_state = self._save_machine_status()
             self._running = True
             self._step = True

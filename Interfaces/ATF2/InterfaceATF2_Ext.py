@@ -183,6 +183,7 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
         self.nominal_laser_intensity = nominal_intensity
         self.laser_intensity = PV('RFGun:LaserIntensity1:Read').get()
         self.test_laser_intensity = wfs_intensity
+        self.energy_frequency_offset_khz = 4.0
         #PV('RFGun:LaserIntensity1:Read').get()
 
         # k_T_per_A : integrated-gradient slope GL/I [T/A]
@@ -900,7 +901,9 @@ class InterfaceATF2_Ext(AbstractMachineInterface):
 
         return bg_img
 
-    def change_energy(self, delta_freq=4):
+    def change_energy(self, delta_freq=None):
+        if delta_freq is None:
+            delta_freq = self.energy_frequency_offset_khz
         PV('RAMP:CONTROL_ON_SW').put(1)
         self._wait_for_pv_readback('RAMP:CONTROL_ON_SW', 1)
         # delta_freq in kHz

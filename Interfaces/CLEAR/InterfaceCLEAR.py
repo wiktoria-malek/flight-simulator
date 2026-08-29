@@ -58,6 +58,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
         self.rf_phase_nominal = 125 # degrees
         self.rf_phase_test = 145 # degrees
+        self.uvatt2_nominal_position = None
+        self.uvatt2_test_position = None
 
         # Bpms and correctors in beamline order
         sequence = [
@@ -254,13 +256,18 @@ class CLEAR_real_machine(AbstractMachineInterface):
         print(after_energy_reset)
 
     def change_intensity(self):
-        self.steps_readback_position = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
+        current_position = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
+        self.steps_readback_position = (
+            current_position if self.uvatt2_nominal_position is None else float(self.uvatt2_nominal_position)
+        )
         self.steps_readback_position_min = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
         self.steps_readback_position_max =self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
         print(f'Changing intensity to ...')
         nominal_settings_steps = self.steps_readback_position
-        N_steps = 1000 # to be verified!
-        new_laser_settings = nominal_settings_steps + N_steps
+        new_laser_settings = (
+            nominal_settings_steps + 1000
+            if self.uvatt2_test_position is None else float(self.uvatt2_test_position)
+        )
         self.log(f"The new laser settings will be set to {new_laser_settings}... Nominal value is {self.steps_readback_position}.")
         self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": new_laser_settings})
         self._wait_for_japc_readback('CO.TOWB.102.UVATT2/Setting', 'position', new_laser_settings)

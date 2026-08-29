@@ -196,6 +196,8 @@ class SaveOrLoad():
         correction_settings = {
             "saved_at": saved_at.isoformat(timespec="seconds"),
             "timezone": getattr(self, "_clock_zone_name", None),
+            "nsamples": int(self.interface.nsamples),
+            "beam_change_values": getattr(self, "_beam_change_values", {}),
             "actuator_mode": "Kicker",
             "w1": w1,
             "w2": w2,
@@ -549,6 +551,10 @@ class SaveOrLoad():
         if "iters" in settings:  self.lineEdit_5.setText(str(settings["iters"]))
         if "gain" in settings: self.lineEdit_6.setText(str(settings["gain"]))
         if "beta" in settings: self.lineEdit_beta.setText(str(settings["beta"]))
+        if "nsamples" in settings and hasattr(self, "nsamples_input"):
+            self.nsamples_input.setText(str(settings["nsamples"]))
+        if settings.get("beam_change_values") and hasattr(self, "_load_beam_change_values"):
+            self._load_beam_change_values(settings["beam_change_values"])
         if "is_triangular" in settings: self.triangular_checkbox.setChecked(settings["is_triangular"])
         if "is_jitter_subtraction_checked" in settings: self.subtract_jitter_checkbox.setChecked(settings["is_jitter_subtraction_checked"])
         if "bpm_weights" in settings:

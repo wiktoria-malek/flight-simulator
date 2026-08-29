@@ -369,6 +369,8 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.horizontal_excursion_spinbox.setSingleStep(0.1)
         self.vertical_excursion_spinbox.setValue(0.5)
         self.vertical_excursion_spinbox.setSingleStep(0.1)
+        self._setup_nsamples_control()
+        self._setup_beam_change_controls()
         self.state_class = interface.get_state().__class__
         self.working_directory_dialog.clicked.connect(self._pick_and_load_data_dir)
         self.__set_status_in_title("[Idle]")
@@ -391,6 +393,92 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.pattern_corrs_input.textChanged.connect(self.pattern_matching)
         self.sysid_plot_popup = None
         self._last_plot_data = None
+
+    def _setup_nsamples_control(self):
+        self.nsamples_input.setText(str(max(1, int(self.interface.nsamples))))
+        self.nsamples_input.textChanged.connect(self._set_interface_nsamples)
+
+    def _set_interface_nsamples(self, value):
+        try:
+            self.interface.nsamples = max(1, int(value))
+            self.nsamples_input.setStyleSheet("")
+        except (TypeError, ValueError):
+            self.nsamples_input.setStyleSheet("QLineEdit { border: 1px solid #c62828; }")
+
+    def _setup_beam_change_controls(self):
+        beam_change = (self._get_interface_initial_settings() or {}).get("beam_change", {})
+        self._beam_change_fields = []
+        controls = {
+            "energy": (
+                self.energy_change_group,
+                self.energy_nominal_container,
+                self.energy_nominal_label,
+                self.energy_nominal_input,
+                self.energy_test_container,
+                self.energy_test_label,
+                self.energy_test_input,
+                self.energy_change_tooltip,
+            ),
+            "intensity": (
+                self.intensity_change_group,
+                self.intensity_nominal_container,
+                self.intensity_nominal_label,
+                self.intensity_nominal_input,
+                self.intensity_test_container,
+                self.intensity_test_label,
+                self.intensity_test_input,
+                self.intensity_change_tooltip,
+            ),
+        }
+        for kind, widgets in controls.items():
+            (
+                title,
+                nominal_container,
+                nominal_label,
+                nominal_input,
+                test_container,
+                test_label,
+                test_input,
+                tooltip,
+            ) = widgets
+            settings = beam_change.get(kind)
+            title.setVisible(settings is not None)
+            tooltip.setVisible(settings is not None)
+            if settings is None:
+                for widget in (nominal_container, test_container):
+                    widget.setVisible(False)
+                continue
+            title.setTitle(settings["label"])
+            tooltip.setToolTip(settings["tooltip"])
+            for slot, container, label, input_widget in (
+                ("nominal", nominal_container, nominal_label, nominal_input),
+                ("test", test_container, test_label, test_input),
+            ):
+                field = settings.get(slot)
+                container.setVisible(field is not None)
+                if field is None:
+                    continue
+                label.setText(field["label"])
+                value = getattr(self.interface, field["attribute"], field.get("default", ""))
+                input_widget.setText("" if value is None else str(value))
+                self._beam_change_fields.append((input_widget, field))
+
+    def _apply_beam_change_controls(self):
+        for input_widget, field in self._beam_change_fields:
+            text = input_widget.text().strip()
+            if not text and field.get("allow_empty", False):
+                setattr(self.interface, field["attribute"], None)
+                input_widget.setStyleSheet("")
+                continue
+            try:
+                value = float(text)
+            except ValueError:
+                input_widget.setStyleSheet("QLineEdit { border: 1px solid #c62828; }")
+                QMessageBox.warning(self, "Invalid beam-change setting", f"{field['label']} must be a number.")
+                return False
+            input_widget.setStyleSheet("")
+            setattr(self.interface, field["attribute"], value)
+        return True
 
     def _handle_plot_double_click(self, event):
         if event is None:
@@ -665,6 +753,9 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.stop_requested=False
         if self.thread and self.thread.isRunning():
             return  # already running
+        if not self._apply_beam_change_controls():
+            self._set_directory_edit_enabled(True)
+            return
 
         if not self._validate_start():
             self._set_directory_edit_enabled(True)
