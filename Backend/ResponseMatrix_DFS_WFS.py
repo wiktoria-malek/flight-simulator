@@ -4,10 +4,6 @@ matplotlib.use("QtAgg")
 from Backend.State import State
 from Knobs.jitter_subtraction import apply_jitter_subtraction
 
-'''
-Mutual response matrix calculation algorithm.
-'''
-
 class AdaptiveResponseMatrix:
     def __init__(self, R0, forgetting=0.995, rank=3, p0_scale=100.0):
         self.R0 = np.array(R0, dtype=float)
@@ -105,11 +101,6 @@ class ResponseMatrix_DFS_WFS():
             Sp = State(filename=fp)
             Sm = State(filename=fm)
 
-            # jitter_model = getattr(self, "jitter_model", None)
-            # if jitter_model is not None:
-            #     Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
-            #     Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
-
             Op = Sp.get_orbit(bpms)
             Om = Sm.get_orbit(bpms)
 
@@ -191,9 +182,6 @@ class ResponseMatrix_DFS_WFS():
         Bx, By = Bx.astype(float), By.astype(float)
         Cx, Cy = Cx.astype(float), Cy.astype(float)
 
-        # Drop unavailable correctors and incomplete shots before fitting.
-        # A corrector needs at least one successfully executed excitation;
-        # otherwise its constant readback is collinear with the offset term.
         hcol_mask = np.array([corr in excited_hcorrs for corr in hcorrs]) & np.any(np.isfinite(Cx), axis=0)
         vcol_mask = np.array([corr in excited_vcorrs for corr in vcorrs]) & np.any(np.isfinite(Cy), axis=0)
         hcorrs = [corr for corr, keep in zip(hcorrs, hcol_mask) if keep]
@@ -202,12 +190,12 @@ class ResponseMatrix_DFS_WFS():
 
         row_mask = np.all(np.isfinite(Cx), axis=1) & np.all(np.isfinite(Cy), axis=1)
         if not np.any(row_mask):
-            raise RuntimeError("No complete corrector readbacks available for response-matrix fitting")
+            raise RuntimeError("No complete corrector readbacks available for response-matrix.")
         Bx, By, Cx, Cy = Bx[row_mask], By[row_mask], Cx[row_mask], Cy[row_mask]
 
         B_mask = np.all(np.isfinite(Bx), axis=0) & np.all(np.isfinite(By), axis=0)
         if not np.any(B_mask):
-            raise RuntimeError("No BPM has complete orbit data for response-matrix fitting")
+            raise RuntimeError("No BPM has complete orbit data for response-matrix.")
 
         Cx = np.hstack((Cx, np.ones((Cx.shape[0], 1))))
         Cy = np.hstack((Cy, np.ones((Cy.shape[0], 1))))
@@ -268,6 +256,39 @@ class ResponseMatrix_DFS_WFS():
 
         return Rxx, Ryy, Rxy, Ryx, Bx, By, hcorrs, vcorrs, bpms
 
+    @staticmethod
+    def _dataset_beam_signature(pairs):
+        if not pairs:
+            return {}
+        try:
+            settings = State(filename=pairs[0][0]).get_beam_settings() or {}
+        except Exception:
+            return {}
+
+        def flatten(d, prefix=""):
+            out = {}
+            for key, value in d.items():
+                path = f"{prefix}.{key}" if prefix else str(key)
+                if isinstance(value, dict):
+                    out.update(flatten(value, path))
+                    continue
+                try:
+                    fvalue = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if np.isfinite(fvalue):
+                    out[path] = fvalue
+            return out
+
+        return flatten(settings)
+
+    @staticmethod
+    def _beam_signatures_unchanged(signature_a, signature_b, atol=1e-6, rtol=1e-3):
+        common_keys = signature_a.keys() & signature_b.keys()
+        if not common_keys:
+            return None
+        return all(np.isclose(signature_a[key], signature_b[key], atol=atol, rtol=rtol) for key in common_keys)
+
     def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, _force_triangular=False):
 
         info_traj = self._data_dirs.get("traj")
@@ -293,6 +314,12 @@ class ResponseMatrix_DFS_WFS():
             R1xx, R1yy, R1xy, R1yx, B1x, B1y, hcorrs1, vcorrs1, bpms1 = self._compute_response_matrix(
                 pairs=info_dfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
             )
+            sig_traj = self._dataset_beam_signature(info_traj["pairs"])
+            sig_dfs = self._dataset_beam_signature(info_dfs["pairs"])
+            verdict = self._beam_signatures_unchanged(sig_traj, sig_dfs)
+            if verdict:
+                raise RuntimeError(f"Orbit and Changed energy measurements have the same settings.")
+
         else:
             R1xx, R1yy, R1xy, R1yx = R0xx.copy(), R0yy.copy(), R0xy.copy(), R0yx.copy()
             B1x, B1y = B0x.copy(), B0y.copy()
@@ -302,6 +329,11 @@ class ResponseMatrix_DFS_WFS():
             R2xx, R2yy, R2xy, R2yx, B2x, B2y, hcorrs2, vcorrs2, bpms2 = self._compute_response_matrix(
                 pairs=info_wfs["pairs"], correctors=selected_corrs, bpms=selected_bpms, triangular=triangular
             )
+            sig_traj = self._dataset_beam_signature(info_traj["pairs"])
+            sig_wfs = self._dataset_beam_signature(info_wfs["pairs"])
+            verdict = self._beam_signatures_unchanged(sig_traj, sig_wfs)
+            if verdict:
+                raise RuntimeError(f"Orbit and Changed intensity measurements have the same settings.")
         else:
             R2xx, R2yy, R2xy, R2yx = R0xx.copy(), R0yy.copy(), R0xy.copy(), R0yx.copy()
             B2x, B2y = B0x.copy(), B0y.copy()
@@ -509,10 +541,6 @@ class ResponseMatrix_DFS_WFS():
             qname = tag[:-2]
             Sp = State(filename=fp)
             Sm = State(filename=fm)
-            # jitter_model = getattr(self, "jitter_model", None)
-            # if jitter_model is not None:
-            #     Sp.bpms = apply_jitter_subtraction(Sp.get_bpms(), jitter_model)
-            #     Sm.bpms = apply_jitter_subtraction(Sm.get_bpms(), jitter_model)
             Op = Sp.get_orbit(bpms)
             Om = Sm.get_orbit(bpms)
             den = qval(Sp, qname, axis) - qval(Sm, qname, axis)
