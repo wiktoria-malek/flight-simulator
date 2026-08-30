@@ -2,7 +2,6 @@ import sys, os, re, matplotlib
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import numpy as np
-
 try:
     from PyQt6 import uic
     from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment, QTimer
@@ -373,7 +372,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         beam_change = (self._get_interface_initial_settings() or {}).get("beam_change", {})
         self._beam_change_fields = []
         self.beam_change_group.setVisible(bool(beam_change))
-        
+
         controls = {
             "energy": (
                 self.energy_change_label,
@@ -452,10 +451,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._cancel = True
         self._running = False
         w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
-        if w2 >0:
-            self.interface.reset_energy()
-        if w3 > 0:
-            self.interface.reset_intensity()
+        try:
+            if w2 > 0:
+                self.interface.reset_energy()
+            if w3 > 0:
+                self.interface.reset_intensity()
+        except Exception:
+            self.log(f"The machine wasn't restored to its nominal state.")
+            QMessageBox.critical(self, "Restore error", f"Could not confirm the machine returned to its nominal energy/intensity.")
         self.interface.restore_correctors_state(self.restore_state)
         self.reset_ref_orb = True
         self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
@@ -877,6 +880,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             adaptive_orbit_only = self.use_adaptive_R and w1 > 0 and w2 == 0 and w3 == 0
             if not adaptive_orbit_only:
                 self._adaptive_R = None
+            if w2 > 0:
+                self.interface.reset_energy()
+            if w3 > 0:
+                self.interface.reset_intensity()
 
             for it in range(iters):
                 if self._cancel:
@@ -939,17 +946,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 if it==0:
                     B0x = O0x
                     B0y = O0y
-
-                # if it == 0:
-                #     B0x = np.asarray(B0x, dtype=float).reshape(-1, 1)
-                #     B0y = np.asarray(B0y, dtype=float).reshape(-1, 1)
-                #     print("||O0x - B0x|| =", np.linalg.norm(O0x - B0x))
-                #     print("||O0y - B0y|| =", np.linalg.norm(O0y - B0y))
-                #     self.log(
-                #         f"Initial orbit error from reference: "
-                #         f"x={np.linalg.norm(O0x - B0x):.6g}, "
-                #         f"y={np.linalg.norm(O0y - B0y):.6g}"
-                #     )
 
                 if self.reset_ref_orb == True:
                     B0x = O0x.copy()
