@@ -71,6 +71,7 @@ class Worker(QObject):
     plot_data = pyqtSignal(np.ndarray, np.ndarray, np.ndarray, np.ndarray, object, str)
     progress=pyqtSignal(int)
     finished = pyqtSignal()
+    error = pyqtSignal(str)
 
     def __init__(self, interface, state, correctors, bpms, hkicks, vkicks, max_osc_h, max_osc_v, max_curr_h, max_curr_v, Niter, output_dir, actuator_mode=ActuatorMode.Kicker, state_class=None):
         super().__init__()
@@ -95,6 +96,19 @@ class Worker(QObject):
 
     @pyqtSlot()
     def run(self):
+        # This wrapper is the only thing standing between "something threw mid-Dispersion/
+        # Wakefield" and the machine being stuck at a test energy/intensity forever with no
+        # warning: finished must fire no matter what _run_impl() does, because the GUI's
+        # cleanup (which resets energy/intensity) only runs off that signal.
+        try:
+            self._run_impl()
+        except Exception as e:
+            self.running = False
+            self.error.emit(str(e))
+        finally:
+            self.finished.emit()
+
+    def _run_impl(self):
         self.running = True
         self.paused = False
         self.progress_value=0
@@ -244,7 +258,6 @@ class Worker(QObject):
                         time.sleep(0.05)
 
         self.running = False
-        self.finished.emit()
 
     def pause(self):
         self.paused = True
@@ -278,6 +291,18 @@ class MainWindow(QMainWindow, SaveOrLoad):
     @pyqtSlot(int)
     def _update_progress(self,value):
         self.progressBar.setValue(value)
+
+    @pyqtSlot(str)
+    def _on_worker_error(self, message):
+        # The worker already guarantees `finished` fires (which restores nominal
+        # energy/intensity via clear_thread()); this only has to make sure the failure
+        # is visible and that we don't blindly continue on to the next SysID mode.
+        self.stop_requested = True
+        QMessageBox.critical(
+            self, "SysID error",
+            f"The {self.current_mode.name} measurement stopped because of an error:\n{message}\n\n"
+            "The machine is being restored to its nominal state; check it before restarting."
+        )
 
     def _update_folder_path(self):
         base = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data"))
@@ -839,6 +864,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
+        self.worker.error.connect(self._on_worker_error)
         self.thread.finished.connect(self.thread.deleteLater)
 
         # Cleanup after thread is done
@@ -897,6 +923,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
                 self.thread.started.connect(self.worker.run)
                 self.worker.finished.connect(self.thread.quit)
                 self.worker.finished.connect(self.worker.deleteLater)
+                self.worker.error.connect(self._on_worker_error)
                 self.thread.finished.connect(self.thread.deleteLater)
                 self.thread.finished.connect(clear_thread)
                 self.worker.plot_data.connect(self.__update_plot)

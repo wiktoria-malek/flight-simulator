@@ -24,6 +24,14 @@ class AbstractMachineInterface(ABC):
         )
         return False
 
+    def _set_and_verify(self, apply, read_value, target, *, description, tolerance=1e-4, timeout=10.0, retries=3):
+        for attempt in range(1, retries + 1):
+            apply()
+            if self._wait_for_readback(read_value, target, description=description, tolerance=tolerance, timeout=timeout):
+                return True
+            getattr(self, "log", print)(f"{description}: retrying (attempt {attempt}/{retries})")
+        raise RuntimeError(f"{description}: failed to reach target {float(target):.6g} after {retries} attempts.")
+
     @abstractmethod
     def get_name(self):
         pass
