@@ -12,7 +12,7 @@ INTERFACE_SETUP = {
                     "test": {"label": "Δf [kHz]", "attribute": "energy_frequency_offset_khz", "default": 4.0},
                 },
                 "intensity": {
-                    "label": "Change intensity (RF gun laser)",
+                    "label": "Change intensity",
                     "tooltip": "Sets the test laser-intensity factor. Reset restores the laser setting captured when the interface was opened.",
                     "test": {"label": "Test factor", "attribute": "test_laser_intensity", "default": 0.125},
                 },
@@ -275,9 +275,8 @@ INTERFACE_SETUP = {
                 },
                 "intensity": {
                     "label": "Change intensity",
-                    "tooltip": "Optional absolute UVATT2 positions. Leave both fields empty to retain the previous behaviour: current position as nominal and nominal + 1000 as test.",
-                    "nominal": {"label": "Nominal [step]", "attribute": "uvatt2_nominal_position", "default": "", "allow_empty": True},
-                    "test": {"label": "Test [step]", "attribute": "uvatt2_test_position", "default": "", "allow_empty": True},
+                    "tooltip": "Adds the specified number of UVATT2 steps to the current position for WFS. The captured position is restored afterward.",
+                    "test": {"label": "Test steps", "attribute": "uvatt2_test_steps", "default": 1000},
                 },
             },
             "settings": {"nsamples":3},
