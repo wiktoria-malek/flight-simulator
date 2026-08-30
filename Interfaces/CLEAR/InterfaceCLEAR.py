@@ -58,8 +58,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
         self.rf_phase_nominal = 125 # degrees
         self.rf_phase_test = 145 # degrees
-        self.uvatt2_nominal_position = None
-        self.uvatt2_test_position = None
+        self.uvatt2_test_steps = 1000
 
         # Bpms and correctors in beamline order
         sequence = [
@@ -210,7 +209,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
         return positions
 
     def _get_tracking_element(self, name):
-        """Return the model element, including the BTV0390L/H machine aliases."""
         candidates = (name, str(name).rstrip("LH"))
         for candidate in dict.fromkeys(candidates):
             try:
@@ -236,53 +234,54 @@ class CLEAR_real_machine(AbstractMachineInterface):
         except Exception:
             return float(default)
 
+    def _set_and_verify(self, property_address, field, target, *, context=None, tolerance=5e-3, timeout=10.0, retries=3, description=None):
+        desc = description or f"{property_address}#{field}"
+        last_value = None
+        for attempt in range(1, retries + 1):
+            self.client.set(property_address, data={field: target})
+            if self._wait_for_japc_readback(property_address, field, target, context=context, tolerance=tolerance, timeout=timeout):
+                return target
+            last_value = self.make_safe_float(self.client.get(property_address, context=context).data.get(field))
+            self.log(f"{desc}: readback={last_value:.6g} did not reach target={target:.6g} (attempt {attempt}/{retries})")
+        raise RuntimeError(
+            f"{desc}: failed to reach target={target:.6g} after {retries} attempts "
+            f"(last readback={last_value})."
+        )
+
     def change_energy(self):
-        energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP'] # changes value globally
+        if np.isclose(float(self.rf_phase_test), float(self.rf_phase_nominal)):
+            raise RuntimeError(f"RF phase test ({self.rf_phase_test}) = RF phase nominal ({self.rf_phase_nominal}).")
+        energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
         self.log(f"Value before changing energy: {energy_readback}")
-        new_energy = self.rf_phase_test
-        self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : new_energy})
+        new_energy = self._set_and_verify('CK.LL-MKS11/Setting', 'PhaseSh_SP', float(self.rf_phase_test), description="RF phase (test)")
         self.log(f"Value after changing energy: {new_energy}")
-        self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', new_energy)
-        after_energy_change = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
-        print(after_energy_change)
-        return after_energy_change
+        return new_energy
 
     def reset_energy(self):
         print(f"Resetting energy to {self.rf_phase_nominal}...")
-        self.client.set('CK.LL-MKS11/Setting', data = {"PhaseSh_SP" : self.rf_phase_nominal})
-        self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', self.rf_phase_nominal)
-        print(f"Energy has been reset to {self.rf_phase_nominal}...")
-        after_energy_reset = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
-        print(after_energy_reset)
+        after_energy_reset = self._set_and_verify('CK.LL-MKS11/Setting', 'PhaseSh_SP', float(self.rf_phase_nominal), description="RF phase (nominal)")
+        print(f"Energy has been reset to {after_energy_reset}.")
+        return after_energy_reset
 
     def change_intensity(self):
+        if np.isclose(float(self.uvatt2_test_steps), 0.0):
+            raise RuntimeError("uvatt2_test_steps is 0.")
         current_position = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
-        self.steps_readback_position = (
-            current_position if self.uvatt2_nominal_position is None else float(self.uvatt2_nominal_position)
-        )
+        self.steps_readback_position = current_position
         self.steps_readback_position_min = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
         self.steps_readback_position_max =self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
-        print(f'Changing intensity to ...')
-        nominal_settings_steps = self.steps_readback_position
-        new_laser_settings = (
-            nominal_settings_steps + 1000
-            if self.uvatt2_test_position is None else float(self.uvatt2_test_position)
-        )
-        self.log(f"The new laser settings will be set to {new_laser_settings}... Nominal value is {self.steps_readback_position}.")
-        self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": new_laser_settings})
-        self._wait_for_japc_readback('CO.TOWB.102.UVATT2/Setting', 'position', new_laser_settings)
-        self.log(f"The new laser settings has been set to {new_laser_settings}. Nominal value was {self.steps_readback_position}.")
-        after_intensity_change = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
-        self.log(f"Read after change of intensity:", after_intensity_change)
+        current_settings_steps = self.steps_readback_position
+        new_laser_settings = current_settings_steps + float(self.uvatt2_test_steps)
+        self.log(f"Changing intensity to {new_laser_settings}... Current value is {self.steps_readback_position}.")
+        after_intensity_change = self._set_and_verify('CO.TOWB.102.UVATT2/Setting', 'position', new_laser_settings, description="UVATT2 position (test)")
+        self.log(f"The new laser settings has been set to {after_intensity_change}. Current value was {self.steps_readback_position}.")
         return self
 
     def reset_intensity(self):
         print(f"Resetting intensity to {self.steps_readback_position}...")
-        self.client.set('CO.TOWB.102.UVATT2/Setting', data = {"position" : self.steps_readback_position})
-        self._wait_for_japc_readback('CO.TOWB.102.UVATT2/Setting', 'position', self.steps_readback_position)
-        print(f"Intensity steps has been reset to {self.steps_readback_position}...")
-        after_intensity_reset = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
-        self.log(f"Read after reset of intensity:", after_intensity_reset)
+        after_intensity_reset = self._set_and_verify('CO.TOWB.102.UVATT2/Setting', 'position', float(self.steps_readback_position), description="UVATT2 position (nominal)")
+        print(f"Intensity steps has been reset to {after_intensity_reset}.")
+        return after_intensity_reset
 
     def get_beam_settings(self):
         settings = {"energy": {}, "intensity": {}}
@@ -292,16 +291,23 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def restore_beam_settings(self, settings):
         settings = settings or {}
+        ok = True
         phase = self.make_safe_float(settings.get("energy", {}).get("mks11_phase"))
         if np.isfinite(phase):
-            self.client.set('CK.LL-MKS11/Setting', data={"PhaseSh_SP": phase})
-            self._wait_for_japc_readback('CK.LL-MKS11/Setting', 'PhaseSh_SP', phase)
+            try:
+                self._set_and_verify('CK.LL-MKS11/Setting', 'PhaseSh_SP', phase, description="RF phase (restore)")
+            except RuntimeError as e:
+                self.log(f"restore_beam_settings: {e}")
+                ok = False
 
         position = self.make_safe_float(settings.get("intensity", {}).get("uvatt2_position"))
         if np.isfinite(position):
-            self.client.set('CO.TOWB.102.UVATT2/Setting', data={"position": position})
-            self._wait_for_japc_readback('CO.TOWB.102.UVATT2/Setting', 'position', position)
-        return True
+            try:
+                self._set_and_verify('CO.TOWB.102.UVATT2/Setting', 'position', position, description="UVATT2 position (restore)")
+            except RuntimeError as e:
+                self.log(f"restore_beam_settings: {e}")
+                ok = False
+        return ok
 
     def get_sequence(self):
         return self.sequence
@@ -518,6 +524,34 @@ class CLEAR_real_machine(AbstractMachineInterface):
         property_address, field = readback_param.rsplit("#", 1)
         return self._wait_for_japc_readback(property_address, field, target, context=self.context_acquisition, tolerance=tolerance, timeout=timeout)
 
+    def _wait_for_quadrupole_readbacks(self, names, targets, tolerance=5e-3, timeout=10.0, poll_interval=0.05):
+        targets = {name: float(target) for name, target in zip(names, targets)}
+        pending = set(targets)
+        last_values = {name: np.nan for name in targets}
+        deadline = time.perf_counter() + timeout
+
+        while pending and time.perf_counter() < deadline:
+            for quadrupole in tuple(pending):
+                try:
+                    readback_param = self.quad_get_params[quadrupole]
+                    property_address, field = readback_param.rsplit("#", 1)
+                    data = self.client.get(property_address, context=self.context_acquisition).data
+                    value = self.make_safe_float(data.get(field))
+                except Exception:
+                    value = np.nan
+                last_values[quadrupole] = value
+                if np.isfinite(value) and abs(value - targets[quadrupole]) <= tolerance:
+                    pending.remove(quadrupole)
+            if pending:
+                time.sleep(poll_interval)
+
+        for quadrupole in pending:
+            self.log(
+                f"Warning: {quadrupole} did not reach target current {targets[quadrupole]:.6g} "
+                f"within {timeout:.2f}s. Last readback = {last_values[quadrupole]:.6g}"
+            )
+        return not pending
+
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
@@ -598,12 +632,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
         if len(names) != len(k1l_values):
             raise ValueError(f"len(names)={len(names)} != len(k1l_values)={len(k1l_values)}")
 
+        currents_A = []
         for quadrupole, k1l in zip(names, k1l_values):
             current_A = self.k1l_to_current(quadrupole, k1l)
+            currents_A.append(current_A)
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
             self.client.set(property_address, data={field: current_A})
-            self._wait_for_quadrupole_readback(quadrupole, current_A)
+        return self._wait_for_quadrupole_readbacks(names, currents_A)
 
     def _get_screen_movement_info(self, screen_name):
         btv_key = screen_name.rstrip("LH")
