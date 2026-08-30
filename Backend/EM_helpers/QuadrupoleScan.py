@@ -199,8 +199,12 @@ class QuadrupoleScan(SaveOrLoad):
                             break
                         if steps_requested > 0:
                             print("Before set_quadrupoles")
-                            self.interface.set_quadrupoles([quad_name], [float(K1L)])
-                            #time.sleep(1)
+                            reached = self.interface.set_quadrupoles([quad_name], [float(K1L)])
+                            if reached is False:
+                                reached = self.interface.set_quadrupoles([quad_name], [float(K1L)])
+                            if reached is False:
+                                raise RuntimeError(
+                                    f"{quad_name} did not reach requested K1L={K1L:.6g} (step {i}) after retry")
                             print("After set_quadrupoles")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
@@ -337,7 +341,12 @@ class QuadrupoleScan(SaveOrLoad):
                         extract_screen(screen_name)
         finally:
             if steps_requested > 0 and np.isfinite(K1L_0):
-                self.interface.set_quadrupoles([quad_name], [float(K1L_0)])
+                try:
+                    restored = self.interface.set_quadrupoles([quad_name], [float(K1L_0)])
+                    if restored is False:
+                        print(f"{quad_name} did not confirm returning to its original K1L={K1L_0:.6g} after the scan.")
+                except Exception as exc:
+                    print(f"Failed to restore {quad_name} to its original K1L={K1L_0:.6g}: {exc}")
 
         session = {
             "delta_min": float(delta_min),
