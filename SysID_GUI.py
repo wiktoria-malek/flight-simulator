@@ -235,18 +235,6 @@ class Worker(QObject):
                     hkicks[icorr] = new_kick
                 else:
                     vkicks[icorr] = new_kick
-                # if corrector in self.hcorrs:
-                #     Diff_x_clean = Diff_x[~np.isnan(Diff_x)]
-                #     if np.max(np.abs(Diff_x_clean)) != 0.0:
-                #         hkicks[icorr] *= self.max_osc_h / np.max(np.abs(Diff_x_clean))
-                #     hkicks[icorr] = 0.8 * hkicks[icorr] + 0.2 * kick
-
-                # else:
-                #     Diff_y_clean = Diff_y[~np.isnan(Diff_y)]
-                #     if np.max(np.abs(Diff_y_clean)) != 0.0:
-                #         vkicks[icorr] *= self.max_osc_v / np.max(np.abs(Diff_y_clean))
-                #     vkicks[icorr] = 0.8 * vkicks[icorr] + 0.2 * kick
-
                 with open(os.path.join(self.output_dir,'kicks.txt'), 'w') as f:
                     for i, c in enumerate(self.correctors):
                         f.write(f'{c} {hkicks[i]} {vkicks[i]}\n')
@@ -616,9 +604,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         return units_settings, sysid_kick,bpm_unit,corrs_unit
 
     def _start_next_mode(self):
-        #initial_hkick=self._read_initial_kicks()
-        #selected_correctors = self.interface.get_correctors()['names']
-        #kicks=initial_hkick*np.ones(len(self.selected_correctors),dtype=float)
         if self.counter>=len(self.modes_to_do):
             self.__set_status_in_title("[Idle]")
             self.progressBar.setValue(100)
@@ -635,12 +620,20 @@ class MainWindow(QMainWindow, SaveOrLoad):
         machine_state=self.state_class(filename=os.path.join(dir_name,'machine_status.pkl'))
         self._restore_actuators_state(machine_state)
 
-        if mode==Mode.Dispersion:
+        if mode==Mode.Orbit:
+            self.interface.reset_energy()
+            #self.interface.reset_intensity()
+            print("Nominal beam state confirmed for Orbit mode")
+        elif mode==Mode.Dispersion:
             self.interface.change_energy()
             print("Energy changed")
         elif mode==Mode.Wakefield:
             self.interface.change_intensity()
-            print("Intensity changed")
+            print("Intensity changed)")
+        self.stop_requested = True
+        self.__set_status_in_title("[Idle]")
+        self._set_directory_edit_enabled(True)
+        return
 
     def _read_all_parameters(self,text):
         text = text.strip()
@@ -859,6 +852,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
                     self.interface.reset_intensity()
             except Exception as e:
                 print(e)
+                QMessageBox.warning(self, "Warning",f"Could not confirm the machine returned to its nominal state.")
             print("Restoring initial correctors' settings...")
             #self.S.load('machine_status')
             current_dir=self.mode_dirs[self.current_mode]
@@ -1007,12 +1001,6 @@ def main():
     interface = SelectInterface.choose_acc_and_interface()
     if interface is None:
         return 1
-
-    # # ================ for a test!!
-    # from Backend.State import State
-    # state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_BBA_260821/BBA_CLEAR260821163644_session_settings/machine_status.pkl")
-    # interface.restore_quadrupoles_state(state)
-    # # ===============================
 
     project_name = interface.get_name()
     print(f"Selected interface: {project_name}")
