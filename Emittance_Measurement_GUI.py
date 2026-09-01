@@ -21,6 +21,7 @@ from Interfaces.interface_setup import INTERFACE_SETUP
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
+from Backend.State import State
 from Backend.EmittanceComputingEngines.select_engine import EmittanceComputingEngineSelector
 from Backend.EM_helpers.QuadrupoleScan import QuadrupoleScan
 from Backend.LogConsole import LogConsole
@@ -435,6 +436,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
     def _set_default_quad_strength_bounds_from_session(self, session):
         if session is None:
             return
+        unit = self._quadrupole_value_unit(session)
+        title = "Current I₀ [A]" if unit == "A" else f"K1L₀ [{unit}]"
+        self.label_bound_quad_k1l_0_title.setText(title)
         k1l_0 = float(session.get("K1L_0", np.nan))
         low, high = sorted((0.7 * k1l_0, 1.3 * k1l_0))
         self.bound_quad_k1l_0_min.setValue(low)
@@ -662,6 +666,21 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_quad_roll.setText("-")
         self.result_reference_screen.setText("-")
 
+    def _quadrupole_value_unit(self, session=None):
+        session = self.session if session is None else session
+        if isinstance(session, dict) and session.get("mode") == "multi_quad_scan":
+            session = self._get_session_for_selected_quad(session) or session
+        if not isinstance(session, dict):
+            units = (self._get_interface_initial_settings() or {}).get("units", {})
+            return str(units.get("quadrupole_strength", "1/m"))
+        return str(session.get("quad_value_unit", "1/m"))
+
+    def _quadrupole_scan_axis_label(self, session=None):
+        unit = self._quadrupole_value_unit(session)
+        if unit == "A":
+            return "Quadrupole current [A]"
+        return f"K1L [{unit}]"
+
     def _update_fit_panel(self, result):
         self.result_quad.setText(str(result["quad_name"]))
         self.result_reference_screen.setText(result["screen0"])
@@ -684,7 +703,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 return f"{value_text} {unit}".rstrip()
             return f"{value_text} ± {error_text} {unit}".rstrip()
 
-        quad_strength_text = fmt_value(result.get("quad_k1l_0"), " 1/m")
+        quad_strength_text = fmt_value(
+            result.get("quad_k1l_0"), f" {self._quadrupole_value_unit()}"
+        )
         if result.get("fit_quadrupole_strength", False) and quad_strength_text != "-":
             quad_strength_text += " (fit)"
         elif quad_strength_text != "-":
@@ -719,7 +740,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         fig.clear()
         ax = fig.add_subplot(111)
         ax.set_title("Quadrupole scan")
-        ax.set_xlabel("K1L [1/m]")
+        ax.set_xlabel(self._quadrupole_scan_axis_label())
         ax.set_ylabel("Beam size")
         ax.grid(True, alpha=0.3)
         self.canvas.draw()
@@ -765,6 +786,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         screens = list(session_to_plot["screens"])
         quad_name = session_to_plot.get("quad_name", "-")
         em_sigma_unit = session_to_plot.get("sigma_unit", self._get_interface_units())
+        quad_axis_label = self._quadrupole_scan_axis_label(session_to_plot)
         fig = self.canvas.figure
         fig.clear()
 
@@ -801,7 +823,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         ax1.set_title(f"Quadrupole scan: {quad_name}")
         ax1.set_ylabel(f"sigx [{em_sigma_unit}]")
         ax2.set_ylabel(f"sigy [{em_sigma_unit}]")
-        ax2.set_xlabel("K1L [1/m]")
+        ax2.set_xlabel(quad_axis_label)
 
         ax1.grid(True, alpha=0.3)
         ax2.grid(True, alpha=0.3)
@@ -861,11 +883,12 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             ax2.plot(fit_K1L_values, fit_y, "-", color=color, linewidth=2.0, label=f"{screen} fit")
 
         unit = self.session.get("sigma_unit", self._get_interface_units())
+        quad_axis_label = self._quadrupole_scan_axis_label(self.session)
 
         ax1.set_title(f"Quadrupole scan: {self.session.get('quad_name', '-')}")
         ax1.set_ylabel(f"sigx [{unit}]")
         ax2.set_ylabel(f"sigy [{unit}]")
-        ax2.set_xlabel("K1L [1/m]")
+        ax2.set_xlabel(quad_axis_label)
 
         ax1.grid(True, alpha=0.3)
         ax2.grid(True, alpha=0.3)
@@ -887,6 +910,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         quad_name = self.emittance_settings.get("quad_name")
         if not quad_name:
             raise ValueError("Choose a quadrupole before rebuilding a fixed-K1L session.")
+        quad_value_unit = "1/m"
 
         if is_quad_scan:
             delta_min = float(self.emittance_settings["delta_min"])
@@ -897,6 +921,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 filename = os.path.basename(path)
                 step_i = int(filename.split("_")[3])  # screen_0000_step_0003_shot_0000.pkl -> 0003
                 quad = state.get_quadrupoles()
+                quad_value_unit = str(quad.get("value_unit", quad_value_unit))
                 K1L_values[step_i] = float(np.ravel(quad["bdes"])[0])
             K1L_0 = float(np.nanmean(K1L_values / (1.0 + deltas))) # to be verified
             nsteps_scan = steps_requested
@@ -905,6 +930,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             strengths = []
             for state in states:
                 quadrupoles = state.get_quadrupoles()
+                quad_value_unit = str(quadrupoles.get("value_unit", quad_value_unit))
                 names = list(quadrupoles.get("names", []))
                 bdes = np.asarray(quadrupoles.get("bdes", []), dtype=float)
                 if quad_name in names:
@@ -970,6 +996,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 "step_index": int(i),
                 "delta": float(deltas[i]),
                 "K1L": float(K1L_values[i]),
+                "quad_value": float(K1L_values[i]),
                 "state_files": state_files,
             })
 
@@ -984,6 +1011,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "quadrupoles": [quad_name],
             "screens": screens,
             "reference_screen": screens[0] if screens else "",
+            "quad_value_unit": quad_value_unit,
             "K1L_0": float(K1L_0),
             "sigx_mean": sigx_mean.tolist(),
             "sigy_mean": sigy_mean.tolist(),
@@ -1004,7 +1032,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "vedges": vedges,
         }
 
-        print("K1L:", session["K1L_values"])
+        print(f"Quadrupole values [{quad_value_unit}]:", session["K1L_values"])
         print("sigx:", session["sigx_mean"])
         print("sigy:", session["sigy_mean"])
         print("unit:", session.get("sigma_unit"))
@@ -1465,6 +1493,13 @@ if __name__ == "__main__":
         sys.exit(1)
 
     I = dialog
+
+    # ================ for a test!!
+    from Backend.State import State
+    state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/AllCLEARfiles/BBA_CLEAR260828151954_session_settings/machine_status.pkl")
+    I.restore_quadrupoles_state(state)
+    # ===============================
+
     project_name = I.get_name()
     is_simulation = bool(getattr(I, "is_simulation"))
     bg_shots = 10
