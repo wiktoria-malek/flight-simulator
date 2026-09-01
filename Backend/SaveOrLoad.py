@@ -153,8 +153,11 @@ class SaveOrLoad():
         sextupoles = state.get_sextupoles()
         self.log("Sextupoles restored!")
         self.log("Restoring correctors' strengths from machine status...")
-        self.interface.restore_correctors_state(state)
-        self.log("Correctors restored!")
+        if self.interface.restore_correctors_state(state) is False:
+            self.log("Warning: not every corrector was set at its saved current.")
+            QMessageBox.warning(self, "Restore machine status", "Not every corrector was set back at its saved current. Check them on the machine.")
+        else:
+            self.log("Correctors restored!")
         self.log("Restoring quadrupoles' state from machine status...")
         self.interface.restore_quadrupoles_state(state)
         self.log("Quadrupoles restored!")
