@@ -46,7 +46,9 @@ class ResponseMatrix_DFS_WFS():
             bba_folder = os.path.join(folder, "BBA_states")
             if not os.path.isdir(bba_folder):
                 bba_folder = folder
-            sample_files = sorted(glob.glob(os.path.join(bba_folder, f"ITER_*_{sample_kind}.pkl")))
+            # ``.pkl*`` also accepts BBA files created before the save call
+            # used the explicit ``filename=`` keyword.
+            sample_files = sorted(glob.glob(os.path.join(bba_folder, f"ITER_*_{sample_kind}.pkl*")))
         if not sample_files:
             return {"ok": False, "dir": folder, "pairs": [], "sample_kind": sample_kind}
         first_state = State(filename=sample_files[0])
@@ -338,9 +340,9 @@ class ResponseMatrix_DFS_WFS():
             raise RuntimeError("No BPM has complete orbit data across the state samples.")
 
         def fit_response(corrector_values, orbit_values):
-            design = np.column_stack((corrector_values, np.ones(len(corrector_values))))
-            coefficients = np.linalg.lstsq(design, orbit_values[:, bpm_mask], rcond=rcond)[0]
-            return coefficients[:-1].T
+            corrector_kicks = np.column_stack((corrector_values, np.ones(len(corrector_values)))) # correctors during BBA correction
+            R = np.linalg.lstsq(corrector_kicks, orbit_values[:, bpm_mask], rcond=rcond)[0]
+            return R[:-1].T
 
         Rxx_fit = fit_response(Cx, Bx)
         Rxy_fit = fit_response(Cy, Bx)
