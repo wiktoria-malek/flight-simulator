@@ -461,7 +461,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         except Exception:
             self.log(f"The machine wasn't restored to its nominal state.")
             QMessageBox.critical(self, "Restore error", f"Could not confirm the machine returned to its nominal energy/intensity.")
-        self.interface.restore_correctors_state(self.restore_state)
+        if self.interface.restore_correctors_state(self.restore_state) is False:
+            self.log("Warning: not every corrector was confirmed back at its saved current.")
+            QMessageBox.warning(
+                self, "Restore initial settings",
+                "Some correctors were not confirmed back at their saved current within the "
+                "readback tolerance. Check them on the machine before the next correction.",
+            )
         self.reset_ref_orb = True
         self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
         self._clear_graphs()
