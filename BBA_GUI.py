@@ -906,7 +906,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 state0 = self.interface.get_state()
                 state0 = self._apply_jitter_subtraction_to_state(state0)
                 nominal_file = os.path.join(samples_dir, f"ITER_{it:04d}_nominal.pkl")
-                state0.save(nominal_file)
+                state0.save(filename=nominal_file)
                 if hasattr(self.interface, "chosen_ict"):
                     charge = np.asarray(state0.get_icts(self.interface.chosen_ict)["charge"], dtype=float).ravel()
                     if charge.size and np.isfinite(charge[0]) and charge[0] != 0:
@@ -980,7 +980,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     state1 = self.interface.get_state()
                     state1 = self._apply_jitter_subtraction_to_state(state1)
                     energy_file = os.path.join(samples_dir, f"ITER_{it:04d}_energy.pkl")
-                    state1.save(energy_file)
+                    state1.save(filename=energy_file)
                     self.interface.reset_energy()
                     O1 = state1.get_orbit(bpms)
                     O1x = np.asarray(O1['x'], dtype=float).reshape(-1, 1)
@@ -1007,7 +1007,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     state2 = self.interface.get_state()
                     state2 = self._apply_jitter_subtraction_to_state(state2)
                     intensity_file = os.path.join(samples_dir, f"ITER_{it:04d}_intensity.pkl")
-                    state2.save(intensity_file)
+                    state2.save(filename=intensity_file)
                     self.interface.reset_intensity()
                     O2 = state2.get_orbit(bpms)
                     O2x = np.asarray(O2['x'], dtype=float).reshape(-1, 1)
@@ -1055,9 +1055,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 if w1 > 0:
                     Bx.append(wgt_orb * (O0x - B0x))
                     By.append(wgt_orb * (O0y - B0y))
-
                 if w2 > 0 and O1x is not None:
-
                     plt.errorbar(range(len(O1x)), (O1x - O0x).ravel(), yerr=err_dx,
                                  color='tab:blue', label="measured x", capsize=3)
                     plt.errorbar(range(len(O1y)), (O1y - O0y).ravel(), yerr=err_dy,
@@ -1067,6 +1065,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     plt.title("DFS: measured orbit difference vs target dispersion (x, y)")
                     plt.legend()
                     plt.grid(True, alpha=0.3)
+                    dfs_plot_ax = plt.gca() # get current axis, dont mistake for other plot
                     Bx.append(wgt_dfs * ((O1x - O0x) - Dx))
                     By.append(wgt_dfs * ((O1y - O0y) - Dy))
 
@@ -1206,6 +1205,18 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 print("after_bdes =", after_bdes)
                 applied_delta = after_bdes - current_bdes
                 print("applied_delta =", applied_delta)
+
+                if w2 > 0 and O1x is not None and O1y is not None:
+                    dfs_start = n if w1 > 0 else 0
+                    dfs_rows = slice(dfs_start, dfs_start + n) # slice of an array start:end
+                    applied_x = applied_delta[:nh]
+                    applied_y = applied_delta[nh:]
+                    dfs_prediction_x = ((O1x - O0x).ravel() + (Axx_it[dfs_rows, :] @ applied_x + Axy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
+                    dfs_prediction_y = ((O1y - O0y).ravel() + (Ayx_it[dfs_rows, :] @ applied_x + Ayy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
+                    dfs_plot_ax.plot(range(n), dfs_prediction_x, color="tab:green", label="R prediction x")
+                    dfs_plot_ax.plot(range(n), dfs_prediction_y, color="tab:green", linestyle="--", label="R prediction y")
+                    dfs_plot_ax.legend()
+                    dfs_plot_ax.figure.canvas.draw_idle()
                 if adaptive_orbit_only:
                     self._adaptive_R_prev_kick = applied_delta.copy()
                     self._adaptive_R_prev_orbit = orbit_now
@@ -1275,13 +1286,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 QMessageBox.information(self, "Correction", "Correction finished.")
             final_state = self.interface.get_state()
             final_machine_status_file = os.path.join(self._session_dir, "machine_status_after_correction.pkl")
-            final_state.save(final_machine_status_file)
+            final_state.save(filename=final_machine_status_file)
             self.log(f"Saved machine status after correction: {os.path.basename(final_machine_status_file)}")
             final_state = self._apply_jitter_subtraction_to_state(final_state)
             if last_completed_iteration is not None:
                 final_nominal_file = os.path.join(
                     samples_dir, f"ITER_{last_completed_iteration + 1:04d}_nominal.pkl")
-                final_state.save(final_nominal_file)
+                final_state.save(filename=final_nominal_file)
                 self.log(f"Saved final nominal BBA state: {os.path.basename(final_nominal_file)}")
             screens_f = final_state.get_screens()
             print("Screen values after correction:")
