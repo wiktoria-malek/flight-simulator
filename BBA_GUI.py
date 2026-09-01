@@ -1213,8 +1213,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     applied_y = applied_delta[nh:]
                     dfs_prediction_x = ((O1x - O0x).ravel() + (Axx_it[dfs_rows, :] @ applied_x + Axy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
                     dfs_prediction_y = ((O1y - O0y).ravel() + (Ayx_it[dfs_rows, :] @ applied_x + Ayy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
-                    dfs_plot_ax.plot(range(n), dfs_prediction_x, color="tab:green", label="R prediction x")
-                    dfs_plot_ax.plot(range(n), dfs_prediction_y, color="tab:green", linestyle="--", label="R prediction y")
+                    dfs_plot_ax.plot(range(n), dfs_prediction_x, color="tab:blue", linestyle = "--" label="R prediction x")
+                    dfs_plot_ax.plot(range(n), dfs_prediction_y, color="tab:orange", linestyle="--", label="R prediction y")
                     dfs_plot_ax.legend()
                     dfs_plot_ax.figure.canvas.draw_idle()
                 if adaptive_orbit_only:
