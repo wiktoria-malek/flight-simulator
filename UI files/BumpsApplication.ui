@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1512</width>
+    <height>841</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Bumps Application</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="main_layout" stretch="0,1">
+    <property name="leftMargin">
+     <number>6</number>
+    </property>
+    <property name="topMargin">
+     <number>6</number>
+    </property>
+    <property name="rightMargin">
+     <number>6</number>
+    </property>
+    <property name="bottomMargin">
+     <number>6</number>
+    </property>
+    <item>
+     <layout class="QHBoxLayout" name="top_bar_layout" stretch="1,0">
+      <item>
+       <widget class="QGroupBox" name="responseGroup">
+        <property name="title">
+         <string>Response matrix</string>
+        </property>
+        <layout class="QGridLayout" name="response_grid">
+         <item row="4" column="0">
+          <widget class="QLabel" name="label_plane">
+           <property name="text">
+            <string>Plane:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_response_dir">
+           <property name="text">
+            <string>Directory / file:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="8">
+          <widget class="QPushButton" name="browse_response_button">
+           <property name="maximumSize">
+            <size>
+             <width>40</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>...</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1" colspan="7">
+          <widget class="QLineEdit" name="response_dir_edit">
+           <property name="placeholderText">
+            <string>Load folder with response matrix data here...</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <layout class="QHBoxLayout" name="parameters_layout">
+           <item>
+            <widget class="QLabel" name="label_rcond">
+             <property name="maximumSize">
+              <size>
+               <width>110</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>PINV tolerance</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="rcond_edit">
+             <property name="maximumSize">
+              <size>
+               <width>90</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>1e-3</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="pinv_toolbutton">
+             <property name="styleSheet">
+              <string notr="true">QToolButton#pinv_toolbutton {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#pinv_toolbutton:hover {
+    background-color: #e6e6e6;
+}</string>
+             </property>
+             <property name="text">
+              <string>?</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_beta">
+             <property name="maximumSize">
+              <size>
+               <width>110</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Beta parameter</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="beta_edit">
+             <property name="maximumSize">
+              <size>
+               <width>90</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>0.0</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="beta_p_toolbutton">
+             <property name="styleSheet">
+              <string notr="true">QToolButton#beta_p_toolbutton {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#beta_p_toolbutton:hover {
+    background-color: #e6e6e6;
+}</string>
+             </property>
+             <property name="text">
+              <string>?</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="4" column="1">
+          <widget class="QComboBox" name="plane_combo">
+           <item>
+            <property name="text">
+             <string>Horizontal (x)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Vertical (y)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Coupled (x &amp; y)</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="logo_label">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>120</width>
+          <height>80</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>180</width>
+          <height>120</height>
+         </size>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTop|Qt::AlignTrailing</set>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="content_layout" stretch="2,3,6">
+      <item>
+       <widget class="QGroupBox" name="devicesGroup">
+        <property name="title">
+         <string>Devices</string>
+        </property>
+        <layout class="QVBoxLayout" name="devices_layout">
+         <item>
+          <widget class="QGroupBox" name="correctorsGroup">
+           <property name="title">
+            <string>Correctors</string>
+           </property>
+           <layout class="QVBoxLayout" name="correctors_group_vbox">
+            <item>
+             <widget class="QListWidget" name="correctors_list">
+              <property name="selectionMode">
+               <enum>QAbstractItemView::ExtendedSelection</enum>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="correctors_buttons_layout">
+              <item>
+               <widget class="QPushButton" name="save_correctors_button">
+                <property name="text">
+                 <string>Save As..</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="load_correctors_button">
+                <property name="text">
+                 <string>Load..</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="clear_correctors_button">
+                <property name="text">
+                 <string>Clear</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="bpmsGroup">
+           <property name="title">
+            <string>BPMs</string>
+           </property>
+           <layout class="QVBoxLayout" name="bpms_group_vbox">
+            <item>
+             <widget class="QListWidget" name="bpms_list">
+              <property name="selectionMode">
+               <enum>QAbstractItemView::ExtendedSelection</enum>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="bpms_buttons_layout">
+              <item>
+               <widget class="QPushButton" name="save_bpms_button">
+                <property name="text">
+                 <string>Save As..</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="load_bpms_button">
+                <property name="text">
+                 <string>Load..</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="clear_bpms_button">
+                <property name="text">
+                 <string>Clear</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="middle_layout" stretch="0,1,0,1">
+        <item>
+         <layout class="QHBoxLayout" name="reference_layout">
+          <item>
+           <widget class="QPushButton" name="read_reference_button">
+            <property name="text">
+             <string>Read reference orbit</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="targetGroup">
+          <property name="title">
+           <string>Target orbit at BPMs [mm]  -  synced with the plot, blank = keep reference</string>
+          </property>
+          <layout class="QVBoxLayout" name="target_layout">
+           <item>
+            <widget class="QTableWidget" name="target_table">
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <column>
+              <property name="text">
+               <string>BPM</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>x target [mm]</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>y target [mm]</string>
+              </property>
+             </column>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="target_helper_layout">
+             <item>
+              <widget class="QLabel" name="label_region_value">
+               <property name="text">
+                <string>Value:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="region_value_edit">
+               <property name="maximumSize">
+                <size>
+                 <width>80</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>0.0</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="set_x_button">
+               <property name="text">
+                <string>Set x (sel.)</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="set_y_button">
+               <property name="text">
+                <string>Set y (sel.)</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="zero_bump_button">
+               <property name="text">
+                <string>Zero bump</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="max_delta_layout">
+             <item>
+              <widget class="QLabel" name="label_max_delta">
+               <property name="text">
+                <string>Max |Δθ| per corrector (0 = no limit):</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="max_delta_edit">
+               <property name="maximumSize">
+                <size>
+                 <width>90</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>0</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="corr_delta_label">
+          <property name="text">
+           <string>Corrector changes Δθ  (relative to reference)</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="corr_delta_table">
+          <column>
+           <property name="text">
+            <string>Corrector</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Δθ</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>reference</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>new setpoint</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="right_layout" stretch="0,1,0,1,0">
+        <item>
+         <widget class="QLabel" name="desired_label">
+          <property name="text">
+           <string>Desired bump  -  drag the blue markers to set the target orbit</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="desired_plot_widget" native="true">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>420</width>
+            <height>220</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="result_label">
+          <property name="text">
+           <string>Desired  /  Predicted  /  Measured</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="result_plot_widget" native="true">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>420</width>
+            <height>240</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="actions_layout">
+          <item>
+           <spacer name="actions_spacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="compute_button">
+            <property name="text">
+             <string>Compute / Preview</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="restore_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(200, 140, 0); color: white;</string>
+            </property>
+            <property name="text">
+             <string>Restore reference</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="apply_button">
+            <property name="minimumSize">
+             <size>
+              <width>120</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">background-color: green; color: white; font-weight: bold;</string>
+            </property>
+            <property name="text">
+             <string>Apply</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
