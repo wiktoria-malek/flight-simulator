@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sys, os , argparse, json, math
 from pathlib import Path
 
@@ -21,7 +22,6 @@ for p_file in p_files:
         print("  bdes:", corrector["bdes"][0])
         print("  bact:", corrector["bact"][0])
 
-from __future__ import annotations
 import argparse
 import json
 import math
