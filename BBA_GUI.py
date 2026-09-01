@@ -1025,6 +1025,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     "O0y": np.asarray(O0y).reshape(-1),
                     "O1y": None if O1y is None else np.asarray(O1y).reshape(-1),
                     "O2y": None if O2y is None else np.asarray(O2y).reshape(-1),
+                    "dfs_err_x": None if w2 <= 0 else np.asarray(err_dx).reshape(-1),
+                    "dfs_err_y": None if w2 <= 0 else np.asarray(err_dy).reshape(-1),
                 }
                 if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
                     self.rms_orbits_data = {}
@@ -1387,7 +1389,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.test_orbits._plot_test_orbits(selected_bpms=self.test_orbits_data["selected_bpms"],
                                                O0x=self.test_orbits_data["O0x"], O0y=self.test_orbits_data["O0y"],
                                                O1x=self.test_orbits_data["O1x"], O1y=self.test_orbits_data["O1y"],
-                                               O2x=self.test_orbits_data["O2x"], O2y=self.test_orbits_data["O2y"])
+                                               O2x=self.test_orbits_data["O2x"], O2y=self.test_orbits_data["O2y"],
+                                               dfs_err_x=self.test_orbits_data["dfs_err_x"],
+                                               dfs_err_y=self.test_orbits_data["dfs_err_y"])
         self.test_orbits.show()
         self.test_orbits.raise_()
         self.test_orbits.activateWindow()
