@@ -92,8 +92,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.measurement_start_state = None
         self._cancel = False
         self._number_re = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
-        # self.initial_state=interface.get_state() # initial, for restoring
-        # self.state=interface.get_state() # for latter use
         self.reset_reference_orbit = False
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
         uic.loadUi(ui_path, self)
@@ -898,11 +896,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     break
                 self._step = False
 
+                samples_dir = os.path.join(self._session_dir, "BBA_states")
+                os.makedirs(samples_dir, exist_ok=True)
                 # nominal
                 print("Measuring orbit")
                 self.log("Measuring orbit")
                 state0 = self.interface.get_state()
                 state0 = self._apply_jitter_subtraction_to_state(state0)
+                nominal_file = os.path.join(samples_dir, f"ITER_{it:04d}_nominal.pkl")
+                state0.save(nominal_file)
                 if hasattr(self.interface, "chosen_ict"):
                     charge = np.asarray(state0.get_icts(self.interface.chosen_ict)["charge"], dtype=float).ravel()
                     if charge.size and np.isfinite(charge[0]) and charge[0] != 0:
@@ -974,6 +976,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self.log("Measuring dispersion")
                     dP_P = self.interface.change_energy()
                     state1 = self.interface.get_state()
+                    energy_file = os.path.join(samples_dir, f"ITER_{it:04d}_energy.pkl")
+                    state1.save(energy_file)
                     state1 = self._apply_jitter_subtraction_to_state(state1)
                     self.interface.reset_energy()
                     O1 = state1.get_orbit(bpms)
