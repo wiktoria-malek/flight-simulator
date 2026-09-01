@@ -235,6 +235,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
             return float(default)
 
     def _set_and_verify(self, property_address, field, target, *, context=None, tolerance=5e-3, timeout=10.0, retries=3, description=None):
+        # PyDA accepts the empty selector for non-PPM properties, but not None.
+        # The RF-phase and UVATT2 callers intentionally omit a context.
+        context = self.context_empty if context is None else context
         desc = description or f"{property_address}#{field}"
         last_value = None
         for attempt in range(1, retries + 1):
@@ -488,6 +491,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         }
 
     def _wait_for_japc_readback(self, property_address, field, target, *, context=None, tolerance=5e-3, timeout=10.0):
+        context = self.context_empty if context is None else context
         def read_value():
             data = self.client.get(property_address, context=context).data
             return self.make_safe_float(data.get(field), default=np.nan)
