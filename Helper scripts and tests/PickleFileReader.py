@@ -38,7 +38,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from Backend.State import State
 
 
-DEFAULT_ROOT = Path("/Users/wiktoriamalek/CERN-Flight_Simulator-Data/AllCLEARfiles")
+DEFAULT_ROOT = Path("/local/home/clearop/CERN-Flight_Simulator-Data")
 
 
 @dataclass
