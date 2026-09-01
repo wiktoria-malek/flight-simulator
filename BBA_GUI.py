@@ -891,13 +891,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             if w3 > 0:
                 self.interface.reset_intensity()
 
+            samples_dir = os.path.join(self._session_dir, "BBA_states")
+            os.makedirs(samples_dir, exist_ok=True)
+            last_completed_iteration = None
+
             for it in range(iters):
                 if self._cancel:
                     break
                 self._step = False
 
-                samples_dir = os.path.join(self._session_dir, "BBA_states")
-                os.makedirs(samples_dir, exist_ok=True)
                 # nominal
                 print("Measuring orbit")
                 self.log("Measuring orbit")
@@ -976,9 +978,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self.log("Measuring dispersion")
                     dP_P = self.interface.change_energy()
                     state1 = self.interface.get_state()
+                    state1 = self._apply_jitter_subtraction_to_state(state1)
                     energy_file = os.path.join(samples_dir, f"ITER_{it:04d}_energy.pkl")
                     state1.save(energy_file)
-                    state1 = self._apply_jitter_subtraction_to_state(state1)
                     self.interface.reset_energy()
                     O1 = state1.get_orbit(bpms)
                     O1x = np.asarray(O1['x'], dtype=float).reshape(-1, 1)
@@ -1004,6 +1006,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     self.interface.change_intensity()
                     state2 = self.interface.get_state()
                     state2 = self._apply_jitter_subtraction_to_state(state2)
+                    intensity_file = os.path.join(samples_dir, f"ITER_{it:04d}_intensity.pkl")
+                    state2.save(intensity_file)
                     self.interface.reset_intensity()
                     O2 = state2.get_orbit(bpms)
                     O2x = np.asarray(O2['x'], dtype=float).reshape(-1, 1)
@@ -1264,11 +1268,21 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                                   values_y=self._hist_wake_y, vals=self._hist_wake, error_x=self._hist_wake_x_err,
                                   error_y=self._hist_wake_y_err, error_all=self._hist_wake_err, title=None)
                 QApplication.processEvents()
+                last_completed_iteration = it
 
             self.setWindowTitle("BBA GUI")
             if not silent:
                 QMessageBox.information(self, "Correction", "Correction finished.")
             final_state = self.interface.get_state()
+            final_machine_status_file = os.path.join(self._session_dir, "machine_status_after_correction.pkl")
+            final_state.save(final_machine_status_file)
+            self.log(f"Saved machine status after correction: {os.path.basename(final_machine_status_file)}")
+            final_state = self._apply_jitter_subtraction_to_state(final_state)
+            if last_completed_iteration is not None:
+                final_nominal_file = os.path.join(
+                    samples_dir, f"ITER_{last_completed_iteration + 1:04d}_nominal.pkl")
+                final_state.save(final_nominal_file)
+                self.log(f"Saved final nominal BBA state: {os.path.basename(final_nominal_file)}")
             screens_f = final_state.get_screens()
             print("Screen values after correction:")
             print(f"Sigx: {screens_f['sigx']}")
