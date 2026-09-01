@@ -1,9 +1,9 @@
-from __future__ import annotations
+import sys, os , argparse, json, math
 from pathlib import Path
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
-
 from Backend.State import State
 folder = Path("/local/home/clearop/CERN-Flight_Simulator-Data/CLEAR_20260901_120949_Kicker_Dispersion")
 p_files = sorted(folder.glob("DATA_*_p0000.pkl"))
@@ -21,6 +21,7 @@ for p_file in p_files:
         print("  bdes:", corrector["bdes"][0])
         print("  bact:", corrector["bact"][0])
 
+from __future__ import annotations
 import argparse
 import json
 import math
@@ -55,6 +56,7 @@ class DirectoryPhaseSummary:
 
 
 def _read_phase(state_file: Path) -> tuple[float | None, object | None]:
+    """Return the saved CLEAR RF phase and state timestamp, if present."""
 
     state = State(filename=str(state_file))
     phase = state.get_beam_settings().get("energy", {}).get("mks11_phase")
@@ -67,6 +69,7 @@ def _read_phase(state_file: Path) -> tuple[float | None, object | None]:
 
 
 def summarise_data_directory(directory: Path, show_files: bool = False) -> DirectoryPhaseSummary:
+    """Read all saved SysID states from *directory* and report their RF phases."""
 
     files = sorted(directory.glob("DATA_*.pkl"))
     phases: Counter = Counter()
