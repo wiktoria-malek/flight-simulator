@@ -147,6 +147,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._setup_beam_change_controls()
         self.restore_machine_status_button.clicked.connect(self._pick_and_load_machine_status_file)
         self.initial_charge_value = None
+        self.orbit_at_first_start_click_x = None
+        self.orbit_at_first_start_click_y = None
 
     def _save_machine_status(self):
         saved_at = self._clock_now()
@@ -944,8 +946,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 '''
 
                 if it==0:
-                    B0x = O0x
-                    B0y = O0y
+                    if self.orbit_at_first_start_click_x is None and self.orbit_at_first_start_click_y is None:
+                        B0x = O0x.copy()
+                        B0y = O0y.copy()
+                        self.orbit_at_first_start_click_x = B0x
+                        self.orbit_at_first_start_click_y = B0y
+                    else:
+                        B0x = self.orbit_at_first_start_click_x
+                        B0y = self.orbit_at_first_start_click_y
+
 
                 if self.reset_ref_orb == True:
                     B0x = O0x.copy()
