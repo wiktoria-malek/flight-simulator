@@ -92,7 +92,7 @@ class QuadrupoleScan(SaveOrLoad):
 
             except ValueError as e:
                 msg = str(e)
-                if "zero K1L_0" in msg:
+                if "zero quadrupole value" in msg:
                     skipped_quadrupoles.append({"quad_name": quad_name, "reason": msg})
                     continue
                 raise
@@ -133,11 +133,13 @@ class QuadrupoleScan(SaveOrLoad):
 
         quad_names = list(getattr(self.interface, "quadrupoles", []))
         quadrupoles = self.interface.get_quadrupoles([quad_name])
+        quad_value_unit = str(quadrupoles.get("value_unit", "1/m"))
+        quad_value_label = "current" if quad_value_unit == "A" else "K1L"
         bdes = np.asarray(quadrupoles.get("bdes", []), dtype=float)
         K1L_0 = float(bdes[0])
 
         if steps_requested > 0 and np.isclose(K1L_0, 0.0):
-            raise ValueError("The quadrupole has zero K1L_0. You should choose another one.")
+            raise ValueError("The quadrupole has zero quadrupole value. You should choose another one.")
 
         if steps_requested == 0:
             deltas = np.array([0.0], dtype=float)
@@ -204,7 +206,8 @@ class QuadrupoleScan(SaveOrLoad):
                                 reached = self.interface.set_quadrupoles([quad_name], [float(K1L)])
                             if reached is False:
                                 raise RuntimeError(
-                                    f"{quad_name} did not reach requested K1L={K1L:.6g} (step {i}) after retry")
+                                    f"{quad_name} did not reach requested {quad_value_label}="
+                                    f"{K1L:.6g} {quad_value_unit} (step {i}) after retry")
                             print("After set_quadrupoles")
                         sx_shots = np.full(nshots, np.nan, dtype=float)
                         sy_shots = np.full(nshots, np.nan, dtype=float)
@@ -281,6 +284,7 @@ class QuadrupoleScan(SaveOrLoad):
                                 "step_index": int(i),
                                 "delta": float(deltas[i]),
                                 "K1L": float(K1L),
+                                "quad_value": float(K1L),
                                 "state_files": [],
                             }
                             scan_steps.append(existing_step)
@@ -296,6 +300,7 @@ class QuadrupoleScan(SaveOrLoad):
                             "quadrupoles": [quad_name],
                             "screens": screens,
                             "reference_screen": reference_screen,
+                            "quad_value_unit": quad_value_unit,
                             "K1L_0": float(K1L_0),
                             "sigx_mean": sigx_mean.tolist(),
                             "sigy_mean": sigy_mean.tolist(),
@@ -344,9 +349,15 @@ class QuadrupoleScan(SaveOrLoad):
                 try:
                     restored = self.interface.set_quadrupoles([quad_name], [float(K1L_0)])
                     if restored is False:
-                        print(f"{quad_name} did not confirm returning to its original K1L={K1L_0:.6g} after the scan.")
+                        print(
+                            f"{quad_name} did not confirm returning to its original "
+                            f"{quad_value_label}={K1L_0:.6g} {quad_value_unit} after the scan."
+                        )
                 except Exception as exc:
-                    print(f"Failed to restore {quad_name} to its original K1L={K1L_0:.6g}: {exc}")
+                    print(
+                        f"Failed to restore {quad_name} to its original "
+                        f"{quad_value_label}={K1L_0:.6g} {quad_value_unit}: {exc}"
+                    )
 
         session = {
             "delta_min": float(delta_min),
@@ -358,6 +369,7 @@ class QuadrupoleScan(SaveOrLoad):
             "quadrupoles": [quad_name],
             "screens": screens,
             "reference_screen": reference_screen,
+            "quad_value_unit": quad_value_unit,
             "K1L_0": float(K1L_0),
             "sigx_mean": sigx_mean.tolist(),
             "sigy_mean": sigy_mean.tolist(),

@@ -17,14 +17,22 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         G_0 = I * self.get_ITF(I) / Lquad  # T/m
         return G_0
 
-    def get_Quad_K(self, G_0, Pref):
-        K = 299.8 * G_0 / Pref  # 1/m^2
-        return K
+    @staticmethod
+    def _gradient_sign(quadrupole_name):
+        if "QFD" in quadrupole_name:
+            return -1.0
+        if "QDD" in quadrupole_name:
+            return 1.0
 
-    def get_Quad_K_from_I(self, I, Lquad, Pref):
-        G_0 = self.get_grad(I, Lquad)
-        K = self.get_Quad_K(G_0, Pref)
-        return K # 1/m^2
+    def get_current_from_grad(self, gradient, Lquad=0.226):
+        integrated_gradient = float(gradient) * float(Lquad)
+        a = float(self.get_ITF(0.0))
+        b = float(a - self.get_ITF(1.0))
+        if np.isclose(b, 0.0):
+            return integrated_gradient / a
+        discriminant = a * a - 4.0 * b * integrated_gradient
+        if discriminant < 0.0: raise ValueError(f"Gradient {gradient:.6g} T/m is outside the calibration range")
+        return float((a - np.sqrt(discriminant)) / (2.0 * b))
 
     @staticmethod
     def _replace_btv_monitors_with_screens(lattice):
@@ -38,9 +46,9 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             screen.set_length(element.get_length())
             element.replace_with(screen)
 
-    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
-        self.sigmaCut = 2.0
-        self.Pref = 198 # MeV/c
+    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1_000_000):
+        self.sigmaCut = 4.0
+        self.Pref = 164 # MeV/c
         self.Q=-1
         self.population = population
         self.jitter = jitter
@@ -105,10 +113,10 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.alpha_y = 7.2462
 
         T.sigma_t = 0#10*rft.ps # mm/c
-        T.sigma_pt = 0#10 # permille
+        T.sigma_pt = 30#10 # permille
         T.mean_xp = 0.0
         T.mean_yp = 0.0
-        sigmaCut = 2.0
+        sigmaCut = 5.0
         self.P0 = rft.Bunch6d_QR(rft.electronmass, self.population, 1, self.Pref, T, self.nparticles, sigmaCut) # reference particle
         self.B0 = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, sigmaCut) # reference bunch
         self.dfs_test_energy = 0.90 #0.963
@@ -526,6 +534,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                     if bunch_at_screen is None and str(screen_name) == end_element_name:
                         bunch_at_screen = tracked_to_last_screen
                     m = bunch_at_screen.get_phase_space('%x %y')
+                    particles_xy[k, si] = (m[:, 0].copy(), m[:, 1].copy())
                     if m is not None and len(m) > 0:
                         xs = m[:, 0]
                         ys = m[:, 1]
@@ -545,7 +554,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return {
             "sigma_x": sigma_x, "sigma_y": sigma_y,
             "x_mean": x_mean, "y_mean": y_mean,
-            "sigma_xy": sigma_xy,
+            "sigma_xy": sigma_xy, "particles_xy": particles_xy,
         }
 
     def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
@@ -732,21 +741,26 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             if not isinstance(elements, list):
                 elements = [elements]
 
-            k1l_values = []
+            current_values = []
             for element in elements:
                 try:
-                    strength = element.get_K1L(self.Pref / self.Q)
+                    gradient = float(element.get_gradient())
+                    current = self.get_current_from_grad(
+                        self._gradient_sign(quadrupole_name) * gradient,
+                        element.get_length(),
+                    )
                 except Exception:
                     continue
-                if isinstance(strength, (list, tuple, np.ndarray)):
-                    if len(strength) > 0:
-                        k1l_values.append(float(strength[0]))
-                else:
-                    k1l_values.append(float(strength))
+                current_values.append(current)
 
-            bdes[i] = k1l_values[0] if k1l_values else 0.0
+            bdes[i] = current_values[0] if current_values else 0.0
 
-        quadrupoles = {"names": self.quadrupoles, "bdes": bdes, "bact": bdes.copy()}
+        quadrupoles = {
+            "names": self.quadrupoles,
+            "bdes": bdes,
+            "bact": bdes.copy(),
+            "value_unit": "A",
+        }
 
         if isinstance(names, str):
             names = [names]
@@ -756,6 +770,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 "names": [quadrupoles["names"][i] for i in idx],
                 "bdes": np.asarray(quadrupoles["bdes"])[idx],
                 "bact": np.asarray(quadrupoles["bact"])[idx],
+                "value_unit": "A",
             }
 
         return quadrupoles
@@ -774,16 +789,23 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         start_quad_element_name = quad_selected
         return start_quad_element_name
 
-    def set_quadrupoles(self, names, values_range, track=True):
+    def set_quadrupoles(self, names, currents_A, track=True):
         if isinstance(names, str):
             names = [names]
-        if not (isinstance(values_range, (list, tuple, np.ndarray))):
-            values_range = [values_range]
-        for quadrupole_name, value in zip(names, values_range):
+        if not isinstance(currents_A, (list, tuple, np.ndarray)):
+            currents_A = [currents_A]
+        if len(names) != len(currents_A):
+            raise ValueError(f"len(names)={len(names)} != len(currents_A)={len(currents_A)}")
+
+        for quadrupole_name, current_A in zip(names, currents_A):
             elements = self.lattice[quadrupole_name]
-            if not isinstance(elements, (list)): elements = [elements]
+            if not isinstance(elements, list):
+                elements = [elements]
             for element in elements:
-                element.set_K1L(self.Pref / self.Q,float(value))
+                gradient = self._gradient_sign(quadrupole_name) * self.get_grad(
+                    float(current_A), element.get_length()
+                )
+                element.set_gradient(gradient)
         if track:
             self.__track_bunch()
 

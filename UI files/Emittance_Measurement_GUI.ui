@@ -86,7 +86,7 @@ QGroupBox#devicesGroup::title {
             <item>
              <widget class="QToolButton" name="quad_status_tooltip">
               <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Reads the current status of all quadrupoles from the machine, converts their readbacks to K1L, and updates the in-memory RF-Track model for more accurate tracking.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Reads the quadrupole currents from the machine and synchronizes the in-memory RF-Track model through the calibrated current-to-gradient relation.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#quad_status_tooltip{
@@ -302,7 +302,7 @@ QGroupBox#scanGroup::title {
                <cursorShape>PointingHandCursor</cursorShape>
               </property>
               <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Relative, dimensionless quadrupole strength change: ΔK1/K1₀.&lt;/p&gt;&lt;p&gt;The scanned strength is computed as:&lt;/p&gt;&lt;p&gt;K1 = K1₀ · (1 + Δ)&lt;/p&gt;&lt;p&gt;K1 has a unit of 1/m².&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Relative, dimensionless change of the scanned quadrupole setting: Δu/u₀.&lt;/p&gt;&lt;p&gt;The scan uses u = u₀ · (1 + Δ).&lt;/p&gt;&lt;p&gt;For CLEAR, u is the magnet current in A.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#delta_min_info_button {
@@ -375,7 +375,7 @@ QToolButton#delta_min_info_button:hover {
                <cursorShape>PointingHandCursor</cursorShape>
               </property>
               <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Relative, dimensionless quadrupole strength change: ΔK1/K1₀.&lt;/p&gt;&lt;p&gt;The scanned strength is computed as:&lt;/p&gt;&lt;p&gt;K1 = K1₀ · (1 + Δ)&lt;/p&gt;&lt;p&gt;K1 has a unit of 1/m².&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Relative, dimensionless change of the scanned quadrupole setting: Δu/u₀.&lt;/p&gt;&lt;p&gt;The scan uses u = u₀ · (1 + Δ).&lt;/p&gt;&lt;p&gt;For CLEAR, u is the magnet current in A.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#delta_max_info_button {
@@ -996,7 +996,7 @@ QGroupBox#localOptimizationSettingsGroup::title {
                <cursorShape>PointingHandCursor</cursorShape>
               </property>
               <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add the nominal quadrupole strength K1₀ as an extra fit parameter.&lt;/p&gt;&lt;p&gt;Without this option, the optimizer assumes that the measured/read K1 values are exactly correct.&lt;/p&gt;&lt;p&gt;With this option, the optimizer can compensate a mismatch between the readback K1 and the quadrupole strength used by the beam.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add the nominal scanned quadrupole setting as an extra fit parameter.&lt;/p&gt;&lt;p&gt;For CLEAR this setting is the magnet current in A.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#fit_k1_scale_info_button {

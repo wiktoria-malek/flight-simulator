@@ -606,15 +606,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         ides = np.asarray(ides, dtype=float)
         iact = np.asarray(iact, dtype=float)
-        try:
-            bdes = np.asarray([self.current_to_k1l(name, current) for name, current in zip(names, ides)], dtype=float)
-            bact = np.asarray([self.current_to_k1l(name, current) for name, current in zip(names, iact)], dtype=float)
-            self.update_tracking_model_with_japc_readback(names=names, nominal_bdes_value=bdes, nominal_bact_value=bact)
-
-        except Exception as exc:
-            self.log(f"CLEAR current-to-K1L conversion failed for {names}: {exc}")
-            bdes = np.full(len(names), np.nan, dtype=float)
-            bact = np.full(len(names), np.nan, dtype=float)
+        bdes = ides.copy()
+        bact = iact.copy()
+        self.update_tracking_model_with_japc_readback(names=names, nominal_bdes_value=bdes, nominal_bact_value=bact)
 
         return {
             "names": list(names),
@@ -622,23 +616,21 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "bact": bact,
             "ides": ides,
             "iact": iact,
+            "value_unit": "A",
         }
 
-    def set_quadrupoles(self, names, k1l_values):
+    def set_quadrupoles(self, names, currents_A):
         if isinstance(names, str):
             names = [names]
-        if not isinstance(k1l_values, (list, tuple, np.ndarray)):
-            k1l_values = [k1l_values]
-        if len(names) != len(k1l_values):
-            raise ValueError(f"len(names)={len(names)} != len(k1l_values)={len(k1l_values)}")
-
-        currents_A = []
-        for quadrupole, k1l in zip(names, k1l_values):
-            current_A = self.k1l_to_current(quadrupole, k1l)
-            currents_A.append(current_A)
+        if not isinstance(currents_A, (list, tuple, np.ndarray)):
+            currents_A = [currents_A]
+        if len(names) != len(currents_A):
+            raise ValueError(f"len(names)={len(names)} != len(currents_A)={len(currents_A)}")
+        for quadrupole, current_A in zip(names, currents_A):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
-            self.client.set(property_address, data={field: current_A})
+            self.client.set(property_address, data={field: float(current_A)})
+
         return self._wait_for_quadrupole_readbacks(names, currents_A)
 
     def _get_screen_movement_info(self, screen_name):
@@ -842,44 +834,20 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         return screens
 
-    @staticmethod
-    def _quad_sign(name):
-        if "QFD" in name:
-            return 1.0
-        if "QDD" in name:
-            return -1.0
-        raise ValueError(f"Unknown interface quadrupole: {name}")
-
-    def current_to_k1l(self, name, current_A, pref_mev_c=None):
-        current_A = float(current_A)
-        pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
-        if not np.isfinite(current_A) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
-            return np.nan
-
-        length = float(self._get_tracking_element(name).get_length())
-        k1 = self.tracking_interface.get_Quad_K_from_I(current_A, length, pref_mev_c)
-        return self._quad_sign(name) * k1 * length
-
-    def k1l_to_current(self, name, k1l, pref_mev_c=None):
-        k1l = float(k1l)
-        pref_mev_c = self.tracking_interface.Pref if pref_mev_c is None else float(pref_mev_c)
-        if not np.isfinite(k1l) or not np.isfinite(pref_mev_c) or pref_mev_c <= 0:
-            raise ValueError(f"Invalid K1L or reference momentum for {name}")
-        a = float(self.tracking_interface.get_ITF(0.0))
-        b = float(a - self.tracking_interface.get_ITF(1.0))
-        target = self._quad_sign(name) * k1l * pref_mev_c / 299.8
-        discriminant = a * a - 4.0 * b * target
-        if discriminant < 0.0:
-            raise ValueError(f"K1L={k1l:.6g} is outside the CLEAR calibration range for {name}")
-        solutions = ((a - np.sqrt(discriminant)) / (2.0 * b),
-                 (a + np.sqrt(discriminant)) / (2.0 * b))
-        return float(min(solutions, key=abs))
-
     def update_tracking_model_with_japc_readback(self, nominal_bdes_value=None, nominal_bact_value=None, names=None):
         if isinstance(names, str):
             names = [names]
         bact = np.asarray(nominal_bact_value, dtype=float)
         self.tracking_interface.set_quadrupoles(names, bact)
+
+    def restore_quadrupoles_state(self, state):
+        quadrupoles = state.get_quadrupoles()
+        if quadrupoles.get("value_unit") != "A":
+            raise ValueError(
+                "Refusing to restore CLEAR quadrupoles from a legacy state without "
+                "current units. Its bdes values may be K1L, not amperes."
+            )
+        super().restore_quadrupoles_state(state)
 
     def predict_emittance_scan_response(self, *args, **kwargs):
         return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
