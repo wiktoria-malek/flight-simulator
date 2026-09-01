@@ -5,7 +5,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from Backend.State import State
-folder = Path("/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_20260828_132037_Orbit")
+folder = Path("/local/home/clearop/CERN-Flight_Simulator-Data/CLEAR_20260901_120949_Kicker_Dispersion")
 p_files = sorted(folder.glob("DATA_*_p0000.pkl"))
 
 for p_file in p_files:
