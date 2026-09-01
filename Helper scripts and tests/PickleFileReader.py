@@ -1,26 +1,28 @@
 from __future__ import annotations
 import sys, os , argparse, json, math
 from pathlib import Path
+from pprint import pprint
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 from Backend.State import State
+
 folder = Path("/local/home/clearop/CERN-Flight_Simulator-Data/CLEAR_20260901_120949_Kicker_Dispersion")
-p_files = sorted(folder.glob("DATA_*_p0000.pkl"))
+data_files = sorted(folder.glob("DATA_*.pkl"))
 
-for p_file in p_files:
-    corrector_name = (p_file.name.removeprefix("DATA_").removesuffix("_p0000.pkl"))
-    print(f"\n{'=' * 60}\nCorrector: {corrector_name}")
-    for pm in ("p", "m"):
-        filename = folder / f"DATA_{corrector_name}_{pm}0000.pkl"
+if not data_files:
+    print(f"No DATA_*.pkl files found in: {folder}")
+
+for filename in data_files:
+    print(f"\n{'=' * 80}\nFile: {filename.name}")
+    try:
         state = State(filename=str(filename))
-        corrector = state.get_correctors([corrector_name])
-
-        print(f"{pm}:")
-        print("  file:", filename.name)
-        print("  bdes:", corrector["bdes"][0])
-        print("  bact:", corrector["bact"][0])
+        print("timestamp:", state.get_timestamp())
+        print("beam_settings:")
+        pprint(state.get_beam_settings(), sort_dicts=False)
+    except Exception as error:
+        print(f"Could not read file: {error}")
 #
 # import argparse
 # import json

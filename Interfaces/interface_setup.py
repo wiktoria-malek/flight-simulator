@@ -283,6 +283,7 @@ INTERFACE_SETUP = {
             "units":
                 {
                     "corrector_strength": "gauss*m",
+                    "quadrupole_strength": "A",
                     "bpm_position": "mm",
                     "sysid_corrector_kick": 1
                 },
