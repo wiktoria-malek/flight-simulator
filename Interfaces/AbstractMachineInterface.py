@@ -143,7 +143,7 @@ class AbstractMachineInterface(ABC):
 
     def restore_correctors_state(self, state):
         correctors = state.get_correctors()
-        self.set_correctors(correctors["names"], correctors["bdes"])
+        return self.set_correctors(correctors["names"], correctors["bdes"])
 
     def restore_quadrupoles_state(self, state):
         quadrupoles = state.get_quadrupoles()
