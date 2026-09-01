@@ -62,11 +62,11 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
         # Bpms and correctors in beamline order
         sequence = [
-            'CA.DHG0130', 'CA.DVG0130', #'CA.BPC0220',
-            'CA.DHG0225', 'CA.DVG0225', #'CA.BPC0240',
-            'CA.DHG0245', 'CA.DVG0245', #'CA.BPC0260',
-            'CA.DHG0265', #'CA.BPC0310',
-            'CA.DHG0320', 'CA.DVG0320', #'CA.SDV0340',
+            'CA.DHG0130', 'CA.DVG0130',
+            'CA.DHG0225', 'CA.DVG0225',
+            'CA.DHG0245', 'CA.DVG0245',
+            'CA.DHG0265', 'CA.DVG0265',
+            'CA.DHG0320', 'CA.DVG0320',
             'CA.QFD0350', 'CA.QDD0355', 'CA.QFD0360',
             'CA.DHG0385', 'CA.DVG0385',
             'CA.BTV0390L', 'CA.BTV0390H',
