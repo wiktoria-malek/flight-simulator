@@ -736,6 +736,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                     if bunch_at_screen is None and str(screen_name) == end_element_name:
                         bunch_at_screen = tracked_to_last_screen
                     m = bunch_at_screen.get_phase_space('%x %y')
+                    particles_xy[k, si] = (m[:, 0].copy(), m[:, 1].copy())
                     if m is not None and len(m) > 0:
                         xs = m[:, 0]
                         ys = m[:, 1]
@@ -755,7 +756,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         return {
             "sigma_x": sigma_x, "sigma_y": sigma_y,
             "x_mean": x_mean, "y_mean": y_mean,
-            "sigma_xy": sigma_xy,
+            "sigma_xy": sigma_xy, "particles_xy": particles_xy,
         }
 
     def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
