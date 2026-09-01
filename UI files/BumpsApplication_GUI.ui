@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1512</width>
-    <height>841</height>
+    <width>1450</width>
+    <height>822</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,182 +16,50 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="main_layout" stretch="0,1">
     <property name="leftMargin">
-     <number>6</number>
+     <number>8</number>
     </property>
     <property name="topMargin">
-     <number>6</number>
+     <number>8</number>
     </property>
     <property name="rightMargin">
-     <number>6</number>
+     <number>8</number>
     </property>
     <property name="bottomMargin">
-     <number>6</number>
+     <number>8</number>
     </property>
     <item>
      <layout class="QHBoxLayout" name="top_bar_layout" stretch="1,0">
       <item>
        <widget class="QGroupBox" name="responseGroup">
         <property name="title">
-         <string>Response matrix</string>
+         <string>SysID response data</string>
         </property>
         <layout class="QGridLayout" name="response_grid">
-         <item row="4" column="0">
-          <widget class="QLabel" name="label_plane">
+         <item row="0" column="3">
+          <widget class="QPushButton" name="browse_response_button">
+           <property name="maximumSize">
+            <size>
+             <width>42</width>
+             <height>16777215</height>
+            </size>
+           </property>
            <property name="text">
-            <string>Plane:</string>
+            <string>…</string>
            </property>
           </widget>
          </item>
          <item row="0" column="0">
           <widget class="QLabel" name="label_response_dir">
            <property name="text">
-            <string>Directory / file:</string>
+            <string>Directory:</string>
            </property>
           </widget>
          </item>
-         <item row="0" column="8">
-          <widget class="QPushButton" name="browse_response_button">
-           <property name="maximumSize">
-            <size>
-             <width>40</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1" colspan="7">
+         <item row="0" column="1" colspan="2">
           <widget class="QLineEdit" name="response_dir_edit">
            <property name="placeholderText">
-            <string>Load folder with response matrix data here...</string>
+            <string>Load response matrix...</string>
            </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <layout class="QHBoxLayout" name="parameters_layout">
-           <item>
-            <widget class="QLabel" name="label_rcond">
-             <property name="maximumSize">
-              <size>
-               <width>110</width>
-               <height>16777215</height>
-              </size>
-             </property>
-             <property name="text">
-              <string>PINV tolerance</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLineEdit" name="rcond_edit">
-             <property name="maximumSize">
-              <size>
-               <width>90</width>
-               <height>16777215</height>
-              </size>
-             </property>
-             <property name="text">
-              <string>1e-3</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="pinv_toolbutton">
-             <property name="styleSheet">
-              <string notr="true">QToolButton#pinv_toolbutton {
-    border: 1px solid #888;
-    border-radius: 10px;
-    min-width: 20px;
-    max-width: 20px;
-    min-height: 20px;
-    max-height: 20px;
-    padding: 0px;
-    font-weight: bold;
-}
-QToolButton#pinv_toolbutton:hover {
-    background-color: #e6e6e6;
-}</string>
-             </property>
-             <property name="text">
-              <string>?</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="label_beta">
-             <property name="maximumSize">
-              <size>
-               <width>110</width>
-               <height>16777215</height>
-              </size>
-             </property>
-             <property name="text">
-              <string>Beta parameter</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLineEdit" name="beta_edit">
-             <property name="maximumSize">
-              <size>
-               <width>90</width>
-               <height>16777215</height>
-              </size>
-             </property>
-             <property name="text">
-              <string>0.0</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QToolButton" name="beta_p_toolbutton">
-             <property name="styleSheet">
-              <string notr="true">QToolButton#beta_p_toolbutton {
-    border: 1px solid #888;
-    border-radius: 10px;
-    min-width: 20px;
-    max-width: 20px;
-    min-height: 20px;
-    max-height: 20px;
-    padding: 0px;
-    font-weight: bold;
-}
-QToolButton#beta_p_toolbutton:hover {
-    background-color: #e6e6e6;
-}</string>
-             </property>
-             <property name="text">
-              <string>?</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-         <item row="4" column="1">
-          <widget class="QComboBox" name="plane_combo">
-           <item>
-            <property name="text">
-             <string>Horizontal (x)</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Vertical (y)</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Coupled (x &amp; y)</string>
-            </property>
-           </item>
           </widget>
          </item>
         </layout>
@@ -199,22 +67,16 @@ QToolButton#beta_p_toolbutton:hover {
       </item>
       <item>
        <widget class="QLabel" name="logo_label">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
         <property name="minimumSize">
          <size>
           <width>120</width>
-          <height>80</height>
+          <height>78</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
           <width>180</width>
-          <height>120</height>
+          <height>110</height>
          </size>
         </property>
         <property name="text">
@@ -243,8 +105,11 @@ QToolButton#beta_p_toolbutton:hover {
            <layout class="QVBoxLayout" name="correctors_group_vbox">
             <item>
              <widget class="QListWidget" name="correctors_list">
+              <property name="toolTip">
+               <string>Choose correctors that may be used in your later calculation.</string>
+              </property>
               <property name="selectionMode">
-               <enum>QAbstractItemView::ExtendedSelection</enum>
+               <enum>QAbstractItemView::MultiSelection</enum>
               </property>
              </widget>
             </item>
@@ -253,14 +118,14 @@ QToolButton#beta_p_toolbutton:hover {
               <item>
                <widget class="QPushButton" name="save_correctors_button">
                 <property name="text">
-                 <string>Save As..</string>
+                 <string>Save as…</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="load_correctors_button">
                 <property name="text">
-                 <string>Load..</string>
+                 <string>Load…</string>
                 </property>
                </widget>
               </item>
@@ -279,13 +144,16 @@ QToolButton#beta_p_toolbutton:hover {
          <item>
           <widget class="QGroupBox" name="bpmsGroup">
            <property name="title">
-            <string>BPMs</string>
+            <string>BPMs (click twice to adjust)</string>
            </property>
            <layout class="QVBoxLayout" name="bpms_group_vbox">
             <item>
              <widget class="QListWidget" name="bpms_list">
+              <property name="toolTip">
+               <string>Double-click a BPM to set its desired orbit. The other BPM selections stay unchanged.</string>
+              </property>
               <property name="selectionMode">
-               <enum>QAbstractItemView::ExtendedSelection</enum>
+               <enum>QAbstractItemView::MultiSelection</enum>
               </property>
              </widget>
             </item>
@@ -294,14 +162,14 @@ QToolButton#beta_p_toolbutton:hover {
               <item>
                <widget class="QPushButton" name="save_bpms_button">
                 <property name="text">
-                 <string>Save As..</string>
+                 <string>Save as…</string>
                 </property>
                </widget>
               </item>
               <item>
                <widget class="QPushButton" name="load_bpms_button">
                 <property name="text">
-                 <string>Load..</string>
+                 <string>Load…</string>
                 </property>
                </widget>
               </item>
@@ -321,147 +189,70 @@ QToolButton#beta_p_toolbutton:hover {
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="middle_layout" stretch="0,1,0,1">
+       <layout class="QVBoxLayout" name="middle_layout" stretch="0,1">
         <item>
-         <layout class="QHBoxLayout" name="reference_layout">
-          <item>
-           <widget class="QPushButton" name="read_reference_button">
-            <property name="text">
-             <string>Read reference orbit</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="targetGroup">
+         <widget class="QGroupBox" name="bumpSetupGroup">
           <property name="title">
-           <string>Target orbit at BPMs [mm]  -  synced with the plot, blank = keep reference</string>
+           <string>Bump setup</string>
           </property>
-          <layout class="QVBoxLayout" name="target_layout">
+          <layout class="QVBoxLayout" name="bump_setup_layout">
            <item>
-            <widget class="QTableWidget" name="target_table">
-             <property name="alternatingRowColors">
-              <bool>true</bool>
+            <widget class="QPushButton" name="read_reference_button">
+             <property name="text">
+              <string>Read reference orbit</string>
              </property>
-             <column>
-              <property name="text">
-               <string>BPM</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>x target [mm]</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>y target [mm]</string>
-              </property>
-             </column>
             </widget>
            </item>
            <item>
-            <layout class="QHBoxLayout" name="target_helper_layout">
-             <item>
-              <widget class="QLabel" name="label_region_value">
-               <property name="text">
-                <string>Value:</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="region_value_edit">
-               <property name="maximumSize">
-                <size>
-                 <width>80</width>
-                 <height>16777215</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>0.0</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="set_x_button">
-               <property name="text">
-                <string>Set x (sel.)</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="set_y_button">
-               <property name="text">
-                <string>Set y (sel.)</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="zero_bump_button">
-               <property name="text">
-                <string>Zero bump</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <layout class="QHBoxLayout" name="max_delta_layout">
-             <item>
-              <widget class="QLabel" name="label_max_delta">
-               <property name="text">
-                <string>Max |Δθ| per corrector (0 = no limit):</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="max_delta_edit">
-               <property name="maximumSize">
-                <size>
-                 <width>90</width>
-                 <height>16777215</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>0</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
+            <widget class="QPushButton" name="clear_targets_button">
+             <property name="text">
+              <string>Clear all desired bumps</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="corr_delta_label">
-          <property name="text">
-           <string>Corrector changes Δθ  (relative to reference)</string>
+         <widget class="QGroupBox" name="correctorPreviewGroup">
+          <property name="title">
+           <string>Calculated corrector settings</string>
           </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QTableWidget" name="corr_delta_table">
-          <column>
-           <property name="text">
-            <string>Corrector</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>Δθ</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>reference</string>
-           </property>
-          </column>
-          <column>
-           <property name="text">
-            <string>new setpoint</string>
-           </property>
-          </column>
+          <layout class="QVBoxLayout" name="corrector_preview_layout">
+           <item>
+            <widget class="QTableWidget" name="corr_delta_table">
+             <property name="toolTip">
+              <string>Read-only preview for corrector values produced by your future calculation.</string>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::NoEditTriggers</set>
+             </property>
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <column>
+              <property name="text">
+               <string>Corrector</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>Δθ</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>Reference</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>New setpoint</string>
+              </property>
+             </column>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
        </layout>
@@ -471,22 +262,16 @@ QToolButton#beta_p_toolbutton:hover {
         <item>
          <widget class="QLabel" name="desired_label">
           <property name="text">
-           <string>Desired bump  -  drag the blue markers to set the target orbit</string>
+           <string>Desired bump (drag to change)</string>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QWidget" name="desired_plot_widget" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
           <property name="minimumSize">
            <size>
-            <width>420</width>
-            <height>220</height>
+            <width>470</width>
+            <height>245</height>
            </size>
           </property>
          </widget>
@@ -494,22 +279,16 @@ QToolButton#beta_p_toolbutton:hover {
         <item>
          <widget class="QLabel" name="result_label">
           <property name="text">
-           <string>Desired  /  Predicted  /  Measured</string>
+           <string>Desired / Predicted / Measured</string>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QWidget" name="result_plot_widget" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
           <property name="minimumSize">
            <size>
-            <width>420</width>
-            <height>240</height>
+            <width>470</width>
+            <height>250</height>
            </size>
           </property>
          </widget>
@@ -531,6 +310,9 @@ QToolButton#beta_p_toolbutton:hover {
           </item>
           <item>
            <widget class="QPushButton" name="compute_button">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="text">
              <string>Compute / Preview</string>
             </property>
@@ -538,6 +320,9 @@ QToolButton#beta_p_toolbutton:hover {
           </item>
           <item>
            <widget class="QPushButton" name="restore_button">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="styleSheet">
              <string notr="true">background-color: rgb(200, 140, 0); color: white;</string>
             </property>
@@ -548,6 +333,9 @@ QToolButton#beta_p_toolbutton:hover {
           </item>
           <item>
            <widget class="QPushButton" name="apply_button">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="minimumSize">
              <size>
               <width>120</width>
@@ -555,7 +343,7 @@ QToolButton#beta_p_toolbutton:hover {
              </size>
             </property>
             <property name="styleSheet">
-             <string notr="true">background-color: green; color: white; font-weight: bold;</string>
+             <string notr="true">background-color: rgb(0, 120, 70); color: white; font-weight: bold;</string>
             </property>
             <property name="text">
              <string>Apply</string>

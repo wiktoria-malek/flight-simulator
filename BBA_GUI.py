@@ -1062,7 +1062,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                                  color='tab:orange', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
-                    plt.title("DFS: measured orbit difference vs target dispersion (x, y)")
+                    plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it/iters}")
                     plt.legend()
                     plt.grid(True, alpha=0.3)
                     dfs_plot_ax = plt.gca() # get current axis, dont mistake for other plot
