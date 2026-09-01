@@ -96,10 +96,6 @@ class Worker(QObject):
 
     @pyqtSlot()
     def run(self):
-        # This wrapper is the only thing standing between "something threw mid-Dispersion/
-        # Wakefield" and the machine being stuck at a test energy/intensity forever with no
-        # warning: finished must fire no matter what _run_impl() does, because the GUI's
-        # cleanup (which resets energy/intensity) only runs off that signal.
         try:
             self._run_impl()
         except Exception as e:
@@ -1039,7 +1035,6 @@ def main():
     window = MainWindow(interface=interface, dir_name=dir_name)
     window.show()
     return app.exec()
-
 
 if __name__ == "__main__":
     sys.exit(main())
