@@ -592,7 +592,7 @@ class MainWindow(QMainWindow, SaveOrLoad):
         return self._sort_elements(names, which="corrs")
 
     def _restore_actuators_state(self, machine_state):
-        self.interface.restore_correctors_state(machine_state)
+        return self.interface.restore_correctors_state(machine_state)
 
     def _actuator_selection_filename(self):
         return "correctors.txt"
@@ -643,7 +643,10 @@ class MainWindow(QMainWindow, SaveOrLoad):
         self.__set_status_in_title(f"[Running {mode.name} mode]")
         self.progressBar.setValue(0)
         machine_state=self.state_class(filename=os.path.join(dir_name,'machine_status.pkl'))
-        self._restore_actuators_state(machine_state)
+        if self._restore_actuators_state(machine_state) is False:
+            QMessageBox.warning(
+                self, "SysID restore",
+                f"Not every corrector was set back at its saved current before the {mode.name} measurement. Check the correctors on the machine.")
 
         if mode==Mode.Orbit:
             self.interface.reset_energy()
@@ -655,9 +658,6 @@ class MainWindow(QMainWindow, SaveOrLoad):
         elif mode==Mode.Wakefield:
             self.interface.change_intensity()
             print("Intensity changed)")
-        self.stop_requested = True
-        self.__set_status_in_title("[Idle]")
-        self._set_directory_edit_enabled(True)
         return
 
     def _read_all_parameters(self,text):
@@ -883,7 +883,10 @@ class MainWindow(QMainWindow, SaveOrLoad):
             #self.S.load('machine_status')
             current_dir=self.mode_dirs[self.current_mode]
             machine_state=self.state_class(filename=os.path.join(current_dir,"machine_status.pkl"))
-            self._restore_actuators_state(machine_state)
+            if self._restore_actuators_state(machine_state) is False:
+                QMessageBox.warning(
+                    self, "SysID restore",
+                    "Not every corrector was set back at its saved current after this mode. Check the correctors on the machine.")
             self.progressBar.setValue(100)
             self.thread = None
             self.worker = None
