@@ -471,7 +471,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             )
         self.reset_ref_orb = True
         self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
-        self._clear_graphs()
         self.log("Machine initial settings restored.")
 
     def _is_h_corrector(self, s):
