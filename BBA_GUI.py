@@ -894,8 +894,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             samples_dir = os.path.join(self._session_dir, "BBA_states")
             os.makedirs(samples_dir, exist_ok=True)
             last_completed_iteration = None
-            prev_Dx = None #np.zeros_like(target_disp_x)
-            prev_Dy = None #np.zeros_like(target_disp_y)
+            prev_Dx = None
+            prev_Dy = None
 
             for it in range(iters):
                 if self._cancel:
@@ -1221,11 +1221,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     dfs_plot_ax.plot(range(n), dfs_prediction_y, color="tab:orange", linestyle="--", label="R prediction y")
                     dfs_plot_ax.legend()
                     dfs_plot_ax.figure.canvas.draw_idle()
-                    prev_Dx = dfs_prediction_x
-                    prev_Dy = dfs_prediction_y
                 if adaptive_orbit_only:
                     self._adaptive_R_prev_kick = applied_delta.copy()
                     self._adaptive_R_prev_orbit = orbit_now
+
                 kicks_path = os.path.join(self._session_dir, "kicks.txt")
                 write_header = not os.path.exists(kicks_path)
                 with open(kicks_path, "a") as file:
@@ -1253,6 +1252,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 if w2 > 0 and O1x is not None and O1y is not None:
                     dx_disp = x1_vals - x0_vals
                     dy_disp = y1_vals - y0_vals
+                    prev_Dx = dx_disp
+                    prev_Dy = dy_disp
                     mean_disp_x, mean_disp_y, err_disp_x, err_disp_y, mean_disp_all, err_disp_all = self._calc_error(
                         dx_disp, dy_disp, ref_x=np.zeros(dx_disp.shape[1]), ref_y=np.zeros(dy_disp.shape[1]),
                         disp_x=Dx.ravel(), disp_y=Dy.ravel())
