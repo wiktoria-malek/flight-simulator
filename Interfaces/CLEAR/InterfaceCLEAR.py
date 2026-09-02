@@ -252,9 +252,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def change_energy(self, scale=1.0):
         scaled_optics_currents = np.asarray([5.0, 20.0, 5.0, 20.0, 30.0, 15.0, 20.0, 35.0, 20.0, 0.0, 0.0], dtype=float) * float(scale)
-        if not self.set_quadrupoles(self.quadrupoles, scaled_optics_currents):
-            raise RuntimeError("Not all quadrupoles reached their scaled-optics currents.")
-        return True
+        for attempt in range(1, 4):
+            if self.set_quadrupoles(self.quadrupoles, scaled_optics_currents):
+                return True
+            if attempt < 3:
+                self.log(f"Scaled optics readback mismatch; retrying ({attempt}/3).")
+        raise RuntimeError("Not all quadrupoles reached their scaled-optics currents after 3 attempts.")
 
     def reset_energy(self):
         return self.change_energy(scale=2.0)
