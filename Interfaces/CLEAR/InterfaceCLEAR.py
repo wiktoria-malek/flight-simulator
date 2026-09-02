@@ -521,7 +521,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             )
         return not pending
 
-    def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance=5e-3, timeout=10.0):
+    def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance=0.1, timeout=10.0):
         readback_param = self.quad_get_params[quadrupole]
         property_address, field = readback_param.rsplit("#", 1)
         return self._wait_for_japc_readback(property_address, field, target, context=self.context_acquisition, tolerance=tolerance, timeout=timeout)
