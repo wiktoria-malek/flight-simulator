@@ -6,9 +6,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 from Backend.State import State
-folder = Path("/local/home/clearop/CERN-Flight_Simulator-Data/CLEAR_20260902_18342_Orbit")
+filename = Path("/local/home/clearop/CERN-Flight_Simulator-Data/CLEAR_20260902_184342_Orbit")
 
-state = State(filename=folder)
+state = State(filename=filename)
 quadrupoles = state.get_quadrupoles()
 print(quadrupoles)
 
