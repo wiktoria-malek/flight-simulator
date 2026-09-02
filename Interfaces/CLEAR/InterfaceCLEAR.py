@@ -151,7 +151,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BCMTHZ2/Acquisition#charge',
         ]
 
-        self.quadrupoles = list(config.quad_names)
         self.quad_set_params = dict(zip(config.quad_names, config.current_set_params))
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
         self.quad_status_params = dict(zip(config.quad_names, config.current_status_params))
@@ -251,20 +250,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
             f"(last readback={last_value})."
         )
 
-    def change_energy(self):
-        if np.isclose(float(self.rf_phase_test), float(self.rf_phase_nominal)):
-            raise RuntimeError(f"RF phase test ({self.rf_phase_test}) = RF phase nominal ({self.rf_phase_nominal}).")
-        energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
-        self.log(f"Value before changing energy: {energy_readback}")
-        new_energy = self._set_and_verify('CK.LL-MKS11/Setting', 'PhaseSh_SP', float(self.rf_phase_test), description="RF phase (test)")
-        self.log(f"Value after changing energy: {new_energy}")
-        return new_energy
+    def change_energy(self, scale=1.0):
+        scaled_optics_currents = np.asarray([5.0, 20.0, 5.0, 20.0, 30.0, 15.0, 20.0, 35.0, 20.0, 0.0, 0.0], dtype=float) * float(scale)
+        if not self.set_quadrupoles(self.quadrupoles, scaled_optics_currents):
+            raise RuntimeError("Not all quadrupoles reached their scaled-optics currents.")
+        return True
 
     def reset_energy(self):
-        print(f"Resetting energy to {self.rf_phase_nominal}...")
-        after_energy_reset = self._set_and_verify('CK.LL-MKS11/Setting', 'PhaseSh_SP', float(self.rf_phase_nominal), description="RF phase (nominal)")
-        print(f"Energy has been reset to {after_energy_reset}.")
-        return after_energy_reset
+        return self.change_energy(scale=2.0)
 
     def change_intensity(self):
         if np.isclose(float(self.uvatt2_test_steps), 0.0):
