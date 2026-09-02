@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1450</width>
-    <height>798</height>
+    <height>770</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -501,7 +501,7 @@ QToolButton#beta_tooltip:hover {
           <item>
            <widget class="QPushButton" name="compute_button">
             <property name="enabled">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="text">
              <string>Compute</string>

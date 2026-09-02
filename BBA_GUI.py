@@ -200,8 +200,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.bpms_list.itemDoubleClicked.connect(self._edit_bpm_weights)
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
-        self.hcorrector_names = set(map(str,
-                                        self.interface.get_hcorrectors_names() or []))  # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
+        self.hcorrector_names = set(map(str,self.interface.get_hcorrectors_names() or []))  # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
         self.vcorrector_names = set(map(str, self.interface.get_vcorrectors_names() or []))
         units_settings, sysid_kick, bpm_unit, corrs_unit = self._get_interface_units()
         self.sysid_kick = sysid_kick
