@@ -1180,7 +1180,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
                 new_bdes = current_bdes + delta_vals
                 new_bdes = clamp(new_bdes, max_vals)
-                for attempt in range(1, 6):
+                for attempt in range(1, 10):
                     set_ok = self.interface.set_correctors(selected_correctors, new_bdes)
                     after_corrs = self.interface.get_correctors(selected_correctors)
                     after_names = list(after_corrs["names"])
