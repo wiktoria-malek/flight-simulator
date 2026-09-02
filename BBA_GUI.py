@@ -1004,7 +1004,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1, 1)
                     plt.clf()
                     plt.plot(Dx, '--', color='blue', label="target dispersion x")
-                    plt.plot(Dy, '--', color='orange', label="target dispersion y")
+                    plt.plot(Dy, '--', color='red', label="target dispersion y")
                 else:
                     O1x = O1y = None
                     Dx = Dy = None
@@ -1071,7 +1071,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     plt.errorbar(range(len(O1x)), (O1x - O0x).ravel(), yerr=err_dx,
                                  color='blue', label="measured x", capsize=3)
                     plt.errorbar(range(len(O1y)), (O1y - O0y).ravel(), yerr=err_dy,
-                                 color='orange', label="measured y", capsize=3)
+                                 color='red', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
                     plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it + 1}/{iters}")
