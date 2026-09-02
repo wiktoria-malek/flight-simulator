@@ -1,7 +1,7 @@
 from __future__ import annotations
 import sys, os , argparse, json, math
 from pathlib import Path
-
+from pprint import pprint
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
@@ -10,7 +10,7 @@ filename = Path("/local/home/clearop/CERN-Flight_Simulator-Data/CLEAR_20260902_1
 
 state = State(filename=filename)
 quadrupoles = state.get_quadrupoles()
-print(quadrupoles)
+pprint(quadrupoles)
 
 
 # p_files = sorted(folder.glob("DATA_*_p0001.pkl"))
