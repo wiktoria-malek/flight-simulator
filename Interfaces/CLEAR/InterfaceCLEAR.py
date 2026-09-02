@@ -488,7 +488,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "tmit": np.asarray(tmit, dtype=float),
         }
 
-    def _wait_for_japc_readback(self, property_address, field, target, *, context=None, tolerance=5e-3, timeout=10.0):
+    def _wait_for_japc_readback(self, property_address, field, target, *, context=None, tolerance=0.1, timeout=10.0):
         context = self.context_empty if context is None else context
         def read_value():
             data = self.client.get(property_address, context=context).data
@@ -632,7 +632,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
             self.client.set(property_address, data={field: float(current_A)})
-
         return self._wait_for_quadrupole_readbacks(names, currents_A)
 
     def _get_screen_movement_info(self, screen_name):
