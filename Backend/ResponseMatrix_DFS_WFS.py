@@ -257,7 +257,8 @@ class ResponseMatrix_DFS_WFS():
         if not pairs:
             return {}
         try:
-            settings = State(filename=pairs[0][0]).get_beam_settings() or {}
+            state = State(filename=pairs[0][0])
+            settings = state.get_beam_settings() or {}
         except Exception:
             return {}
 
@@ -278,7 +279,16 @@ class ResponseMatrix_DFS_WFS():
                     out[path] = fvalue
             return out
 
-        return flatten(settings)
+        signature = flatten(settings)
+        quadrupoles = state.get_quadrupoles()
+        for name, value in zip(quadrupoles.get("names", []), quadrupoles.get("bact", [])):
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(value):
+                signature[f"quadrupoles.{name}"] = value
+        return signature
 
     @staticmethod
     def _beam_signatures_unchanged(signature_a, signature_b, atol=1e-6, rtol=1e-3):
