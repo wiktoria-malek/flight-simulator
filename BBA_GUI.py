@@ -1180,7 +1180,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
                 new_bdes = current_bdes + delta_vals
                 new_bdes = clamp(new_bdes, max_vals)
-                for attempt in range(1, 4):
+                for attempt in range(1, 6):
                     set_ok = self.interface.set_correctors(selected_correctors, new_bdes)
                     after_corrs = self.interface.get_correctors(selected_correctors)
                     after_names = list(after_corrs["names"])
@@ -1190,7 +1190,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     after_bact = np.array([after_bact_map[name] for name in selected_correctors], dtype=float)
                     if set_ok is not False and np.allclose(after_bact, new_bdes, rtol=0.0, atol=readback_tolerance):
                         break
-                    self.log(f"Corrector readback mismatch after BBA kick (attempt {attempt}/3)")
+                    self.log(f"Corrector readback mismatch after BBA kick (attempt {attempt}/5)")
                 else:
                     failed = [
                         f"{name} (target={target:.6g}, bact={actual:.6g})"
