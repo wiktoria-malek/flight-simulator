@@ -526,7 +526,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         property_address, field = readback_param.rsplit("#", 1)
         return self._wait_for_japc_readback(property_address, field, target, context=self.context_acquisition, tolerance=tolerance, timeout=timeout)
 
-    def _wait_for_quadrupole_readbacks(self, names, targets, tolerance=5e-3, timeout=10.0, poll_interval=0.05):
+    def _wait_for_quadrupole_readbacks(self, names, targets, tolerance=0.1, timeout=10.0, poll_interval=0.05):
         targets = {name: float(target) for name, target in zip(names, targets)}
         pending = set(targets)
         last_values = {name: np.nan for name in targets}
