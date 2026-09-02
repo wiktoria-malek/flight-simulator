@@ -896,6 +896,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             last_completed_iteration = None
             prev_Dx = None
             prev_Dy = None
+            prev_applied_kick = None
 
             for it in range(iters):
                 if self._cancel:
@@ -1066,7 +1067,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                                  color='tab:orange', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
-                    plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it}/{iters}")
+                    plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it+1}/{iters}")
                     plt.legend()
                     plt.grid(True, alpha=0.3)
                     dfs_plot_ax = plt.gca() # get current axis, don't mistake for other plot
@@ -1252,8 +1253,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 if w2 > 0 and O1x is not None and O1y is not None:
                     dx_disp = x1_vals - x0_vals
                     dy_disp = y1_vals - y0_vals
-                    prev_Dx = dx_disp
-                    prev_Dy = dy_disp
+                    prev_Dx = (O1x - O0x).ravel()
+                    prev_Dy = (O1y - O0y).ravel()
                     mean_disp_x, mean_disp_y, err_disp_x, err_disp_y, mean_disp_all, err_disp_all = self._calc_error(
                         dx_disp, dy_disp, ref_x=np.zeros(dx_disp.shape[1]), ref_y=np.zeros(dy_disp.shape[1]),
                         disp_x=Dx.ravel(), disp_y=Dy.ravel())

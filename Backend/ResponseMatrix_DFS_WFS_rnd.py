@@ -401,6 +401,8 @@ class ResponseMatrix_DFS_WFS():
                 try:
                     fvalue = float(value)
                 except (TypeError, ValueError):
+                    if isinstance(value, str):
+                        out[path] = value
                     continue
                 if np.isfinite(fvalue):
                     out[path] = fvalue
@@ -413,7 +415,12 @@ class ResponseMatrix_DFS_WFS():
         common_keys = signature_a.keys() & signature_b.keys()
         if not common_keys:
             return None
-        return all(np.isclose(signature_a[key], signature_b[key], atol=atol, rtol=rtol) for key in common_keys)
+        def values_equal(value_a, value_b):
+            if isinstance(value_a, str) or isinstance(value_b, str):
+                return value_a == value_b
+            return np.isclose(value_a, value_b, atol=atol, rtol=rtol)
+
+        return all(values_equal(signature_a[key], signature_b[key]) for key in common_keys)
 
     def _get_data_from_loaded_directories(self, selected_bpms, selected_corrs, _force_triangular=False):
         info_traj = self._data_dirs.get("traj")
