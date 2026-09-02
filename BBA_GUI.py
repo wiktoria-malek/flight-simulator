@@ -997,8 +997,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     Dx = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1, 1)
                     Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1, 1)
                     plt.clf()
-                    plt.plot(Dx, '--', color='tab:blue', label="target dispersion x")
-                    plt.plot(Dy, '--', color='tab:orange', label="target dispersion y")
+                    plt.plot(Dx, '--', color='blue', label="target dispersion x")
+                    plt.plot(Dy, '--', color='orange', label="target dispersion y")
                 else:
                     O1x = O1y = None
                     Dx = Dy = None
@@ -1063,9 +1063,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     By.append(wgt_orb * (O0y - B0y))
                 if w2 > 0 and O1x is not None:
                     plt.errorbar(range(len(O1x)), (O1x - O0x).ravel(), yerr=err_dx,
-                                 color='tab:blue', label="measured x", capsize=3)
+                                 color='blue', label="measured x", capsize=3)
                     plt.errorbar(range(len(O1y)), (O1y - O0y).ravel(), yerr=err_dy,
-                                 color='tab:orange', label="measured y", capsize=3)
+                                 color='orange', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
                     plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it+1}/{iters}")
@@ -1219,8 +1219,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     applied_y = applied_delta[nh:]
                     dfs_prediction_x = (prev_Dx + (Axx_it[dfs_rows, :] @ applied_x + Axy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
                     dfs_prediction_y = (prev_Dy + (Ayx_it[dfs_rows, :] @ applied_x + Ayy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
-                    dfs_plot_ax.plot(range(n), dfs_prediction_x, color="tab:blue", linestyle = "--" , label="R prediction x")
-                    dfs_plot_ax.plot(range(n), dfs_prediction_y, color="tab:orange", linestyle="--", label="R prediction y")
+                    dfs_plot_ax.plot(range(n), dfs_prediction_x, color="blue", linestyle = "--" , label="R prediction x")
+                    dfs_plot_ax.plot(range(n), dfs_prediction_y, color="orange", linestyle="--", label="R prediction y")
                     dfs_plot_ax.legend()
                     dfs_plot_ax.figure.canvas.draw_idle()
                 if adaptive_orbit_only:
