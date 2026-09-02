@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1450</width>
-    <height>822</height>
+    <height>798</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -32,35 +32,225 @@
       <item>
        <widget class="QGroupBox" name="responseGroup">
         <property name="title">
-         <string>SysID response data</string>
+         <string>Response matrix data</string>
         </property>
-        <layout class="QGridLayout" name="response_grid">
-         <item row="0" column="3">
-          <widget class="QPushButton" name="browse_response_button">
-           <property name="maximumSize">
-            <size>
-             <width>42</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>…</string>
-           </property>
-          </widget>
+        <layout class="QVBoxLayout" name="response_layout">
+         <item>
+          <layout class="QHBoxLayout" name="response_directory_layout">
+           <item>
+            <widget class="QLabel" name="label_response_dir">
+             <property name="text">
+              <string>Directory:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="response_dir_edit">
+             <property name="placeholderText">
+              <string>Load response matrix...</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="browse_response_button">
+             <property name="maximumSize">
+              <size>
+               <width>42</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>…</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="label_response_dir">
-           <property name="text">
-            <string>Directory:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1" colspan="2">
-          <widget class="QLineEdit" name="response_dir_edit">
-           <property name="placeholderText">
-            <string>Load response matrix...</string>
-           </property>
-          </widget>
+         <item>
+          <layout class="QHBoxLayout" name="response_parameters_layout">
+           <item>
+            <widget class="QLabel" name="pinv_label">
+             <property name="minimumSize">
+              <size>
+               <width>130</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>130</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>PINV tolerance</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="pinv_edit">
+             <property name="maximumSize">
+              <size>
+               <width>50</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>0.001</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="pinv_tooltip">
+             <property name="minimumSize">
+              <size>
+               <width>22</width>
+               <height>22</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>22</width>
+               <height>22</height>
+              </size>
+             </property>
+             <property name="focusPolicy">
+              <enum>Qt::NoFocus</enum>
+             </property>
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;PINV tolerance sets the pseudoinverse cutoff. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Smaller values&lt;/span&gt; keep &lt;span style=&quot; font-weight:600;&quot;&gt;more modes&lt;/span&gt; and give &lt;span style=&quot; font-weight:600;&quot;&gt;stronger but noisier correction&lt;/span&gt;. &lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Larger values&lt;/span&gt; remove &lt;span style=&quot; font-weight:600;&quot;&gt;weak modes&lt;/span&gt;, making &lt;span style=&quot; font-weight:600;&quot;&gt;correction more stable but sometimes weaker&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QToolButton#pinv_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#pinv_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+             </property>
+             <property name="text">
+              <string>?</string>
+             </property>
+             <property name="autoRaise">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="response_parameters_spacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Fixed</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QLabel" name="beta_label">
+             <property name="minimumSize">
+              <size>
+               <width>130</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>130</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Beta parameter</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="beta_edit">
+             <property name="maximumSize">
+              <size>
+               <width>50</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>0</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="beta_tooltip">
+             <property name="minimumSize">
+              <size>
+               <width>22</width>
+               <height>22</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>22</width>
+               <height>22</height>
+              </size>
+             </property>
+             <property name="focusPolicy">
+              <enum>Qt::NoFocus</enum>
+             </property>
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Tikhonov regularization strength. &lt;/p&gt;&lt;p&gt;If beta &amp;gt; 0, the solver uses (A^T A + beta I)^-1 to stabilize the correction.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Use &lt;span style=&quot; font-weight:600;&quot;&gt;0 for standard pseudo-inverse.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;Increase&lt;/span&gt; it to &lt;span style=&quot; font-weight:600;&quot;&gt;make the solution smoother and less sensitive to noise&lt;/span&gt;. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QToolButton#beta_tooltip {
+    border: 1px solid #888;
+    border-radius: 10px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#beta_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+             </property>
+             <property name="text">
+              <string>?</string>
+             </property>
+             <property name="autoRaise">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="response_parameters_stretch">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </item>
         </layout>
        </widget>
@@ -314,7 +504,7 @@
              <bool>false</bool>
             </property>
             <property name="text">
-             <string>Compute / Preview</string>
+             <string>Compute</string>
             </property>
            </widget>
           </item>

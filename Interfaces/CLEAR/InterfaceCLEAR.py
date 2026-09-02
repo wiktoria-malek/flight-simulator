@@ -478,6 +478,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
                 x_sample.append(H)
                 y_sample.append(V)
                 tmit_sample.append(s_sum)
+                if np.isclose(H, 0.0) or np.isclose(V, 0.0):
+                    print(f"Zero detected in the readout of the BPMs! Check your error bars. BPM affected: {bpm}, H = {H}, V = {V}")
             x.append(x_sample)
             y.append(y_sample)
             tmit.append(tmit_sample)

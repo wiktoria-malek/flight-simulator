@@ -894,6 +894,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             samples_dir = os.path.join(self._session_dir, "BBA_states")
             os.makedirs(samples_dir, exist_ok=True)
             last_completed_iteration = None
+            prev_Dx = None #np.zeros_like(target_disp_x)
+            prev_Dy = None #np.zeros_like(target_disp_y)
 
             for it in range(iters):
                 if self._cancel:
@@ -933,7 +935,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                             print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
                         else:
                             pass
-                O0 = state0.get_orbit(bpms)  # because axis=1 is mean from one whole measurement, not for 1 bpm
+                O0 = state0.get_orbit(bpms)
                 O0x = np.asarray(O0['x'], dtype=float).reshape(-1, 1)
                 O0y = np.asarray(O0['y'], dtype=float).reshape(-1, 1)
                 orbit_now = np.concatenate([O0x, O0y]).ravel()
@@ -1064,10 +1066,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                                  color='tab:orange', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
-                    plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it/iters}")
+                    plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it}/{iters}")
                     plt.legend()
                     plt.grid(True, alpha=0.3)
-                    dfs_plot_ax = plt.gca() # get current axis, dont mistake for other plot
+                    dfs_plot_ax = plt.gca() # get current axis, don't mistake for other plot
                     Bx.append(wgt_dfs * ((O1x - O0x) - Dx))
                     By.append(wgt_dfs * ((O1y - O0y) - Dy))
 
@@ -1208,17 +1210,19 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 applied_delta = after_bdes - current_bdes
                 print("applied_delta =", applied_delta)
 
-                if w2 > 0 and O1x is not None and O1y is not None:
+                if w2 > 0 and O1x is not None and O1y is not None and prev_Dx is not None and prev_Dy is not None:
                     dfs_start = n if w1 > 0 else 0
                     dfs_rows = slice(dfs_start, dfs_start + n) # slice of an array start:end
                     applied_x = applied_delta[:nh]
                     applied_y = applied_delta[nh:]
-                    dfs_prediction_x = ((O1x - O0x).ravel() + (Axx_it[dfs_rows, :] @ applied_x + Axy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
-                    dfs_prediction_y = ((O1y - O0y).ravel() + (Ayx_it[dfs_rows, :] @ applied_x + Ayy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
+                    dfs_prediction_x = (prev_Dx + (Axx_it[dfs_rows, :] @ applied_x + Axy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
+                    dfs_prediction_y = (prev_Dy + (Ayx_it[dfs_rows, :] @ applied_x + Ayy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
                     dfs_plot_ax.plot(range(n), dfs_prediction_x, color="tab:blue", linestyle = "--" , label="R prediction x")
                     dfs_plot_ax.plot(range(n), dfs_prediction_y, color="tab:orange", linestyle="--", label="R prediction y")
                     dfs_plot_ax.legend()
                     dfs_plot_ax.figure.canvas.draw_idle()
+                    prev_Dx = dfs_prediction_x
+                    prev_Dy = dfs_prediction_y
                 if adaptive_orbit_only:
                     self._adaptive_R_prev_kick = applied_delta.copy()
                     self._adaptive_R_prev_orbit = orbit_now
