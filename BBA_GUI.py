@@ -200,8 +200,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.bpms_list.itemDoubleClicked.connect(self._edit_bpm_weights)
         correctors = self.interface.get_correctors()
         correctors_list = correctors['names']
-        self.hcorrector_names = set(map(str,
-                                        self.interface.get_hcorrectors_names() or []))  # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
+        self.hcorrector_names = set(map(str, self.interface.get_hcorrectors_names() or []))  # takes correctors names, if None, then use an empty list, makes everything a string and saves as a set without the duplicates
         self.vcorrector_names = set(map(str, self.interface.get_vcorrectors_names() or []))
         units_settings, sysid_kick, bpm_unit, corrs_unit = self._get_interface_units()
         self.sysid_kick = sysid_kick
@@ -222,11 +221,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
             max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
             max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
-
+            if "bba_max_h_strength" in units_settings: max_curr_h = units_settings["bba_max_h_strength"]
+            if "bba_max_v_strength" in units_settings: max_curr_v = units_settings["bba_max_v_strength"]
         self.max_horizontal_current_spinbox.setValue(max_curr_h)
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
         self._refresh_metric_plots_for_mode()
 
     def _setup_nsamples_control(self):

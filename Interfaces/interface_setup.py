@@ -285,7 +285,9 @@ INTERFACE_SETUP = {
                     "corrector_strength": "gauss*m",
                     "quadrupole_strength": "A",
                     "bpm_position": "mm",
-                    "sysid_corrector_kick": 1
+                    "sysid_corrector_kick": 1,
+                    "bba_max_h_strength": 9.99,
+                    "bba_max_v_strength": 9.99,
                 },
             "bounds":
                 {
@@ -311,7 +313,9 @@ INTERFACE_SETUP = {
                 {
                     "corrector_strength": "gauss*m",
                     "bpm_position": "mm",
-                    "sysid_corrector_kick": 0.01
+                    "sysid_corrector_kick": 0.01,
+                    "bba_max_h_strength": 9.99,
+                    "bba_max_v_strength": 9.99,
                 },
             "bounds": {
                 "emit_x_norm": [0.0, 20.0],
