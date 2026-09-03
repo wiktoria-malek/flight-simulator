@@ -650,7 +650,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             desired_y - current_y,
         ])
 
-
         # if self.beta_value > 0:
         #     delta =
         delta = np.linalg.pinv(R_matrix, rcond= self.pinv_value) @ delta_orbit
