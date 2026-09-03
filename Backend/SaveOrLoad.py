@@ -710,3 +710,216 @@ class SaveOrLoad():
             pickle.dump(qm_matrices, f)
 
         return save_session_dir
+
+    def _save_bumps_machine_status(self, machine_state=None):
+        if self._session_dir is None:
+            saved_at = self._clock_now()
+            time_str = saved_at.strftime("%y%m%d%H%M%S")
+            default_dir = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
+            self._session_dir = os.path.join(default_dir, f"Bumps_{self.interface.get_name()}{time_str}_session_settings")
+            os.makedirs(self._session_dir, exist_ok=True)
+        machine_status_file = os.path.join(self._session_dir, "machine_status.pkl")
+        if not os.path.isfile(machine_status_file):
+            machine_state = machine_state if machine_state is not None else self.interface.get_state()
+            machine_state.timestamp = self._clock_now()
+            machine_state.save(filename=machine_status_file)
+        self.loadsave_session_edit.setText(self._session_dir)
+        return machine_state
+
+    def _bumps_session_settings(self):
+        try:
+            rcond = float(self.pinv_edit.text())
+        except ValueError:
+            rcond = self.pinv_value
+        try:
+            beta = float(self.beta_edit.text())
+        except ValueError:
+            beta = self.beta_value
+        return {
+            "saved_at": self._clock_now().isoformat(timespec="seconds"),
+            "timezone": self._clock_zone_name,
+            "interface_id": f"{type(self.interface).__module__}.{type(self.interface).__name__}",
+            "actuator_mode": "Kicker",
+            "response_directory": self._expand_path(self.response_dir_edit.text()) if self.response_dir_edit.text().strip() else None,
+            "nsamples": int(self.interface.nsamples),
+            "rcond": rcond,
+            "beta": beta,
+            "max_horizontal_current": self.max_horizontal_current_spinbox.value(),
+            "max_vertical_current": self.max_vertical_current_spinbox.value(),
+            "is_triangular": bool(self.triangular_checkbox.isChecked()),
+            "targets": {
+                str(name): {plane: None if value is None else float(value) for plane, value in values.items()}
+                for name, values in self.targets.items()
+            },
+        }
+
+    def _save_bumps_reference_orbit(self):
+        if self.reference is None:
+            return
+        reference = {
+            "names": [str(name) for name in self.reference["names"]],
+            "x": np.asarray(self.reference["x"], dtype=float).tolist(),
+            "y": np.asarray(self.reference["y"], dtype=float).tolist(),
+        }
+        with open(os.path.join(self._session_dir, "reference_orbit.json"), "w") as file:
+            json.dump(reference, file, indent=2)
+
+    def _save_bumps_result_orbit(self):
+        if self._result_data is None:
+            return
+        result = {key: value for key, value in self._result_data.items() if value is not None}
+        result["bpms"] = np.asarray(result["bpms"], dtype=str)
+        np.savez(os.path.join(self._session_dir, "result_orbit.npz"), **result)
+
+    def _save_bumps_session(self, machine_state=None):
+        self._save_bumps_machine_status(machine_state)
+        self._saving_func(self.correctors_list, "correctors.txt", "Save Correctors", use_dialog=False,
+                          base_dir=self._session_dir)
+        self._saving_func(self.bpms_list, "bpms.txt", "Save BPMs", use_dialog=False, base_dir=self._session_dir)
+        with open(os.path.join(self._session_dir, "correction_settings.json"), "w") as file:
+            json.dump(self._bumps_session_settings(), file, indent=2)
+        self._save_bumps_reference_orbit()
+        self._save_bumps_result_orbit()
+
+    def _append_bumps_kicks(self, before, after):
+        kicks_path = os.path.join(self._session_dir, "kicks.txt")
+        write_header = not os.path.exists(kicks_path)
+        with open(kicks_path, "a") as file:
+            if write_header:
+                file.write("time\titeration\tcorrector\tbdes_before\tapplied_kick\tbdes_after\n")
+            timestamp = self._clock_now().isoformat(timespec="seconds")
+            for corrector, previous, current in zip(self.corrector_names, before, after):
+                applied_kick = float(current) - float(previous)
+                file.write(f"{timestamp}\t{self._session_kick_count}\t{corrector}\t{float(previous):.12g}\t{applied_kick:.12g}\t{float(current):.12g}\n")
+
+    @staticmethod
+    def _bumps_state_matches_interface(state, interface):
+        interface_id = f"{type(interface).__module__}.{type(interface).__name__}"
+        return state.get_interface_id() == interface_id
+
+    def _pick_and_load_bumps_machine_status_file(self):
+        directory = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
+        filename, _ = QFileDialog.getOpenFileName(self, "Load Machine Status", directory, "Machine status (*.pkl)")
+        if filename:
+            self._load_bumps_machine_status_file(filename)
+
+    def _load_bumps_machine_status_file(self, filename):
+        try:
+            state = State(filename=filename)
+        except Exception as exc:
+            QMessageBox.warning(self, "Restore machine status", f"Could not load this file:\n{exc}")
+            return False
+        if not self._bumps_state_matches_interface(state, self.interface):
+            QMessageBox.warning(self, "Restore machine status", "This machine status was created on a different interface/machine. Choose appropriate one or change interface.")
+            return False
+        if self.interface.restore_correctors_state(state) is False:
+            QMessageBox.warning(self, "Restore machine status", "Not every corrector was set back at its saved current. Check them on the machine.")
+        self.interface.restore_quadrupoles_state(state)
+        self.interface.restore_sextupoles_state(state)
+        self.interface.restore_beam_settings(state.get_beam_settings())
+        self.corr_status_edit.setText(filename)
+        timestamp = state.get_timestamp()
+        saved_at = timestamp.isoformat(sep=" ", timespec="seconds") if getattr(timestamp, "tzinfo", None) is not None else timestamp.strftime("%Y-%m-%d %H:%M:%S") + " (legacy/local timezone)"
+        QMessageBox.information(self, "Restore machine status", f"Machine status restored.\nSaved at: {saved_at}")
+        return True
+
+    def _pick_and_load_bumps_session(self):
+        directory = os.path.expanduser(os.path.expandvars("~/CERN-Flight_Simulator-Data/"))
+        folder = QFileDialog.getExistingDirectory(self, "Select Bumps session directory", directory)
+        if folder:
+            self._load_bumps_session(folder)
+
+    def _load_bumps_session(self, folder):
+        folder = self._expand_path(folder)
+        settings_path = os.path.join(folder, "correction_settings.json")
+        if not os.path.isfile(settings_path):
+            QMessageBox.warning(self, "Load session", "Selected folder doesn't contain proper correction settings.")
+            return
+        try:
+            with open(settings_path, "r") as file:
+                settings = json.load(file)
+        except Exception as exc:
+            QMessageBox.warning(self, "Load session", f"Couldn't read correction_settings.json: {exc}")
+            return
+        saved_interface_id = settings.get("interface_id")
+        current_interface_id = f"{type(self.interface).__module__}.{type(self.interface).__name__}"
+        if saved_interface_id is not None and saved_interface_id != current_interface_id:
+            QMessageBox.warning(self, "Load session", "This session was created on a different interface/machine. Choose appropriate one or change interface.")
+            return
+        response_directory = settings.get("response_directory")
+        if response_directory:
+            self.response_matrix_data = None
+            self._load_response_directory(response_directory)
+            if self.response_matrix_data is None:
+                return
+        self.reference = None
+        self.restore_state = None
+        self._loading_func(self.correctors_list, "correctors.txt", "Load Correctors", use_dialog=False, base_dir=folder)
+        self._loading_func(self.bpms_list, "bpms.txt", "Load BPMs", use_dialog=False, base_dir=folder)
+        if "rcond" in settings:
+            self.pinv_edit.setText(str(settings["rcond"]))
+        if "beta" in settings:
+            self.beta_edit.setText(str(settings["beta"]))
+        if "nsamples" in settings:
+            self.bpm_samples_edit.setText(str(settings["nsamples"]))
+        if "max_horizontal_current" in settings:
+            self.max_horizontal_current_spinbox.setValue(float(settings["max_horizontal_current"]))
+        if "max_vertical_current" in settings:
+            self.max_vertical_current_spinbox.setValue(float(settings["max_vertical_current"]))
+        if "is_triangular" in settings:
+            self.triangular_checkbox.setChecked(bool(settings["is_triangular"]))
+        self.targets = {
+            str(name): {plane: values.get(plane) for plane in ("x", "y")}
+            for name, values in settings.get("targets", {}).items()
+        }
+        reference_path = os.path.join(folder, "reference_orbit.json")
+        if os.path.isfile(reference_path):
+            try:
+                with open(reference_path, "r") as file:
+                    reference = json.load(file)
+                self.reference = {
+                    "names": [str(name) for name in reference["names"]],
+                    "x": np.asarray(reference["x"], dtype=float),
+                    "y": np.asarray(reference["y"], dtype=float),
+                }
+            except Exception:
+                self.reference = None
+        reference_state_path = os.path.join(folder, "reference_machine_status.pkl")
+        if os.path.isfile(reference_state_path):
+            try:
+                reference_state = State(filename=reference_state_path)
+                if self._bumps_state_matches_interface(reference_state, self.interface):
+                    self.restore_state = reference_state
+            except Exception:
+                self.restore_state = None
+        self.restore_button.setEnabled(self.restore_state is not None)
+        result_path = os.path.join(folder, "result_orbit.npz")
+        if os.path.isfile(result_path):
+            try:
+                with np.load(result_path, allow_pickle=False) as result:
+                    measured_x = result["measured_x"] if "measured_x" in result.files else None
+                    measured_y = result["measured_y"] if "measured_y" in result.files else None
+                    self._draw_result_plot(
+                        result["bpms"].astype(str).tolist(), result["desired_x"], result["desired_y"],
+                        result["predicted_x"], result["predicted_y"], measured_x, measured_y,
+                    )
+            except Exception:
+                self._result_data = None
+                self._draw_result_placeholder()
+        self._session_dir = folder
+        self._session_kick_count = 0
+        kicks_path = os.path.join(folder, "kicks.txt")
+        if os.path.isfile(kicks_path):
+            with open(kicks_path, "r") as file:
+                for line in file:
+                    fields = line.rstrip("\n").split("\t")
+                    if len(fields) > 1:
+                        try:
+                            self._session_kick_count = max(self._session_kick_count, int(fields[1]))
+                        except ValueError:
+                            pass
+        self.loadsave_session_edit.setText(folder)
+        self.apply_button.setEnabled(False)
+        self._refresh_desired_plot()
+        saved_at = settings.get("saved_at")
+        QMessageBox.information(self, "Load session", f"Loaded session" + (f"\nSaved at: {saved_at}" if saved_at else ""))

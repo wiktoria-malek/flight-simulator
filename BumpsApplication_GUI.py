@@ -35,7 +35,7 @@ from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
 
 class TwinPlot(FigureCanvas):
     def __init__(self, parent=None):
-        figure = Figure(tight_layout=True)
+        figure = Figure(tight_layout={"rect": (0.0, 0.07, 1.0, 1.0)})
         super().__init__(figure)
         self.setParent(parent)
         self.ax_x = figure.add_subplot(211)
@@ -45,6 +45,13 @@ class TwinPlot(FigureCanvas):
         for axis in (self.ax_x, self.ax_y):
             axis.clear()
             axis.grid(True, alpha=0.3)
+
+    def set_time_caption(self, text):
+        if getattr(self, "_time_caption", None) is None:
+            self._time_caption = self.figure.text(0.5, 0.015, text, ha="center", va="bottom", fontsize=12, fontweight="bold", color="black")
+        else:
+            self._time_caption.set_text(text)
+            self._time_caption.set_visible(bool(text))
 
 
 class PlotPopup(QMainWindow):
@@ -60,7 +67,6 @@ class PlotPopup(QMainWindow):
         self.plot.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.plot)
 
-
 def install_canvas(host):
     layout = host.layout() or QVBoxLayout(host)
     layout.setContentsMargins(0, 0, 0, 0)
@@ -69,11 +75,9 @@ def install_canvas(host):
     layout.addWidget(canvas)
     return canvas
 
-
 def dialog_accepted(result):
     accepted = QDialog.DialogCode.Accepted if pyqt_version == 6 else QDialog.Accepted
     return result == accepted
-
 
 class BPMTargetDialog(QDialog):
     def __init__(self, name, reference, current_target, parent=None):
@@ -89,7 +93,6 @@ class BPMTargetDialog(QDialog):
         reference_label = QLabel(ref_text)
         reference_label.setWordWrap(True)
         form.addRow(reference_label)
-
         target_x, target_y = current_target
         self.x_enabled = QCheckBox("Set desired horizontal x")
         self.x_enabled.setChecked(target_x is not None)
@@ -129,7 +132,6 @@ class BPMTargetDialog(QDialog):
             self.y_value.value() if self.y_enabled.isChecked() else None,
         )
 
-
 class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
     def __init__(self, interface=None, dir_name=None, start_state=None):
         super().__init__()
@@ -142,6 +144,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.response_matrix_data = None
         self.reference = None
         self.targets = {}
+        self._session_dir = None
+        self._session_kick_count = 0
         self._drag = None
         self._desired_lines = {}
         self._desired_bpms = []
@@ -156,6 +160,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._setup_corrector_controls()
         self._wire_signals()
         self._populate_devices_from_interface()
+        self.loadsave_session_edit.setText(dir_name or "")
         self._draw_result_placeholder()
         self._refresh_desired_plot()
         self.setWindowTitle(f"Bumps Application — {self.interface.get_name()}")
@@ -167,15 +172,38 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._hist_desired_orbit, self._hist_predicted_orbit, self._hist_measured_orbit = [], [], []
         self._hist_desired_orbit_error, self._hist_predicted_orbit_error, self._hist_measured_orbit_error = [], [], []
         self.apply_button.clicked.connect(self._apply_orbit_bump)
+        self.stop_bump_button.clicked.connect(lambda: self._stop_bump_loop("stopped by user"))
         self.restore_button.clicked.connect(self._restore_reference)
         self.restore_button.setEnabled(False)
+        self.apply_button.setEnabled(False)
+        self.stop_bump_button.setEnabled(False)
         self.current_delta = None
         self.corrector_names = None
         self.R = None
+        self._R_matrix = None
+        self._bump_running = False
+        self._bump_iter = 0
+        self._bump_prev_rms = None
+        self._bump_stall = 0
+        self._bump_tol_mm = 0.02
+        self._bump_max_iter = 20
+        self._bump_step_delay_ms = 1500
+        self._bump_min_improvement_mm = 0.002
+        self._bump_timer = QTimer(self)
+        self._bump_timer.setSingleShot(True)
+        self._bump_timer.timeout.connect(self._bump_step)
         self.show_response_matrix.clicked.connect(self._display_response_matrix)
         self._clock_zone_name = self._get_clock_zone()
         self._setup_machine_clock()
         self.clear_plots_button.clicked.connect(self.clear_graphs)
+        self._live_orbit = None
+        self._live_busy = False
+        self._compute_time = None
+        self._measured_time = None
+        self._live_timer = QTimer(self)
+        self._live_timer.setInterval(2000)
+        self._live_timer.timeout.connect(self._live_tick)
+        self._live_timer.start()
 
     def clear_graphs(self):
         self._hist_desired_orbit.clear(), self._hist_predicted_orbit.clear(), self._hist_measured_orbit.clear()
@@ -183,6 +211,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._drag = None
         self._desired_lines = {}
         self._desired_bpms = []
+        self._live_orbit = None
+        self._compute_time = None
+        self._measured_time = None
         canvases = [self.desired_plot, self.result_plot]
         if self._desired_popup is not None and self._desired_popup.isVisible():
             canvases.append(self._desired_popup.plot)
@@ -190,6 +221,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             canvases.append(self._result_popup.plot)
         for canvas in canvases:
             canvas.clear()
+            canvas.set_time_caption("")
             canvas.draw_idle()
 
     def _display_response_matrix(self):
@@ -230,27 +262,119 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             print(f"Error in opening Compute Response Matrix: {e}")
 
     def _apply_orbit_bump(self):
+        if self._bump_running:
+            return
         if self.R is None or self.current_delta is None or self.corrector_names is None or self._result_data is None:
             QMessageBox.information(self, "Apply", "Compute the bump first.")
             return
         if not self._set_bpm_samples():
             QMessageBox.warning(self, "BPM samples", "Enter a positive integer number of BPM samples.")
             return
+        self._start_bump_loop()
+
+    def _apply_current_delta(self):
         current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bdes"], dtype=float)
         final_current = current_corrector_settings + self.current_delta
         try:
-            self.interface.set_correctors(self.corrector_names, final_current)
+            if self.interface.set_correctors(self.corrector_names, final_current) is False:
+                if self._bump_running:
+                    print("There's a mismatch in corrector values.")
+                else:
+                    QMessageBox.warning(self, "Apply", "Not every corrector was set at the requested current. Check them on the machine.")
+                return False
         except Exception as e:
             print(f"Error in setting correctors: {e}")
+            return False
         final_corrector_values = self.interface.get_correctors(self.corrector_names)["bdes"]
         self._update_corrector_table(self.corrector_names, self.current_delta, current_corrector_settings, final_corrector_values)
-        orbit_measured = self.interface.get_state().get_orbit(self.R.bpms)
+        final_state = self.interface.get_state()
+        orbit_measured = final_state.get_orbit(self.R.bpms)
+        self._measured_time = self._clock_now()
         measured_x = np.asarray(orbit_measured["x"], dtype=float).reshape(-1)
         measured_y = np.asarray(orbit_measured["y"], dtype=float).reshape(-1)
-        self._draw_result_plot(self._result_data["bpms"], self._result_data["desired_x"], self._result_data["desired_y"], self._result_data["predicted_x"], self._result_data["predicted_y"], measured_x, measured_y)
+        n_measured = max(int(orbit_measured.get("nshots", 1) or 1), 1)
+        measured_x_err = np.asarray(orbit_measured["stdx"], dtype=float).reshape(-1) / np.sqrt(n_measured)
+        measured_y_err = np.asarray(orbit_measured["stdy"], dtype=float).reshape(-1) / np.sqrt(n_measured)
+        self._draw_result_plot(self._result_data["bpms"], self._result_data["desired_x"], self._result_data["desired_y"], self._result_data["predicted_x"], self._result_data["predicted_y"], measured_x, measured_y, measured_x_err, measured_y_err)
+        self._session_kick_count += 1
+        self._save_bumps_session()
+        self._append_bumps_kicks(current_corrector_settings, final_corrector_values)
+        final_state.timestamp = self._clock_now()
+        final_state.save(filename=os.path.join(self._session_dir, "machine_status_after_bump.pkl"))
+        return True
+
+    def _bump_residual_rms(self):
+        data = self._result_data
+        if not data or data.get("measured_x") is None:
+            return float("nan")
+        dx = np.asarray(data["measured_x"], dtype=float) - np.asarray(data["desired_x"], dtype=float)
+        dy = np.asarray(data["measured_y"], dtype=float) - np.asarray(data["desired_y"], dtype=float)
+        diff = np.concatenate([dx, dy])
+        diff = diff[np.isfinite(diff)]
+        return float(np.sqrt(np.mean(diff ** 2))) if diff.size else float("nan")
+
+    def _set_bump_controls_running(self, running):
+        self.compute_button.setEnabled(not running)
+        self.apply_button.setEnabled(not running and self.current_delta is not None)
+        self.stop_bump_button.setEnabled(running)
+        self.clear_plots_button.setEnabled(not running)
+        self.read_reference_button.setEnabled(not running)
+        self.restore_button.setEnabled(not running and self.restore_state is not None)
+
+    def _start_bump_loop(self):
+        self._bump_running = True
+        self._bump_iter = 0
+        self._bump_prev_rms = None
+        self._bump_stall = 0
+        self._set_bump_controls_running(True)
+        self._bump_step()
+
+    def _bump_step(self):
+        if not self._bump_running:
+            return
+        try:
+            self._bump_iter += 1
+            if self.current_delta is None or not self._apply_current_delta():
+                self._stop_bump_loop("Bump was not excited.")
+                return
+            rms = self._bump_residual_rms()
+            if np.isfinite(rms) and rms <= self._bump_tol_mm:
+                self._stop_bump_loop(f"Bump was set.")
+                return
+            if self._bump_iter >= self._bump_max_iter:
+                self._stop_bump_loop(f"Bump was not set.")
+                return
+            if self._bump_prev_rms is not None and rms >= self._bump_prev_rms - self._bump_min_improvement_mm:
+                self._bump_stall += 1
+                if self._bump_stall >= 2:
+                    self._stop_bump_loop(f"Bump was not set.")
+                    return
+            else:
+                self._bump_stall = 0
+            self._bump_prev_rms = rms
+            if self._compute_orbit_bump(rebuild=False) is not True:
+                self._stop_bump_loop("Compute failed")
+                return
+            self._bump_timer.start(self._bump_step_delay_ms)
+        except Exception as exc:
+            self._stop_bump_loop(f"error: {exc}")
+
+    def _stop_bump_loop(self, reason="stopped"):
+        was_running = self._bump_running
+        self._bump_running = False
+        self._bump_timer.stop()
+        self._set_bump_controls_running(False)
+        if was_running:
+            print(f"{reason}")
 
     def _wire_signals(self):
         self.browse_response_button.clicked.connect(self._pick_response_directory)
+        self.browse_session_button.clicked.connect(self._pick_and_load_bumps_session)
+        self.loadsave_session_edit.returnPressed.connect(
+            lambda: self._load_bumps_session(self.loadsave_session_edit.text()))
+        self.corr_status_load.clicked.connect(self._pick_and_load_bumps_machine_status_file)
+        self.corr_status_edit.returnPressed.connect(
+            lambda: self._load_bumps_machine_status_file(self.corr_status_edit.text()))
         self.bpm_samples_edit.textChanged.connect(self._set_bpm_samples)
         self.response_dir_edit.returnPressed.connect(
             lambda: self._load_response_directory(self.response_dir_edit.text()))
@@ -472,8 +596,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         missing_bpms = response_matrix_bpms - selected_bpms
         missing_correctors = response_matrix_correctors - selected_correctors
         if missing_bpms or missing_correctors:
-            print(
-                f" Devices unavailable in this interface: {len(missing_bpms)} BPMs, {len(missing_correctors)} correctors.")
+            print(f" Devices unavailable in this interface: {len(missing_bpms)} BPMs, {len(missing_correctors)} correctors.")
 
     def _ordered_selected_bpms(self):
         selected = set(self._selected_names(self.bpms_list))
@@ -499,9 +622,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             "names": [str(name) for name in orbit["names"]],
             "x": np.asarray(orbit["x"], dtype=float),
             "y": np.asarray(orbit["y"], dtype=float),
+            "stdx": np.asarray(orbit["stdx"], dtype=float),
+            "stdy": np.asarray(orbit["stdy"], dtype=float),
+            "nshots": max(int(orbit.get("nshots", 1) or 1), 1),
         }
         self.restore_state = state
         self.restore_button.setEnabled(True)
+        self._save_bumps_machine_status(state)
+        state.save(filename=os.path.join(self._session_dir, "reference_machine_status.pkl"))
+        self._save_bumps_session(state)
         self._refresh_desired_plot()
 
     def _reference_values(self, bpms):
@@ -516,6 +645,31 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         x = np.asarray([self.targets.get(name, {}).get("x", np.nan) for name in bpms], dtype=float)
         y = np.asarray([self.targets.get(name, {}).get("y", np.nan) for name in bpms], dtype=float)
         return x, y
+
+    def _reference_errors(self, bpms):
+        if self.reference is None or "stdx" not in self.reference:
+            nan = np.full(len(bpms), np.nan)
+            return nan, nan
+        n = max(int(self.reference.get("nshots", 1) or 1), 1)
+        lookup = dict(zip(self.reference["names"], zip(self.reference["stdx"], self.reference["stdy"])))
+        sx = np.asarray([lookup.get(name, (np.nan, np.nan))[0] for name in bpms], dtype=float)
+        sy = np.asarray([lookup.get(name, (np.nan, np.nan))[1] for name in bpms], dtype=float)
+        return sx / np.sqrt(n), sy / np.sqrt(n)
+
+    def _live_values(self, bpms):
+        nan = np.full(len(bpms), np.nan)
+        if not self._live_orbit:
+            return nan, nan, nan, nan
+        n = max(int(self._live_orbit.get("nshots", 1) or 1), 1)
+        lookup = dict(zip(self._live_orbit["names"],
+                          zip(self._live_orbit["x"], self._live_orbit["y"],
+                              self._live_orbit["stdx"], self._live_orbit["stdy"])))
+        cols = [lookup.get(name, (np.nan, np.nan, np.nan, np.nan)) for name in bpms]
+        x = np.asarray([c[0] for c in cols], dtype=float)
+        y = np.asarray([c[1] for c in cols], dtype=float)
+        sx = np.asarray([c[2] for c in cols], dtype=float) / np.sqrt(n)
+        sy = np.asarray([c[3] for c in cols], dtype=float) / np.sqrt(n)
+        return x, y, sx, sy
 
     def _edit_bpm_target(self, item):
         item.setSelected(True)
@@ -556,22 +710,34 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             return
         reference_x, reference_y = self._reference_values(bpms)
         target_x, target_y = self._target_values(bpms)
+        live_x, live_y, live_sx, live_sy = self._live_values(bpms)
+        ref_sx, ref_sy = self._reference_errors(bpms)
         index = np.arange(len(bpms))
         lines = {}
-        for axis, reference, target, plane in ((canvas.ax_x, reference_x, target_x, "x"),
-                                               (canvas.ax_y, reference_y, target_y, "y")):
-            baseline = np.where(np.isfinite(reference), reference, 0.0)
-            desired = np.where(np.isfinite(target), target, baseline)
-            axis.plot(index, reference, color="0.55", linestyle="--", marker=".", label="reference", zorder=1)
-            line, = axis.plot(index, desired, color="tab:blue", marker="o", markersize=7, label="desired", zorder=4)
+        for axis, reference, target, live, live_sem, ref_sem, plane in (
+                (canvas.ax_x, reference_x, target_x, live_x, live_sx, ref_sx, "x"),
+                (canvas.ax_y, reference_y, target_y, live_y, live_sy, ref_sy, "y")):
+            base = np.where(np.isfinite(reference), reference, 0.0)
+            desired_rel = np.where(np.isfinite(target), target - base, 0.0)
+            measured_rel = live - base
+            diff_err = np.sqrt(np.nan_to_num(live_sem) ** 2 + np.nan_to_num(ref_sem) ** 2)
+            axis.axhline(0.0, color="0.55", linestyle="--", linewidth=1, label="reference", zorder=1)
+            if self.reference is not None and np.any(np.isfinite(measured_rel)):
+                axis.errorbar(index, measured_rel, yerr=diff_err, color="tab:green", marker="o",
+                              markersize=4, capsize=3, elinewidth=1, label="measured − reference orbit", zorder=3)
+            line, = axis.plot(index, desired_rel, color="tab:blue", marker="o", markersize=7,
+                              label="desired bump", zorder=4)
             lines[plane] = line
-            axis.set_ylabel(f"{plane} [mm]")
+            axis.set_ylabel(f"Δ{plane} [mm]")
             axis.legend(fontsize=7, loc="best")
-            scale = max(0.5, float(np.max(np.abs(np.concatenate([baseline, desired])))))
+            span = np.concatenate([desired_rel, measured_rel[np.isfinite(measured_rel)]])
+            scale = max(0.5, float(np.max(np.abs(span))) if span.size else 0.5)
             axis.set_ylim(-1.25 * scale, 1.25 * scale)
         canvas.ax_y.set_xlabel("BPM")
         self._set_bpm_ticks(canvas, bpms)
         self._desired_lines[canvas] = lines
+        stamp = self._live_orbit.get("time") if self._live_orbit else None
+        canvas.set_time_caption(f"{stamp:%Y-%m-%d %H:%M:%S %Z}" if stamp is not None else "waiting for first BPM read…")
         canvas.draw_idle()
 
     @staticmethod
@@ -635,7 +801,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if value < lower + 0.1 * (upper - lower) or value > upper - 0.1 * (upper - lower):
             scale = 1.25 * max(abs(value), abs(lower), abs(upper), 0.5)
             axis.set_ylim(-scale, scale)
-        axis.set_title(f"{self._desired_bpms[row]}: {value:+.3f} mm", fontsize=8)
+        axis.set_title(f"{self._desired_bpms[row]}: Δ = {value:+.3f} mm", fontsize=8)
         canvas.draw_idle()
 
     def _desired_release(self, _event, canvas):
@@ -649,7 +815,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if line is None:
             return
         value = float(np.asarray(line.get_ydata(), dtype=float)[row])
-        self.targets.setdefault(self._desired_bpms[row], {})[plane] = value
+        name = self._desired_bpms[row]
+        reference = self._reference_values([name])[0 if plane == "x" else 1][0]
+        base = float(reference) if np.isfinite(reference) else 0.0
+        self.targets.setdefault(name, {})[plane] = base + value
         line.axes.set_title("")
         self._refresh_desired_plot()
 
@@ -669,6 +838,38 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self._draw_result_placeholder()
             return
         self._draw_result_plot(**self._result_data)
+
+    def _live_tick(self):
+        if self._live_busy or self._drag is not None:
+            return
+        self._live_busy = True
+        try:
+            bpms = self._ordered_selected_bpms()
+            if self.R is not None:
+                bpms = list(dict.fromkeys(list(self.R.bpms) + bpms))
+            if not bpms:
+                return
+            orbit = State(bpms=self.interface.get_bpms()).get_orbit(bpms)
+            self._measured_time = self._clock_now()
+            self._live_orbit = {
+                "names": [str(name) for name in orbit["names"]],
+                "x": np.asarray(orbit["x"], dtype=float),
+                "y": np.asarray(orbit["y"], dtype=float),
+                "stdx": np.asarray(orbit["stdx"], dtype=float),
+                "stdy": np.asarray(orbit["stdy"], dtype=float),
+                "nshots": max(int(orbit.get("nshots", 1) or 1), 1),
+                "time": self._measured_time,
+            }
+            self._refresh_desired_plot()
+            if self._result_data is not None:
+                mx, my, ex, ey = self._live_values(self._result_data["bpms"])
+                data = dict(self._result_data)
+                data.update(measured_x=mx, measured_y=my, measured_x_err=ex, measured_y_err=ey)
+                self._draw_result_plot(**data)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Live orbit update skipped: {exc}")
+        finally:
+            self._live_busy = False
 
     def _expand_path(self, path):
         expanded_path = (path or "").strip()
@@ -718,30 +919,33 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         R.By = By
         return R
 
-    def _compute_orbit_bump(self, correctors_currents):
+    def _compute_orbit_bump(self, *_args, rebuild=True):
         if not self._set_bpm_samples():
             QMessageBox.warning(self, "BPM samples", "Enter valid number of BPM samples.")
-            return
+            return False
         try:
             self.pinv_value = float(self.pinv_edit.text())
         except ValueError:
             QMessageBox.warning(self, "PINV tolerance", "Enter a valid PINV tolerance.")
-            return
+            return False
         try:
             self.beta_value = float(self.beta_edit.text())
         except ValueError:
             QMessageBox.warning(self, "Beta parameter", "Enter a valid beta parameter.")
-            return
+            return False
 
-        self.R = self._get_response_matrix(self.response_dir_edit.text())
-        if self.R is None:
-            QMessageBox.warning(self, "Error", "No data files found")
-            return
-        R_matrix = np.block([
-            [self.R.Rxx, self.R.Rxy],
-            [self.R.Ryx, self.R.Ryy],
-        ])
-        self.corrector_names = self.R.hcorrs + self.R.vcorrs
+        if rebuild or self.R is None or self._R_matrix is None:
+            self._save_bumps_machine_status()
+            self.R = self._get_response_matrix(self.response_dir_edit.text())
+            if self.R is None:
+                QMessageBox.warning(self, "Error", "No data files found")
+                return False
+            self._R_matrix = np.block([
+                [self.R.Rxx, self.R.Rxy],
+                [self.R.Ryx, self.R.Ryy],
+            ])
+            self.corrector_names = self.R.hcorrs + self.R.vcorrs
+        R_matrix = self._R_matrix
         max_curr_h = self.max_horizontal_current_spinbox.value()
         max_curr_v = self.max_vertical_current_spinbox.value()
 
@@ -753,7 +957,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             result[finite] = np.clip(result[finite], -max_val[finite], max_val[finite])
             return result
 
-        current_orbit = self.interface.get_state().get_orbit(self.R.bpms)
+        current_orbit = State(bpms=self.interface.get_bpms()).get_orbit(self.R.bpms)
         current_x = np.asarray(current_orbit["x"], dtype=float).reshape(-1)
         current_y = np.asarray(current_orbit["y"], dtype=float).reshape(-1)
 
@@ -796,8 +1000,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         predicted_x = current_x + orbit_predicted[:len(self.R.bpms)]
         predicted_y = current_y + orbit_predicted[len(self.R.bpms):]
 
-        self._draw_result_plot(self.R.bpms, desired_x, desired_y, predicted_x, predicted_y)
-        self.apply_button.setEnabled(True)
+        prev = self._result_data if self._result_data else {}
+        mx, my = prev.get("measured_x"), prev.get("measured_y")
+        mex, mey = prev.get("measured_x_err"), prev.get("measured_y_err")
+        if mx is not None and len(mx) != len(self.R.bpms):
+            mx = my = mex = mey = None
+        self._compute_time = self._clock_now()
+        self._draw_result_plot(self.R.bpms, desired_x, desired_y, predicted_x, predicted_y, mx, my, mex, mey)
+        self._save_bumps_session()
+        self.apply_button.setEnabled(not self._bump_running)
+        return True
 
     def _update_corrector_table(self, corrector_names, delta, reference, bdes):
         # corrector | kick | reference | new setpoint
@@ -818,9 +1030,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             QMessageBox.warning(self, "Restore initial settings",
                                 "Some correctors were not confirmed back at their reference current within the readback tolerance. Check them on the machine before the next correction.")
         self.reset_ref_orb = True
-        self.log("Reference corrector settings restored.")
+        print("Reference corrector settings restored.")
 
-    def _draw_result_plot(self, bpms, desired_x, desired_y, predicted_x, predicted_y, measured_x=None, measured_y=None):
+    def _draw_result_plot(self, bpms, desired_x, desired_y, predicted_x, predicted_y, measured_x=None, measured_y=None,
+                          measured_x_err=None, measured_y_err=None):
         self._result_data = {
             "bpms": list(bpms),
             "desired_x": np.asarray(desired_x, dtype=float).copy(),
@@ -829,6 +1042,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             "predicted_y": np.asarray(predicted_y, dtype=float).copy(),
             "measured_x": None if measured_x is None else np.asarray(measured_x, dtype=float).copy(),
             "measured_y": None if measured_y is None else np.asarray(measured_y, dtype=float).copy(),
+            "measured_x_err": None if measured_x_err is None else np.asarray(measured_x_err, dtype=float).copy(),
+            "measured_y_err": None if measured_y_err is None else np.asarray(measured_y_err, dtype=float).copy(),
         }
         canvases = [self.result_plot]
         if self._result_popup is not None and self._result_popup.isVisible():
@@ -837,29 +1052,33 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         index = np.arange(len(bpms))
         for canvas in canvases:
             canvas.clear()
-            for axis, desired, predicted, measured, plane in (
-                    (canvas.ax_x, desired_x, predicted_x, measured_x, "x"),
-                    (canvas.ax_y, desired_y, predicted_y, measured_y, "y"),
+            for axis, desired, predicted, measured, merr, plane in (
+                    (canvas.ax_x, desired_x, predicted_x, measured_x, measured_x_err, "x"),
+                    (canvas.ax_y, desired_y, predicted_y, measured_y, measured_y_err, "y"),
             ):
                 axis.plot(index, desired, "--o", label="desired")
                 axis.plot(index, predicted, ":o", label="predicted")
                 if measured is not None:
-                    axis.plot(index, measured, "-o", label="measured")
+                    if merr is not None:
+                        axis.errorbar(index, measured, yerr=merr, fmt="-o", capsize=3, elinewidth=1, label="measured")
+                    else:
+                        axis.plot(index, measured, "-o", label="measured")
                 axis.set_ylabel(f"{plane} [mm]")
                 axis.legend(fontsize=7, loc="best")
             canvas.ax_y.set_xlabel("BPM")
             self._set_bpm_ticks(canvas, bpms)
+            parts = []
+            if (measured_x is not None or measured_y is not None) and self._measured_time is not None:
+                parts.append(f"{self._measured_time:%Y-%m-%d %H:%M:%S %Z}")
+            canvas.set_time_caption("      ".join(parts))
             canvas.draw_idle()
 
     def _clear_graphs(self):
         self._hist_desired_orbit.clear(), self._hist_predicted_orbit.clear(), self._hist_measured_orbit.clear()
         self._hist_desired_orbit_error.clear(), self._hist_predicted_orbit_error.clear(), self._hist_measured_orbit_error.clear()
-        self._plot_series(self._hist_desired_orbit_ax, self._hist_desired_orbit_canvas, values_x=[], values_y=[],
-                          title=None)
-        self._plot_series(self._hist_predicted_orbit_ax, self._hist_predicted_orbit_canvas, values_x=[], values_y=[],
-                          title=None)
-        self._plot_series(self._hist_measured_orbit_ax, self._hist_measured_orbit_canvas, values_x=[], values_y=[],
-                          title=None)
+        self._plot_series(self._hist_desired_orbit_ax, self._hist_desired_orbit_canvas, values_x=[], values_y=[], title=None)
+        self._plot_series(self._hist_predicted_orbit_ax, self._hist_predicted_orbit_canvas, values_x=[], values_y=[], title=None)
+        self._plot_series(self._hist_measured_orbit_ax, self._hist_measured_orbit_canvas, values_x=[], values_y=[], title=None)
         self._refresh_all_plot_popups()
 
     def _get_interface_initial_settings(self):
@@ -877,7 +1096,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         interface_defaults = self._get_interface_initial_settings() or {}
         timezone = interface_defaults.get("clock_timezone", "Europe/Zurich")
         return timezone
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

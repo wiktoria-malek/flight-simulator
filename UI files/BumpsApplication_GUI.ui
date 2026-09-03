@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1450</width>
-    <height>811</height>
+    <height>835</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -33,7 +33,7 @@
        <enum>QTabWidget::North</enum>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="files_tab">
        <attribute name="title">
@@ -165,7 +165,7 @@ QToolButton#directory_tooltip:hover {
              <enum>Qt::NoFocus</enum>
             </property>
             <property name="toolTip">
-             <string>Directory where this Bumps GUI session is saved. Choosing an existing session loads its saved settings.</string>
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;By default, shows the place where your session data will be saved. &lt;/p&gt;&lt;p&gt;Choosing an existing session loads its saved settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QToolButton#session_tooltip {
@@ -912,6 +912,71 @@ QToolButton#max_strength_tooltip:hover {
                  </property>
                 </widget>
                </item>
+               <item>
+                <widget class="QPushButton" name="clear_plots_button">
+                 <property name="text">
+                  <string>Clear plots</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="compute_button">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="text">
+                  <string>Compute</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="restore_button">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="text">
+                  <string>Restore reference</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="apply_button">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>120</width>
+                   <height>0</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb(190, 45, 45); color: white;</string>
+                 </property>
+                 <property name="text">
+                  <string>Apply</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="stop_bump_button">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>110</width>
+                   <height>0</height>
+                  </size>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">background-color: rgb(40, 150, 70); color: white;</string>
+                 </property>
+                 <property name="text">
+                  <string>Stop bump</string>
+                 </property>
+                </widget>
+               </item>
               </layout>
              </widget>
             </item>
@@ -996,67 +1061,7 @@ QToolButton#max_strength_tooltip:hover {
              </widget>
             </item>
             <item>
-             <layout class="QHBoxLayout" name="actions_layout">
-              <item>
-               <spacer name="actions_spacer">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-                <property name="sizeHint" stdset="0">
-                 <size>
-                  <width>40</width>
-                  <height>20</height>
-                 </size>
-                </property>
-               </spacer>
-              </item>
-              <item>
-               <widget class="QPushButton" name="clear_plots_button">
-                <property name="text">
-                 <string>Clear plots</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="compute_button">
-                <property name="enabled">
-                 <bool>true</bool>
-                </property>
-                <property name="text">
-                 <string>Compute</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="restore_button">
-                <property name="enabled">
-                 <bool>true</bool>
-                </property>
-                <property name="text">
-                 <string>Restore reference</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="apply_button">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="minimumSize">
-                 <size>
-                  <width>120</width>
-                  <height>0</height>
-                 </size>
-                </property>
-                <property name="styleSheet">
-                 <string notr="true">background-color: rgb(190, 45, 45); color: white;</string>
-                </property>
-                <property name="text">
-                 <string>Apply</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
+             <layout class="QHBoxLayout" name="actions_layout"/>
             </item>
            </layout>
           </item>
