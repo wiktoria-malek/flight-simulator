@@ -1494,12 +1494,6 @@ if __name__ == "__main__":
 
     I = dialog
 
-    # ================ for a test!!
-    from Backend.State import State
-    state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/AllCLEARfiles/BBA_CLEAR260828151954_session_settings/machine_status.pkl")
-    I.restore_quadrupoles_state(state)
-    # ===============================
-
     project_name = I.get_name()
     is_simulation = bool(getattr(I, "is_simulation"))
     bg_shots = 10
