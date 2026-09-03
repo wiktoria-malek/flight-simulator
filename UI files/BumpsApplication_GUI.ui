@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1450</width>
-    <height>835</height>
+    <height>807</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -989,7 +989,7 @@ QToolButton#max_strength_tooltip:hover {
                <item>
                 <widget class="QTableWidget" name="corr_delta_table">
                  <property name="toolTip">
-                  <string>Read-only preview for corrector values produced by your future calculation.</string>
+                  <string/>
                  </property>
                  <property name="editTriggers">
                   <set>QAbstractItemView::NoEditTriggers</set>
