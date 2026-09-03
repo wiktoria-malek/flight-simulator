@@ -33,7 +33,7 @@ class AdaptiveResponseMatrix:
         return self.R0 + self.delta
 
 class ResponseMatrix_DFS_WFS():
-    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=1e-3):
+    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=None):
         info=self._find_useful_files(directory)
         if not info["ok"]:
             raise RuntimeError(f"Could not find any valid DATA pairs in {directory}")
@@ -55,7 +55,7 @@ class ResponseMatrix_DFS_WFS():
                 pairs.append((fp, fm, tag))
         return {"ok":bool(pairs), "dir":directory, "pairs":pairs}
 
-    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=1e-3):
+    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=None):
         if not hasattr(self, 'sequence'):
             file = pairs[0][0]
             S = State(filename=file)
@@ -197,7 +197,7 @@ class ResponseMatrix_DFS_WFS():
         Cy = np.hstack((Cy, np.ones((Cy.shape[0], 1))))
 
         def lstsq(C, B):
-            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=None)[0])
+            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=rcond)[0])
 
         Rxx_ = lstsq(Cx, Bx)
         Rxy_ = lstsq(Cy, Bx)

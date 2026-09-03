@@ -15,6 +15,10 @@ except ImportError:
 import numpy as np
 from Backend.State import State
 
+
+def _match_exactly():
+    return Qt.MatchFlag.MatchExactly if hasattr(Qt, "MatchFlag") else Qt.MatchExactly
+
 class SaveOrLoad():
 
     def _refactor_names_order(self,elements_list, selected_names):
@@ -91,7 +95,7 @@ class SaveOrLoad():
                     selected = [elements_list.item(i).text() for i in range(elements_list.count())]
         elements_list.clearSelection()
         for name in selected:
-            for it in elements_list.findItems(name, Qt.MatchFlag.MatchExactly):
+            for it in elements_list.findItems(name, _match_exactly()):
                 it.setSelected(True)
 
     def _load_correctors(self):
@@ -288,13 +292,13 @@ class SaveOrLoad():
 
         self.quadrupoles_list.clearSelection()
         if quad_selected:
-            for it in self.quadrupoles_list.findItems(quad_selected, Qt.MatchFlag.MatchExactly):
+            for it in self.quadrupoles_list.findItems(quad_selected, _match_exactly()):
                 it.setSelected(True)
         else:
             for name in os.listdir(folder):
                 if name.startswith("states_"):
                     quad_selected = name.removeprefix("states_")
-                    for it in self.quadrupoles_list.findItems(quad_selected, Qt.MatchFlag.MatchExactly):
+                    for it in self.quadrupoles_list.findItems(quad_selected, _match_exactly()):
                         it.setSelected(True)
                     break
                 else:
@@ -329,7 +333,7 @@ class SaveOrLoad():
         screens = [screens_by_index[index] for index in sorted(screens_by_index)]
         self.screens_list.clearSelection()
         for screen in screens:
-            for it in self.screens_list.findItems(screen, Qt.MatchFlag.MatchExactly):
+            for it in self.screens_list.findItems(screen, _match_exactly()):
                 it.setSelected(True)
         if quad_selected:
             self.quadrupoles_list.blockSignals(True)
@@ -696,9 +700,6 @@ class SaveOrLoad():
         __save_graph_data(os.path.join(save_session_dir, "trajectory_x_after_correction.txt"), self._hist_orbit_x)
         __save_graph_data(os.path.join(save_session_dir, "trajectory_y_after_correction.txt"), self._hist_orbit_y)
         __save_graph_data(os.path.join(save_session_dir, "trajectory_combined_after_correction.txt"), self._hist_orbit)
-        __save_graph_data(os.path.join(save_session_dir, "orbit_rms_x_after_correction.txt"), self._hist_abs_rms_x)
-        __save_graph_data(os.path.join(save_session_dir, "orbit_rms_y_after_correction.txt"), self._hist_abs_rms_y)
-        __save_graph_data(os.path.join(save_session_dir, "orbit_rms_xy_after_correction.txt"), self._hist_abs_rms_xy)
 
         qm_matrices = {}
         if response is not None:
