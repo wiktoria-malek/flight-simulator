@@ -110,6 +110,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._hist_orbit_x_err, self._hist_orbit_y_err, self._hist_orbit_err = [], [], []
         self._hist_disp_x_err, self._hist_disp_y_err, self._hist_disp_err = [], [], []
         self._hist_wake_x_err, self._hist_wake_y_err, self._hist_wake_err = [], [], []
+        self._hist_abs_rms_x, self._hist_abs_rms_y, self._hist_abs_rms_xy = [], [], []
         self.log_console = None
         self.show_response_matrix = None
         self.test_orbits = None
@@ -223,11 +224,13 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
             max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
             max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
-
+            if "bba_max_h_strength" in units_settings: max_curr_h = units_settings["bba_max_h_strength"]
+            if "bba_max_v_strength" in units_settings: max_curr_v = units_settings["bba_max_v_strength"]
         self.max_horizontal_current_spinbox.setValue(max_curr_h)
         self.max_horizontal_current_spinbox.setSingleStep(0.01)
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
+
         self._refresh_metric_plots_for_mode()
 
     def _setup_nsamples_control(self):
@@ -469,6 +472,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 "readback tolerance. Check them on the machine before the next correction.",
             )
         self.reset_ref_orb = True
+        self._hist_abs_rms_x.clear(), self._hist_abs_rms_y.clear(), self._hist_abs_rms_xy.clear()
+        self._clear_graphs()
         self.log("Machine initial settings restored.")
 
     def _is_h_corrector(self, s):
@@ -536,6 +541,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                      error_all=None):
         ylabel = f"Residual norm [{self.bpm_unit}]"
         if canvas is None or ax is None:
+            return
+        if getattr(self, "_suppress_main_plots", False):
             return
         if ax is self.traj_ax and getattr(self, "traj_transmission_ax", None) is not None:
             self.traj_transmission_ax.remove()
@@ -804,6 +811,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     "wake_x_err": list(self._hist_wake_x_err),
                     "wake_y_err": list(self._hist_wake_y_err),
                     "wake_err": list(self._hist_wake_err),
+                    "abs_rms_x": list(self._hist_abs_rms_x),
+                    "abs_rms_y": list(self._hist_abs_rms_y),
+                    "abs_rms_xy": list(self._hist_abs_rms_xy),
                 }
             corrs, bpms = self._get_selection()
 
@@ -943,6 +953,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 bpms0 = state0.get_bpms(bpms)
                 x0_vals = np.asarray(bpms0['x'], dtype=float)
                 y0_vals = np.asarray(bpms0['y'], dtype=float)
+                mean_x = np.mean(x0_vals, axis=0) if x0_vals.ndim == 2 else x0_vals
+                mean_y = np.mean(y0_vals, axis=0) if y0_vals.ndim == 2 else y0_vals
+                orbit_rms_x = float(np.sqrt(np.mean(mean_x ** 2)))
+                orbit_rms_y = float(np.sqrt(np.mean(mean_y ** 2)))
+                orbit_rms_xy = float(np.sqrt(np.mean(mean_x ** 2 + mean_y ** 2)))
+                self._hist_abs_rms_x.append(orbit_rms_x)
+                self._hist_abs_rms_y.append(orbit_rms_y)
+                self._hist_abs_rms_xy.append(orbit_rms_xy)
+
                 '''
                 UNCOMMENT AFTER SANITY CHECKS 
                 '''
@@ -987,7 +1006,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1, 1)
                     plt.clf()
                     plt.plot(Dx, '--', color='blue', label="target dispersion x")
-                    plt.plot(Dy, '--', color='red', label="target dispersion y")
+                    plt.plot(Dy, '--', color='orange', label="target dispersion y")
                 else:
                     O1x = O1y = None
                     Dx = Dy = None
@@ -1021,6 +1040,29 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     "dfs_err_x": None if w2 <= 0 else np.asarray(err_dx).reshape(-1),
                     "dfs_err_y": None if w2 <= 0 else np.asarray(err_dy).reshape(-1),
                 }
+                if not hasattr(self, "rms_orbits_data") or self.rms_orbits_data is None:
+                    self.rms_orbits_data = {}
+
+                self.rms_orbits_data = {
+                    "selected_bpms": list(bpms),
+                    "start_x": np.asarray(x0_vals, dtype=float) if it == 0 else self.rms_orbits_data.get("start_x"),
+                    "start_y": np.asarray(y0_vals, dtype=float) if it == 0 else self.rms_orbits_data.get("start_y"),
+                    "current_x": np.asarray(x0_vals, dtype=float),
+                    "current_y": np.asarray(y0_vals, dtype=float),
+                    "final_x": self.rms_orbits_data.get("final_x"),
+                    "final_y": self.rms_orbits_data.get("final_y"),
+                    "x1_vals": None if w2 <= 0 else np.asarray(x1_vals, dtype=float),
+                    "y1_vals": None if w2 <= 0 else np.asarray(y1_vals, dtype=float),
+                    "x2_vals": None if w3 <= 0 else np.asarray(x2_vals, dtype=float),
+                    "y2_vals": None if w3 <= 0 else np.asarray(y2_vals, dtype=float),
+                    "nominal_x": None,
+                    "nominal_y": None,
+                }
+
+                if self.nominal_state is not None:
+                    nominal_bpms = self.nominal_state.get_bpms(bpms)
+                    self.rms_orbits_data["nominal_x"] = np.asarray(nominal_bpms["x"], dtype=float)
+                    self.rms_orbits_data["nominal_y"] = np.asarray(nominal_bpms["y"], dtype=float)
 
                 Bx = []
                 By = []
@@ -1031,7 +1073,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     plt.errorbar(range(len(O1x)), (O1x - O0x).ravel(), yerr=err_dx,
                                  color='blue', label="measured x", capsize=3)
                     plt.errorbar(range(len(O1y)), (O1y - O0y).ravel(), yerr=err_dy,
-                                 color='red', label="measured y", capsize=3)
+                                 color='orange', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
                     plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it + 1}/{iters}")
@@ -1288,6 +1330,25 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     print(f"Emitt y for screen {screen_name}: {tw['emitt_y']}")
             else:
                 pass
+            final_bpms = final_state.get_bpms(bpms)
+            final_x_vals = np.asarray(final_bpms["x"], dtype=float)
+            final_y_vals = np.asarray(final_bpms["y"], dtype=float)
+
+            if hasattr(self, "rms_orbits_data") and self.rms_orbits_data is not None:
+                self.rms_orbits_data["final_x"] = final_x_vals
+                self.rms_orbits_data["final_y"] = final_y_vals
+
+            mean_final_x = np.mean(final_x_vals, axis=0) if final_x_vals.ndim == 2 else final_x_vals
+            mean_final_y = np.mean(final_y_vals, axis=0) if final_y_vals.ndim == 2 else final_y_vals
+
+            final_rms_x = float(np.sqrt(np.mean(mean_final_x ** 2)))
+            final_rms_y = float(np.sqrt(np.mean(mean_final_y ** 2)))
+            final_rms_xy = float(np.sqrt(np.mean(mean_final_x ** 2 + mean_final_y ** 2)))
+
+            self._hist_abs_rms_x.append(final_rms_x)
+            self._hist_abs_rms_y.append(final_rms_y)
+            self._hist_abs_rms_xy.append(final_rms_xy)
+
             if silent:
                 self.log("Internal orbit correction finished.")
             else:
@@ -1317,6 +1378,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self._hist_wake_x_err[:] = plot_snapshot["wake_x_err"]
                 self._hist_wake_y_err[:] = plot_snapshot["wake_y_err"]
                 self._hist_wake_err[:] = plot_snapshot["wake_err"]
+                self._hist_abs_rms_x[:] = plot_snapshot["abs_rms_x"]
+                self._hist_abs_rms_y[:] = plot_snapshot["abs_rms_y"]
+                self._hist_abs_rms_xy[:] = plot_snapshot["abs_rms_xy"]
                 self._plot_series(ax=self.traj_ax, canvas=self.traj_canvas, values_x=self._hist_orbit_x,
                                   values_y=self._hist_orbit_y, vals=self._hist_orbit, error_x=self._hist_orbit_x_err,
                                   error_y=self._hist_orbit_y_err, error_all=self._hist_orbit_err, title=None)
@@ -1470,6 +1534,7 @@ if __name__ == "__main__":
 
     I = dialog
     project_name = I.get_name()
+
     nominal_state = None
     start_state = I.get_state()
 

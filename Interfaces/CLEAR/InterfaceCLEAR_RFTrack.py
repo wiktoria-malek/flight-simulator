@@ -46,7 +46,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             screen.set_length(element.get_length())
             element.replace_with(screen)
                                                                                                 # 1_000_000
-    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.05, nsamples=1, nparticles=10000):
+    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 4.0
         self.Pref = 164 # MeV/c
         self.Q=-1
@@ -99,8 +99,6 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         '''test of bpm invertion'''
         self.invert_bpm = True
-
-
         self.__track_bunch()
 
     def __setup_beam0(self):
