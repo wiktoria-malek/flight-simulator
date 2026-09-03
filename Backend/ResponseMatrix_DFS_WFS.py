@@ -308,7 +308,7 @@ class ResponseMatrix_DFS_WFS():
         info_dfs = self._data_dirs.get("dfs")
         info_wfs = self._data_dirs.get("wfs")
 
-        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold, samples = self._read_params()
 
         if not (info_traj and info_traj["ok"]):
             raise RuntimeError("Please select a trajectory data directory")
@@ -368,7 +368,7 @@ class ResponseMatrix_DFS_WFS():
             bpms = list(selected_bpms)
 
 
-        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold, samples = self._read_params()
         wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
         #corrs, bpms = self._get_selection()

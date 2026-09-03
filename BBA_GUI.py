@@ -148,6 +148,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.initial_charge_value = None
         self.orbit_at_first_start_click_x = None
         self.orbit_at_first_start_click_y = None
+        _, _, _, _, _, _, _, _, samples = self._read_params()
+        self.interface.nsamples = max(1, samples)
 
     def _save_machine_status(self):
         saved_at = self._clock_now()
@@ -194,7 +196,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.lineEdit_6.setText("0.4")
         self.lineEdit_beta.setText("0")
         self.transmission_value.setText("0.65")
-        self._setup_nsamples_control()
+        self.nsamples_input.setText("3")
         self.compute_response_matrix_button.clicked.connect(self._display_response_matrix)
         self.pushButton_reset_ref_orbit.clicked.connect(self._reset_reference_orbit)
         self.reset_ref_orb = False
@@ -229,14 +231,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.max_vertical_current_spinbox.setValue(max_curr_v)
         self.max_vertical_current_spinbox.setSingleStep(0.01)
         self._refresh_metric_plots_for_mode()
-
-    def _setup_nsamples_control(self):
-        self.nsamples_input.setText(str(max(1, int(self.interface.nsamples))))
-        self.nsamples_input.textChanged.connect(self._set_interface_nsamples)
-
-    def _set_interface_nsamples(self, value):
-        self.interface.nsamples = max(1, int(value))
-        self.nsamples_input.setStyleSheet("")
 
     def _load_logo(self):
         self.logo_label.setText("")
@@ -451,7 +445,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.log("Restoring initial settings...")
         self._cancel = True
         self._running = False
-        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold, samples = self._read_params()
+        self.interface.nsamples = max(1, int(samples))
         try:
             if w2 > 0:
                 self.interface.reset_energy()
@@ -734,7 +729,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         gain = getf("lineEdit_6", 0.4)
         beta = getf("lineEdit_beta", 0.0)
         transmission_threshold = getf("transmission_value", 0.65) * 100
-        return orbit_w, disp_w, wake_w, rcond, iters, gain, beta, transmission_threshold
+        samples = geti("nsamples_input", 1)
+        return orbit_w, disp_w, wake_w, rcond, iters, gain, beta, transmission_threshold, samples
 
     def _reset_reference_orbit(self):
         self.reset_ref_orb = True
@@ -807,6 +803,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 }
             corrs, bpms = self._get_selection()
 
+            w1, w2, w3, rcond, iters, gain, beta, transmission_threshold, samples = self._read_params()
+            self.interface.nsamples = max(1, samples)
+
             self._build_jitter_model_for_correction(actuators=corrs, bpms=bpms)
             if self.jitter_model is not None:
                 refs = set(self.jitter_model["reference_bpms"])
@@ -816,7 +815,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.log("Starting correction...")
 
             self._cancel = False
-            w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
             wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
             Cx = [s for s in corrs if self._is_h_corrector(s)]
             Cy = [s for s in corrs if self._is_v_corrector(s)]

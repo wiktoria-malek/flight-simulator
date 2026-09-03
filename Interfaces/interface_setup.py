@@ -306,7 +306,7 @@ INTERFACE_SETUP = {
                 "energy": {"label": "Change energy", "tooltip": "Multiplies RFTrack reference momentum Pref for the DFS measurement.", "test": {"label": "Pref factor", "attribute": "dfs_test_energy", "default": 0.90}},
                 "intensity": {"label": "Change intensity", "tooltip": "Multiplies the RFTrack bunch charge for the WFS measurement.", "test": {"label": "Charge factor", "attribute": "wfs_test_charge", "default": 0.90}},
             },
-            "settings": {"jitter": 0.0, "bpm_resolution": 0.05, "nsamples": 1},
+            "settings": {"jitter": 0.0, "bpm_resolution": 0.00, "nsamples": 1},
             "units":
                 {
                     "corrector_strength": "gauss*m",
