@@ -1,5 +1,5 @@
 from datetime import datetime
-import argparse, glob, os, re, sys
+import argparse, glob, os, re, sys, threading
 import matplotlib
 import numpy as np
 from Backend.Response import Response
@@ -8,7 +8,7 @@ from Interfaces.interface_setup import INTERFACE_SETUP
 
 try:
     from PyQt6 import uic
-    from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment, QTimer
+    from PyQt6.QtCore import Qt, QMetaObject, QObject, QProcess, QProcessEnvironment, QThread, QTimer, pyqtSignal, pyqtSlot
     from PyQt6.QtGui import QPixmap
     from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog,
                                  QFormLayout, QHeaderView, QLabel, QMainWindow, QMessageBox, QPushButton, QSizePolicy,
@@ -17,7 +17,7 @@ try:
     pyqt_version = 6
 except ImportError:
     from PyQt5 import uic
-    from PyQt5.QtCore import Qt, QProcess, QProcessEnvironment, QTimer
+    from PyQt5.QtCore import Qt, QMetaObject, QObject, QProcess, QProcessEnvironment, QThread, QTimer, pyqtSignal, pyqtSlot
     from PyQt5.QtGui import QPixmap
     from PyQt5.QtWidgets import (QApplication, QCheckBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog,
                                  QFormLayout, QHeaderView, QLabel, QMainWindow, QMessageBox, QPushButton, QSizePolicy,
@@ -31,6 +31,41 @@ from matplotlib.figure import Figure
 from Backend.SaveOrLoad import SaveOrLoad
 from Backend.State import State
 from Backend.ResponseMatrix_DFS_WFS import ResponseMatrix_DFS_WFS
+
+
+class OrbitPoller(QObject):
+    bpms_ready = pyqtSignal(object)
+
+    def __init__(self, interface, lock, interval_ms):
+        super().__init__()
+        self._interface = interface
+        self._lock = lock
+        self._interval_ms = interval_ms
+        self._timer = None
+
+    @pyqtSlot()
+    def start(self):
+        self._timer = QTimer(self)
+        self._timer.setInterval(self._interval_ms)
+        self._timer.timeout.connect(self._poll)
+        self._timer.start()
+
+    @pyqtSlot()
+    def stop(self):
+        if self._timer is not None:
+            self._timer.stop()
+
+    def _poll(self):
+        if not self._lock.acquire(blocking=False):
+            return
+        try:
+            raw = self._interface.get_bpms()
+        except Exception as exc:  # noqa: BLE001
+            print(f"Live BPM read skipped: {exc}")
+            return
+        finally:
+            self._lock.release()
+        self.bpms_ready.emit(raw)
 
 
 class TwinPlot(FigureCanvas):
@@ -200,10 +235,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._live_busy = False
         self._compute_time = None
         self._measured_time = None
-        self._live_timer = QTimer(self)
-        self._live_timer.setInterval(2000)
-        self._live_timer.timeout.connect(self._live_tick)
-        self._live_timer.start()
+        self._live_interval_ms = 2000
+        self._machine_lock = threading.Lock()
+        self._live_thread = QThread(self)
+        self._poller = OrbitPoller(self.interface, self._machine_lock, self._live_interval_ms)
+        self._poller.moveToThread(self._live_thread)
+        self._live_thread.started.connect(self._poller.start)
+        self._poller.bpms_ready.connect(self._on_live_bpms)
+        self._live_thread.start()
 
     def clear_graphs(self):
         self._hist_desired_orbit.clear(), self._hist_predicted_orbit.clear(), self._hist_measured_orbit.clear()
@@ -273,21 +312,27 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._start_bump_loop()
 
     def _apply_current_delta(self):
-        current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bdes"], dtype=float)
-        final_current = current_corrector_settings + self.current_delta
-        try:
-            if self.interface.set_correctors(self.corrector_names, final_current) is False:
-                if self._bump_running:
-                    print("There's a mismatch in corrector values.")
+        with self._machine_lock:
+            current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bdes"], dtype=float)
+            final_current = current_corrector_settings + self.current_delta
+            try:
+                if self.interface.set_correctors(self.corrector_names, final_current) is False:
+                    mismatch = True
                 else:
-                    QMessageBox.warning(self, "Apply", "Not every corrector was set at the requested current. Check them on the machine.")
+                    mismatch = False
+            except Exception as e:
+                print(f"Error in setting correctors: {e}")
                 return False
-        except Exception as e:
-            print(f"Error in setting correctors: {e}")
+            if not mismatch:
+                final_corrector_values = self.interface.get_correctors(self.corrector_names)["bdes"]
+                final_state = self.interface.get_state()
+        if mismatch:
+            if self._bump_running:
+                print("There's a mismatch in corrector values.")
+            else:
+                QMessageBox.warning(self, "Apply", "Not every corrector was set at the requested current. Check them on the machine.")
             return False
-        final_corrector_values = self.interface.get_correctors(self.corrector_names)["bdes"]
         self._update_corrector_table(self.corrector_names, self.current_delta, current_corrector_settings, final_corrector_values)
-        final_state = self.interface.get_state()
         orbit_measured = final_state.get_orbit(self.R.bpms)
         self._measured_time = self._clock_now()
         measured_x = np.asarray(orbit_measured["x"], dtype=float).reshape(-1)
@@ -613,7 +658,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             QMessageBox.warning(self, "BPM samples", "Enter a positive integer number of BPM samples.")
             return
         try:
-            state = self.interface.get_state()
+            with self._machine_lock:
+                state = self.interface.get_state()
             orbit = state.get_orbit(bpms)
         except Exception as exc:
             QMessageBox.critical(self, "Reference orbit", f"Could not read the BPMs:\n{exc}")
@@ -839,7 +885,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             return
         self._draw_result_plot(**self._result_data)
 
-    def _live_tick(self):
+    def _on_live_bpms(self, raw):
         if self._live_busy or self._drag is not None:
             return
         self._live_busy = True
@@ -849,7 +895,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 bpms = list(dict.fromkeys(list(self.R.bpms) + bpms))
             if not bpms:
                 return
-            orbit = State(bpms=self.interface.get_bpms()).get_orbit(bpms)
+            orbit = State(bpms=raw).get_orbit(bpms)
             self._measured_time = self._clock_now()
             self._live_orbit = {
                 "names": [str(name) for name in orbit["names"]],
@@ -957,7 +1003,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             result[finite] = np.clip(result[finite], -max_val[finite], max_val[finite])
             return result
 
-        current_orbit = State(bpms=self.interface.get_bpms()).get_orbit(self.R.bpms)
+        with self._machine_lock:
+            raw_bpms = self.interface.get_bpms()
+        current_orbit = State(bpms=raw_bpms).get_orbit(self.R.bpms)
         current_x = np.asarray(current_orbit["x"], dtype=float).reshape(-1)
         current_y = np.asarray(current_orbit["y"], dtype=float).reshape(-1)
 
@@ -989,7 +1037,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         max_vals_y = np.full(delta_y.shape, max_curr_v, dtype=float)
         max_vals = np.concatenate([max_vals_x, max_vals_y])
 
-        current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bdes"], dtype=float)
+        with self._machine_lock:
+            current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bdes"], dtype=float)
         new_bdes = current_corrector_settings + delta
         new_bdes = clamp(new_bdes, max_vals)
         delta = new_bdes - current_corrector_settings
@@ -1025,7 +1074,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             QMessageBox.information(self, "Restore reference", "Read the reference orbit first.")
             return
         print("Restoring reference corrector settings...")
-        if self.interface.restore_correctors_state(self.restore_state) is False:
+        with self._machine_lock:
+            restored = self.interface.restore_correctors_state(self.restore_state)
+        if restored is False:
             print("Warning: not every corrector was confirmed back at its reference current.")
             QMessageBox.warning(self, "Restore initial settings",
                                 "Some correctors were not confirmed back at their reference current within the readback tolerance. Check them on the machine before the next correction.")
@@ -1080,6 +1131,15 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self._plot_series(self._hist_predicted_orbit_ax, self._hist_predicted_orbit_canvas, values_x=[], values_y=[], title=None)
         self._plot_series(self._hist_measured_orbit_ax, self._hist_measured_orbit_canvas, values_x=[], values_y=[], title=None)
         self._refresh_all_plot_popups()
+
+    def closeEvent(self, event):
+        self._stop_bump_loop("window closed")
+        if self._live_thread.isRunning():
+            blocking = Qt.ConnectionType.BlockingQueuedConnection if pyqt_version == 6 else Qt.BlockingQueuedConnection
+            QMetaObject.invokeMethod(self._poller, "stop", blocking)
+            self._live_thread.quit()
+            self._live_thread.wait(5000)
+        super().closeEvent(event)
 
     def _get_interface_initial_settings(self):
         interface_class_name = self.interface.__class__.__name__
