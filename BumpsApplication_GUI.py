@@ -152,6 +152,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.desired_plot = install_canvas(self.desired_plot_widget)
         self.result_plot = install_canvas(self.result_plot_widget)
         self._configure_readonly_table()
+        self._set_bpm_samples()
+        self._setup_corrector_controls()
         self._wire_signals()
         self._populate_devices_from_interface()
         self._draw_result_placeholder()
@@ -161,16 +163,34 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.pinv_value = float(self.pinv_edit.text())
         self.beta_value = float(self.beta_edit.text())
         self.start_state = start_state if start_state is not None else interface.get_state()
-        self.restore_state = self.start_state
+        self.restore_state = None
         self._hist_desired_orbit, self._hist_predicted_orbit, self._hist_measured_orbit = [], [], []
         self._hist_desired_orbit_error, self._hist_predicted_orbit_error, self._hist_measured_orbit_error = [], [], []
         self.apply_button.clicked.connect(self._apply_orbit_bump)
+        self.restore_button.clicked.connect(self._restore_reference)
+        self.restore_button.setEnabled(False)
         self.current_delta = None
         self.corrector_names = None
         self.R = None
         self.show_response_matrix.clicked.connect(self._display_response_matrix)
         self._clock_zone_name = self._get_clock_zone()
         self._setup_machine_clock()
+        self.clear_plots_button.clicked.connect(self.clear_graphs)
+
+    def clear_graphs(self):
+        self._hist_desired_orbit.clear(), self._hist_predicted_orbit.clear(), self._hist_measured_orbit.clear()
+        self._hist_desired_orbit_error.clear(), self._hist_predicted_orbit_error.clear(), self._hist_measured_orbit_error.clear()
+        self._drag = None
+        self._desired_lines = {}
+        self._desired_bpms = []
+        canvases = [self.desired_plot, self.result_plot]
+        if self._desired_popup is not None and self._desired_popup.isVisible():
+            canvases.append(self._desired_popup.plot)
+        if self._result_popup is not None and self._result_popup.isVisible():
+            canvases.append(self._result_popup.plot)
+        for canvas in canvases:
+            canvas.clear()
+            canvas.draw_idle()
 
     def _display_response_matrix(self):
         orbit_dir = self.response_dir_edit.text()
@@ -213,28 +233,25 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if self.R is None or self.current_delta is None or self.corrector_names is None or self._result_data is None:
             QMessageBox.information(self, "Apply", "Compute the bump first.")
             return
-        current_corrector_settings = self.interface.get_correctors(self.corrector_names)["bact"]
+        if not self._set_bpm_samples():
+            QMessageBox.warning(self, "BPM samples", "Enter a positive integer number of BPM samples.")
+            return
+        current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bdes"], dtype=float)
         final_current = current_corrector_settings + self.current_delta
-        self.interface.set_correctors(self.corrector_names, final_current)
+        try:
+            self.interface.set_correctors(self.corrector_names, final_current)
+        except Exception as e:
+            print(f"Error in setting correctors: {e}")
         final_corrector_values = self.interface.get_correctors(self.corrector_names)["bdes"]
-        self._update_corrector_table(self.corrector_names, self.current_delta, current_corrector_settings,
-                                     final_corrector_values)
-
+        self._update_corrector_table(self.corrector_names, self.current_delta, current_corrector_settings, final_corrector_values)
         orbit_measured = self.interface.get_state().get_orbit(self.R.bpms)
         measured_x = np.asarray(orbit_measured["x"], dtype=float).reshape(-1)
         measured_y = np.asarray(orbit_measured["y"], dtype=float).reshape(-1)
-        self._draw_result_plot(
-            self._result_data["bpms"],
-            self._result_data["desired_x"],
-            self._result_data["desired_y"],
-            self._result_data["predicted_x"],
-            self._result_data["predicted_y"],
-            measured_x,
-            measured_y,
-        )
+        self._draw_result_plot(self._result_data["bpms"], self._result_data["desired_x"], self._result_data["desired_y"], self._result_data["predicted_x"], self._result_data["predicted_y"], measured_x, measured_y)
 
     def _wire_signals(self):
         self.browse_response_button.clicked.connect(self._pick_response_directory)
+        self.bpm_samples_edit.textChanged.connect(self._set_bpm_samples)
         self.response_dir_edit.returnPressed.connect(
             lambda: self._load_response_directory(self.response_dir_edit.text()))
         self.save_correctors_button.clicked.connect(
@@ -253,6 +270,58 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                                       lambda event: self._handle_plot_double_click(event, "desired"))
         self.result_plot.mpl_connect("button_press_event",
                                      lambda event: self._handle_plot_double_click(event, "result"))
+
+    def _set_bpm_samples(self, _=None):
+        try:
+            samples = int(self.bpm_samples_edit.text())
+        except ValueError:
+            return False
+        if samples < 1:
+            return False
+        self.interface.nsamples = samples
+        return True
+
+    def _setup_corrector_controls(self):
+        correctors = self.interface.get_correctors()
+        correctors_list = correctors['names']
+        self.hcorrector_names = set(map(str, self.interface.get_hcorrectors_names() or []))
+        self.vcorrector_names = set(map(str, self.interface.get_vcorrectors_names() or []))
+        units_settings, sysid_kick, bpm_unit, corrs_unit = self._get_interface_units()
+        self.sysid_kick = sysid_kick
+        self.bpm_unit = bpm_unit
+        self.corrs_unit = corrs_unit
+        max_curr_h = 0.0
+        max_curr_v = 0.0
+        if correctors_list is not None:
+            hcorrs = self.interface.get_hcorrectors_names()
+            vcorrs = self.interface.get_vcorrectors_names()
+            hcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in hcorrs])
+            vcorr_indexes = np.array([index for index, string in enumerate(correctors_list) if string in vcorrs])
+
+            def clean_array(a):
+                a = np.array([0 if x is None else x for x in a], dtype=float)
+                a[np.isnan(a)] = 0
+                return a
+
+            max_curr_h = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[hcorr_indexes])))
+            max_curr_v = 1.15 * np.max(np.abs(clean_array(np.array(correctors['bdes'])[vcorr_indexes])))
+            if "bba_max_h_strength" in units_settings: max_curr_h = units_settings["bba_max_h_strength"]
+            if "bba_max_v_strength" in units_settings: max_curr_v = units_settings["bba_max_v_strength"]
+        self.max_horizontal_current_spinbox.setValue(max_curr_h)
+        self.max_horizontal_current_spinbox.setSingleStep(0.01)
+        self.max_vertical_current_spinbox.setValue(max_curr_v)
+        self.max_vertical_current_spinbox.setSingleStep(0.01)
+
+    def _get_interface_units(self):
+        interface_defaults = self._get_interface_initial_settings()
+        if interface_defaults is None:
+            return {}, 0.01, "mm", ""
+        units_settings = interface_defaults.get("units", {})
+        sysid_kick = units_settings.get("sysid_corrector_kick", 0.01)
+        bpm_unit = units_settings.get("bpm_position", "mm")
+        corrs_unit = units_settings.get("corrector_strength", "T*mm")
+
+        return units_settings, sysid_kick, bpm_unit, corrs_unit
 
     def _connect_desired_plot_events(self, canvas):
         canvas.mpl_connect("button_press_event", lambda event: self._desired_press(event, canvas))
@@ -362,6 +431,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             return
         try:
             first_state = State(filename=pairs[0][0])
+            interface_id = f"{type(self.interface).__module__}.{type(self.interface).__name__}"
+            if first_state.get_interface_id() != interface_id:
+                QMessageBox.warning(self, "Response matrix data", "This response-matrix data was created on a different interface/machine. Choose appropriate one or change interface.")
+                return
             bpms = [str(name) for name in first_state.get_bpms()["names"]]
             correctors = list(dict.fromkeys(str(device) for _, _, device in pairs))
             horizontal = {str(name) for name in first_state.hcorrectors_names}
@@ -376,6 +449,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             "vcorrs": [name for name in correctors if name in vertical],
         }
         self.reference = None
+        self.restore_state = None
+        self.restore_button.setEnabled(False)
         self.targets.clear()
         self._result_data = None
         self.response_dir_edit.setText(directory)
@@ -411,8 +486,12 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         if not bpms:
             QMessageBox.warning(self, "Reference orbit", "Load Response Matrix data and select at least one BPM first.")
             return
+        if not self._set_bpm_samples():
+            QMessageBox.warning(self, "BPM samples", "Enter a positive integer number of BPM samples.")
+            return
         try:
-            orbit = self.interface.get_state().get_orbit(bpms)
+            state = self.interface.get_state()
+            orbit = state.get_orbit(bpms)
         except Exception as exc:
             QMessageBox.critical(self, "Reference orbit", f"Could not read the BPMs:\n{exc}")
             return
@@ -421,6 +500,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             "x": np.asarray(orbit["x"], dtype=float),
             "y": np.asarray(orbit["y"], dtype=float),
         }
+        self.restore_state = state
+        self.restore_button.setEnabled(True)
         self._refresh_desired_plot()
 
     def _reference_values(self, bpms):
@@ -601,6 +682,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             QMessageBox.warning(self, "Error", "No data files found")
             return
         S = State(filename=datafiles[0])
+        interface_id = f"{type(self.interface).__module__}.{type(self.interface).__name__}"
+        if S.get_interface_id() != interface_id:
+            QMessageBox.warning(self, "Response matrix data", "This response-matrix data was created on a different interface/machine. Choose appropriate one or change interface.")
+            return
         self.sequence = S.get_sequence()
         correctors = [self.correctors_list.item(i).text() for i in range(self.correctors_list.count()) if
                       self.correctors_list.item(i).isSelected()]
@@ -634,13 +719,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         return R
 
     def _compute_orbit_bump(self, correctors_currents):
-
+        if not self._set_bpm_samples():
+            QMessageBox.warning(self, "BPM samples", "Enter valid number of BPM samples.")
+            return
         try:
             self.pinv_value = float(self.pinv_edit.text())
         except ValueError:
             QMessageBox.warning(self, "PINV tolerance", "Enter a valid PINV tolerance.")
             return
-
         try:
             self.beta_value = float(self.beta_edit.text())
         except ValueError:
@@ -656,6 +742,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             [self.R.Ryx, self.R.Ryy],
         ])
         self.corrector_names = self.R.hcorrs + self.R.vcorrs
+        max_curr_h = self.max_horizontal_current_spinbox.value()
+        max_curr_v = self.max_vertical_current_spinbox.value()
+
+        def clamp(val, max_val):
+            val = np.asarray(val, dtype=float)
+            max_val = np.asarray(max_val, dtype=float)
+            result = val.copy()
+            finite = np.isfinite(max_val) & (max_val > 0.0)
+            result[finite] = np.clip(result[finite], -max_val[finite], max_val[finite])
+            return result
 
         current_orbit = self.interface.get_state().get_orbit(self.R.bpms)
         current_x = np.asarray(current_orbit["x"], dtype=float).reshape(-1)
@@ -674,14 +770,27 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             desired_y - current_y,
         ])
 
-        # if self.beta_value > 0:
-        #     delta =
-        delta = np.linalg.pinv(R_matrix, rcond=self.pinv_value) @ delta_orbit
+        if self.beta_value > 0:
+            delta = np.linalg.solve(
+                R_matrix.T @ R_matrix + self.beta_value * np.eye(R_matrix.shape[1]),
+                R_matrix.T @ delta_orbit,
+            )
+        else:
+            delta = np.linalg.pinv(R_matrix, rcond=self.pinv_value) @ delta_orbit
+
+        nh = len(self.R.hcorrs)
+        delta_x = np.asarray(delta[:nh], dtype=float)
+        delta_y = np.asarray(delta[nh:], dtype=float)
+        max_vals_x = np.full(delta_x.shape, max_curr_h, dtype=float)
+        max_vals_y = np.full(delta_y.shape, max_curr_v, dtype=float)
+        max_vals = np.concatenate([max_vals_x, max_vals_y])
+
+        current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bdes"], dtype=float)
+        new_bdes = current_corrector_settings + delta
+        new_bdes = clamp(new_bdes, max_vals)
+        delta = new_bdes - current_corrector_settings
         self.current_delta = delta
-        current_corrector_settings = np.asarray(self.interface.get_correctors(self.corrector_names)["bact"],
-                                                dtype=float)
-        self._update_corrector_table(self.corrector_names, delta, current_corrector_settings,
-                                     current_corrector_settings + delta)
+        self._update_corrector_table(self.corrector_names, delta, current_corrector_settings, current_corrector_settings + delta)
         # predicted
         orbit_predicted = R_matrix @ delta
         predicted_x = current_x + orbit_predicted[:len(self.R.bpms)]
@@ -700,13 +809,16 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             self.corr_delta_table.setItem(row, 3, QTableWidgetItem(f"{float(bdes):.6g}"))
 
     def _restore_reference(self):
-        print("Restoring initial settings of correctors...")
+        if self.restore_state is None:
+            QMessageBox.information(self, "Restore reference", "Read the reference orbit first.")
+            return
+        print("Restoring reference corrector settings...")
         if self.interface.restore_correctors_state(self.restore_state) is False:
-            print("Warning: not every corrector was confirmed back at its saved current.")
+            print("Warning: not every corrector was confirmed back at its reference current.")
             QMessageBox.warning(self, "Restore initial settings",
-                                "Some correctors were not confirmed back at their saved current within the readback tolerance. Check them on the machine before the next correction.")
+                                "Some correctors were not confirmed back at their reference current within the readback tolerance. Check them on the machine before the next correction.")
         self.reset_ref_orb = True
-        self.log("Initial state of correctors restored.")
+        self.log("Reference corrector settings restored.")
 
     def _draw_result_plot(self, bpms, desired_x, desired_y, predicted_x, predicted_y, measured_x=None, measured_y=None):
         self._result_data = {
