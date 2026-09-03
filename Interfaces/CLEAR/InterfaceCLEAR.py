@@ -250,8 +250,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
             f"(last readback={last_value})."
         )
 
-    def change_energy(self, scale=1.0):
-        scaled_optics_currents = np.asarray([5.0, 20.0, 5.0, 20.0, 30.0, 15.0, 20.0, 35.0, 20.0, 0.0, 0.0], dtype=float) * float(scale)
+    def change_energy(self, scale=0.5):
+        scaled_optics_currents = np.asarray([10.0, 40.0, 10.0, 40.0, 60.0, 30.0, 40.0, 70.0, 40.0, 0.0, 0.0], dtype=float) * float(scale)
         for attempt in range(1, 10):
             if self.set_quadrupoles(self.quadrupoles, scaled_optics_currents):
                 return True
@@ -260,7 +260,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         raise RuntimeError("Not all quadrupoles reached their scaled-optics currents after 3 attempts.")
 
     def reset_energy(self):
-        return self.change_energy(scale=2.0)
+        return self.change_energy(scale=1.0)
 
     def change_intensity(self):
         if np.isclose(float(self.uvatt2_test_steps), 0.0):
