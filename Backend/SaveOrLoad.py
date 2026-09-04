@@ -331,9 +331,18 @@ class SaveOrLoad():
                 screens_by_index[screen_i] = str(state_screen_names[0])
 
         screens = [screens_by_index[index] for index in sorted(screens_by_index)]
+        add_missing_screens = getattr(self, "_add_missing_screens_to_list", None)
+        if callable(add_missing_screens):
+            add_missing_screens(screens)
         self.screens_list.clearSelection()
+        list_names = [str(self.screens_list.item(i).data(Qt.ItemDataRole.UserRole) or self.screens_list.item(i).text())
+                      for i in range(self.screens_list.count())]
+        match_screen = getattr(self, "_match_screen_name", None)
         for screen in screens:
-            for it in self.screens_list.findItems(screen, _match_exactly()):
+            listed = match_screen(screen, list_names) if callable(match_screen) else screen
+            if listed is None:
+                continue
+            for it in self.screens_list.findItems(listed, _match_exactly()):
                 it.setSelected(True)
         if quad_selected:
             self.quadrupoles_list.blockSignals(True)
@@ -368,20 +377,24 @@ class SaveOrLoad():
         nscreens = max(screen_i for screen_i, step_i, shot_i in read_filenames)+1
 
 
+        screen_current_ranges = {}
         if is_quad_scan:
-            delta_min = float(self.delta_min_scan.value())
-            delta_max = float(self.delta_max_scan.value())
+            current_A_min = float(self.minimum_current.value())
+            current_A_max = float(self.maximum_current.value())
             scan_steps = max(step_i for screen_i, step_i, shot_i in read_filenames)+1
             saved_scan_settings = self._find_matching_emittance_settings(folder)
             if saved_scan_settings:
-                if "delta_min" in saved_scan_settings:
-                    delta_min = float(saved_scan_settings["delta_min"])
-                if "delta_max" in saved_scan_settings:
-                    delta_max = float(saved_scan_settings["delta_max"])
-                self.delta_min_scan.setValue(delta_min)
-                self.delta_max_scan.setValue(delta_max)
+                if "current_A_min" in saved_scan_settings:
+                    current_A_min = float(saved_scan_settings["current_A_min"])
+                if "current_A_max" in saved_scan_settings:
+                    current_A_max = float(saved_scan_settings["current_A_max"])
+                screen_current_ranges = dict(saved_scan_settings.get("screen_current_ranges", {}))
+                self.minimum_current.setValue(current_A_min)
+                self.maximum_current.setValue(current_A_max)
+                self._screen_current_ranges = {str(screen): (float(values[0]), float(values[1])) for screen, values in screen_current_ranges.items()}
+                self._update_per_screen_ranges_button()
         else:
-            delta_min, delta_max, scan_steps = 0.0, 0.0, 0.0
+            current_A_min, current_A_max, scan_steps = 0.0, 0.0, 0.0
             quad_selected = None
 
         print(f"Nshots: {nshots}, Scan steps: {scan_steps}")
@@ -389,8 +402,9 @@ class SaveOrLoad():
         is_fit_quad_strength_checked = bool(self.fit_quadrupole_strength_checkbox.isChecked())
 
         self.emittance_settings = {
-            "delta_min": delta_min,
-            "delta_max": delta_max,
+            "current_A_min": current_A_min,
+            "current_A_max": current_A_max,
+            "screen_current_ranges": screen_current_ranges,
             "scan_steps": scan_steps,
             "nshots": nshots,
             "nscreens": nscreens,
@@ -451,10 +465,13 @@ class SaveOrLoad():
             if "is_quad_scan" not in self.emittance_settings:
                 data_folder_name = os.path.basename(os.path.normpath(states_dir))
                 self.emittance_settings["is_quad_scan"] = not data_folder_name.startswith("screens_data")
-            if "delta_min" in self.emittance_settings:
-                self.delta_min_scan.setValue(float(self.emittance_settings["delta_min"]))
-            if "delta_max" in self.emittance_settings:
-                self.delta_max_scan.setValue(float(self.emittance_settings["delta_max"]))
+            if "current_A_min" in self.emittance_settings:
+                self.minimum_current.setValue(float(self.emittance_settings["current_A_min"]))
+            if "current_A_max" in self.emittance_settings:
+                self.maximum_current.setValue(float(self.emittance_settings["current_A_max"]))
+            if "screen_current_ranges" in self.emittance_settings:
+                self._screen_current_ranges = {str(screen): (float(values[0]), float(values[1])) for screen, values in dict(self.emittance_settings["screen_current_ranges"]).items()}
+                self._update_per_screen_ranges_button()
             if "scan_steps" in self.emittance_settings:
                 self.steps_settings.setValue(int(self.emittance_settings["scan_steps"]))
             if "nshots" in self.emittance_settings:
@@ -476,8 +493,9 @@ class SaveOrLoad():
             self._draw_live_scan(self.session)
             self._clear_fit_panel()
 
-            self.delta_min_scan.setEnabled(False)
-            self.delta_max_scan.setEnabled(False)
+            self.minimum_current.setEnabled(False)
+            self.maximum_current.setEnabled(False)
+            self.per_screen_ranges_button.setEnabled(False)
             self.steps_settings.setEnabled(False)
             self.meas_per_step.setEnabled(False)
             self.quadrupoles_list.setEnabled(False)
@@ -624,8 +642,9 @@ class SaveOrLoad():
                 state_files.extend(step.get("state_files", []))
             state_files = list(dict.fromkeys(str(path) for path in state_files))
             self.emittance_settings.update({
-                "delta_min": session.get("delta_min"),
-                "delta_max": session.get("delta_max"),
+                "current_A_min": session.get("current_A_min"),
+                "current_A_max": session.get("current_A_max"),
+                "screen_current_ranges": session.get("screen_current_ranges", {}),
                 "scan_steps": session.get("steps"),
                 "nshots": session.get("nshots"),
                 "data_session": self.load_screens_data_database.text(),
@@ -638,6 +657,8 @@ class SaveOrLoad():
                 "reference_screen": session.get("reference_screen"),
                 "K1L_0": session.get("K1L_0"),
                 "K1L_values": session.get("K1L_values"),
+                "current_values": session.get("current_values"),
+                "quad_value_unit": session.get("quad_value_unit"),
                 "sigma_unit": session.get("sigma_unit", "mm"),
             })
 

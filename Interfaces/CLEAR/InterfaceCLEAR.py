@@ -747,6 +747,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         camera_data = self._acquire_screen_data(screen_name, previous_frame_id)
         if camera_data is None: raise RuntimeError(f"No camera data available for {screen_name}")
         beam_img = np.asarray(camera_data['image2D'], dtype=float)
+        if not np.any(np.isfinite(beam_img)) or float(np.nanmax(beam_img)) <= 0.0:
+            raise RuntimeError(f"{screen_name} delivered an empty camera frame (no positive pixel).")
         bg_img = self.screen_backgrounds[screen_name]
         subtracted_img = beam_img - bg_img
         subtracted_img[~np.isfinite(subtracted_img)] = 0.0
@@ -789,6 +791,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
                         break
 
                 except Exception as e:
+                    self.log(f"{screen_name}: attempt {attempt + 1}/3 rejected ({e})")
                     x_mean = np.nan
                     y_mean = np.nan
                     sigx = np.nan
@@ -850,17 +853,40 @@ class CLEAR_real_machine(AbstractMachineInterface):
             )
         super().restore_quadrupoles_state(state)
 
+    def _model_screen_name(self, name):
+        name = str(name)
+        model_screens = list(getattr(self.tracking_interface, "screens", []))
+        candidates = (self.screen_config.get(name, {}).get("japc_name", name), name.rstrip("LH"), name)
+        for candidate in dict.fromkeys(candidates):
+            if candidate in model_screens:
+                return candidate
+        raise ValueError(f"Screen '{name}' has no matching element in the RF-Track model of CLEAR.")
+
+    def _model_screen_kwargs(self, kwargs):
+        mapped = dict(kwargs)
+        screens = mapped.get("screens")
+        if screens is not None:
+            if isinstance(screens, str):
+                screens = [screens]
+            mapped["screens"] = [self._model_screen_name(screen) for screen in screens]
+        if mapped.get("reference_screen") is not None:
+            mapped["reference_screen"] = self._model_screen_name(mapped["reference_screen"])
+        return mapped
+
     def predict_emittance_scan_response(self, *args, **kwargs):
-        return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
+        return self.tracking_interface.predict_emittance_scan_response(*args, **self._model_screen_kwargs(kwargs))
+
+    def predict_emittance_scan_response_full(self, *args, **kwargs):
+        return self.tracking_interface.predict_emittance_scan_response_full(*args, **self._model_screen_kwargs(kwargs))
 
     def get_R_matrix_scan(self, *args, **kwargs):
-        return self.tracking_interface.get_R_matrix_scan(*args, **kwargs)
+        return self.tracking_interface.get_R_matrix_scan(*args, **self._model_screen_kwargs(kwargs))
 
     def get_phase_space_transport_to_screens(self, *args, **kwargs):
-        return self.tracking_interface.get_phase_space_transport_to_screens(*args, **kwargs)
+        return self.tracking_interface.get_phase_space_transport_to_screens(*args, **self._model_screen_kwargs(kwargs))
 
     def get_twiss_evolution(self, *args, **kwargs):
-        return self.tracking_interface.get_twiss_evolution(*args, **kwargs)
+        return self.tracking_interface.get_twiss_evolution(*args, **self._model_screen_kwargs(kwargs))
 
     @staticmethod
     def _gaussian(x, amplitude, center, sigma, offset):
@@ -868,12 +894,24 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     @classmethod
     def _fit_projection(cls, axis, projection):
-        baseline_subtracted = projection - np.min(projection)
-        normalisation = baseline_subtracted.sum()
-        centre = baseline_subtracted.dot(axis) / normalisation
-        rms = np.sqrt(baseline_subtracted.dot((axis - centre) ** 2) / normalisation)
-        fitted, _ = curve_fit(cls._gaussian, axis, projection, p0=[np.max(projection) - np.min(projection), centre, rms, np.min(projection)]) # [amplitude, center, sigma, background]
-        return fitted[1], abs(fitted[2]) # sigx, sigy
+        pixel = abs(float(axis[1] - axis[0]))
+        sigma_max = float(axis[-1] - axis[0]) / 4.0
+        baseline = float(np.median(projection))
+        baseline_subtracted = np.clip(projection - baseline, 0.0, None)
+        normalisation = float(baseline_subtracted.sum())
+        peak = float(baseline_subtracted.max())
+        if not np.isfinite(normalisation) or normalisation <= 0.0 or peak <= 0.0:
+            return np.nan, np.nan
+        centre = float(baseline_subtracted.dot(axis) / normalisation)
+        rms = float(np.sqrt(baseline_subtracted.dot((axis - centre) ** 2) / normalisation))
+        fitted, _ = curve_fit(cls._gaussian, axis, projection,
+            p0=[peak, centre, float(np.clip(rms, pixel, sigma_max)), baseline], # [amplitude, center, sigma, background]
+            bounds=([0.0, float(axis.min()), pixel / 2.0, -np.inf], [np.inf, float(axis.max()), sigma_max, np.inf]),
+            maxfev=20000)
+        sigma = abs(float(fitted[2]))
+        if sigma > 0.99 * sigma_max: # beam wider than the screen can measure
+            return np.nan, np.nan
+        return float(fitted[1]), sigma # sigx, sigy
 
     def _screen_data_from_image(self, image, hpixel, vpixel): # better be subtracted!
         img = np.flipud(np.asarray(image, dtype=float).copy())

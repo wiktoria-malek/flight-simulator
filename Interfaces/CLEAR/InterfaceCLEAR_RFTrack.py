@@ -48,7 +48,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                                                                                                 # 1_000_000
     def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
         self.sigmaCut = 4.0
-        self.Pref = 164 # MeV/c
+        self.Pref = 198 # MeV/c
         self.Q=-1
         self.population = population
         self.jitter = jitter
@@ -159,8 +159,20 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.B0 = rft.Bunch6d_QR(rft.electronmass, population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
         self.P0 = rft.Bunch6d_QR(rft.electronmass, population,  1, self.Pref, T, self.nparticles, self.sigmaCut)
 
+    def _model_screen_names(self, screens):
+        if screens is None:
+            return None
+        single = isinstance(screens, str)
+        names = [screens] if single else list(screens)
+        mapped = []
+        for name in names:
+            name = str(name)
+            mapped.append(name if name in self.screens else name.rstrip("LH"))
+        return mapped[0] if single else mapped
+
     def get_screens(self, names=None):
         if isinstance(names, str): names = [names]
+        names = self._model_screen_names(names)
         hpixel = 0.001
         vpixel = 0.001
         selected_screens = [screen for screen in self.screens if names is None or screen in names]
@@ -486,6 +498,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return output_x, output_y
 
     def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
+        screens = self._model_screen_names(screens)
+        reference_screen = self._model_screen_names(reference_screen)
         screens = list(screens)
         K1L_values = np.asarray(K1L_values, dtype=float)
         if reference_screen is None: reference_screen = screens[0]
@@ -507,6 +521,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         x_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
         y_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
         sigma_xy = np.full((nK1L, nscreens), np.nan, dtype=float)
+        particles_xy = np.empty((nK1L, nscreens), dtype=object)
 
         try:
             if override_offsets:
@@ -564,6 +579,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
 
     def get_phase_space_transport_to_screens(self, reference_screen=None, screens=None):
+        screens = self._model_screen_names(screens)
+        reference_screen = self._model_screen_names(reference_screen)
         if screens is None:
             screens = list(self.screens)
         if isinstance(screens, str):
@@ -653,6 +670,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         return result
 
     def get_R_matrix_scan(self, quad_name, screens, K1L_values):
+        screens = self._model_screen_names(screens)
         screens = list(screens)
         K1L_values = np.asarray(K1L_values, dtype=float)
         original_quads = self.get_quadrupoles(names=[quad_name])

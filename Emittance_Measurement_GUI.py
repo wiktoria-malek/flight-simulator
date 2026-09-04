@@ -6,13 +6,13 @@ from enum import Enum
 try:
     pyqt_version = 6
     from PyQt6 import uic
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame, QDialog, QDialogButtonBox
     from PyQt6.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt6.QtGui import QPainter, QPixmap, QFont
 except ImportError:
     pyqt_version = 5
     from PyQt5 import uic
-    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame, QDialog, QDialogButtonBox, QFormLayout
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 import matplotlib
@@ -28,6 +28,20 @@ from Backend.LogConsole import LogConsole
 #from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
 from Backend.EM_helpers.ShowBeamline import ShowBeamline
 from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
+from Backend.EM_helpers.FitBounds import BoundsForParameter
+from Backend.EM_helpers.ScanCurrentRanges import ScanCurrentRanges
+from Backend.EM_helpers.ScanPointSelection import ScanPointSelection
+def match_screen_name(name, candidates):
+    name = str(name)
+    candidates = [str(candidate) for candidate in candidates]
+    if name in candidates:
+        return name
+    stripped = name.rstrip("LH") # CLEAR exposes CA.BTV0390H / CA.BTV0390L for the one camera the model calls CA.BTV0390
+    for candidate in candidates:
+        if candidate.rstrip("LH") == stripped:
+            return candidate
+    return None
+
 class ComputationMode(Enum):
     LRM = "Linear R-response model"
     ML = "Machine learning model"
@@ -120,9 +134,12 @@ class OptimizationWorker(QObject):
         if not selected_screens:
             raise ValueError("Select at least one screen")
         session_screens = list(self.session.get("screens", []))
-        selected_indices = [session_screens.index(screen) for screen in selected_screens if screen in session_screens]
+        matched_screens = [match_screen_name(screen, session_screens) for screen in selected_screens]
+        selected_indices = [session_screens.index(screen) for screen in matched_screens if screen is not None]
         if not selected_indices:
-            raise ValueError("None of the selected screens are present in the loaded session data.")
+            raise ValueError(
+                f"None of the selected screens {list(selected_screens)} are present in the loaded session data "
+                f"{session_screens}.")
 
         cut_session = dict(self.session)
         cut_session["screens"] = [session_screens[i] for i in selected_indices]
@@ -211,7 +228,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.quad_on_plot.addItems(quadrupoles)
         self.screen_on_plot.clear()
         self.screen_on_plot.addItems(screens_sorted)
-        self.start_button_scan.clicked.connect(self._run_scan)
+        self.start_button_scan.clicked.connect(lambda _checked=False: self._run_scan())
         self.stop_button_scan.clicked.connect(self._stop_scan)
         self.quad_on_plot.currentIndexChanged.connect(lambda _=None: self._draw_live_scan(self.session))
         self.screen_on_plot.currentIndexChanged.connect(lambda _=None: self._draw_live_scan(self.session))
@@ -238,10 +255,13 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._scan_pause_requested = False
         self._scan_is_paused = False
         self._optimization_paused = False
+        self._interrupted_scan = None
         self._last_scan_status = None
         self.fit_core_params = ("emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0")
         self.additional_params = ("quad_k1l_0", "quad_dx0", "quad_dy0", "quad_roll")
         self.additional_params_scales = {"quad_k1l_0": 1.0, "quad_dx0": 1e-3, "quad_dy0": 1e-3, "quad_roll": 1e-3}
+        self.additional_params_defaults = {"quad_k1l_0": (0.0, 0.0), "quad_dx0": (-2.0, 2.0), "quad_dy0": (-2.0, 2.0), "quad_roll": (-50.0, 50.0)}
+        self._setup_bounds_buttons()
         self._populate_default_bounds()
         self.fit_quadrupole_strength_checkbox.toggled.connect(self._update_additional_fit_controls)
         self.fit_quad_offset_checkbox.toggled.connect(self._update_additional_fit_controls)
@@ -261,6 +281,17 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         else:
             self.download_quads_button.setEnabled(True)
             self.download_quads_button.clicked.connect(self._download_all_quads_status)
+        self._screen_current_ranges = {}
+        self._excluded_points = set()
+        self.delete_point_button.clicked.connect(self._edit_excluded_points)
+        self.per_screen_ranges_button.clicked.connect(self._edit_per_screen_current_ranges)
+        self.quadrupoles_list.itemSelectionChanged.connect(self._update_quad_readback_label)
+        self.minimum_current.valueChanged.connect(lambda _=None: self._update_per_screen_ranges_button())
+        self.maximum_current.valueChanged.connect(lambda _=None: self._update_per_screen_ranges_button())
+        self._update_per_screen_ranges_button()
+        self._update_quad_readback_label()
+
+
 
     def _make_settings_panel_scrollable(self):
         main_layout = self.centralwidget.layout()
@@ -386,8 +417,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._set_default_quad_strength_bounds_from_session(self.session)
         self._refresh_plot_comboboxes_from_session(self.session)
         self._draw_live_scan(self.session)
-        self.delta_min_scan.setEnabled(False)
-        self.delta_max_scan.setEnabled(False)
         self.steps_settings.setEnabled(False)
         self.meas_per_step.setEnabled(False)
         self.quadrupoles_list.setEnabled(False)
@@ -426,26 +455,106 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             return {}
         return dict(interface_defaults.get("bounds", {}))
 
+    def _setup_bounds_buttons(self):
+        self.bounds_buttons = {
+            "emit_x_norm": self.eps_h_bounds,
+            "beta_x0": self.beta_h_bounds,
+            "alpha_x0": self.alpha_h_bounds,
+            "emit_y_norm": self.eps_v_bounds,
+            "beta_y0": self.beta_v_bounds,
+            "alpha_y0": self.alpha_v_bounds,
+            "quad_k1l_0": self.quad_strength_bounds,
+            "quad_dx0": self.quad_dx_bounds,
+            "quad_dy0": self.quad_dy_bounds,
+            "quad_roll": self.quad_roll_bounds,
+        }
+        self.bounds_units = {
+            "emit_x_norm": "mm·mrad", "beta_x0": "m", "alpha_x0": "",
+            "emit_y_norm": "mm·mrad", "beta_y0": "m", "alpha_y0": "",
+            "quad_k1l_0": self._quadrupole_value_unit(), "quad_dx0": "mm", "quad_dy0": "mm", "quad_roll": "mrad",
+        }
+        self.bounds_display_names = {
+            "emit_x_norm": "Horizontal ε (norm.)",
+            "beta_x0": "Horizontal β",
+            "alpha_x0": "Horizontal α",
+            "emit_y_norm": "Vertical ε (norm.)",
+            "beta_y0": "Vertical β",
+            "alpha_y0": "Vertical α",
+            "quad_k1l_0": "Quadrupole strength",
+            "quad_dx0": "Quadrupole Δx",
+            "quad_dy0": "Quadrupole Δy",
+            "quad_roll": "Quadrupole roll",
+        }
+        self._bounds_button_base_text = {param: button.text() for param, button in self.bounds_buttons.items()}
+        quad_value_unit = self.bounds_units["quad_k1l_0"]
+        self._bounds_button_base_text["quad_k1l_0"] = "I₀ [A]" if quad_value_unit == "A" else f"K1L₀ [{quad_value_unit}]"
+        self._bounds_values = {}
+        for param, button in self.bounds_buttons.items():
+            button.clicked.connect(lambda _checked=False, parameter=param: self._edit_bounds(parameter))
+
+    def _set_bounds_value(self, param, low, high):
+        low, high = float(low), float(high)
+        self._bounds_values[param] = [min(low, high), max(low, high)]
+        self._refresh_bounds_button(param)
+
+    def _refresh_bounds_button(self, param):
+        button = self.bounds_buttons.get(param)
+        if button is None:
+            return
+        low, high = self._bounds_values.get(param, (0.0, 0.0))
+        base_text = self._bounds_button_base_text.get(param, param)
+        button.setText(f"{base_text} ({low:.4g}, {high:.4g})")
+        unit = self.bounds_units.get(param, "")
+        button.setToolTip(f"{self.bounds_display_names.get(param, param)}: ({low:g}, {high:g}) {unit}".strip() + "\nClick to change the fit search bounds.")
+
+    def _bounds_hint(self, param):
+        if param == "quad_k1l_0":
+            return self._quad_readback_text()
+        return ""
+
+    def _edit_bounds(self, param):
+        if param == "quad_k1l_0":
+            self.bounds_units[param] = self._quadrupole_value_unit()
+        low, high = self._bounds_values.get(param, (0.0, 0.0))
+        dialog = BoundsForParameter(self.bounds_display_names.get(param, param), parent=self, unit=self.bounds_units.get(param, ""), hint=self._bounds_hint(param))
+        dialog.set_values(float(low), float(high))
+        if not dialog.exec():
+            return
+        low, high = dialog.get_values()
+        if np.isclose(low, high):
+            QMessageBox.information(self, "Fit bounds", "Lower and upper bound must be different.")
+            return
+        self._set_bounds_value(param, low, high)
+
     def _populate_default_bounds(self):
         defaults = self._get_interface_default_bounds()
         for param in self.fit_core_params:
             low, high = defaults.get(param, (0.0, 0.0))
-            getattr(self, f"bound_{param}_min").setValue(float(low))
-            getattr(self, f"bound_{param}_max").setValue(float(high))
+            self._set_bounds_value(param, low, high)
+        for param in self.additional_params:
+            low, high = defaults.get(param, self.additional_params_defaults[param])
+            self._set_bounds_value(param, low, high)
 
     def _set_default_quad_strength_bounds_from_session(self, session):
         if session is None:
             return
         unit = self._quadrupole_value_unit(session)
-        title = "Current I₀ [A]" if unit == "A" else f"K1L₀ [{unit}]"
-        self.label_bound_quad_k1l_0_title.setText(title)
+        self.bounds_units["quad_k1l_0"] = unit
+        self._bounds_button_base_text["quad_k1l_0"] = "I₀ [A]" if unit == "A" else f"K1L₀ [{unit}]"
         k1l_0 = float(session.get("K1L_0", np.nan))
+        if not np.isfinite(k1l_0) or np.isclose(k1l_0, 0.0):
+            scanned_values = np.asarray(session.get("K1L_values", []), dtype=float)
+            k1l_0 = float(np.nanmedian(scanned_values)) if scanned_values.size else np.nan
+        if not np.isfinite(k1l_0):
+            self._refresh_bounds_button("quad_k1l_0")
+            return
         low, high = sorted((0.7 * k1l_0, 1.3 * k1l_0))
-        self.bound_quad_k1l_0_min.setValue(low)
-        self.bound_quad_k1l_0_max.setValue(high)
+        self._set_bounds_value("quad_k1l_0", low, high)
 
     def _set_bound_row_enabled(self, param, enabled):
-        for suffix in ("title", "min", "max"): getattr(self, f"label_bound_{param}_{suffix}" if suffix == "title" else f"bound_{param}_{suffix}").setEnabled(enabled)
+        button = self.bounds_buttons.get(param)
+        if button is not None:
+            button.setEnabled(bool(enabled))
 
     def _update_additional_fit_controls(self, _checked=None):
         is_linear_mode = self.computation_mode == ComputationMode.LRM
@@ -461,24 +570,16 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         for param in self.fit_core_params:
             if param in saved_bounds:
                 low, high = saved_bounds[param]
-                getattr(self, f"bound_{param}_min").setValue(float(low))
-                getattr(self, f"bound_{param}_max").setValue(float(high))
+                self._set_bounds_value(param, low, high)
 
         for param in self.additional_params:
             if param in saved_bounds:
                 low, high = saved_bounds[param]
                 scale = self.additional_params_scales[param]
-                getattr(self, f"bound_{param}_min").setValue(float(low) / scale)
-                getattr(self, f"bound_{param}_max").setValue(float(high) / scale)
+                self._set_bounds_value(param, float(low) / scale, float(high) / scale)
 
     def _get_bounds_from_gui(self):
-        bounds = {
-            param: [
-                float(getattr(self, f"bound_{param}_min").value()),
-                float(getattr(self, f"bound_{param}_max").value()),
-            ]
-            for param in self.fit_core_params
-        }
+        bounds = {param: list(self._bounds_values.get(param, (0.0, 0.0))) for param in self.fit_core_params}
         checkbox_by_param = {
             "quad_k1l_0": self.fit_quadrupole_strength_checkbox,
             "quad_dx0": self.fit_quad_offset_checkbox,
@@ -488,11 +589,136 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         for param in self.additional_params:
             if checkbox_by_param[param].isChecked():
                 scale = self.additional_params_scales[param]
-                bounds[param] = [
-                    float(getattr(self, f"bound_{param}_min").value()) * scale,
-                    float(getattr(self, f"bound_{param}_max").value()) * scale,
-                ]
+                low, high = self._bounds_values.get(param, (0.0, 0.0))
+                bounds[param] = [float(low) * scale, float(high) * scale]
         return bounds
+
+    def _scan_points_of_session(self, session):
+        session = self._get_session_for_selected_quad(session)
+        if not isinstance(session, dict):
+            return []
+        quad_values = np.asarray(session.get("K1L_values", []), dtype=float)
+        currents = np.asarray(session.get("current_values", []), dtype=float)
+        screens = list(session.get("screens", []))
+        sigx = np.asarray(session.get("sigx_mean", []), dtype=float)
+        sigy = np.asarray(session.get("sigy_mean", []), dtype=float)
+        unit = self._quadrupole_value_unit(session)
+        points = []
+        for step_index in range(len(quad_values)):
+            for screen_index, screen in enumerate(screens):
+                if sigx.ndim != 2 or step_index >= sigx.shape[0] or screen_index >= sigx.shape[1]:
+                    continue
+                if not np.isfinite(sigx[step_index, screen_index]) and not np.isfinite(sigy[step_index, screen_index]):
+                    if (step_index, screen_index) not in self._excluded_points:
+                        continue
+                quad_value = currents[step_index] if unit != "A" and step_index < currents.size else quad_values[step_index]
+                points.append({"step": step_index, "screen_index": screen_index, "screen": screen,
+                               "quad_value": quad_values[step_index], "quad_unit": unit,
+                               "sigx": sigx[step_index, screen_index], "sigy": sigy[step_index, screen_index]})
+        return points
+
+    def _edit_excluded_points(self):
+        if self.session is None:
+            QMessageBox.information(self, "Delete scan point", "Run or load a scan first.")
+            return
+        points = self._scan_points_of_session(self.session)
+        if not points:
+            QMessageBox.information(self, "Delete scan point", "This session has no scan points to choose from.")
+            return
+        dialog = ScanPointSelection(points, self._excluded_points, parent=self)
+        if not dialog.exec():
+            return
+        self._excluded_points = dialog.get_excluded()
+        self._update_delete_point_button()
+        self._draw_live_scan(self.session)
+
+    def _update_delete_point_button(self):
+        excluded = getattr(self, "_excluded_points", set())
+        if not excluded:
+            self.delete_point_button.setText("Delete chosen point")
+            return
+        self.delete_point_button.setText(f"Delete chosen point ({len(excluded)} removed)")
+
+    def _session_without_excluded_points(self, session):
+        excluded = getattr(self, "_excluded_points", set())
+        if not isinstance(session, dict) or not excluded:
+            return session
+        masked = dict(session)
+        target = masked
+        if masked.get("mode") == "multi_quad_scan":
+            per_quad = list(masked.get("per_quad_sessions", []))
+            index = int(self.quad_on_plot.currentIndex())
+            if not (0 <= index < len(per_quad)):
+                return masked
+            target = dict(per_quad[index])
+            per_quad[index] = target
+            masked["per_quad_sessions"] = per_quad
+        for key in ("sigx_mean", "sigy_mean", "sigxy_mean", "x_mean", "y_mean",
+                    "sigx_std", "sigy_std", "sigxy_std", "x_std", "y_std",
+                    "sigx_shots", "sigy_shots", "sigxy_shots", "x_shots", "y_shots"):
+            values = target.get(key)
+            if values is None:
+                continue
+            array = np.asarray(values, dtype=float)
+            if array.ndim < 2:
+                continue
+            for step_index, screen_index in excluded:
+                if step_index < array.shape[0] and screen_index < array.shape[1]:
+                    array[step_index, screen_index] = np.nan
+            target[key] = array.tolist()
+        return masked
+
+    def _quad_readback_text(self, quad_names=None):
+        if quad_names is None:
+            quad_names, _ = self._get_selection()
+        quad_names = list(quad_names or [])
+        if not quad_names:
+            return "Quadrupole readback: no quadrupole selected."
+        quad_name = quad_names[0]
+        try:
+            quadrupoles = self.interface.get_quadrupoles([quad_name])
+        except Exception as e:
+            return f"{quad_name} readback: unavailable ({e})"
+        unit = str(quadrupoles.get("value_unit", "1/m"))
+        bdes = np.asarray(quadrupoles.get("bdes", []), dtype=float)
+        if bdes.size == 0 or not np.isfinite(bdes[0]):
+            return f"{quad_name} readback: not available."
+        value = float(bdes[0])
+        if unit == "A":
+            return f"{quad_name} readback: {value:.3f} A"
+        iact = np.asarray(quadrupoles.get("iact", []), dtype=float)
+        current = float(iact[0]) if iact.size and np.isfinite(iact[0]) else self.quad_setpoint_to_current(quad_name, value, unit)
+        current_text = f" = {current:.3f} A" if np.isfinite(current) else " (no A calibration)"
+        return f"{quad_name} readback: K1L = {value:.5g} {unit}{current_text}"
+
+    def _update_quad_readback_label(self):
+        self.quad_readback_label.setText(self._quad_readback_text())
+
+    def _edit_per_screen_current_ranges(self):
+        _, screens = self._get_selection()
+        if not screens:
+            QMessageBox.information(self, "Scan current range", "No screens available.")
+            return
+        default_range = (float(self.minimum_current.value()), float(self.maximum_current.value()))
+        dialog = ScanCurrentRanges(screens=screens, default_range=default_range,
+                                   ranges=getattr(self, "_screen_current_ranges", {}),
+                                   steps=int(self.steps_settings.value()), parent=self)
+        if not dialog.exec():
+            return
+        self._screen_current_ranges = dialog.get_values()
+        self._update_per_screen_ranges_button()
+
+    def _update_per_screen_ranges_button(self):
+        _, screens = self._get_selection()
+        default_range = (float(self.minimum_current.value()), float(self.maximum_current.value()))
+        ranges = {screen: values for screen, values in getattr(self, "_screen_current_ranges", {}).items()
+                  if screen in screens and not np.allclose(values, default_range)}
+        if not ranges:
+            self.per_screen_ranges_button.setText("Current range per screen...")
+            self.per_screen_ranges_button.setToolTip("Every screen is scanned over the current range set above.")
+            return
+        self.per_screen_ranges_button.setText(f"Current range per screen ({len(ranges)} changed)...")
+        self.per_screen_ranges_button.setToolTip("\n".join(f"{screen}: ({values[0]:g}, {values[1]:g}) A" for screen, values in ranges.items()))
 
     def _on_computation_mode_changed(self, text):
         self.computation_mode = ComputationMode(text)
@@ -530,6 +756,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             self._scan_pause_requested = False
             self._scan_is_paused = False
             return
+        if not self._is_scanning and getattr(self, "_interrupted_scan", None):
+            self._resume_interrupted_scan()
+            return
         if self._optimization_paused and not self._is_optimizing and self.session is not None:
             self.log("Resuming optimization...")
             self._optimization_paused = False
@@ -545,6 +774,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
     def _clear_plots(self):
         self.session = None
+        self._interrupted_scan = None
+        self._excluded_points = set()
+        self._update_delete_point_button()
         self._scan_stop_requested = False
         self._scan_pause_requested = False
         self._optimization_paused=False
@@ -626,6 +858,25 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 order_text = ""
             item.setData(SPositionDelegate.S_ROLE, order_text)
 
+    @staticmethod
+    def _match_screen_name(name, candidates):
+        return match_screen_name(name, candidates)
+
+    def _add_missing_screens_to_list(self, screens):
+        existing = []
+        for i in range(self.screens_list.count()):
+            item = self.screens_list.item(i)
+            existing.append(str(item.data(Qt.ItemDataRole.UserRole) or item.text()))
+        missing = [str(screen) for screen in screens if match_screen_name(screen, existing) is None]
+        if not missing:
+            return
+        combined = existing + missing
+        order_values, _ = self._get_element_order_values(combined)
+        pairs = sorted(zip(combined, order_values), key=lambda pair: pair[1] if np.isfinite(pair[1]) else np.inf)
+        self.screens_list.blockSignals(True)
+        self._show_s_values_and_device_lists(self.screens_list, [name for name, _ in pairs])
+        self.screens_list.blockSignals(False)
+
     def _load_logo(self):
         self.logo_label.setText("")
         self.logo_label.setScaledContents(False)
@@ -666,13 +917,27 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_quad_roll.setText("-")
         self.result_reference_screen.setText("-")
 
+    def _interface_quad_value_unit(self):
+        cached_unit = getattr(self, "_cached_quad_value_unit", None)
+        if cached_unit is not None:
+            return cached_unit
+        units = (self._get_interface_initial_settings() or {}).get("units", {})
+        unit = str(units.get("quadrupole_strength", ""))
+        if not unit:
+            try:
+                quadrupoles = list(getattr(self.interface, "quadrupoles", []))
+                unit = str(self.interface.get_quadrupoles(quadrupoles[:1]).get("value_unit", "1/m"))
+            except Exception:
+                unit = "1/m"
+        self._cached_quad_value_unit = unit
+        return unit
+
     def _quadrupole_value_unit(self, session=None):
         session = self.session if session is None else session
         if isinstance(session, dict) and session.get("mode") == "multi_quad_scan":
             session = self._get_session_for_selected_quad(session) or session
         if not isinstance(session, dict):
-            units = (self._get_interface_initial_settings() or {}).get("units", {})
-            return str(units.get("quadrupole_strength", "1/m"))
+            return self._interface_quad_value_unit()
         return str(session.get("quad_value_unit", "1/m"))
 
     def _quadrupole_scan_axis_label(self, session=None):
@@ -777,7 +1042,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         if session is None:
             return
         self._refresh_plot_comboboxes_from_session(session)
-        session_to_plot = self._get_session_for_selected_quad(session)
+        session_to_plot = self._get_session_for_selected_quad(self._session_without_excluded_points(session))
         if session_to_plot is None:
             return
         K1L_values = np.asarray(session_to_plot["K1L_values"], dtype=float)
@@ -836,6 +1101,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
     def _plot_fit_overlay(self, pred_x, pred_y, result=None, screens=None, fit_k1l_values=None):
         if self.session is None:
             return
+        plotted_session = self._session_without_excluded_points(self.session)
         session_screens = list(self.session.get("screens", []))
         if screens is None:
             screens = session_screens
@@ -848,9 +1114,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             raise ValueError(f"Unknown prediction observable: {prediction_observable}")
         n_screens = min(len(screens), pred_x.shape[1], pred_y.shape[1])
         screens = screens[:n_screens]
-        K1L_values = np.asarray(self.session["K1L_values"], dtype=float)
-        sigx = np.asarray(self.session["sigx_mean"], dtype=float)
-        sigy = np.asarray(self.session["sigy_mean"], dtype=float)
+        K1L_values = np.asarray(plotted_session["K1L_values"], dtype=float)
+        sigx = np.asarray(plotted_session["sigx_mean"], dtype=float)
+        sigy = np.asarray(plotted_session["sigy_mean"], dtype=float)
         if fit_k1l_values is not None and len(fit_k1l_values) == pred_x.shape[0]:
             fit_K1L_values = np.asarray(fit_k1l_values, dtype=float)
         else:
@@ -899,6 +1165,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.canvas.draw()
 
     def _get_session_data_from_database(self):
+        self._excluded_points = set()
+        self._update_delete_point_button()
         states = list(getattr(self, "loaded_states_from_scan", []))
         files = list(getattr(self, "loaded_state_files", []))
         if not states:
@@ -913,18 +1181,27 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         quad_value_unit = "1/m"
 
         if is_quad_scan:
-            delta_min = float(self.emittance_settings["delta_min"])
-            delta_max = float(self.emittance_settings["delta_max"])
-            deltas = np.linspace(delta_min, delta_max, steps_requested)
-            K1L_values = np.full(steps_requested, np.nan)
-            for path, state in zip(self.loaded_state_files, self.loaded_states_from_scan):
+            current_A_min = float(self.emittance_settings.get("current_A_min", 0.0))
+            current_A_max = float(self.emittance_settings.get("current_A_max", 0.0))
+            nsteps_scan = max(int(os.path.basename(path).replace(".pkl", "").split("_")[3]) for path in files) + 1
+            K1L_values = np.full(nsteps_scan, np.nan)
+            for path, state in zip(files, states):
                 filename = os.path.basename(path)
                 step_i = int(filename.split("_")[3])  # screen_0000_step_0003_shot_0000.pkl -> 0003
                 quad = state.get_quadrupoles()
                 quad_value_unit = str(quad.get("value_unit", quad_value_unit))
-                K1L_values[step_i] = float(np.ravel(quad["bdes"])[0])
-            K1L_0 = float(np.nanmean(K1L_values / (1.0 + deltas))) # to be verified
-            nsteps_scan = steps_requested
+                names = list(quad.get("names", []))
+                bdes = np.ravel(np.asarray(quad.get("bdes", []), dtype=float))
+                index = names.index(quad_name) if quad_name in names else 0
+                if index < bdes.size:
+                    K1L_values[step_i] = float(bdes[index])
+            K1L_0 = float(self.emittance_settings.get("K1L_0", np.nan))
+            if not np.isfinite(K1L_0):
+                K1L_0 = float(np.nanmedian(K1L_values))
+            if np.isfinite(K1L_0) and not np.isclose(K1L_0, 0.0):
+                deltas = K1L_values / K1L_0 - 1.0
+            else:
+                deltas = np.full(nsteps_scan, np.nan)
 
         else:
             strengths = []
@@ -941,7 +1218,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                     "Please rescan it with the current application version."
                 )
             K1L_0 = float(np.nanmean(strengths))
-            delta_min, delta_max, nsteps_scan = 0.0, 0.0, 1
+            current_A_min, current_A_max, nsteps_scan = 0.0, 0.0, 1
             deltas = np.array([0.0])
             K1L_values = np.array([K1L_0])
 
@@ -1001,8 +1278,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             })
 
         session = {
-            "delta_min": delta_min,
-            "delta_max": delta_max,
+            "current_A_min": current_A_min,
+            "current_A_max": current_A_max,
             "is_quad_scan": is_quad_scan,
             "steps": steps_requested,
             "nshots": int(self.emittance_settings["nshots"]),
@@ -1023,6 +1300,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "sigxy_std": sigxy_std.tolist(),
             "deltas": deltas.tolist(),
             "K1L_values": K1L_values.tolist(),
+            "current_values": [self.quad_setpoint_to_current(quad_name, value, quad_value_unit) for value in K1L_values],
             "scan_steps": scan_steps,
             "states_dir": folder,
             "cancelled": False,
@@ -1071,7 +1349,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
         computing_method = self.computing_method_combo.currentText().strip()
         _, selected_screens = self._get_selection()
-        worker = OptimizationWorker(self.interface, self.session, selected_screens = selected_screens, bounds = bounds,
+        worker = OptimizationWorker(self.interface, self._session_without_excluded_points(self.session), selected_screens = selected_screens, bounds = bounds,
             fit_quadrupole_strength = bool(self.fit_quadrupole_strength_checkbox.isChecked()),
             fit_quad_offset = bool(self.fit_quad_offset_checkbox.isChecked()),
             fit_quad_roll = bool(self.fit_quad_roll_checkbox.isChecked()),
@@ -1197,8 +1475,11 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         if self._scan_stop_requested:
             raise KeyboardInterrupt("Scan stopped by user.")
 
-    def _run_scan(self):
+    def _run_scan(self, resume=None):
+        resume_states_dir = resume["states_dir"] if resume else None
         quadrupoles, _ = self._get_selection()
+        if resume:
+            quadrupoles = list(resume["quadrupoles"])
         if len(quadrupoles) == 0:
             QMessageBox.information(self, "Scan error", "No quadrupole selected.")
             return
@@ -1220,6 +1501,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             self.screens_list.selectAll()
             self.screens_list.blockSignals(False)
         _, screens = self._get_selection()
+        if resume:
+            screens = list(resume["screens"])
         self.screen_on_plot.blockSignals(True)
         self.screen_on_plot.clear()
         self.screen_on_plot.addItems(screens)
@@ -1230,40 +1513,86 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             QMessageBox.information(self, "Scan error", "No screens available.")
             return
 
-        delta_min = float(self.delta_min_scan.value())
-        delta_max = float(self.delta_max_scan.value())
+        current_min = float(self.minimum_current.value())
+        current_max = float(self.maximum_current.value())
         steps = int(self.steps_settings.value())
         nshots = int(self.meas_per_step.value())
+        screen_current_ranges = {screen: values for screen, values in getattr(self, "_screen_current_ranges", {}).items() if screen in screens}
+        if resume:
+            current_min = float(resume["current_min"])
+            current_max = float(resume["current_max"])
+            steps = int(resume["steps"])
+            nshots = int(resume["nshots"])
+            screen_current_ranges = dict(resume["screen_current_ranges"])
+        if steps > 0 and current_max <= current_min:
+            QMessageBox.information(self, "Scan error", "Maximum scan current must be larger than the minimum scan current.")
+            return
 
         self._last_scan_status = None
         self._scan_stop_requested = False
         self._is_scanning = True
+        if resume is None:
+            self._excluded_points = set()
+            self._update_delete_point_button()
+        scan_settings = {"quadrupoles": quadrupoles, "screens": screens, "current_min": current_min,
+                         "current_max": current_max, "steps": steps, "nshots": nshots,
+                         "screen_current_ranges": screen_current_ranges}
 
         self._clear_fit_panel()
         self._set_progress(0)
         try:
-            self.session = self.run_scan(quad_name=quadrupoles, delta_min=delta_min, delta_max=delta_max, steps=steps, nshots=nshots, screens=screens, reference_screen=screens[0], progress_callback=self._scan_progress_callback)
+            self.session = self.run_scan(quad_name=quadrupoles, current_min=current_min, current_max=current_max, steps=steps, nshots=nshots,
+                screens=screens, screen_current_ranges=screen_current_ranges, reference_screen=screens[0],
+                progress_callback=self._scan_progress_callback, resume_states_dir=resume_states_dir)
+            self._interrupted_scan = None
             self._set_default_quad_strength_bounds_from_session(self.session)
+            self._update_quad_readback_label()
             if steps == 0:
                 self.log("Finished gathering data from the screens.")
             else:
                 self.log("Quadrupole scan finished.")
         except KeyboardInterrupt as e:
-            (self._set_progress(0))
+            self._set_progress(0)
+            self._remember_interrupted_scan(scan_settings, str(e))
             QMessageBox.information(self, "Scan", str(e))
             return
         except TypeError as e:
             self._set_progress(0)
+            self._remember_interrupted_scan(scan_settings, f"Type Error: {e}")
             QMessageBox.information(self,"Scan error",f"Type Error: {e}")
             return
         except Exception as e:
             self._set_progress(0)
-            QMessageBox.information(self, "Scan error", str(e))
+            self._remember_interrupted_scan(scan_settings, str(e))
+            QMessageBox.information(self, "Scan error", f"{e}\n\nPress RESUME to continue this scan from where it stopped."
+                if getattr(self, "_interrupted_scan", None) else str(e))
             return
         finally:
             self._is_scanning = False
         QMessageBox.information(self, "Scan", f"Scan completed.")
         self._set_progress(100)
+
+    def _remember_interrupted_scan(self, scan_settings, reason):
+        states_dir = getattr(self, "_last_scan_states_dir", None)
+        if not states_dir or not os.path.isdir(states_dir):
+            self._interrupted_scan = None
+            return
+        if len(list(scan_settings.get("quadrupoles", []))) != 1 or int(scan_settings.get("steps", 0)) <= 0:
+            self._interrupted_scan = None
+            return
+        self._interrupted_scan = dict(scan_settings, states_dir=states_dir, reason=str(reason))
+        self.log(f"Scan interrupted ({reason}). Measured points are kept in {states_dir}. You can click resume to continue.")
+
+    def _resume_interrupted_scan(self):
+        interrupted = getattr(self, "_interrupted_scan", None)
+        if not interrupted:
+            return False
+        self.log(f"Resuming the scan of {interrupted['quadrupoles'][0]} from {interrupted['states_dir']}...")
+        self._scan_stop_requested = False
+        self._scan_pause_requested = False
+        self._scan_is_paused = False
+        self._run_scan(resume=interrupted)
+        return True
 
     def _get_twiss_s_positions(self, names):
         names = list(names)
@@ -1282,6 +1611,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 requested_name = str(requested_name)
                 if requested_name in lookup:
                     positions.append(lookup[requested_name])
+                    continue
+                if requested_name.rstrip("LH") in lookup:
+                    positions.append(lookup[requested_name.rstrip("LH")])
                     continue
                 quad_part_positions = []
                 for lattice_name in (f"{requested_name}_1", f"{requested_name}_2"):
@@ -1430,6 +1762,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
     def _screen_selection_changed(self):
         self._filter_quadrupoles_in_gui()
+        self._update_per_screen_ranges_button()
+        self._update_quad_readback_label()
 
     def _show_console_log(self):
         if self.log_console is None:
@@ -1493,13 +1827,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     I = dialog
-
-    # ================ for a test!!
-    from Backend.State import State
-    state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/AllCLEARfiles/BBA_CLEAR260828151954_session_settings/machine_status.pkl")
-    I.restore_quadrupoles_state(state)
-    # ===============================
-
     project_name = I.get_name()
     is_simulation = bool(getattr(I, "is_simulation"))
     bg_shots = 10

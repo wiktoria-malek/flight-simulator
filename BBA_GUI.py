@@ -607,8 +607,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         return f"[w1 = {wbpm_orb:g}, w2 = {wbpm_dfs:g}, w3 = {wbpm_wfs:g}]"  # general format, removes reduntant zeros at the end etc.
 
     def _update_bpm_weights(self, item):
-        bpm_name = item.data(Qt.ItemDataRole.UserRole) or (
-                item.text() or "")  # it gives a clean name of the item, even if there is another text (like weights)
+        bpm_name = item.data(Qt.ItemDataRole.UserRole) or (item.text() or "")  # it gives a clean name of the item, even if there is another text (like weights)
         item.setData(BpmWeightsDelegate.WEIGHTS_ROLE, self._get_bpm_weights_text(bpm_name))
         item.setText(bpm_name)
 

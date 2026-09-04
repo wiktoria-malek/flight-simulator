@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import least_squares
 import pandas as pd
-from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable
+from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable, REDUCED_CHI2_WARNING
 
 def _finite_diff_jacobian(residual_func, x, low, high, param_scale=None, rel_step=1e-4):
     x = np.asarray(x, dtype=float)
@@ -307,9 +307,9 @@ class Optimization:
         n_x_sum = np.sum(np.isfinite(sigma_x_shots), axis=2)
         n_y_sum = np.sum(np.isfinite(sigma_y_shots), axis=2)
 
-        # Measured mean beam size.
-        sig_x = np.nanmean(sigma_x_shots, axis=2)
-        sig_y = np.nanmean(sigma_y_shots, axis=2)
+        # Measured beam size: the median over shots, so a single bad frame cannot drag the point.
+        sig_x = np.nanmedian(sigma_x_shots, axis=2)
+        sig_y = np.nanmedian(sigma_y_shots, axis=2)
 
         # Sample standard deviation of sigma, then standard error of its mean.
         s_sigx = np.nanstd(sigma_x_shots, axis=2, ddof=1)
@@ -345,7 +345,7 @@ class Optimization:
 
         if have_dx_data:
             n_dx_sum = np.sum(np.isfinite(x_shots_arr), axis=2)
-            dx_meas = np.nanmean(x_shots_arr, axis=2)
+            dx_meas = np.nanmedian(x_shots_arr, axis=2)
             s_dx = np.nanstd(x_shots_arr, axis=2, ddof=1)
             u_dx = np.where(n_dx_sum >= 2, s_dx / np.sqrt(n_dx_sum), fallback_u_dx)
             u_dx = np.where(np.isfinite(u_dx) & (u_dx > 1e-9), u_dx, fallback_u_dx)
@@ -357,7 +357,7 @@ class Optimization:
 
         if have_dy_data:
             n_dy_sum = np.sum(np.isfinite(y_shots_arr), axis=2)
-            dy_meas = np.nanmean(y_shots_arr, axis=2)
+            dy_meas = np.nanmedian(y_shots_arr, axis=2)
             s_dy = np.nanstd(y_shots_arr, axis=2, ddof=1)
             u_dy = np.where(n_dy_sum >= 2, s_dy / np.sqrt(n_dy_sum), fallback_u_dy)
             u_dy = np.where(np.isfinite(u_dy) & (u_dy > 1e-9), u_dy, fallback_u_dy)
@@ -369,7 +369,7 @@ class Optimization:
 
         if have_sigxy_data:
             n_sigxy_sum = np.sum(np.isfinite(sigxy_shots_arr), axis=2)
-            sigxy_meas = np.nanmean(sigxy_shots_arr, axis=2)
+            sigxy_meas = np.nanmedian(sigxy_shots_arr, axis=2)
             s_sigxy = np.nanstd(sigxy_shots_arr, axis=2, ddof=1)
             u_sigxy = np.where(n_sigxy_sum >= 2, s_sigxy / np.sqrt(n_sigxy_sum), fallback_u_sigxy)
             u_sigxy = np.where(np.isfinite(u_sigxy) & (u_sigxy > 1e-9), u_sigxy, fallback_u_sigxy)
@@ -474,22 +474,48 @@ class Optimization:
         best_cost = np.inf
         stopped_during_fit = False
 
+        linear_optics = None
+        linear_optics_notes = []
         try:
             linear_optics = estimate_twiss_use_linear_optics_start(self.interface, quad_name, screens, K1L_values, sig_x, sig_y, u_x, u_y, valid_x, valid_y, beta_gamma)
         except CheckLinearOpticsUnavailable as e:
-            raise RuntimeError(f"Fit will not converge: {e} Try a different K1L scan range/number of steps, or scan a different quadrupole.") from e
+            linear_optics_notes.append(str(e))
         except Exception as e:
-            raise RuntimeError(f"Fit will not converge: could not compute a linear-optics starting estimate. {e} Try a different K1L scan range/number of steps, or scan a different quadrupole.") from e
+            linear_optics_notes.append(f"could not compute a best starting point ({e})")
 
-        x0_linear_optics_values = [linear_optics[p] for p in ("emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0")]
+        # the linear estimate is only a starting point: when it is missing, or lands outside the bounds
+        # the user asked for, that plane starts from the middle of its bounds instead of aborting the fit
+        x0_linear_optics_values = []
+        for plane, plane_params in (("x", ("emit_x_norm", "beta_x0", "alpha_x0")), ("y", ("emit_y_norm", "beta_y0", "alpha_y0"))):
+            plane_values = [float(linear_optics.get(p, np.nan)) if linear_optics else np.nan for p in plane_params]
+            inside_bounds = all(np.isfinite(value) and bounds[p][0] <= value <= bounds[p][1]
+                                for p, value in zip(plane_params, plane_values))
+            if linear_optics is not None:
+                chi2 = float(linear_optics.get(f"reduced_chi2_{plane}", np.nan))
+                if np.isfinite(chi2) and chi2 > REDUCED_CHI2_WARNING:
+                    linear_optics_notes.append(
+                        f"plane {plane}: rft model reproduces the scan poorly, so the machine optics probably differ from the model")
+            if not inside_bounds:
+                linear_optics_notes.append(
+                    f"plane {plane}: first point estimate {dict(zip(plane_params, np.round(plane_values, 5)))} is outside the fit bounds, starting from the middle of the bounds instead")
+                plane_values = [0.5 * (bounds[p][0] + bounds[p][1]) for p in plane_params]
+            x0_linear_optics_values.extend(plane_values)
+
         if self.fit_quadrupole_strength: x0_linear_optics_values.append(K1L_0_readback)
         if self.fit_quad_offset: x0_linear_optics_values.extend([0.0, 0.0])  # start from "no offset", the fit pulls away from it if the data supports it
         if self.fit_quad_roll: x0_linear_optics_values.append(0.0)  # start from "no roll"
         x0_linear_optics = np.clip(np.array(x0_linear_optics_values, dtype=float), original_low_bounds, original_high_bounds)
+        for note in linear_optics_notes:
+            print(f"Linear optics start: {note}")
         cost_linear_optics, _ = compute_cost(dict(zip(params_order, x0_linear_optics)), allow_stop=False)
 
         if not np.isfinite(cost_linear_optics):
-            raise RuntimeError("Fit will not converge: the linear-optics starting estimate does not reproduce the measured beam sizes. Try a different K1L scan range/number of steps, or scan a different quadrupole.")
+            x0_linear_optics = np.clip(0.5 * (original_low_bounds + original_high_bounds), original_low_bounds, original_high_bounds)
+            print("Linear optics start: the starting point does not reproduce the measured beam sizes, retrying from the middle of the bounds.")
+            cost_linear_optics, _ = compute_cost(dict(zip(params_order, x0_linear_optics)), allow_stop=False)
+
+        if not np.isfinite(cost_linear_optics):
+            raise RuntimeError("Fit will not converge: the model does not produce a finite beam size anywhere inside the fit bounds. Check the scan range, the fit bounds and the machine model.")
 
         row_values = dict(zip(params_order, x0_linear_optics))
         row_values["f"] = float(cost_linear_optics)

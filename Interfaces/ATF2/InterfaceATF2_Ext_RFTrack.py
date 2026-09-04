@@ -4,6 +4,7 @@ import time, os, re
 from Backend.LogConsole import LogConsole
 from datetime import datetime
 from Interfaces.AbstractMachineInterface import AbstractMachineInterface
+from Interfaces.ATF2.MagKi import load_mag_ki
 # from . import ipbsm_calc
 # from .knobs import KnobSystem
 class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
@@ -529,6 +530,33 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         if track:
             self.__track_bunch()
 
+    def _mag_ki_name(self, name):
+        name = self._original_quad_name(str(name))
+        return name[1:] if name.startswith("M") else name
+
+    def _get_mag_ki(self):
+        if getattr(self, "mag_ki", None) is None:
+            self.mag_ki = load_mag_ki()
+        return self.mag_ki
+
+    def current_to_k1l(self, name, current_A):
+        current_A = float(current_A)
+        if not np.isfinite(current_A):
+            return np.nan
+        mag_ki = self._get_mag_ki()
+        if mag_ki is None:
+            raise KeyError(f"No A-K1 calibration for '{name}'")
+        return mag_ki.current_to_k1l(self._mag_ki_name(name), current_A, self.Pref / 1e3)
+
+    def k1l_to_current(self, name, k1):
+        k1 = float(k1)
+        if not np.isfinite(k1):
+            raise ValueError(f"Cannot convert K1 for quadrupole '{name}': {k1}")
+        mag_ki = self._get_mag_ki()
+        if mag_ki is None:
+            raise KeyError(f"No A-K1 calibration for '{name}'")
+        return mag_ki.k1l_to_current(self._mag_ki_name(name), k1, self.Pref / 1e3)
+
     def set_correctors(self, names, corr_vals):
         if isinstance(names, str):
             names = [names]
@@ -710,6 +738,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         x_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
         y_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
         sigma_xy = np.full((nK1L, nscreens), np.nan, dtype=float)
+        particles_xy = np.empty((nK1L, nscreens), dtype=object)
 
         try:
             if override_offsets:
