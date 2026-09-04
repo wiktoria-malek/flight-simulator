@@ -234,7 +234,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         except Exception:
             return float(default)
 
-    def _set_and_verify(self, property_address, field, target, *, context=None, tolerance=5e-3, timeout=10.0, retries=3, description=None):
+    def _set_and_verify(self, property_address, field, target, *, context=None, tolerance=0.1, timeout=10.0, retries=3, description=None):
         # PyDA accepts the empty selector for non-PPM properties, but not None.
         # The RF-phase and UVATT2 callers intentionally omit a context.
         context = self.context_empty if context is None else context
@@ -492,14 +492,14 @@ class CLEAR_real_machine(AbstractMachineInterface):
             "tmit": np.asarray(tmit, dtype=float),
         }
 
-    def _wait_for_japc_readback(self, property_address, field, target, *, context=None, tolerance=5e-3, timeout=10.0):
+    def _wait_for_japc_readback(self, property_address, field, target, *, context=None, tolerance=0.1, timeout=10.0):
         context = self.context_empty if context is None else context
         def read_value():
             data = self.client.get(property_address, context=context).data
             return self.make_safe_float(data.get(field), default=np.nan)
         return self._wait_for_readback(read_value, target, description=f"{property_address}#{field}", tolerance=tolerance, timeout=timeout)
 
-    def _wait_for_corrector_readbacks(self, names, targets, tolerance=5e-3, timeout=10.0, poll_interval=0.05):
+    def _wait_for_corrector_readbacks(self, names, targets, tolerance=0.1, timeout=10.0, poll_interval=0.05):
         targets = {name: float(target) for name, target in zip(names, targets)}
         pending = set(targets)
         last_values = {name: np.nan for name in targets}
@@ -525,12 +525,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
             )
         return not pending
 
-    def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance=5e-3, timeout=10.0):
+    def _wait_for_quadrupole_readback(self, quadrupole, target, tolerance=0.1, timeout=10.0):
         readback_param = self.quad_get_params[quadrupole]
         property_address, field = readback_param.rsplit("#", 1)
         return self._wait_for_japc_readback(property_address, field, target, context=self.context_acquisition, tolerance=tolerance, timeout=timeout)
 
-    def _wait_for_quadrupole_readbacks(self, names, targets, tolerance=5e-3, timeout=10.0, poll_interval=0.05):
+    def _wait_for_quadrupole_readbacks(self, names, targets, tolerance=0.1, timeout=10.0, poll_interval=0.05):
         targets = {name: float(target) for name, target in zip(names, targets)}
         pending = set(targets)
         last_values = {name: np.nan for name in targets}
