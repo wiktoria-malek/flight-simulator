@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1626</width>
-    <height>1004</height>
+    <width>1542</width>
+    <height>1053</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -111,12 +111,15 @@ QToolButton#quad_status_tooltip:hover {
             <item>
              <widget class="QPushButton" name="load_machine_status_button">
               <property name="text">
-               <string>Load machine status...</string>
+               <string>Load quadrupoles status...</string>
               </property>
              </widget>
             </item>
             <item>
              <widget class="QToolButton" name="machine_status_tooltip">
+              <property name="toolTip">
+               <string>Pick a file with saved quadrupole currents. RF-Track will be updated with those values, so that both real machine and simulation have the same optics.</string>
+              </property>
               <property name="styleSheet">
                <string notr="true">QToolButton#machine_status_tooltip{
     border: 1px solid #888;
@@ -461,14 +464,14 @@ QToolButton#nshots_toolbutton:hover {
           </item>
           <item row="4" column="0" colspan="3">
            <widget class="QLabel" name="quad_readback_label">
+            <property name="styleSheet">
+             <string notr="true">color: rgb(70, 70, 70);</string>
+            </property>
             <property name="text">
              <string>Quadrupole readback: -</string>
             </property>
             <property name="wordWrap">
              <bool>true</bool>
-            </property>
-            <property name="styleSheet">
-             <string notr="true">color: rgb(70, 70, 70);</string>
             </property>
            </widget>
           </item>

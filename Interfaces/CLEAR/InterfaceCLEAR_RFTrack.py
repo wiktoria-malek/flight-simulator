@@ -46,7 +46,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
             screen.set_length(element.get_length())
             element.replace_with(screen)
                                                                                                 # 1_000_000
-    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=10000):
+    def __init__(self, population=300 * rft.pC, jitter=0.0, bpm_resolution=0.0, nsamples=1, nparticles=1000):
         self.sigmaCut = 4.0
         self.Pref = 198 # MeV/c
         self.Q=-1
@@ -80,15 +80,15 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         self.quadrupoles = [element.get_name() for element in self.lattice.get_quadrupoles()]
         self.sextupoles = []
         self.__setup_beam0()
+        self.lattice.align_elements()
         '''Uncomment lines below to scatter elements in the lattice.'''
-        self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
-        self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        # self.lattice.scatter_elements('bpm', 0.100, 0.100, 0, 0, 0, 0, 'center')
+        # self.lattice.scatter_elements('quadrupole', 0.100, 0.100, 0, 0, 0, 0, 'center')
         self.freq=2.997e9
         self.nr_quad=11
         self.Lquad=0.226 #magnetic length of the quadrupole in [m]
         self.nominal_K=0.7752883624676146 #3.35  # 1/m
         self.machine_name = "CLEAR"
-        self.lattice.align_elements()
         self.chosen_ict = "CA.BPM0890"
         # qfd520 = self.lattice["CA.QFD0520"]
         #                     # dx   # dy   #dz  # roll  # pitch # yaw

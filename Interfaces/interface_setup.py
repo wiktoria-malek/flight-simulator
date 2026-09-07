@@ -289,15 +289,14 @@ INTERFACE_SETUP = {
                     "bba_max_h_strength": 9.99,
                     "bba_max_v_strength": 9.99,
                 },
-            "bounds":
-                {
-                    "emit_x_norm": [0.5, 10.0],
-                    "beta_x0": [0.2, 20.0],
-                    "alpha_x0": [-4.0, 2.0],
-                    "emit_y_norm": [0.5, 10.0],
-                    "beta_y0": [10.0, 30.0],
-                    "alpha_y0": [-8.0, 2.0],
-                }
+            "bounds": {
+                "emit_x_norm": [0.0, 50.0],
+                "beta_x0": [0.001, 200.0],
+                "alpha_x0": [-100.0, 100.0],
+                "emit_y_norm": [0.0, 50.0],
+                "beta_y0": [0.001, 200.0],
+                "alpha_y0": [-100.0, 100.0],
+            }
         },
         {
             "display_name": "CLEAR RFTrack",
@@ -318,12 +317,12 @@ INTERFACE_SETUP = {
                     "bba_max_v_strength": 9.99,
                 },
             "bounds": {
-                "emit_x_norm": [0.0, 20.0],
+                "emit_x_norm": [0.0, 50.0],
                 "beta_x0": [0.001, 200.0],
-                "alpha_x0": [-50.0, 50.0],
-                "emit_y_norm": [0.0, 20.0],
+                "alpha_x0": [-100.0, 100.0],
+                "emit_y_norm": [0.0, 50.0],
                 "beta_y0": [0.001, 200.0],
-                "alpha_y0": [-50.0, 50.0],
+                "alpha_y0": [-100.0, 100.0],
             }
         },
     ],

@@ -1,18 +1,18 @@
 import RF_Track as rft # do not touch this import!
 import os, sys, time
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 try:
     pyqt_version = 6
     from PyQt6 import uic
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame, QDialog, QDialogButtonBox
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame, QDialog, QDialogButtonBox, QFileDialog
     from PyQt6.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt6.QtGui import QPainter, QPixmap, QFont
 except ImportError:
     pyqt_version = 5
     from PyQt5 import uic
-    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame, QDialog, QDialogButtonBox, QFormLayout
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QListWidgetItem, QStyledItemDelegate, QScrollArea, QFrame, QDialog, QDialogButtonBox, QFormLayout, QFileDialog
     from PyQt5.QtCore import Qt, QTimer, QRect, QObject, QThread, pyqtSignal
     from PyQt5.QtGui import QPainter, QPixmap, QFont
 import matplotlib
@@ -31,6 +31,7 @@ from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 from Backend.EM_helpers.FitBounds import BoundsForParameter
 from Backend.EM_helpers.ScanCurrentRanges import ScanCurrentRanges
 from Backend.EM_helpers.ScanPointSelection import ScanPointSelection
+from Backend.EM_helpers.QuadrupoleModelStatus import load_model_quadrupoles, quadrupole_tracking_model, quadrupole_status_metadata, save_quadrupole_status
 def match_screen_name(name, candidates):
     name = str(name)
     candidates = [str(candidate) for candidate in candidates]
@@ -137,10 +138,7 @@ class OptimizationWorker(QObject):
         matched_screens = [match_screen_name(screen, session_screens) for screen in selected_screens]
         selected_indices = [session_screens.index(screen) for screen in matched_screens if screen is not None]
         if not selected_indices:
-            raise ValueError(
-                f"None of the selected screens {list(selected_screens)} are present in the loaded session data "
-                f"{session_screens}.")
-
+            raise ValueError(f"None of the selected screens {list(selected_screens)} are present in the loaded session data {session_screens}.")
         cut_session = dict(self.session)
         cut_session["screens"] = [session_screens[i] for i in selected_indices]
 
@@ -173,10 +171,8 @@ class OptimizationWorker(QObject):
             self.optimizer_ready.emit(tool)
             output = tool.fit_from_session(session_for_opt, bounds=bounds)
             self.finished.emit(output)
-
         except Exception as e:
             self.error.emit(str(e))
-
         finally:
             self.done.emit()
 
@@ -281,6 +277,17 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         else:
             self.download_quads_button.setEnabled(True)
             self.download_quads_button.clicked.connect(self._download_all_quads_status)
+        self.quadrupoles_status = None
+        self.model_quadrupoles_status = None
+        self._quadrupoles_status_payload = None
+        self._model_quadrupoles_status_payload = None
+        self.load_machine_status_button.setText("Load model quadrupoles...")
+        self.load_machine_status_button.clicked.connect(self._load_model_quadrupoles_status)
+        try:
+            quadrupole_tracking_model(self.interface)
+        except ValueError as e:
+            self.load_machine_status_button.setEnabled(False)
+            self.load_machine_status_button.setToolTip(str(e))
         self._screen_current_ranges = {}
         self._excluded_points = set()
         self.delete_point_button.clicked.connect(self._edit_excluded_points)
@@ -290,8 +297,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.maximum_current.valueChanged.connect(lambda _=None: self._update_per_screen_ranges_button())
         self._update_per_screen_ranges_button()
         self._update_quad_readback_label()
-
-
 
     def _make_settings_panel_scrollable(self):
         main_layout = self.centralwidget.layout()
@@ -303,7 +308,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         settings_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded if pyqt_version == 6 else Qt.ScrollBarAsNeeded)
         main_layout.replaceWidget(settings_panel, settings_scroll)
         settings_scroll.setWidget(settings_panel)
-        main_layout.setStretch(main_layout.indexOf(settings_scroll), 1)
+        main_layout.setStretch(main_layout.indexOf(settings_scroll), 0)
         main_layout.setStretch(main_layout.indexOf(self.tabs), 1)
         self.settings_scroll = settings_scroll
         self._settings_sections = []
@@ -311,88 +316,87 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             item = self.leftVBox.takeAt(0)
             if item.widget() is not None:
                 self._settings_sections.append(item.widget())
-        self._settings_wide_layout = None
-        self._settings_layout_updating = False
-        self._update_settings_layout()
+        for section in self._settings_sections:
+            self.leftVBox.addWidget(section)
+        self._update_settings_panel_width()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, "settings_scroll"):
-            self._update_settings_layout()
+        self._update_settings_panel_width()
 
-    def _settings_can_use_two_columns(self):
+    def _update_settings_panel_width(self):
         if not hasattr(self, "settings_scroll"):
-            return False
-        left_width = max(
-            self.devicesGroup.minimumSizeHint().width(),
-            self.actionsGroup.minimumSizeHint().width(),
-            self.scanGroup.minimumSizeHint().width(),
-        )
-        right_width = max(
-            self.boundsSettingsGroup.minimumSizeHint().width(),
-            self.bounds_quad_group.minimumSizeHint().width(),
-        )
-        layout_margins = self.leftVBox.contentsMargins()
-        required_width = left_width + right_width + self.leftVBox.spacing() + layout_margins.left() + layout_margins.right()
-        return self.settings_scroll.viewport().width() >= required_width
-
-    def _update_settings_layout(self):
-        if self._settings_layout_updating or not hasattr(self, "_settings_sections"):
             return
-
-        use_two_columns = self._settings_can_use_two_columns()
-        if use_two_columns == self._settings_wide_layout:
-            return
-
-        self._settings_layout_updating = True
-        try:
-            self._clear_layout(self.leftVBox)
-
-            if use_two_columns:
-                columns = QHBoxLayout()
-                columns.setContentsMargins(0, 0, 0, 0)
-                left_column = QVBoxLayout()
-                right_column = QVBoxLayout()
-                left_names = {
-                    "devicesGroup", "computingMethodGroup", "scanGroup",
-                    "localOptimizationSettingsGroup", "actionsGroup", "progressBar",
-                }
-                for section in self._settings_sections:
-                    (left_column if section.objectName() in left_names else right_column).addWidget(section)
-                left_column.addStretch(1)
-                right_column.addStretch(1)
-                columns.addLayout(left_column)
-                columns.addLayout(right_column)
-                self.leftVBox.addLayout(columns)
-            else:
-                for section in self._settings_sections:
-                    self.leftVBox.addWidget(section)
-
-            self._settings_wide_layout = use_two_columns
-        finally:
-            self._settings_layout_updating = False
-
-    @classmethod
-    def _clear_layout(cls, layout):
-        while layout.count():
-            item = layout.takeAt(0)
-            child_layout = item.layout()
-            if child_layout is not None:
-                cls._clear_layout(child_layout)
-                child_layout.deleteLater()
+        if self.width() >= 1900:
+            width = self.leftGroup.minimumSizeHint().width()
+            self.settings_scroll.setMinimumWidth(width)
+            self.settings_scroll.setMaximumWidth(width)
+        else:
+            self.settings_scroll.setMinimumWidth(0)
+            self.settings_scroll.setMaximumWidth(16777215)
 
     def _download_all_quads_status(self):
         try:
-            output_file_name = os.path.join(self.dir_name, "quadrupoles_status.npz")
+            target_dir = self.session_directory.text().strip() or self.dir_name
+            output_file_name = os.path.join(target_dir, "quadrupoles_status.npz")
             quadrupoles = list(getattr(self.interface, "quadrupoles", []))
-            self.log(f"Saving quadrupoles {quadrupoles} real readbacks to {self.dir_name}.")
-            quadrupoles_real_status=self.interface.get_quadrupoles(names=quadrupoles)
-            self.log(f"Successfully read real readbacks. Trying to save to {self.dir_name}")
-            np.savez(output_file_name, **quadrupoles_real_status) # it will save all the fields separately, instead of saving the entire dictionary as a python object, meaning we would have to load pickle and do allow_pickle etc
-            self.log(f"Saved quadrupoles real status to {self.dir_name}.")
+            self.log(f"Reading {len(quadrupoles)} quadrupole currents from the machine.")
+            payload = dict(self.interface.get_quadrupoles(names=quadrupoles))
+            payload["captured_at_utc"] = datetime.now(timezone.utc).isoformat()
+            payload["source_interface"] = self.interface.get_name()
+            momentum = getattr(getattr(self.interface, "tracking_interface", self.interface), "Pref", None)
+            if momentum is not None and np.isfinite(float(momentum)):
+                payload["reference_momentum_MeV_c"] = float(momentum)
+            output_file_name = save_quadrupole_status(payload, output_file_name)
+            self._quadrupoles_status_payload = payload
+            self.quadrupoles_status = quadrupole_status_metadata(payload, output_file_name)
+            self.quadrupoles_status["saved_path"] = output_file_name
+            if self.session is not None:
+                self.session["quadrupoles_status"] = dict(self.quadrupoles_status)
+            self.log(f"Saved quadrupole readbacks to {output_file_name} at {payload['captured_at_utc']}.")
         except Exception as e:
             QMessageBox.information(self, "Save quadrupoles status", f"An error occured while trying to save quadrupoles status. {e}")
             return
+
+    def _load_model_quadrupoles_status(self):
+        print("Quadrupoles currents before RFTrack model update:")
+        print(self.interface.get_quadrupoles()["bact"])
+        if self._is_scanning or self._is_optimizing:
+            QMessageBox.information(self, "Load model quadrupoles", "Stop the scan or fit before changing the model quadrupoles.")
+            return
+        default_dir = self.load_screens_data_database.text().strip() or self.session_directory.text().strip() or self.dir_name
+        source_path, _ = QFileDialog.getOpenFileName(self, "Load model quadrupoles", default_dir, "Quadrupole snapshots (*.npz)")
+        if not source_path:
+            return
+        try:
+            payload, metadata = load_model_quadrupoles(self.interface, source_path)
+        except Exception as e:
+            QMessageBox.warning(self, "Load model quadrupoles", str(e))
+            return
+        self._model_quadrupoles_status_payload = payload
+        self.model_quadrupoles_status = metadata
+        if self.session is not None:
+            self.session["model_quadrupoles_status"] = dict(metadata)
+        timestamp = metadata["captured_at_utc"] or "None"
+        print(f"Loaded {metadata['quadrupole_count']} quadrupoles into the RF-Track model")
+
+        print("Quadrupoles currents after RFTrack model update:")
+        print(self.interface.get_quadrupoles()["bact"])
+
+    def _preserve_quadrupole_status_files(self, target_dir):
+        for attribute, filename in (("quadrupoles_status", "quadrupoles_status.npz"), ("model_quadrupoles_status", "model_quadrupoles_status.npz")):
+            payload = getattr(self, f"_{attribute}_payload", None)
+            metadata = getattr(self, attribute, None)
+            if payload is None or metadata is None:
+                continue
+            target_path = os.path.join(target_dir, filename)
+            previous_path = metadata.get("saved_path")
+            if previous_path and os.path.dirname(previous_path) == os.path.abspath(target_dir):
+                target_path = previous_path
+            saved_path = save_quadrupole_status(payload, target_path)
+            metadata["saved_path"] = saved_path
+            if self.session is not None:
+                self.session[attribute] = dict(metadata)
 
     def _show_beamline(self):
         selected_quadrupole, screens = self._get_selection()
@@ -417,6 +421,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._set_default_quad_strength_bounds_from_session(self.session)
         self._refresh_plot_comboboxes_from_session(self.session)
         self._draw_live_scan(self.session)
+        self.steps_settings.setValue(int(self.session["steps"]))
+        self.meas_per_step.setValue(int(self.session["nshots"]))
         self.steps_settings.setEnabled(False)
         self.meas_per_step.setEnabled(False)
         self.quadrupoles_list.setEnabled(False)
@@ -723,12 +729,14 @@ class MainWindow(QMainWindow, QuadrupoleScan):
     def _on_computation_mode_changed(self, text):
         self.computation_mode = ComputationMode(text)
         is_linear_mode = self.computation_mode == ComputationMode.LRM
-        if is_linear_mode:
-            self.steps_settings.setValue(0)
-            self.quadrupoles_list.setEnabled(True)
-        else:
-            self.steps_settings.setValue(5)
-            self._on_nsteps_scan_changed(self.steps_settings.value())
+        if self.steps_settings.isEnabled():
+            if is_linear_mode:
+                if self.steps_settings.value() > 0:
+                    self._scan_steps_before_linear_mode = self.steps_settings.value()
+                self.steps_settings.setValue(0)
+                self.quadrupoles_list.setEnabled(True)
+            elif self.steps_settings.value() == 0:
+                self.steps_settings.setValue(getattr(self, "_scan_steps_before_linear_mode", 5))
 
         widgets_to_disable = [self.boundsSettingsGroup, self.bounds_quad_group, self.localOptimizationSettingsGroup]
         for widget in widgets_to_disable:
@@ -1177,7 +1185,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         steps_requested = int(self.emittance_settings["scan_steps"])
         quad_name = self.emittance_settings.get("quad_name")
         if not quad_name:
-            raise ValueError("Choose a quadrupole before rebuilding a fixed-K1L session.")
+            raise ValueError("Choose a quadrupole before doing a fixed-K1L session.")
         quad_value_unit = "1/m"
 
         if is_quad_scan:
@@ -1213,10 +1221,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                 if quad_name in names:
                     strengths.append(float(bdes[names.index(quad_name)]))
             if not strengths or not np.any(np.isfinite(strengths)):
-                raise ValueError(
-                    "The loaded fixed-K1L session does not contain the selected quadrupole strength. "
-                    "Please rescan it with the current application version."
-                )
+                raise ValueError("The loaded fixed-K1L session does not contain the selected quadrupole strength.")
             K1L_0 = float(np.nanmean(strengths))
             current_A_min, current_A_max, nsteps_scan = 0.0, 0.0, 1
             deltas = np.array([0.0])
@@ -1232,6 +1237,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         sigx_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         sigy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         sigxy_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
+        x_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
+        y_samples = np.full((nsteps_scan, nscreens, nshots), np.nan)
         images = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
         hedges = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
         vedges = [[[None for _ in range(nshots)] for _ in range(nscreens)] for _ in range(nsteps_scan)]
@@ -1247,6 +1254,8 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             sigx_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigx"])[0]) #/ 1000.0
             sigy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data["sigy"])[0]) #/ 1000.0
             sigxy_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("sigxy", [np.nan]))[0]) #/ 1000.0
+            x_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("x", [np.nan]))[0])
+            y_samples[step_i, screen_i, shot_i] = float(np.ravel(screen_data.get("y", [np.nan]))[0])
             screen_images = state.get_screens().get("images", [])
             if len(screen_images) > 0:
                 images[step_i][screen_i][shot_i] = np.asarray(screen_images[0])
@@ -1257,12 +1266,16 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             if len(screen_vedges) > 0:
                 vedges[step_i][screen_i][shot_i] = np.asarray(screen_vedges[0], dtype=float)
 
-        sigx_mean = np.nanmean(sigx_samples, axis=2)
-        sigy_mean = np.nanmean(sigy_samples, axis=2)
+        sigx_mean = np.nanmedian(sigx_samples, axis=2)
+        sigy_mean = np.nanmedian(sigy_samples, axis=2)
         sigxy_mean = np.nanmean(sigxy_samples, axis=2)
         sigx_std = np.nanstd(sigx_samples, axis=2)
         sigy_std = np.nanstd(sigy_samples, axis=2)
         sigxy_std = np.nanstd(sigxy_samples, axis=2)
+        x_mean = np.nanmedian(x_samples, axis=2)
+        y_mean = np.nanmedian(y_samples, axis=2)
+        x_std = np.nanstd(x_samples, axis=2)
+        y_std = np.nanstd(y_samples, axis=2)
 
         scan_steps=[]
         for i in range(nsteps_scan):
@@ -1297,7 +1310,14 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "sigy_std": sigy_std.tolist(),
             "sigx_shots": sigx_samples.tolist(),
             "sigy_shots": sigy_samples.tolist(),
+            "sigxy_shots": sigxy_samples.tolist(),
             "sigxy_std": sigxy_std.tolist(),
+            "x_mean": x_mean.tolist(),
+            "y_mean": y_mean.tolist(),
+            "x_std": x_std.tolist(),
+            "y_std": y_std.tolist(),
+            "x_shots": x_samples.tolist(),
+            "y_shots": y_samples.tolist(),
             "deltas": deltas.tolist(),
             "K1L_values": K1L_values.tolist(),
             "current_values": [self.quad_setpoint_to_current(quad_name, value, quad_value_unit) for value in K1L_values],
@@ -1339,14 +1359,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._set_progress(0)
         self._optimization_t0 = time.perf_counter()
         thread = QThread(self)
-
-        # FOR TESTS!!!
-        # scale = 0.8
-        # session_bad = copy.deepcopy(self.session)
-        # session_bad["K1L_0"] = self.session["K1L_0"] * scale
-        # session_bad["K1L_values"] = (np.asarray(self.session["K1L_values"]) * scale).tolist()
-        # FOR TESTS!!! in order to test again, pass session_bad to the worker, instead of self.session
-
         computing_method = self.computing_method_combo.currentText().strip()
         _, selected_screens = self._get_selection()
         worker = OptimizationWorker(self.interface, self._session_without_excluded_points(self.session), selected_screens = selected_screens, bounds = bounds,
@@ -1376,9 +1388,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
     def _on_optimization_progress(self, phase, current, total):
         total = max(int(total), 1)
         current = max(0, min(int(current), total))
-
         value = 30 + 65 * current / total
-
         self._set_progress(value)
         self.progressBar.setFormat(f"{phase}: {current}/{total}")
 
@@ -1564,7 +1574,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         except Exception as e:
             self._set_progress(0)
             self._remember_interrupted_scan(scan_settings, str(e))
-            QMessageBox.information(self, "Scan error", f"{e}\n\nPress RESUME to continue this scan from where it stopped."
+            QMessageBox.information(self, "Scan error", f"{e}\n\nPress Resume to continue this scan from where it stopped."
                 if getattr(self, "_interrupted_scan", None) else str(e))
             return
         finally:

@@ -104,6 +104,9 @@ class QuadrupoleScan(SaveOrLoad):
         else:
             self.dir_name = self._new_scan_session_dir(quad_names=quad_names, is_quad_scan=(steps > 0))
         self.session_directory.setText(self.dir_name)
+        preserve_status = getattr(self, "_preserve_quadrupole_status_files", None)
+        if callable(preserve_status):
+            preserve_status(self.dir_name)
 
         if steps == 0:
             if len(quad_names) != 1:

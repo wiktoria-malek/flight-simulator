@@ -767,6 +767,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         yb_list = []
         sigx_list = []
         sigy_list = []
+        sigxy_list = []
         sum_list = []
         images = []
         hedges_all = []

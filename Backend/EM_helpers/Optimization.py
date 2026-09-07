@@ -426,7 +426,7 @@ class Optimization:
                         quad_dy0=(float(params["quad_dy0"]) if self.fit_quad_offset else None),
                         quad_roll=(float(params["quad_roll"]) if self.fit_quad_roll else None),
                         reference_screen=screens[0], stop_checker=stop_checker)
-                    pred = {k: np.asarray(v, dtype=float) for k, v in full.items()}
+                    pred = {k: np.asarray(v, dtype=float) for k, v in full.items() if k != "particles_xy"}
                 else:
                     pred_sigx, pred_sigy = self.interface.predict_emittance_scan_response(
                         quad_name=quad_name, screens=screens, K1L_values=K1L_values_used,
@@ -486,19 +486,23 @@ class Optimization:
         # the linear estimate is only a starting point: when it is missing, or lands outside the bounds
         # the user asked for, that plane starts from the middle of its bounds instead of aborting the fit
         x0_linear_optics_values = []
+        trusted_core_params = []
         for plane, plane_params in (("x", ("emit_x_norm", "beta_x0", "alpha_x0")), ("y", ("emit_y_norm", "beta_y0", "alpha_y0"))):
             plane_values = [float(linear_optics.get(p, np.nan)) if linear_optics else np.nan for p in plane_params]
             inside_bounds = all(np.isfinite(value) and bounds[p][0] <= value <= bounds[p][1]
                                 for p, value in zip(plane_params, plane_values))
+            chi2 = float(linear_optics.get(f"reduced_chi2_{plane}", np.nan)) if linear_optics else np.nan
+            physical = bool(linear_optics.get(f"unconstrained_is_physical_{plane}", False)) if linear_optics else False
+            trusted = inside_bounds and physical and np.isfinite(chi2) and chi2 <= REDUCED_CHI2_WARNING
+            trusted_core_params.extend([trusted] * len(plane_params))
             if linear_optics is not None:
-                chi2 = float(linear_optics.get(f"reduced_chi2_{plane}", np.nan))
                 if np.isfinite(chi2) and chi2 > REDUCED_CHI2_WARNING:
-                    linear_optics_notes.append(
-                        f"plane {plane}: rft model reproduces the scan poorly, so the machine optics probably differ from the model")
+                    linear_optics_notes.append(f"plane {plane}: RF-Track doesn't reproduce the machine state, so the machine optics probably differ from the model")
             if not inside_bounds:
-                linear_optics_notes.append(
-                    f"plane {plane}: first point estimate {dict(zip(plane_params, np.round(plane_values, 5)))} is outside the fit bounds, starting from the middle of the bounds instead")
+                linear_optics_notes.append(f"plane {plane}: Initial point: {dict(zip(plane_params, np.round(plane_values, 5)))} is outside the fit bounds, starting from the middle of the bounds instead")
                 plane_values = [0.5 * (bounds[p][0] + bounds[p][1]) for p in plane_params]
+            if not trusted:
+                linear_optics_notes.append(f"This fit will probably not converge.")
             x0_linear_optics_values.extend(plane_values)
 
         if self.fit_quadrupole_strength: x0_linear_optics_values.append(K1L_0_readback)
@@ -506,16 +510,17 @@ class Optimization:
         if self.fit_quad_roll: x0_linear_optics_values.append(0.0)  # start from "no roll"
         x0_linear_optics = np.clip(np.array(x0_linear_optics_values, dtype=float), original_low_bounds, original_high_bounds)
         for note in linear_optics_notes:
-            print(f"Linear optics start: {note}")
+            print(f"{note}")
         cost_linear_optics, _ = compute_cost(dict(zip(params_order, x0_linear_optics)), allow_stop=False)
 
         if not np.isfinite(cost_linear_optics):
             x0_linear_optics = np.clip(0.5 * (original_low_bounds + original_high_bounds), original_low_bounds, original_high_bounds)
-            print("Linear optics start: the starting point does not reproduce the measured beam sizes, retrying from the middle of the bounds.")
+            trusted_core_params = [False] * n_core_params
+            print("The starting point does not reproduce the measured beam sizes, retrying from the middle of the bounds.")
             cost_linear_optics, _ = compute_cost(dict(zip(params_order, x0_linear_optics)), allow_stop=False)
 
         if not np.isfinite(cost_linear_optics):
-            raise RuntimeError("Fit will not converge: the model does not produce a finite beam size anywhere inside the fit bounds. Check the scan range, the fit bounds and the machine model.")
+            raise RuntimeError("Fit will not converge: the model does not produce beam sizes anywhere inside the fit bounds. Check the scan range, the fit bounds and the machine model.")
 
         row_values = dict(zip(params_order, x0_linear_optics))
         row_values["f"] = float(cost_linear_optics)
@@ -523,12 +528,11 @@ class Optimization:
         best_cost = float(cost_linear_optics)
         rel_window = 0.15
         half_width = rel_window * (original_high_bounds - original_low_bounds)
-        half_width[n_core_params:] = (original_high_bounds - original_low_bounds)[n_core_params:]
-        low_bounds = np.maximum(original_low_bounds, x0_linear_optics - half_width)
-        high_bounds = np.minimum(original_high_bounds, x0_linear_optics + half_width)
-        low_bounds = np.minimum(low_bounds, x0_linear_optics - 1e-9)
-        high_bounds = np.maximum(high_bounds, x0_linear_optics + 1e-9)
-        print(f"Linear optics cost: cost={cost_linear_optics:.6g}, x0={row_values}")
+        trusted_params = np.zeros(len(params_order), dtype=bool)
+        trusted_params[:n_core_params] = trusted_core_params
+        low_bounds = np.where(trusted_params, np.maximum(original_low_bounds, x0_linear_optics - half_width), original_low_bounds)
+        high_bounds = np.where(trusted_params, np.minimum(original_high_bounds, x0_linear_optics + half_width), original_high_bounds)
+        print(f"Starting point cost={cost_linear_optics:.6g}, x0={row_values}")
 
         if self._stop_requested or self._pause_requested:
             pred_partial = predict_from_params(best_row[params_order].to_dict(), allow_stop=False)
@@ -618,23 +622,42 @@ class Optimization:
                 reason_to_stop[0] = "no meaningful improvement"
                 raise StopIteration
 
-        try:
-            res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=200, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
-            p_try = np.asarray(res_try.x, dtype=float)
-            f_try, _ = compute_cost(dict(zip(params_order, p_try)), allow_stop=False)
-            if np.isfinite(f_try) and f_try < ls_best_cost[0]:
-                ls_best_cost[0] = float(f_try)
-                ls_best_params[0] = p_try.copy()
-            print(
-                f"Least squares fit: cost={float(f_try):.4g}")
-            if reason_to_stop[0] is not None:
-                print(f"Stopping LS: {reason_to_stop[0]}.")
+        for local_pass in range(2):
+            try:
+                res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=200, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
+                p_try = np.asarray(res_try.x, dtype=float)
+                f_try, _ = compute_cost(dict(zip(params_order, p_try)), allow_stop=False)
+                if np.isfinite(f_try) and f_try < ls_best_cost[0]:
+                    ls_best_cost[0] = float(f_try)
+                    ls_best_params[0] = p_try.copy()
+                print(f"Least squares fit: cost={float(f_try):.4g}")
+                if reason_to_stop[0] is not None:
+                    print(f"Stopping LS: {reason_to_stop[0]}.")
+            except StopIteration:
+                ls_stopped[0] = True
+                print("LS interrupted.")
+                break
+            except Exception as e:
+                print(f"LS failed ({e}).")
+                break
 
-        except StopIteration:
-            ls_stopped[0] = True
-            print("  LS interrupted.")
-        except Exception as e:
-            print(f"  LS failed ({e}).")
+            if local_pass or self._stop_requested or self._pause_requested:
+                break
+            edge_tolerance = np.maximum(1e-10, 1e-3 * (high_bounds - low_bounds))
+            hits_low = (low_bounds > original_low_bounds) & (ls_best_params[0] - low_bounds <= edge_tolerance)
+            hits_high = (high_bounds < original_high_bounds) & (high_bounds - ls_best_params[0] <= edge_tolerance)
+            if not np.any(hits_low | hits_high):
+                break
+            expand_params = hits_low | hits_high
+            for plane_start in range(0, n_core_params, 3):
+                if np.any(expand_params[plane_start:plane_start + 3]):
+                    expand_params[plane_start:plane_start + 3] = True
+            low_bounds = np.where(expand_params, original_low_bounds, low_bounds)
+            high_bounds = np.where(expand_params, original_high_bounds, high_bounds)
+            x0_try = np.clip(ls_best_params[0], low_bounds, high_bounds)
+            best_cost_in_this_fit[0] = np.inf
+            steps_without_improvement[0] = 0
+            reason_to_stop[0] = None
 
         p_final = ls_best_params[0]
         best_cost_final = ls_best_cost[0]

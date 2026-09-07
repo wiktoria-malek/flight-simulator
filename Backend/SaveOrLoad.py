@@ -267,7 +267,7 @@ class SaveOrLoad():
         if not saved_states_dir:
             return None
         saved_states_dir = os.path.normpath(os.path.expanduser(os.path.expandvars(str(saved_states_dir))))
-        if saved_states_dir != states_dir:
+        if saved_states_dir != states_dir and os.path.basename(saved_states_dir) != os.path.basename(states_dir):
             return None
         return settings
 
@@ -285,10 +285,17 @@ class SaveOrLoad():
         quad_selected = None
         screens = []
         folder_base_name = os.path.basename(os.path.normpath(folder))
+
         if folder_base_name.startswith("states_"):
-            quad_selected = folder_base_name.removeprefix("states_").split("_")[0]
+            state_folder_path = folder
         else:
-            quad_selected = None
+            states_folders = [name for name in sorted(os.listdir(folder)) if name.startswith("states_") and os.path.isdir(os.path.join(folder, name))]
+            if not states_folders: QMessageBox.information(self, "Error", "No states folder found.")
+            state_folder_path = os.path.join(folder, states_folders[0])
+
+        print(f"Loading scan data from {state_folder_path}")
+        state_folder_name = os.path.basename(os.path.normpath(state_folder_path))
+        quad_selected = state_folder_name.removeprefix("states_").split("_")[0]
 
         self.quadrupoles_list.clearSelection()
         if quad_selected:
@@ -306,7 +313,6 @@ class SaveOrLoad():
                     quad_selected = None
 
         state_files = []
-        state_folder_path = folder
         for filename in sorted(os.listdir(state_folder_path)):
             if filename.endswith(".pkl"):
                 state_files.append(os.path.join(state_folder_path, filename))
@@ -381,9 +387,14 @@ class SaveOrLoad():
         if is_quad_scan:
             current_A_min = float(self.minimum_current.value())
             current_A_max = float(self.maximum_current.value())
-            scan_steps = max(step_i for screen_i, step_i, shot_i in read_filenames)+1
+            steps_per_screen = {}
+            for screen_i, step_i, shot_i in read_filenames:
+                steps_per_screen.setdefault(screen_i, set()).add(step_i)
+            scan_steps = max(len(indices) for indices in steps_per_screen.values())
             saved_scan_settings = self._find_matching_emittance_settings(folder)
             if saved_scan_settings:
+                if saved_scan_settings.get("scan_steps") is not None:
+                    scan_steps = int(saved_scan_settings["scan_steps"])
                 if "current_A_min" in saved_scan_settings:
                     current_A_min = float(saved_scan_settings["current_A_min"])
                 if "current_A_max" in saved_scan_settings:
@@ -397,7 +408,7 @@ class SaveOrLoad():
             current_A_min, current_A_max, scan_steps = 0.0, 0.0, 0.0
             quad_selected = None
 
-        print(f"Nshots: {nshots}, Scan steps: {scan_steps}")
+        print(f"Nshots: {nshots}, Scan steps per screen: {scan_steps}")
 
         is_fit_quad_strength_checked = bool(self.fit_quadrupole_strength_checkbox.isChecked())
 
@@ -414,6 +425,9 @@ class SaveOrLoad():
             "screens": screens if screens is not None else [],
             "quad_name": quad_selected if quad_selected else None,
         }
+
+        self.steps_settings.setValue(int(scan_steps))
+        self.meas_per_step.setValue(int(nshots))
 
         return self.loaded_states_from_scan
 
@@ -621,6 +635,9 @@ class SaveOrLoad():
     def save_emittance_measurement_session(self, session=None, is_fit_quad_strength_checked=None, bounds=None, target_dir=None):
         save_session_dir = target_dir or getattr(self, "dir_name", None) or self.session_directory.text()
         os.makedirs(save_session_dir, exist_ok=True)
+        preserve_status = getattr(self, "_preserve_quadrupole_status_files", None)
+        if callable(preserve_status):
+            preserve_status(save_session_dir)
         self.session_directory.setText(save_session_dir)
         self._saving_func(elements_list=self.quadrupoles_list, filename="quadrupoles.txt", saving_name="Save quadrupoles", use_dialog=False, base_dir=save_session_dir)
         self._saving_func(elements_list=self.screens_list, filename="screens.txt", saving_name="Save screens", use_dialog=False, base_dir=save_session_dir)
@@ -635,6 +652,10 @@ class SaveOrLoad():
         else:
             self.emittance_settings = {}
         self.emittance_settings.pop("ls_steps", None)
+        for status_key in ("quadrupoles_status", "model_quadrupoles_status"):
+            status = getattr(self, status_key, None)
+            if status is not None:
+                self.emittance_settings[status_key] = status
 
         if session is not None:
             state_files = []
