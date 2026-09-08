@@ -109,7 +109,7 @@ class OptimizationWorker(QObject):
     ml_not_found_rft_fallback = pyqtSignal()
 
     def __init__(self, interface, session, selected_screens=None, bounds=None, fit_quadrupole_strength=False,
-                 fit_quad_offset=False, fit_quad_roll=False, computing_method="Linear R-response model"):
+                 fit_quad_offset=False, fit_quad_roll=False, fit_energy_pref = None, computing_method="Linear R-response model"):
         super().__init__()
         self.interface = interface
         self.session = session
@@ -118,6 +118,7 @@ class OptimizationWorker(QObject):
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
         self.fit_quad_offset = bool(fit_quad_offset)
         self.fit_quad_roll = bool(fit_quad_roll)
+        self.fit_energy_pref = bool(fit_energy_pref)
         self.computing_method = computing_method
 
     def _emit_progress(self, phase, current, total):
@@ -187,6 +188,7 @@ class OptimizationWorker(QObject):
                                                            fit_quadrupole_strength=self.fit_quadrupole_strength,
                                                            fit_quad_offset=self.fit_quad_offset,
                                                            fit_quad_roll=self.fit_quad_roll,
+                                                           fit_energy_pref = self.fit_energy_pref,
                                                            progress_callback=self._emit_progress,
                                                            fallback_callback=self.ml_not_found_rft_fallback.emit)
             self.optimizer_ready.emit(tool)
@@ -277,10 +279,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self._interrupted_scan = None
         self._last_scan_status = None
         self.fit_core_params = ("emit_x_norm", "beta_x0", "alpha_x0", "emit_y_norm", "beta_y0", "alpha_y0")
-        self.additional_params = ("quad_k1l_0", "quad_dx0", "quad_dy0", "quad_roll")
-        self.additional_params_scales = {"quad_k1l_0": 1.0, "quad_dx0": 1e-3, "quad_dy0": 1e-3, "quad_roll": 1e-3}
-        self.additional_params_defaults = {"quad_k1l_0": (0.0, 0.0), "quad_dx0": (-2.0, 2.0), "quad_dy0": (-2.0, 2.0),
-                                           "quad_roll": (-50.0, 50.0)}
+        self.additional_params = ("quad_k1l_0", "quad_dx0", "quad_dy0", "quad_roll", "energy_pref")
+        self.additional_params_scales = {"quad_k1l_0": 1.0, "quad_dx0": 1e-3, "quad_dy0": 1e-3, "quad_roll": 1e-3, "energy_pref": 1}
+        self.additional_params_defaults = {"quad_k1l_0": (0.0, 0.0), "quad_dx0": (-2.0, 2.0), "quad_dy0": (-2.0, 2.0), "quad_roll": (-50.0, 50.0), "energy_pref": (150, 250)}
         self._setup_bounds_buttons()
         self._populate_default_bounds()
         self.fit_quadrupole_strength_checkbox.toggled.connect(self._update_additional_fit_controls)
@@ -504,11 +505,14 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "quad_dx0": self.quad_dx_bounds,
             "quad_dy0": self.quad_dy_bounds,
             "quad_roll": self.quad_roll_bounds,
+            "energy_pref": self.energy_pref_bounds,
         }
         self.bounds_units = {
             "emit_x_norm": "mm·mrad", "beta_x0": "m", "alpha_x0": "",
             "emit_y_norm": "mm·mrad", "beta_y0": "m", "alpha_y0": "",
             "quad_k1l_0": self._quadrupole_value_unit(), "quad_dx0": "mm", "quad_dy0": "mm", "quad_roll": "mrad",
+            "energy_pref": "MeV"
+
         }
         self.bounds_display_names = {
             "emit_x_norm": "Horizontal ε (norm.)",
@@ -521,6 +525,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "quad_dx0": "Quadrupole Δx",
             "quad_dy0": "Quadrupole Δy",
             "quad_roll": "Quadrupole roll",
+            "energy_pref": "Beam energy"
         }
         self._bounds_button_base_text = {param: button.text() for param, button in self.bounds_buttons.items()}
         quad_value_unit = self.bounds_units["quad_k1l_0"]
@@ -598,15 +603,14 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
     def _update_additional_fit_controls(self, _checked=None):
         is_linear_mode = self.computation_mode == ComputationMode.LRM
-        for checkbox in (self.fit_quadrupole_strength_checkbox, self.fit_quad_offset_checkbox,
-                         self.fit_quad_roll_checkbox):
+        for checkbox in (self.fit_quadrupole_strength_checkbox, self.fit_quad_offset_checkbox, self.fit_quad_roll_checkbox):
             checkbox.setEnabled(not is_linear_mode)
-        self._set_bound_row_enabled("quad_k1l_0",
-                                    not is_linear_mode and self.fit_quadrupole_strength_checkbox.isChecked())
+        self._set_bound_row_enabled("quad_k1l_0", not is_linear_mode and self.fit_quadrupole_strength_checkbox.isChecked())
         offset_bounds_enabled = not is_linear_mode and self.fit_quad_offset_checkbox.isChecked()
         self._set_bound_row_enabled("quad_dx0", offset_bounds_enabled)
         self._set_bound_row_enabled("quad_dy0", offset_bounds_enabled)
         self._set_bound_row_enabled("quad_roll", not is_linear_mode and self.fit_quad_roll_checkbox.isChecked())
+        self._set_bound_row_enabled("energy_pref", not is_linear_mode and self.fit_energy_checkbox.isChecked())
 
     def _set_bounds_from_saved_settings(self, saved_bounds):
         for param in self.fit_core_params:
@@ -627,6 +631,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "quad_dx0": self.fit_quad_offset_checkbox,
             "quad_dy0": self.fit_quad_offset_checkbox,
             "quad_roll": self.fit_quad_roll_checkbox,
+            "energy_pref": self.fit_energy_checkbox,
         }
         for param in self.additional_params:
             if checkbox_by_param[param].isChecked():
@@ -962,6 +967,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_quad_dx0.setText("-")
         self.result_quad_dy0.setText("-")
         self.result_quad_roll.setText("-")
+        self.result_energy_pref.setText("-")
         self.result_reference_screen.setText("-")
 
     def _interface_quad_value_unit(self):
@@ -1035,15 +1041,10 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_alpha_x0.setText(formatted_result(result.get("alpha_x0"), result.get("alpha_x0_err")))
         self.result_beta_y0.setText(formatted_result(result.get("beta_y0"), result.get("beta_y0_err"), "m"))
         self.result_alpha_y0.setText(formatted_result(result.get("alpha_y0"), result.get("alpha_y0_err")))
-        self.result_quad_dx0.setText(
-            formatted_result(result.get("quad_dx0"), result.get("quad_dx0_err"), "mm") if result.get(
-                "fit_quad_offset") else "-")
-        self.result_quad_dy0.setText(
-            formatted_result(result.get("quad_dy0"), result.get("quad_dy0_err"), "mm") if result.get(
-                "fit_quad_offset") else "-")
-        self.result_quad_roll.setText(
-            formatted_result(result.get("quad_roll"), result.get("quad_roll_err"), "mrad") if result.get(
-                "fit_quad_roll") else "-")
+        self.result_quad_dx0.setText(formatted_result(result.get("quad_dx0"), result.get("quad_dx0_err"), "mm") if result.get("fit_quad_offset") else "-")
+        self.result_quad_dy0.setText(formatted_result(result.get("quad_dy0"), result.get("quad_dy0_err"), "mm") if result.get("fit_quad_offset") else "-")
+        self.result_quad_roll.setText(formatted_result(result.get("quad_roll"), result.get("quad_roll_err"), "mrad") if result.get("fit_quad_roll") else "-")
+        self.result_energy_pref.setText(formatted_result(result.get("energy_pref"), result.get("energy_pref_err"), "mm"))
         self.result_reference_screen.setText(result["screen0"])
 
         print("Errors of the fit:")

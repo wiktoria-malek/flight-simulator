@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1542</width>
-    <height>1053</height>
+    <width>1568</width>
+    <height>1054</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -684,6 +684,35 @@ QToolButton#fit_quad_roll_info_button:hover {
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QCheckBox" name="fit_energy_checkbox">
+              <property name="text">
+               <string>Fit energy</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="fit_energy_tooltip">
+              <property name="styleSheet">
+               <string notr="true">QToolButton#fit_energy_tooltip {
+    border: 1px solid #888;
+    border-radius: 11px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px;
+    font-weight: bold;
+}
+QToolButton#fit_energy_tooltip:hover {
+    background-color: #e6e6e6;
+}</string>
+              </property>
+              <property name="text">
+               <string>?</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
          </layout>
@@ -873,28 +902,28 @@ QToolButton#bounds_info_button:hover {
                <property name="verticalSpacing">
                 <number>6</number>
                </property>
-               <item row="0" column="0">
+               <item row="1" column="0">
                 <widget class="QPushButton" name="quad_strength_bounds">
                  <property name="text">
                   <string>I₀ [A]</string>
                  </property>
                 </widget>
                </item>
-               <item row="2" column="0">
+               <item row="3" column="0">
                 <widget class="QPushButton" name="quad_dy_bounds">
                  <property name="text">
                   <string>quad Δy [mm]</string>
                  </property>
                 </widget>
                </item>
-               <item row="1" column="0">
+               <item row="2" column="0">
                 <widget class="QPushButton" name="quad_dx_bounds">
                  <property name="text">
                   <string>quad Δx [mm]</string>
                  </property>
                 </widget>
                </item>
-               <item row="3" column="0">
+               <item row="4" column="0">
                 <widget class="QPushButton" name="quad_roll_bounds">
                  <property name="text">
                   <string>quad roll [mrad]</string>
@@ -902,6 +931,26 @@ QToolButton#bounds_info_button:hover {
                 </widget>
                </item>
               </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="groupBox">
+              <property name="title">
+               <string>Beam settings</string>
+              </property>
+              <widget class="QPushButton" name="energy_pref_bounds">
+               <property name="geometry">
+                <rect>
+                 <x>10</x>
+                 <y>40</y>
+                 <width>125</width>
+                 <height>32</height>
+                </rect>
+               </property>
+               <property name="text">
+                <string>Energy [MeV]</string>
+               </property>
+              </widget>
              </widget>
             </item>
            </layout>
@@ -1465,6 +1514,39 @@ QGroupBox#fit_results_group::title {
                     </widget>
                    </item>
                   </layout>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QGroupBox" name="groupBox_2">
+                  <property name="title">
+                   <string>Beam settings</string>
+                  </property>
+                  <widget class="QLabel" name="energy_result_label">
+                   <property name="geometry">
+                    <rect>
+                     <x>50</x>
+                     <y>20</y>
+                     <width>60</width>
+                     <height>16</height>
+                    </rect>
+                   </property>
+                   <property name="text">
+                    <string>Energy</string>
+                   </property>
+                  </widget>
+                  <widget class="QLabel" name="result_energy_pref">
+                   <property name="geometry">
+                    <rect>
+                     <x>130</x>
+                     <y>20</y>
+                     <width>60</width>
+                     <height>16</height>
+                    </rect>
+                   </property>
+                   <property name="text">
+                    <string>-</string>
+                   </property>
+                  </widget>
                  </widget>
                 </item>
                </layout>

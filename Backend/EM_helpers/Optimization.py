@@ -37,7 +37,7 @@ class OptimizationPaused(Exception):
         self.solution = solution
 
 class Optimization:
-    def __init__(self, interface, fit_quadrupole_strength=False, fit_quad_offset=False, fit_quad_roll=False, progress_callback=None):
+    def __init__(self, interface, fit_quadrupole_strength=False, fit_quad_offset=False, fit_quad_roll=False, fit_energy_pref = None, progress_callback=None):
         self.progress_callback = progress_callback
         self.interface = interface
         self._stop_requested = False
@@ -47,6 +47,7 @@ class Optimization:
         self.fit_quadrupole_strength = bool(fit_quadrupole_strength)
         self.fit_quad_offset = bool(fit_quad_offset)
         self.fit_quad_roll = bool(fit_quad_roll)
+        self.fit_energy_pref = bool(fit_energy_pref)
 
     def _emit_progress(self, phase, current, total):
         if self.progress_callback is None:
@@ -204,6 +205,7 @@ class Optimization:
         quad_dx0_err = float(err_dict.get("quad_dx0", np.nan)) * 1e3 # mm
         quad_dy0_err = float(err_dict.get("quad_dy0", np.nan)) * 1e3 # mm
         quad_roll_err = float(err_dict.get("quad_roll", np.nan)) * 1e3 # mrad
+        energy_pref_err = float(err_dict.get("energy_pref", np.nan)) # MeV
 
         if np.isfinite(beta_gamma) and beta_gamma > 0:
             emit_x_geom_err = emit_x_norm_err / beta_gamma * 1e3 if np.isfinite(emit_x_norm_err) else np.nan
@@ -228,6 +230,7 @@ class Optimization:
             "fit_quadrupole_strength": bool(self.fit_quadrupole_strength),
             "fit_quad_offset": bool(self.fit_quad_offset),
             "fit_quad_roll": bool(self.fit_quad_roll),
+            "fit_energy_pref": bool(self.fit_energy_pref),
             "quad_k1l_0": (
                 float(joint_fit.get("quad_k1l_0", np.nan))
                 if bool(self.fit_quadrupole_strength) and isinstance(joint_fit, dict)
@@ -239,6 +242,8 @@ class Optimization:
             "quad_dy0_err": quad_dy0_err,
             "quad_roll": (float(joint_fit.get("quad_roll", np.nan)) * 1e3 if bool(self.fit_quad_roll) and isinstance(joint_fit, dict) else np.nan),  # mrad
             "quad_roll_err": quad_roll_err,
+            "energy_pref": (float(joint_fit.get("energy_pref", np.nan)) if bool(self.fit_energy_pref) and isinstance(joint_fit, dict) else np.nan),  # MeV
+            "energy_pref_err": energy_pref_err,
             "emit_x_norm_err": emit_x_norm_err,
             "emit_y_norm_err": emit_y_norm_err,
             "emit_x_geom_err": emit_x_geom_err,
@@ -294,6 +299,7 @@ class Optimization:
             "quad_dx0": (float(best_row["quad_dx0"]) if "quad_dx0" in best_row else np.nan),
             "quad_dy0": (float(best_row["quad_dy0"]) if "quad_dy0" in best_row else np.nan),
             "quad_roll": (float(best_row["quad_roll"]) if "quad_roll" in best_row else np.nan),
+            "energy_pref": (float(best_row["energy_pref"]) if "energy_pref" in best_row else np.nan),
             "cost": float(best_cost) if np.isfinite(best_cost) else np.nan,
         }
 
@@ -400,6 +406,8 @@ class Optimization:
             params_order.extend(["quad_dx0", "quad_dy0"])
         if self.fit_quad_roll:
             params_order.append("quad_roll")
+        if self.fit_energy_pref:
+            params_order.append("fit_energy_pref")
 
         low_bounds = np.array([bounds[p][0] for p in params_order], dtype=float)
         high_bounds = np.array([bounds[p][1] for p in params_order], dtype=float)
@@ -427,6 +435,7 @@ class Optimization:
                         quad_dx0=(float(params["quad_dx0"]) if self.fit_quad_offset else None),
                         quad_dy0=(float(params["quad_dy0"]) if self.fit_quad_offset else None),
                         quad_roll=(float(params["quad_roll"]) if self.fit_quad_roll else None),
+                        energy_pref = (float(params["fit_energy_pref"]) if self.fit_energy_pref else None),
                         reference_screen=screens[0], stop_checker=stop_checker)
                     pred = {k: np.asarray(v, dtype=float) for k, v in full.items() if k != "particles_xy"}
                 else:

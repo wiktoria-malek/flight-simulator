@@ -710,7 +710,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             sigy[i] = float(screen_data["sigy"][idx])
         return sigx, sigy
 
-    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
+    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref = None, stop_checker=None, reference_screen=None):
         screens = list(screens)
         K1L_values = np.asarray(K1L_values, dtype=float)
         if reference_screen is None: reference_screen = screens[0]
@@ -718,10 +718,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         B0_original = self.B0
         lattice_reference = self.lattice
         self.lattice = lattice_reference.clone()
-
-        # Each least-squares trial must modify an isolated lattice.  In this
-        # RF-Track binding get_offsets() returns a Frame, not a six-number
-        # vector, so never try to index or reconstruct it here.
         quad_elements = self._map_quadrupoles_names_from_lattice(quad_name)
         if not isinstance(quad_elements, list):
             quad_elements = [quad_elements]
@@ -731,6 +727,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         dx = 0.0 if quad_dx0 is None else float(quad_dx0)
         dy = 0.0 if quad_dy0 is None else float(quad_dy0)
         roll = 0.0 if quad_roll is None else float(quad_roll)
+        energy_pref = 0.0 if energy_pref is None else float(energy_pref)
         nK1L, nscreens = len(K1L_values), len(screens)
         sigma_x = np.full((nK1L, nscreens), np.nan, dtype=float)
         sigma_y = np.full((nK1L, nscreens), np.nan, dtype=float)
@@ -791,8 +788,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         full = self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker=stop_checker, reference_screen=reference_screen)
         return full["sigma_x"], full["sigma_y"]
 
-    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
-        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, stop_checker=stop_checker, reference_screen=reference_screen)
+    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref = None, stop_checker=None, reference_screen=None):
+        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, energy_pref = energy_pref, stop_checker=stop_checker, reference_screen=reference_screen)
 
     def get_twiss_at_screen(self, name): # for printing emittance after bba using rft interface, can be deleted later
         if name not in self.screens:
