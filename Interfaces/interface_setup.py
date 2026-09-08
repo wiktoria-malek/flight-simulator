@@ -31,6 +31,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [0.005, 0.15],
                 "beta_y0": [0.5, 8.0],
                 "alpha_y0": [-4.0, 6.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -56,6 +57,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [0.005, 0.15],
                 "beta_y0": [0.5, 8.0],
                 "alpha_y0": [-4.0, 6.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -92,6 +94,7 @@ INTERFACE_SETUP = {
                     "emit_y_norm": [0.005, 0.12],
                     "beta_y0": [2.0, 20.0],
                     "alpha_y0": [-8.0, 2.0],
+                    "energy_pref": [1000.0, 2000.0],
                 }
         },
         {
@@ -120,6 +123,7 @@ INTERFACE_SETUP = {
             "emit_y_norm": [0.01, 5.0],
             "beta_y0": [0.001, 60.0],
             "alpha_y0": [-15, 15.0],
+            "energy_pref": [1000.0, 2000.0],
         }
 
         },
@@ -152,6 +156,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [1e-4, 0.05],
                 "beta_y0": [0.2, 8.0],
                 "alpha_y0": [-15.0, 2.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -174,6 +179,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [1e-4, 0.05],
                 "beta_y0": [0.2, 8.0],
                 "alpha_y0": [-15.0, 2.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -199,6 +205,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [1e-4, 0.05],
                 "beta_y0": [0.2, 8.0],
                 "alpha_y0": [-15.0, 2.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
     ],
@@ -296,6 +303,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [0.0, 50.0],
                 "beta_y0": [0.001, 200.0],
                 "alpha_y0": [-100.0, 100.0],
+                "energy_pref": [150.0, 250.0],
             }
         },
         {
@@ -323,6 +331,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [0.0, 50.0],
                 "beta_y0": [0.001, 200.0],
                 "alpha_y0": [-100.0, 100.0],
+                "energy_pref": [150.0, 250.0],
             }
         },
     ],
