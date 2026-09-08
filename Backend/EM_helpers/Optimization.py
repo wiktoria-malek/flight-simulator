@@ -314,18 +314,22 @@ class Optimization:
         n_y_sum = np.sum(np.isfinite(sigma_y_shots), axis=2)
 
         # Measured beam size: the median over shots, so a single bad frame cannot drag the point.
-        sig_x = np.nanmean(sigma_x_shots, axis=2)
-        sig_y = np.nanmean(sigma_y_shots, axis=2)
-
-        # Sample standard deviation of sigma, then standard error of its mean.
-        s_sigx = np.nanstd(sigma_x_shots, axis=2, ddof=1)
-        s_sigy = np.nanstd(sigma_y_shots, axis=2, ddof=1)
+        sig_x = np.nanmedian(sigma_x_shots, axis=2)
+        sig_y = np.nanmedian(sigma_y_shots, axis=2)
 
         fallback_u_x = np.maximum(0.08 * np.abs(sig_x), 1e-12)
         fallback_u_y = np.maximum(0.08 * np.abs(sig_y), 1e-12)
 
-        u_x = np.where(n_x_sum >= 2, s_sigx / np.sqrt(n_x_sum), fallback_u_x)
-        u_y = np.where(n_y_sum >= 2, s_sigy / np.sqrt(n_y_sum), fallback_u_y)
+        u_x = fallback_u_x.copy()
+        u_y = fallback_u_y.copy()
+        rng = np.random.default_rng(0)
+        for shots, uncertainty in ((sigma_x_shots, u_x), (sigma_y_shots, u_y)):
+            for index in np.ndindex(shots.shape[:2]):
+                values = shots[index]
+                values = values[np.isfinite(values)]
+                if values.size >= 2:
+                    medians = np.median(rng.choice(values, size=(2000, values.size)), axis=1)
+                    uncertainty[index] = np.std(medians, ddof=1)
 
         u_x = np.where(np.isfinite(u_x) & (u_x > 1e-9), u_x, fallback_u_x)
         u_y = np.where(np.isfinite(u_y) & (u_y > 1e-9), u_y, fallback_u_y)

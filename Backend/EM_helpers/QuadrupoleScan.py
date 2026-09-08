@@ -338,8 +338,8 @@ class QuadrupoleScan(SaveOrLoad):
                                 state_files.append(state_filename)
 
                         if state_files:
-                            sigx_mean[i, k] = np.nanmean(sx_shots)
-                            sigy_mean[i, k] = np.nanmean(sy_shots)
+                            sigx_mean[i, k] = np.nanmedian(sx_shots)
+                            sigy_mean[i, k] = np.nanmedian(sy_shots)
                             sigxy_mean[i, k] = np.nanmean(sxy_shots)
                             sigx_std[i, k] = np.nanstd(sx_shots)
                             sigy_std[i, k] = np.nanstd(sy_shots)
