@@ -889,6 +889,9 @@ class CLEAR_real_machine(AbstractMachineInterface):
     def get_twiss_evolution(self, *args, **kwargs):
         return self.tracking_interface.get_twiss_evolution(*args, **self._model_screen_kwargs(kwargs))
 
+    def get_emittance_at_screens(self, *args, **kwargs):
+        return self.tracking_interface.get_emittance_at_screens(*args, **kwargs)
+
     @staticmethod
     def _gaussian(x, amplitude, center, sigma, offset):
         return amplitude * np.exp(-((x - center) ** 2) / (2.0 * sigma ** 2)) + offset

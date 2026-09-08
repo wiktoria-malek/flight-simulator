@@ -473,6 +473,30 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                    "S": np.array(s_list, dtype=float),}
         return screens
 
+    def get_emittance_at_screens(self, names=None):
+        if isinstance(names, str): names = [names]
+        fields = ("emitt_x", "emitt_y", "beta_x", "beta_y", "alpha_x", "alpha_y", "sigma_x", "sigma_y")
+        screen_names = []
+        s_list = []
+        values = {field: [] for field in fields}
+
+        for s in self.lattice.get_screens():
+            screen_name = s.get_name()
+            if names is not None and screen_name not in names:
+                continue
+            bunch = s.get_bunch()
+            if bunch is None:
+                continue
+            info = bunch.get_info()
+            screen_names.append(screen_name)
+            s_list.append(float(s.get_S("exit")))
+            for field in fields:
+                values[field].append(float(getattr(info, field, np.nan)))
+
+        emittance = {"names": screen_names, "S": np.array(s_list, dtype=float)}
+        emittance.update({field: np.array(values[field], dtype=float) for field in fields})
+        return emittance
+
     def get_quadrupoles(self, names=None):
         #self.log("Reading quadrupoles' strengths...")
         bdes = np.zeros(len(self.quadrupoles), dtype=float)
@@ -684,7 +708,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "S": np.array(all_s, dtype=float),
         }
 
-    def _build_bunch_from_guesses(self, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
+    def _build_bunch_from_guesses(self, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, energy_pref=None):
         T = rft.Bunch6d_twiss()
         T.emitt_x = float(emit_x)  # mm.mrad normalised emittance
         T.emitt_y = float(emit_y)  # mm.mrad
@@ -694,7 +718,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         T.alpha_y = float(alpha_y0)
         T.sigma_t = 8  # mm/c
         T.sigma_pt = 0.8  # permille
-        bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
+        Pref = self.Pref if energy_pref is None else float(energy_pref)
+        bunch = rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, Pref, T, self.nparticles, self.sigmaCut)
         return bunch
 
     def _read_tracked_bunch_screen_sigmas(self, screens):
@@ -727,7 +752,6 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         dx = 0.0 if quad_dx0 is None else float(quad_dx0)
         dy = 0.0 if quad_dy0 is None else float(quad_dy0)
         roll = 0.0 if quad_roll is None else float(quad_roll)
-        energy_pref = 0.0 if energy_pref is None else float(energy_pref)
         nK1L, nscreens = len(K1L_values), len(screens)
         sigma_x = np.full((nK1L, nscreens), np.nan, dtype=float)
         sigma_y = np.full((nK1L, nscreens), np.nan, dtype=float)
@@ -749,7 +773,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                 if isinstance(end_element, list):
                     end_element = end_element[-1]
 
-                temp_bunch = self._build_bunch_from_guesses(emit_x=float(emit_x), emit_y=float(emit_y), beta_x0=float(beta_x0), beta_y0=float(beta_y0), alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0))
+                temp_bunch = self._build_bunch_from_guesses(emit_x=float(emit_x), emit_y=float(emit_y), beta_x0=float(beta_x0), beta_y0=float(beta_y0), alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0), energy_pref=energy_pref)
                 lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
                 tracked_to_last_screen = lattice_view.track(temp_bunch)
 

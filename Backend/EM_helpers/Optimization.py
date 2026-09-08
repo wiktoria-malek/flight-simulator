@@ -155,7 +155,7 @@ class Optimization:
             }
 
             print(
-                f"Joint fit done with cost={joint_fit['cost']:.6g}, "
+                f"Joint fit done: "
                 f"emit_x_geom={joint_fit['emit_x_geom']:.6g}, beta_x0={joint_fit['beta_x0']:.6g}, alpha_x0={joint_fit['alpha_x0']:.6g}, "
                 f"emit_y_geom={joint_fit['emit_y_geom']:.6g}, beta_y0={joint_fit['beta_y0']:.6g}, alpha_y0={joint_fit['alpha_y0']:.6g}")
 
@@ -270,9 +270,7 @@ class Optimization:
         print(
             f"Final result: "
             f"emit_x_norm={result['emit_x_norm']:.6g}, "
-            f"emit_y_norm={result['emit_y_norm']:.6g}, "
-            f"fit_x_cost={result['fit_x_cost']:.6g}, "
-            f"fit_y_cost={result['fit_y_cost']:.6g}"
+            f"emit_y_norm={result['emit_y_norm']:.6g}"
         )
 
         return output
@@ -410,7 +408,7 @@ class Optimization:
         if self.fit_quad_roll:
             params_order.append("quad_roll")
         if self.fit_energy_pref:
-            params_order.append("fit_energy_pref")
+            params_order.append("energy_pref")
 
         low_bounds = np.array([bounds[p][0] for p in params_order], dtype=float)
         high_bounds = np.array([bounds[p][1] for p in params_order], dtype=float)
@@ -430,7 +428,7 @@ class Optimization:
 
             stop_checker = (lambda: self._stop_requested or self._pause_requested) if allow_stop else None
             try:
-                if self.fit_quad_offset or self.fit_quad_roll:
+                if self.fit_quad_offset or self.fit_quad_roll or self.fit_energy_pref:
                     full = self.interface.predict_emittance_scan_response_full(
                         quad_name=quad_name, screens=screens, K1L_values=K1L_values_used,
                         emit_x=emit_x_norm, emit_y=emit_y_norm, beta_x0=beta_x0, beta_y0=beta_y0,
@@ -438,7 +436,7 @@ class Optimization:
                         quad_dx0=(float(params["quad_dx0"]) if self.fit_quad_offset else None),
                         quad_dy0=(float(params["quad_dy0"]) if self.fit_quad_offset else None),
                         quad_roll=(float(params["quad_roll"]) if self.fit_quad_roll else None),
-                        energy_pref = (float(params["fit_energy_pref"]) if self.fit_energy_pref else None),
+                        energy_pref = (float(params["energy_pref"]) if self.fit_energy_pref else None),
                         reference_screen=screens[0], stop_checker=stop_checker)
                     pred = {k: np.asarray(v, dtype=float) for k, v in full.items() if k != "particles_xy"}
                 else:
@@ -520,6 +518,7 @@ class Optimization:
         if self.fit_quadrupole_strength: x0_linear_optics_values.append(K1L_0_readback)
         if self.fit_quad_offset: x0_linear_optics_values.extend([0.0, 0.0])  # start from "no offset", the fit pulls away from it if the data supports it
         if self.fit_quad_roll: x0_linear_optics_values.append(0.0)  # start from "no roll"
+        if self.fit_energy_pref: x0_linear_optics_values.append(float(getattr(self.interface, "Pref", 0.5 * (bounds["energy_pref"][0] + bounds["energy_pref"][1]))))
         x0_linear_optics = np.clip(np.array(x0_linear_optics_values, dtype=float), original_low_bounds, original_high_bounds)
         for note in linear_optics_notes:
             print(f"{note}")
@@ -544,7 +543,7 @@ class Optimization:
         trusted_params[:n_core_params] = trusted_core_params
         low_bounds = np.where(trusted_params, np.maximum(original_low_bounds, x0_linear_optics - half_width), original_low_bounds)
         high_bounds = np.where(trusted_params, np.minimum(original_high_bounds, x0_linear_optics + half_width), original_high_bounds)
-        print(f"Starting point cost={cost_linear_optics:.6g}, x0={row_values}")
+        print(f"Starting point: x0={dict(zip(params_order, x0_linear_optics))}")
 
         if self._stop_requested or self._pause_requested:
             pred_partial = predict_from_params(best_row[params_order].to_dict(), allow_stop=False)
@@ -553,7 +552,7 @@ class Optimization:
                 raise OptimizationPaused("Optimization paused.", solution=solution)
             return solution
         pred = predict_from_params(best_row[params_order].to_dict(), allow_stop=True)
-        print(f"Starting local optimization from f={best_cost:.4g}...")
+        print("Starting local optimization...")
         x0 = np.array([float(best_row[p]) for p in params_order], dtype=float)
         x0 = np.clip(x0, low_bounds, high_bounds)
 
@@ -644,7 +643,7 @@ class Optimization:
                 if np.isfinite(f_try) and f_try < ls_best_cost[0]:
                     ls_best_cost[0] = float(f_try)
                     ls_best_params[0] = p_try.copy()
-                print(f"Least squares fit: cost={float(f_try):.4g}")
+                print("Least squares fit completed.")
                 if reason_to_stop[0] is not None:
                     print(f"Stopping LS: {reason_to_stop[0]}.")
             except StopIteration:

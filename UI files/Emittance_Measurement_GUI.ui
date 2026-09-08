@@ -948,7 +948,7 @@ QToolButton#bounds_info_button:hover {
                 </rect>
                </property>
                <property name="text">
-                <string>Energy [MeV]</string>
+                <string>Energy [MeV/c]</string>
                </property>
               </widget>
              </widget>

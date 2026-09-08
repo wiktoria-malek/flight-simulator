@@ -238,6 +238,32 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return screens
 
+    def get_emittance_at_screens(self, names=None):
+        if isinstance(names, str): names = [names]
+        names = self._model_screen_names(names)
+        selected_screens = [screen for screen in self.screens if names is None or screen in names]
+        fields = ("emitt_x", "emitt_y", "beta_x", "beta_y", "alpha_x", "alpha_y", "sigma_x", "sigma_y")
+        screen_names = []
+        s_list = []
+        values = {field: [] for field in fields}
+
+        for screen_name in selected_screens:
+            screen = self.lattice[screen_name]
+            if isinstance(screen, list):
+                screen = screen[-1]
+            bunch = screen.get_bunch()
+            if bunch is None:
+                continue
+            info = bunch.get_info()
+            screen_names.append(screen_name)
+            s_list.append(float(screen.get_S("entrance")))
+            for field in fields:
+                values[field].append(float(getattr(info, field, np.nan)))
+
+        emittance = {"names": screen_names, "S": np.array(s_list, dtype=float)}
+        emittance.update({field: np.array(values[field], dtype=float) for field in fields})
+        return emittance
+
     def __track_bunch(self):
         I0 = self.B0.get_info()
         dx = self.jitter * I0.sigma_x
@@ -403,7 +429,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 c.vary_strength(0.0, val / 10)
         self.__track_bunch()
 
-    def _build_bunch_from_guesses(self, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0):
+    def _build_bunch_from_guesses(self, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, energy_pref=None):
         T = rft.Bunch6d_twiss()
         T.emitt_x = float(emit_x)
         T.emitt_y = float(emit_y)
@@ -415,7 +441,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         T.sigma_pt = 0#10 # permille
         T.mean_xp = 0.0
         T.mean_yp = 0.0
-        return rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, self.Pref, T, self.nparticles, self.sigmaCut)
+        Pref = self.Pref if energy_pref is None else float(energy_pref)
+        return rft.Bunch6d_QR(rft.electronmass, self.population, self.Q, Pref, T, self.nparticles, self.sigmaCut)
 
     def _read_tracked_bunch_screen_sigmas(self, screens):
         screen_data = self.get_screens(names=screens)
@@ -497,7 +524,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
 
         return output_x, output_y
 
-    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
+    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref=None, stop_checker=None, reference_screen=None):
         screens = self._model_screen_names(screens)
         reference_screen = self._model_screen_names(reference_screen)
         screens = list(screens)
@@ -535,7 +562,7 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
                 if isinstance(end_element, list):
                     end_element = end_element[-1]
 
-                temp_bunch = self._build_bunch_from_guesses(emit_x=float(emit_x), emit_y=float(emit_y), beta_x0=float(beta_x0), beta_y0=float(beta_y0), alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0))
+                temp_bunch = self._build_bunch_from_guesses(emit_x=float(emit_x), emit_y=float(emit_y), beta_x0=float(beta_x0), beta_y0=float(beta_y0), alpha_x0=float(alpha_x0), alpha_y0=float(alpha_y0), energy_pref=energy_pref)
                 lattice_view = rft.Lattice_view(self.lattice, start_element, end_element)
                 tracked_to_last_screen = lattice_view.track(temp_bunch)
 
@@ -574,8 +601,8 @@ class InterfaceCLEAR_RFTrack(AbstractMachineInterface):
         full = self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker=stop_checker, reference_screen=reference_screen)
         return full["sigma_x"], full["sigma_y"]
 
-    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, stop_checker=None, reference_screen=None):
-        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, stop_checker=stop_checker, reference_screen=reference_screen)
+    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref=None, stop_checker=None, reference_screen=None):
+        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, energy_pref=energy_pref, stop_checker=stop_checker, reference_screen=reference_screen)
 
 
     def get_phase_space_transport_to_screens(self, reference_screen=None, screens=None):

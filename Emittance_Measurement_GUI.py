@@ -32,6 +32,7 @@ from Backend.LogConsole import LogConsole
 # from Backend.EM_helpers.PhaseSpaceGraphs import PhaseSpaces
 from Backend.EM_helpers.ShowBeamline import ShowBeamline
 from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
+from Backend.EM_helpers.EmittanceEvolution import EmittanceEvolution
 from Backend.EM_helpers.FitBounds import BoundsForParameter
 from Backend.EM_helpers.ScanCurrentRanges import ScanCurrentRanges
 from Backend.EM_helpers.ScanPointSelection import ScanPointSelection
@@ -270,7 +271,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         # self.phase_spaces_button.clicked.connect(self._show_phase_spaces)
         self.display_screen_images_button.clicked.connect(self._show_screen_images)
         # self.beta_function_button.clicked.connect(self._show_beta_function_evolution)
-        # self.emittance_evolution_button.clicked.connect(self._show_emittance_evolution)
+        #self.emittance_evolution_button.clicked.connect(self._show_emittance_evolution)
         self.pause_button.clicked.connect(self._pause_task)
         self.resume_button.clicked.connect(self._resume_task)
         self._scan_pause_requested = False
@@ -287,6 +288,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.fit_quadrupole_strength_checkbox.toggled.connect(self._update_additional_fit_controls)
         self.fit_quad_offset_checkbox.toggled.connect(self._update_additional_fit_controls)
         self.fit_quad_roll_checkbox.toggled.connect(self._update_additional_fit_controls)
+        self.fit_energy_checkbox.toggled.connect(self._update_additional_fit_controls)
         self.computation_mode = ComputationMode(self.computing_method_combo.currentText())
         self.computing_method_combo.currentTextChanged.connect(self._on_computation_mode_changed)
         self.steps_settings.valueChanged.connect(self._on_nsteps_scan_changed)
@@ -439,6 +441,16 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.beamline_view.raise_()
         self.beamline_view.activateWindow()
 
+    def _show_emittance_evolution(self):
+        _, screens = self._get_selection()
+        if self.emittance_evolution_window is None:
+            self.emittance_evolution_window = EmittanceEvolution(interface=self.interface, parent=self, screens=screens)
+        result = self.session.get("optimization_result") if isinstance(self.session, dict) else None
+        self.emittance_evolution_window._display_emittance_evolution(screens=screens, result=result)
+        self.emittance_evolution_window.show()
+        self.emittance_evolution_window.raise_()
+        self.emittance_evolution_window.activateWindow()
+
     def _on_bg_shots_changed(self, value):
         self.interface.bg_shots = max(0, int(value))
 
@@ -511,7 +523,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             "emit_x_norm": "mm·mrad", "beta_x0": "m", "alpha_x0": "",
             "emit_y_norm": "mm·mrad", "beta_y0": "m", "alpha_y0": "",
             "quad_k1l_0": self._quadrupole_value_unit(), "quad_dx0": "mm", "quad_dy0": "mm", "quad_roll": "mrad",
-            "energy_pref": "MeV"
+            "energy_pref": "MeV/c"
 
         }
         self.bounds_display_names = {
@@ -603,7 +615,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
 
     def _update_additional_fit_controls(self, _checked=None):
         is_linear_mode = self.computation_mode == ComputationMode.LRM
-        for checkbox in (self.fit_quadrupole_strength_checkbox, self.fit_quad_offset_checkbox, self.fit_quad_roll_checkbox):
+        for checkbox in (self.fit_quadrupole_strength_checkbox, self.fit_quad_offset_checkbox, self.fit_quad_roll_checkbox, self.fit_energy_checkbox):
             checkbox.setEnabled(not is_linear_mode)
         self._set_bound_row_enabled("quad_k1l_0", not is_linear_mode and self.fit_quadrupole_strength_checkbox.isChecked())
         offset_bounds_enabled = not is_linear_mode and self.fit_quad_offset_checkbox.isChecked()
@@ -1044,7 +1056,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.result_quad_dx0.setText(formatted_result(result.get("quad_dx0"), result.get("quad_dx0_err"), "mm") if result.get("fit_quad_offset") else "-")
         self.result_quad_dy0.setText(formatted_result(result.get("quad_dy0"), result.get("quad_dy0_err"), "mm") if result.get("fit_quad_offset") else "-")
         self.result_quad_roll.setText(formatted_result(result.get("quad_roll"), result.get("quad_roll_err"), "mrad") if result.get("fit_quad_roll") else "-")
-        self.result_energy_pref.setText(formatted_result(result.get("energy_pref"), result.get("energy_pref_err"), "mm"))
+        self.result_energy_pref.setText(formatted_result(result.get("energy_pref"), result.get("energy_pref_err"), "MeV/c") if result.get("fit_energy_pref") else "-")
         self.result_reference_screen.setText(result["screen0"])
 
         print("Errors of the fit:")
@@ -1417,6 +1429,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
                                     fit_quadrupole_strength=bool(self.fit_quadrupole_strength_checkbox.isChecked()),
                                     fit_quad_offset=bool(self.fit_quad_offset_checkbox.isChecked()),
                                     fit_quad_roll=bool(self.fit_quad_roll_checkbox.isChecked()),
+                                    fit_energy_pref=bool(self.fit_energy_checkbox.isChecked()),
                                     computing_method=computing_method)
         worker.info.connect(self.log)
 
