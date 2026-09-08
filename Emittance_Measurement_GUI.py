@@ -1317,14 +1317,14 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             if len(screen_vedges) > 0:
                 vedges[step_i][screen_i][shot_i] = np.asarray(screen_vedges[0], dtype=float)
 
-        sigx_mean = np.nanmedian(sigx_samples, axis=2)
-        sigy_mean = np.nanmedian(sigy_samples, axis=2)
+        sigx_mean = np.nanmean(sigx_samples, axis=2)
+        sigy_mean = np.nanmean(sigy_samples, axis=2)
         sigxy_mean = np.nanmean(sigxy_samples, axis=2)
         sigx_std = np.nanstd(sigx_samples, axis=2)
         sigy_std = np.nanstd(sigy_samples, axis=2)
         sigxy_std = np.nanstd(sigxy_samples, axis=2)
-        x_mean = np.nanmedian(x_samples, axis=2)
-        y_mean = np.nanmedian(y_samples, axis=2)
+        x_mean = np.nanmean(x_samples, axis=2)
+        y_mean = np.nanmean(y_samples, axis=2)
         x_std = np.nanstd(x_samples, axis=2)
         y_std = np.nanstd(y_samples, axis=2)
 
