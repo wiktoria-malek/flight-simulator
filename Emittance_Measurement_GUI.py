@@ -31,7 +31,7 @@ from Backend.EM_helpers.DisplayScreenImages import DisplayScreenImages
 from Backend.EM_helpers.FitBounds import BoundsForParameter
 from Backend.EM_helpers.ScanCurrentRanges import ScanCurrentRanges
 from Backend.EM_helpers.ScanPointSelection import ScanPointSelection
-from Backend.EM_helpers.QuadrupoleModelStatus import load_model_quadrupoles, quadrupole_tracking_model, quadrupole_status_metadata, save_quadrupole_status
+from Backend.EM_helpers.QuadrupoleModelUpdate import load_model_quadrupoles, quadrupole_tracking_model, quadrupole_status_metadata, save_quadrupole_status
 def match_screen_name(name, candidates):
     name = str(name)
     candidates = [str(candidate) for candidate in candidates]
