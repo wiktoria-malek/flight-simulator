@@ -454,7 +454,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.log("Restoring initial settings...")
         self._cancel = True
         self._running = False
-        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold= self._read_params()
         try:
             if w2 > 0:
                 self.interface.reset_energy()
