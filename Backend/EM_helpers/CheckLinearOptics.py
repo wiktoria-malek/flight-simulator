@@ -1,13 +1,12 @@
 import numpy as np
 from scipy.optimize import least_squares
 
-MODEL_RELATIVE_UNCERTAINTY = 0.05
 REDUCED_CHI2_WARNING = 5.0
 
 class CheckLinearOpticsUnavailable(Exception):
     pass
 
-def _solve_plane(R1, R2, sigma, u, valid, model_relative_uncertainty=MODEL_RELATIVE_UNCERTAINTY):
+def _solve_plane(R1, R2, sigma, u, valid):
     R1 = np.asarray(R1, dtype=float)[valid]
     R2 = np.asarray(R2, dtype=float)[valid]
     sigma_v = np.asarray(sigma, dtype=float)[valid] # beam size
@@ -17,7 +16,7 @@ def _solve_plane(R1, R2, sigma, u, valid, model_relative_uncertainty=MODEL_RELAT
     if R1.size < 3: raise CheckLinearOpticsUnavailable("Not enough valid scan points for a first estimate (need >= 3).")
 
     # uncertainty of sigma^2: the measured one propagated, plus a floor for how well the model describes the machine
-    u_sigma2 = np.sqrt((2.0 * np.abs(sigma_v) * u_v) ** 2 + (model_relative_uncertainty * sigma2) ** 2)
+    u_sigma2 = np.sqrt((2.0 * np.abs(sigma_v) * u_v) ** 2)
     u_sigma2 = np.where(np.isfinite(u_sigma2) & (u_sigma2 > 0), u_sigma2, np.maximum(np.abs(sigma2), 1e-12))
 
     coefficients = np.column_stack([R1 ** 2,
