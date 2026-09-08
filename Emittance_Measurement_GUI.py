@@ -281,7 +281,6 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         self.model_quadrupoles_status = None
         self._quadrupoles_status_payload = None
         self._model_quadrupoles_status_payload = None
-        self.load_machine_status_button.setText("Load model quadrupoles...")
         self.load_machine_status_button.clicked.connect(self._load_model_quadrupoles_status)
         try:
             quadrupole_tracking_model(self.interface)
@@ -354,6 +353,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
             if self.session is not None:
                 self.session["quadrupoles_status"] = dict(self.quadrupoles_status)
             self.log(f"Saved quadrupole readbacks to {output_file_name} at {payload['captured_at_utc']}.")
+
         except Exception as e:
             QMessageBox.information(self, "Save quadrupoles status", f"An error occured while trying to save quadrupoles status. {e}")
             return
@@ -362,16 +362,16 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         print("Quadrupoles currents before RFTrack model update:")
         print(self.interface.get_quadrupoles()["bact"])
         if self._is_scanning or self._is_optimizing:
-            QMessageBox.information(self, "Load model quadrupoles", "Stop the scan or fit before changing the model quadrupoles.")
+            QMessageBox.information(self, "Load quadrupoles status", "Stop the scan or fit before changing the model quadrupoles.")
             return
         default_dir = self.load_screens_data_database.text().strip() or self.session_directory.text().strip() or self.dir_name
-        source_path, _ = QFileDialog.getOpenFileName(self, "Load model quadrupoles", default_dir, "Quadrupole snapshots (*.npz)")
+        source_path, _ = QFileDialog.getOpenFileName(self, "Load quadrupoles status", default_dir, "Quadrupole snapshots (*.npz)")
         if not source_path:
             return
         try:
             payload, metadata = load_model_quadrupoles(self.interface, source_path)
         except Exception as e:
-            QMessageBox.warning(self, "Load model quadrupoles", str(e))
+            QMessageBox.warning(self, "Load quadrupoles status", str(e))
             return
         self._model_quadrupoles_status_payload = payload
         self.model_quadrupoles_status = metadata

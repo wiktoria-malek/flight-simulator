@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import least_squares
 import pandas as pd
-from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable, REDUCED_CHI2_WARNING
+from Backend.EM_helpers.CheckLinearOptics import estimate_twiss_use_linear_optics_start, CheckLinearOpticsUnavailable, REDUCED_CHI2_WARNING, MODEL_RELATIVE_UNCERTAINTY
 
 def _finite_diff_jacobian(residual_func, x, low, high, param_scale=None, rel_step=1e-4):
     x = np.asarray(x, dtype=float)
@@ -324,6 +324,8 @@ class Optimization:
         # measurement uncertainty, instead of falling back to the 8% heuristic.
         u_x = np.where(np.isfinite(u_x) & (u_x > 1e-9), u_x, fallback_u_x)
         u_y = np.where(np.isfinite(u_y) & (u_y > 1e-9), u_y, fallback_u_y)
+        u_x = np.sqrt(u_x ** 2 + (MODEL_RELATIVE_UNCERTAINTY * np.abs(sig_x)) ** 2)
+        u_y = np.sqrt(u_y ** 2 + (MODEL_RELATIVE_UNCERTAINTY * np.abs(sig_y)) ** 2)
 
         # Points usable in the weighted least-squares residual vector.
         valid_x = np.isfinite(sig_x) & np.isfinite(u_x) & (u_x > 0) & (n_x_sum >= 1)
