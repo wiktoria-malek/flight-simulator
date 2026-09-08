@@ -322,8 +322,12 @@ class Optimization:
 
         u_x = np.where(np.isfinite(u_x) & (u_x > 1e-9), u_x, fallback_u_x)
         u_y = np.where(np.isfinite(u_y) & (u_y > 1e-9), u_y, fallback_u_y)
+
         # u_x = np.sqrt(u_x ** 2 + (np.abs(sig_x)) ** 2)
         # u_y = np.sqrt(u_y ** 2 + (np.abs(sig_y)) ** 2)
+
+        u_x = np.ones_like(u_x)
+        u_y = np.ones_like(u_y)
 
         # Points usable in the weighted least-squares residual vector.
         valid_x = np.isfinite(sig_x) & np.isfinite(u_x) & (u_x > 0) & (n_x_sum >= 1)
