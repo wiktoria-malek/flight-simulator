@@ -304,7 +304,6 @@ class Optimization:
         }
 
     def _fit_6d(self, screens, quad_name, K1L_values, sigx_shots, sigy_shots, bounds, x_shots=None, y_shots=None, sigxy_shots=None):
-
         # Beam size for every individual shot.
         sigma_x_shots = np.asarray(sigx_shots, dtype=float)
         sigma_y_shots = np.asarray(sigy_shots, dtype=float)
@@ -498,8 +497,6 @@ class Optimization:
         except Exception as e:
             linear_optics_notes.append(f"could not compute a best starting point ({e})")
 
-        # the linear estimate is only a starting point: when it is missing, or lands outside the bounds
-        # the user asked for, that plane starts from the middle of its bounds instead of aborting the fit
         x0_linear_optics_values = []
         trusted_core_params = []
         for plane, plane_params in (("x", ("emit_x_norm", "beta_x0", "alpha_x0")), ("y", ("emit_y_norm", "beta_y0", "alpha_y0"))):
@@ -602,7 +599,9 @@ class Optimization:
             ls_eval[0] += 1
             self._emit_progress("Least squares", min(ls_eval[0], 200), 200)
             params = dict(zip(params_order, p_c))
-            print(f"Least squares {ls_eval[0]}: best_f={ls_best_cost[0]:.4g}, " + ", ".join(f"{k}={v:.6g}" for k, v in params.items()))
+            u = np.concatenate([u_x[valid_x], u_y[valid_y]] + ([u_dx[valid_dx], u_dy[valid_dy]] if self.fit_quad_offset else []) + ([u_sigxy[valid_sigxy]] if self.fit_quad_roll else []))
+            cost_unweighted = float(np.sum((residuals * u) ** 2))
+            print(f"Least squares {ls_eval[0]}: cost_unweighted={cost_unweighted:.4g}, " + ", ".join(f"{k}={v:.6g}" for k, v in params.items()))
 
             return residuals
 
