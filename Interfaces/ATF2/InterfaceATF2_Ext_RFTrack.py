@@ -66,8 +66,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
 
         # for el in self._map_quadrupoles_names_from_lattice("QD18X"):
         #                     # dx # dy #dz #roll #pitch #yaw
-        #     el.set_offsets(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
-
+        #     el.set_offsets(0.5, 0.5, 0.0, 5, 0.0, 0.0, "center")  # 0.5 mm dx, meters+radians
 
         # ----------------------------
         # Knobs (linear / nonlinear)

@@ -308,8 +308,8 @@ class Optimization:
         n_y_sum = np.sum(np.isfinite(sigma_y_shots), axis=2)
 
         # Measured beam size: the median over shots, so a single bad frame cannot drag the point.
-        sig_x = np.nanmedian(sigma_x_shots, axis=2)
-        sig_y = np.nanmedian(sigma_y_shots, axis=2)
+        sig_x = np.nanmean(sigma_x_shots, axis=2)
+        sig_y = np.nanmean(sigma_y_shots, axis=2)
 
         # Sample standard deviation of sigma, then standard error of its mean.
         s_sigx = np.nanstd(sigma_x_shots, axis=2, ddof=1)
@@ -317,17 +317,15 @@ class Optimization:
 
         fallback_u_x = np.maximum(0.08 * np.abs(sig_x), 1e-12)
         fallback_u_y = np.maximum(0.08 * np.abs(sig_y), 1e-12)
+
         u_x = np.where(n_x_sum >= 2, s_sigx / np.sqrt(n_x_sum), fallback_u_x)
         u_y = np.where(n_y_sum >= 2, s_sigy / np.sqrt(n_y_sum), fallback_u_y)
 
         u_x = np.where(np.isfinite(u_x) & (u_x > 1e-9), u_x, fallback_u_x)
         u_y = np.where(np.isfinite(u_y) & (u_y > 1e-9), u_y, fallback_u_y)
 
-        # u_x = np.sqrt(u_x ** 2 + (np.abs(sig_x)) ** 2)
-        # u_y = np.sqrt(u_y ** 2 + (np.abs(sig_y)) ** 2)
-
-        u_x = np.ones_like(u_x)
-        u_y = np.ones_like(u_y)
+        # u_x = np.ones_like(u_x)
+        # u_y = np.ones_like(u_y)
 
         # Points usable in the weighted least-squares residual vector.
         valid_x = np.isfinite(sig_x) & np.isfinite(u_x) & (u_x > 0) & (n_x_sum >= 1)
@@ -349,7 +347,7 @@ class Optimization:
 
         if have_dx_data:
             n_dx_sum = np.sum(np.isfinite(x_shots_arr), axis=2)
-            dx_meas = np.nanmedian(x_shots_arr, axis=2)
+            dx_meas = np.nanmean(x_shots_arr, axis=2)
             s_dx = np.nanstd(x_shots_arr, axis=2, ddof=1)
             u_dx = np.where(n_dx_sum >= 2, s_dx / np.sqrt(n_dx_sum), fallback_u_dx)
             u_dx = np.where(np.isfinite(u_dx) & (u_dx > 1e-9), u_dx, fallback_u_dx)
@@ -361,7 +359,7 @@ class Optimization:
 
         if have_dy_data:
             n_dy_sum = np.sum(np.isfinite(y_shots_arr), axis=2)
-            dy_meas = np.nanmedian(y_shots_arr, axis=2)
+            dy_meas = np.nanmean(y_shots_arr, axis=2)
             s_dy = np.nanstd(y_shots_arr, axis=2, ddof=1)
             u_dy = np.where(n_dy_sum >= 2, s_dy / np.sqrt(n_dy_sum), fallback_u_dy)
             u_dy = np.where(np.isfinite(u_dy) & (u_dy > 1e-9), u_dy, fallback_u_dy)
@@ -373,7 +371,7 @@ class Optimization:
 
         if have_sigxy_data:
             n_sigxy_sum = np.sum(np.isfinite(sigxy_shots_arr), axis=2)
-            sigxy_meas = np.nanmedian(sigxy_shots_arr, axis=2)
+            sigxy_meas = np.nanmean(sigxy_shots_arr, axis=2)
             s_sigxy = np.nanstd(sigxy_shots_arr, axis=2, ddof=1)
             u_sigxy = np.where(n_sigxy_sum >= 2, s_sigxy / np.sqrt(n_sigxy_sum), fallback_u_sigxy)
             u_sigxy = np.where(np.isfinite(u_sigxy) & (u_sigxy > 1e-9), u_sigxy, fallback_u_sigxy)
