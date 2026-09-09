@@ -735,7 +735,7 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             sigy[i] = float(screen_data["sigy"][idx])
         return sigx, sigy
 
-    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref = None, stop_checker=None, reference_screen=None):
+    def _predict_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref = None, with_twiss=False, stop_checker=None, reference_screen=None):
         screens = list(screens)
         K1L_values = np.asarray(K1L_values, dtype=float)
         if reference_screen is None: reference_screen = screens[0]
@@ -759,6 +759,8 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
         y_mean = np.full((nK1L, nscreens), np.nan, dtype=float)
         sigma_xy = np.full((nK1L, nscreens), np.nan, dtype=float)
         particles_xy = np.empty((nK1L, nscreens), dtype=object)
+        twiss_fields = ("emitt_x", "emitt_y", "beta_x", "beta_y", "alpha_x", "alpha_y")
+        twiss = {field: np.full((nK1L, nscreens), np.nan, dtype=float) for field in twiss_fields} if with_twiss else {}
 
         try:
             if override_offsets:
@@ -796,6 +798,10 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
                         x_mean[k, si] = xm
                         y_mean[k, si] = ym
                         sigma_xy[k, si] = float(np.mean((xs - xm) * (ys - ym))) # covariance
+                        if with_twiss:
+                            info = bunch_at_screen.get_info()
+                            for field in twiss_fields:
+                                twiss[field][k, si] = float(getattr(info, field, np.nan))
 
         finally:
             self.lattice = lattice_reference
@@ -806,14 +812,15 @@ class InterfaceATF2_Ext_RFTrack(AbstractMachineInterface):
             "sigma_x": sigma_x, "sigma_y": sigma_y,
             "x_mean": x_mean, "y_mean": y_mean,
             "sigma_xy": sigma_xy, "particles_xy": particles_xy,
+            **twiss,
         }
 
     def predict_emittance_scan_response(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker = None, reference_screen = None):
         full = self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, stop_checker=stop_checker, reference_screen=reference_screen)
         return full["sigma_x"], full["sigma_y"]
 
-    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref = None, stop_checker=None, reference_screen=None):
-        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, energy_pref = energy_pref, stop_checker=stop_checker, reference_screen=reference_screen)
+    def predict_emittance_scan_response_full(self, quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=None, quad_dy0=None, quad_roll=None, energy_pref = None, with_twiss=False, stop_checker=None, reference_screen=None):
+        return self._predict_scan_response_full(quad_name, screens, K1L_values, emit_x, emit_y, beta_x0, beta_y0, alpha_x0, alpha_y0, quad_dx0=quad_dx0, quad_dy0=quad_dy0, quad_roll=quad_roll, energy_pref = energy_pref, with_twiss=with_twiss, stop_checker=stop_checker, reference_screen=reference_screen)
 
     def get_twiss_at_screen(self, name): # for printing emittance after bba using rft interface, can be deleted later
         if name not in self.screens:

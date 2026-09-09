@@ -602,7 +602,7 @@ class Optimization:
             cost_unweighted = float(np.sum((residuals * u) ** 2))
             print(f"Least squares {ls_eval[0]}: cost_unweighted={cost_unweighted:.4g}, " + ", ".join(f"{k}={v:.6g}" for k, v in params.items()))
 
-            return residuals
+            return residuals, cost_unweighted
 
         stagnation_patience = 25
         min_improvement_of_cost = 1e-3
@@ -637,13 +637,13 @@ class Optimization:
 
         for local_pass in range(2):
             try:
-                res_try = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=200, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
+                res_try, cost_unweighted = least_squares(_ls_residuals, x0_try, bounds=(low_bounds, high_bounds), method="trf", loss="linear", f_scale=1.0, max_nfev=200, x_scale=np.maximum(high_bounds - low_bounds, 1e-12), ftol=1e-8, xtol=1e-8, gtol=1e-8, callback = exit_ls_if_no_improvement_or_reached_goal)
                 p_try = np.asarray(res_try.x, dtype=float)
                 f_try, _ = compute_cost(dict(zip(params_order, p_try)), allow_stop=False)
                 if np.isfinite(f_try) and f_try < ls_best_cost[0]:
                     ls_best_cost[0] = float(f_try)
                     ls_best_params[0] = p_try.copy()
-                print("Least squares fit completed.")
+                print(f"Least squares fit completed. Cost: {cost_unweighted:.4g}")
                 if reason_to_stop[0] is not None:
                     print(f"Stopping LS: {reason_to_stop[0]}.")
             except StopIteration:

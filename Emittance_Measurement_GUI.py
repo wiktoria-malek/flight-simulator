@@ -271,7 +271,7 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         # self.phase_spaces_button.clicked.connect(self._show_phase_spaces)
         self.display_screen_images_button.clicked.connect(self._show_screen_images)
         # self.beta_function_button.clicked.connect(self._show_beta_function_evolution)
-        #self.emittance_evolution_button.clicked.connect(self._show_emittance_evolution)
+        self.emittance_evolution_button.clicked.connect(self._show_emittance_evolution)
         self.pause_button.clicked.connect(self._pause_task)
         self.resume_button.clicked.connect(self._resume_task)
         self._scan_pause_requested = False
@@ -445,8 +445,9 @@ class MainWindow(QMainWindow, QuadrupoleScan):
         _, screens = self._get_selection()
         if self.emittance_evolution_window is None:
             self.emittance_evolution_window = EmittanceEvolution(interface=self.interface, parent=self, screens=screens)
-        result = self.session.get("optimization_result") if isinstance(self.session, dict) else None
-        self.emittance_evolution_window._display_emittance_evolution(screens=screens, result=result)
+        session = self.session if isinstance(self.session, dict) else {}
+        self.emittance_evolution_window._display_emittance_evolution(
+            screens=screens, session=session, result=session.get("optimization_result"))
         self.emittance_evolution_window.show()
         self.emittance_evolution_window.raise_()
         self.emittance_evolution_window.activateWindow()
