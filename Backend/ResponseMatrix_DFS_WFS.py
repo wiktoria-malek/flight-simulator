@@ -33,7 +33,7 @@ class AdaptiveResponseMatrix:
         return self.R0 + self.delta
 
 class ResponseMatrix_DFS_WFS():
-    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=1e-3):
+    def _compute_response_matrix_from_directory(self, directory, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=None):
         info=self._find_useful_files(directory)
         if not info["ok"]:
             raise RuntimeError(f"Could not find any valid DATA pairs in {directory}")
@@ -55,7 +55,7 @@ class ResponseMatrix_DFS_WFS():
                 pairs.append((fp, fm, tag))
         return {"ok":bool(pairs), "dir":directory, "pairs":pairs}
 
-    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=1e-3):
+    def _compute_response_matrix(self, pairs, correctors, bpms, triangular=False, actuator_mode="correctors", rcond=None):
         if not hasattr(self, 'sequence'):
             file = pairs[0][0]
             S = State(filename=file)
@@ -197,7 +197,7 @@ class ResponseMatrix_DFS_WFS():
         Cy = np.hstack((Cy, np.ones((Cy.shape[0], 1))))
 
         def lstsq(C, B):
-            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=None)[0])
+            return np.transpose(np.linalg.lstsq(C, B[:, B_mask], rcond=rcond)[0])
 
         Rxx_ = lstsq(Cx, Bx)
         Rxy_ = lstsq(Cy, Bx)
@@ -257,7 +257,8 @@ class ResponseMatrix_DFS_WFS():
         if not pairs:
             return {}
         try:
-            settings = State(filename=pairs[0][0]).get_beam_settings() or {}
+            state = State(filename=pairs[0][0])
+            settings = state.get_beam_settings() or {}
         except Exception:
             return {}
 
@@ -278,7 +279,16 @@ class ResponseMatrix_DFS_WFS():
                     out[path] = fvalue
             return out
 
-        return flatten(settings)
+        signature = flatten(settings)
+        quadrupoles = state.get_quadrupoles()
+        for name, value in zip(quadrupoles.get("names", []), quadrupoles.get("bact", [])):
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(value):
+                signature[f"quadrupoles.{name}"] = value
+        return signature
 
     @staticmethod
     def _beam_signatures_unchanged(signature_a, signature_b, atol=1e-6, rtol=1e-3):
@@ -298,7 +308,7 @@ class ResponseMatrix_DFS_WFS():
         info_dfs = self._data_dirs.get("dfs")
         info_wfs = self._data_dirs.get("wfs")
 
-        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold= self._read_params()
 
         if not (info_traj and info_traj["ok"]):
             raise RuntimeError("Please select a trajectory data directory")
@@ -358,7 +368,7 @@ class ResponseMatrix_DFS_WFS():
             bpms = list(selected_bpms)
 
 
-        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold= self._read_params()
         wgt_orb, wgt_dfs, wgt_wfs = w1, w2, w3
 
         #corrs, bpms = self._get_selection()

@@ -1,27 +1,33 @@
 from __future__ import annotations
 import sys, os , argparse, json, math
 from pathlib import Path
-
+from pprint import pprint
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 from Backend.State import State
-folder = Path("/Users/wiktoriamalek/CERN-Flight_Simulator-Data/AllCLEARfiles/CLEAR_20260902_163002_Kicker_Dispersion")
-p_files = sorted(folder.glob("DATA_*_p0001.pkl"))
+filename = Path("/local/home/clearop/CERN-Flight_Simulator-Data/CLEAR_20260902_184342_Orbit/machine_status.pkl")
 
-for p_file in p_files:
-    corrector_name = (p_file.name.removeprefix("DATA_").removesuffix("_p0001.pkl"))
-    print(f"\n{'=' * 60}\nCorrector: {corrector_name}")
-    for pm in ("p", "m"):
-        filename = folder / f"DATA_{corrector_name}_{pm}0001.pkl"
-        state = State(filename=str(filename))
-        corrector = state.get_correctors([corrector_name])
+state = State(filename=filename)
+quadrupoles = state.get_quadrupoles()
+pprint(quadrupoles)
 
-        print(f"{pm}:")
-        print("  file:", filename.name)
-        print("  bdes:", corrector["bdes"][0])
-        print("  bact:", corrector["bact"][0])
-print("===============================================")
+
+# p_files = sorted(folder.glob("DATA_*_p0001.pkl"))
+#
+# for p_file in p_files:
+#     corrector_name = (p_file.name.removeprefix("DATA_").removesuffix("_p0001.pkl"))
+#     print(f"\n{'=' * 60}\nCorrector: {corrector_name}")
+#     for pm in ("p", "m"):
+#         filename = folder / f"DATA_{corrector_name}_{pm}0001.pkl"
+#         state = State(filename=str(filename))
+#         corrector = state.get_correctors([corrector_name])
+#
+#         print(f"{pm}:")
+#         print("  file:", filename.name)
+#         print("  bdes:", corrector["bdes"][0])
+#         print("  bact:", corrector["bact"][0])
+# print("===============================================")
 
 # p_files = sorted(folder.glob("DATA_*_p0001.pkl"))
 # for p_file in p_files:

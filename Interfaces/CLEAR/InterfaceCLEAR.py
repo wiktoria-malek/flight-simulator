@@ -56,8 +56,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.context_empty = ""
         self.log = print
         self.client = pyda.SimpleClient(provider=pyda_japc.JapcProvider())
-        self.rf_phase_nominal = 120 # degrees
-        self.rf_phase_test = 100 # degrees
+        self.rf_phase_nominal = 128 # degrees
+        self.rf_phase_test = 108 # degrees
         self.uvatt2_test_steps = 1000
 
         # Bpms and correctors in beamline order
@@ -151,7 +151,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             'CA.BCMTHZ2/Acquisition#charge',
         ]
 
-        self.quadrupoles = list(config.quad_names)
         self.quad_set_params = dict(zip(config.quad_names, config.current_set_params))
         self.quad_get_params = dict(zip(config.quad_names, config.current_get_params))
         self.quad_status_params = dict(zip(config.quad_names, config.current_status_params))
@@ -195,7 +194,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         #     if np.isfinite(value) and value > 0:
         #         pref = value
         #         break
-        pref = 195
+        pref = 198
         gamma_rel = np.sqrt((pref / self.electronmass) ** 2 + 1.0)
         beta_rel = np.sqrt(1.0 - 1.0 / gamma_rel ** 2)
         beta_gamma = gamma_rel * beta_rel
@@ -251,7 +250,21 @@ class CLEAR_real_machine(AbstractMachineInterface):
             f"(last readback={last_value})."
         )
 
-    def change_energy(self):
+    def change_energy(self, scale=0.5):
+        scaled_optics_currents = np.asarray([10.0, 40.0, 10.0, 40.0, 60.0, 30.0, 40.0, 70.0, 40.0, 0.0, 0.0], dtype=float) * float(scale)
+        for attempt in range(1, 10):
+            if self.set_quadrupoles(self.quadrupoles, scaled_optics_currents):
+                return True
+            if attempt < 10:
+                self.log(f"Scaled optics readback mismatch; retrying ({attempt}/10).")
+        raise RuntimeError("Not all quadrupoles reached their scaled-optics currents after 3 attempts.")
+
+    def reset_energy(self):
+        return self.change_energy(scale=1.0)
+
+    def change_intensity(self):
+        # this is not a charge change, but rf phase - based change in the energy, probably if you would
+        # use both scaling quadrupoles and this method, the correction would be even better
         if np.isclose(float(self.rf_phase_test), float(self.rf_phase_nominal)):
             raise RuntimeError(f"RF phase test ({self.rf_phase_test}) = RF phase nominal ({self.rf_phase_nominal}).")
         energy_readback = self.client.get('CK.LL-MKS11/Setting').data['PhaseSh_SP']
@@ -260,31 +273,32 @@ class CLEAR_real_machine(AbstractMachineInterface):
         self.log(f"Value after changing energy: {new_energy}")
         return new_energy
 
-    def reset_energy(self):
+    def reset_intensity(self):
         print(f"Resetting energy to {self.rf_phase_nominal}...")
         after_energy_reset = self._set_and_verify('CK.LL-MKS11/Setting', 'PhaseSh_SP', float(self.rf_phase_nominal), description="RF phase (nominal)")
         print(f"Energy has been reset to {after_energy_reset}.")
         return after_energy_reset
 
-    def change_intensity(self):
-        if np.isclose(float(self.uvatt2_test_steps), 0.0):
-            raise RuntimeError("uvatt2_test_steps is 0.")
-        current_position = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
-        self.steps_readback_position = current_position
-        self.steps_readback_position_min = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
-        self.steps_readback_position_max =self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
-        current_settings_steps = self.steps_readback_position
-        new_laser_settings = current_settings_steps + float(self.uvatt2_test_steps)
-        self.log(f"Changing intensity to {new_laser_settings}... Current value is {self.steps_readback_position}.")
-        after_intensity_change = self._set_and_verify('CO.TOWB.102.UVATT2/Setting', 'position', new_laser_settings, description="UVATT2 position (test)")
-        self.log(f"The new laser settings has been set to {after_intensity_change}. Current value was {self.steps_readback_position}.")
-        return self
-
-    def reset_intensity(self):
-        print(f"Resetting intensity to {self.steps_readback_position}...")
-        after_intensity_reset = self._set_and_verify('CO.TOWB.102.UVATT2/Setting', 'position', float(self.steps_readback_position), description="UVATT2 position (nominal)")
-        print(f"Intensity steps has been reset to {after_intensity_reset}.")
-        return after_intensity_reset
+    # REAL CHANGE INTENSITY METHODS FOR CLEAR:
+    # def change_intensity(self):
+    #     if np.isclose(float(self.uvatt2_test_steps), 0.0):
+    #         raise RuntimeError("uvatt2_test_steps is 0.")
+    #     current_position = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position']
+    #     self.steps_readback_position = current_position
+    #     self.steps_readback_position_min = self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_min']
+    #     self.steps_readback_position_max =self.client.get('CO.TOWB.102.UVATT2/Setting').data['position_max']
+    #     current_settings_steps = self.steps_readback_position
+    #     new_laser_settings = current_settings_steps + float(self.uvatt2_test_steps)
+    #     self.log(f"Changing intensity to {new_laser_settings}... Current value is {self.steps_readback_position}.")
+    #     after_intensity_change = self._set_and_verify('CO.TOWB.102.UVATT2/Setting', 'position', new_laser_settings, description="UVATT2 position (test)")
+    #     self.log(f"The new laser settings has been set to {after_intensity_change}. Current value was {self.steps_readback_position}.")
+    #     return self
+    #
+    # def reset_intensity(self):
+    #     print(f"Resetting intensity to {self.steps_readback_position}...")
+    #     after_intensity_reset = self._set_and_verify('CO.TOWB.102.UVATT2/Setting', 'position', float(self.steps_readback_position), description="UVATT2 position (nominal)")
+    #     print(f"Intensity steps has been reset to {after_intensity_reset}.")
+    #     return after_intensity_reset
 
     def get_beam_settings(self):
         settings = {"energy": {}, "intensity": {}}
@@ -636,7 +650,6 @@ class CLEAR_real_machine(AbstractMachineInterface):
             address = self.quad_set_params[quadrupole]
             property_address, field = address.rsplit("#", 1)
             self.client.set(property_address, data={field: float(current_A)})
-
         return self._wait_for_quadrupole_readbacks(names, currents_A)
 
     def _get_screen_movement_info(self, screen_name):
@@ -677,11 +690,12 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     def insert_screen(self, screen_name):
         info = self._get_screen_movement_info(screen_name)
-        current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']] # 0 or not == 0 means screen is out, whatever else means IN
-        if current_screen_inout_status.value == 0:
+        target = 2 if screen_name == "CA.BTV0390H" else 1
+        current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['get_prop']}").data[info['get_set_field']]
+        if current_screen_inout_status.value != target:
             self.log(f"Inserting {screen_name}...")
-            self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": 1}) # 1, meaning INSERT the screen
-            reached_target = self._wait_for_screen_target_position(screen_name, 1)
+            self.client.set(f"{info['btvdevice']}/{info['set_prop']}", data={f"{info['get_set_field']}": target})
+            reached_target = self._wait_for_screen_target_position(screen_name, target)
             if not reached_target: raise RuntimeError(f"Screen {screen_name} was not inserted within time.")
             self.log(f"Inserted {screen_name}!")
             current_screen_inout_status2 = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]
@@ -735,9 +749,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         info = self._get_screen_movement_info(screen_name)
         t0 = time.perf_counter()
         while time.perf_counter() - t0 < timeout:
-            current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['set_prop']}").data[info['get_set_field']]  # 0 or not == 0 means screen is out, whatever else means IN
-            if current_screen_inout_status.value == 0 and target==0: return True
-            if current_screen_inout_status.value > 0 and target >0: return True
+            current_screen_inout_status = self.client.get(f"{info['btvdevice']}/{info['get_prop']}").data[info['get_set_field']]
+            if current_screen_inout_status.value == target: return True
             time.sleep(poll_interval)
         self.log(
             f'Warning: {screen_name} did not reach target state = {target:.6g} '
@@ -752,6 +765,8 @@ class CLEAR_real_machine(AbstractMachineInterface):
         camera_data = self._acquire_screen_data(screen_name, previous_frame_id)
         if camera_data is None: raise RuntimeError(f"No camera data available for {screen_name}")
         beam_img = np.asarray(camera_data['image2D'], dtype=float)
+        if not np.any(np.isfinite(beam_img)) or float(np.nanmax(beam_img)) <= 0.0:
+            raise RuntimeError(f"{screen_name} delivered an empty camera frame (no positive pixel).")
         bg_img = self.screen_backgrounds[screen_name]
         subtracted_img = beam_img - bg_img
         subtracted_img[~np.isfinite(subtracted_img)] = 0.0
@@ -770,6 +785,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
         yb_list = []
         sigx_list = []
         sigy_list = []
+        sigxy_list = []
         sum_list = []
         images = []
         hedges_all = []
@@ -794,6 +810,7 @@ class CLEAR_real_machine(AbstractMachineInterface):
                         break
 
                 except Exception as e:
+                    self.log(f"{screen_name}: attempt {attempt + 1}/3 rejected ({e})")
                     x_mean = np.nan
                     y_mean = np.nan
                     sigx = np.nan
@@ -855,17 +872,46 @@ class CLEAR_real_machine(AbstractMachineInterface):
             )
         super().restore_quadrupoles_state(state)
 
+    def match_screen_name(self, name, candidates):
+        return self.tracking_interface.match_screen_name(name, candidates)
+
+    def _model_screen_name(self, name):
+        name = str(name)
+        model_screens = list(getattr(self.tracking_interface, "screens", []))
+        candidates = (self.screen_config.get(name, {}).get("japc_name", name), name.rstrip("LH"), name)
+        for candidate in dict.fromkeys(candidates):
+            if candidate in model_screens:
+                return candidate
+        raise ValueError(f"Screen '{name}' has no matching element in the RF-Track model of CLEAR.")
+
+    def _model_screen_kwargs(self, kwargs):
+        mapped = dict(kwargs)
+        screens = mapped.get("screens")
+        if screens is not None:
+            if isinstance(screens, str):
+                screens = [screens]
+            mapped["screens"] = [self._model_screen_name(screen) for screen in screens]
+        if mapped.get("reference_screen") is not None:
+            mapped["reference_screen"] = self._model_screen_name(mapped["reference_screen"])
+        return mapped
+
     def predict_emittance_scan_response(self, *args, **kwargs):
-        return self.tracking_interface.predict_emittance_scan_response(*args, **kwargs)
+        return self.tracking_interface.predict_emittance_scan_response(*args, **self._model_screen_kwargs(kwargs))
+
+    def predict_emittance_scan_response_full(self, *args, **kwargs):
+        return self.tracking_interface.predict_emittance_scan_response_full(*args, **self._model_screen_kwargs(kwargs))
 
     def get_R_matrix_scan(self, *args, **kwargs):
-        return self.tracking_interface.get_R_matrix_scan(*args, **kwargs)
+        return self.tracking_interface.get_R_matrix_scan(*args, **self._model_screen_kwargs(kwargs))
 
     def get_phase_space_transport_to_screens(self, *args, **kwargs):
-        return self.tracking_interface.get_phase_space_transport_to_screens(*args, **kwargs)
+        return self.tracking_interface.get_phase_space_transport_to_screens(*args, **self._model_screen_kwargs(kwargs))
 
     def get_twiss_evolution(self, *args, **kwargs):
-        return self.tracking_interface.get_twiss_evolution(*args, **kwargs)
+        return self.tracking_interface.get_twiss_evolution(*args, **self._model_screen_kwargs(kwargs))
+
+    def get_emittance_at_screens(self, *args, **kwargs):
+        return self.tracking_interface.get_emittance_at_screens(*args, **kwargs)
 
     @staticmethod
     def _gaussian(x, amplitude, center, sigma, offset):
@@ -873,12 +919,24 @@ class CLEAR_real_machine(AbstractMachineInterface):
 
     @classmethod
     def _fit_projection(cls, axis, projection):
-        baseline_subtracted = projection - np.min(projection)
-        normalisation = baseline_subtracted.sum()
-        centre = baseline_subtracted.dot(axis) / normalisation
-        rms = np.sqrt(baseline_subtracted.dot((axis - centre) ** 2) / normalisation)
-        fitted, _ = curve_fit(cls._gaussian, axis, projection, p0=[np.max(projection) - np.min(projection), centre, rms, np.min(projection)]) # [amplitude, center, sigma, background]
-        return fitted[1], abs(fitted[2]) # sigx, sigy
+        pixel = abs(float(axis[1] - axis[0]))
+        sigma_max = float(axis[-1] - axis[0]) / 4.0
+        baseline = float(np.median(projection))
+        baseline_subtracted = np.clip(projection - baseline, 0.0, None)
+        normalisation = float(baseline_subtracted.sum())
+        peak = float(baseline_subtracted.max())
+        if not np.isfinite(normalisation) or normalisation <= 0.0 or peak <= 0.0:
+            return np.nan, np.nan
+        centre = float(baseline_subtracted.dot(axis) / normalisation)
+        rms = float(np.sqrt(baseline_subtracted.dot((axis - centre) ** 2) / normalisation))
+        fitted, _ = curve_fit(cls._gaussian, axis, projection,
+            p0=[peak, centre, float(np.clip(rms, pixel, sigma_max)), baseline], # [amplitude, center, sigma, background]
+            bounds=([0.0, float(axis.min()), pixel / 2.0, -np.inf], [np.inf, float(axis.max()), sigma_max, np.inf]),
+            maxfev=20000)
+        sigma = abs(float(fitted[2]))
+        if sigma > 0.99 * sigma_max: # beam wider than the screen can measure
+            return np.nan, np.nan
+        return float(fitted[1]), sigma # sigx, sigy
 
     def _screen_data_from_image(self, image, hpixel, vpixel): # better be subtracted!
         img = np.flipud(np.asarray(image, dtype=float).copy())

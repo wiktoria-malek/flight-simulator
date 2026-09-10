@@ -72,6 +72,10 @@ class AbstractMachineInterface(ABC):
     def get_screens(self, names=None):
         return {"names": [], "hpixel": np.array([]), "vpixel": np.array([]), "x":np.array([]),"y":np.array([]), "sigx":np.array([]), "sigy":np.array([]),"sum":np.array([]),"hedges":[],"vedges":[],"images":[],"S":np.array([])}
 
+    def match_screen_name(self, name, candidates):
+        name = str(name)
+        return name if name in map(str, candidates) else None
+
     def get_target_dispersion(self, names=None):
         if names is None:
             names = self.bpms

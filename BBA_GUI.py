@@ -2,6 +2,7 @@ import sys, os, re, matplotlib
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import numpy as np
+
 try:
     from PyQt6 import uic
     from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment, QTimer
@@ -79,6 +80,7 @@ class BpmWeightsDelegate(QStyledItemDelegate):
         finally:
             painter.restore()
 
+
 class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
     def __init__(self, interface, dir_name, nominal_state=None, start_state=None):
         super().__init__()
@@ -95,7 +97,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.reset_reference_orbit = False
         ui_path = os.path.join(os.path.dirname(__file__), "UI files/BBA_GUI.ui")
         uic.loadUi(ui_path, self)
-        self._clock_zone_name= self._get_clock_zone()
+        self._clock_zone_name = self._get_clock_zone()
         self._setup_machine_clock()
         self._load_logo()
         self.bpms_list.setItemDelegate(BpmWeightsDelegate(self.bpms_list))
@@ -404,8 +406,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             title.setText(settings["label"])
             tooltip.setToolTip(settings["tooltip"])
             for slot, label, input_widget in (
-                ("nominal", nominal_label, nominal_input),
-                ("test", test_label, test_input),
+                    ("nominal", nominal_label, nominal_input),
+                    ("test", test_label, test_input),
             ):
                 field = settings.get(slot)
                 label.setVisible(field is not None)
@@ -451,7 +453,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         self.log("Restoring initial settings...")
         self._cancel = True
         self._running = False
-        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold = self._read_params()
+        w1, w2, w3, rcond, iters, gain, beta, transmission_threshold= self._read_params()
         try:
             if w2 > 0:
                 self.interface.reset_energy()
@@ -459,7 +461,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 self.interface.reset_intensity()
         except Exception:
             self.log(f"The machine wasn't restored to its nominal state.")
-            QMessageBox.critical(self, "Restore error", f"Could not confirm the machine returned to its nominal energy/intensity.")
+            QMessageBox.critical(self, "Restore error",
+                                 f"Could not confirm the machine returned to its nominal energy/intensity.")
         if self.interface.restore_correctors_state(self.restore_state) is False:
             self.log("Warning: not every corrector was confirmed back at its saved current.")
             QMessageBox.warning(
@@ -603,8 +606,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
         return f"[w1 = {wbpm_orb:g}, w2 = {wbpm_dfs:g}, w3 = {wbpm_wfs:g}]"  # general format, removes reduntant zeros at the end etc.
 
     def _update_bpm_weights(self, item):
-        bpm_name = item.data(Qt.ItemDataRole.UserRole) or (
-                    item.text() or "")  # it gives a clean name of the item, even if there is another text (like weights)
+        bpm_name = item.data(Qt.ItemDataRole.UserRole) or (item.text() or "")  # it gives a clean name of the item, even if there is another text (like weights)
         item.setData(BpmWeightsDelegate.WEIGHTS_ROLE, self._get_bpm_weights_text(bpm_name))
         item.setText(bpm_name)
 
@@ -841,7 +843,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             if self.remove_coupling_checkbox.isChecked():
                 Axy_base.fill(0.0)
                 Ayx_base.fill(0.0)
-                
+
             bpms = list(bpms_common)
 
             n = len(bpms)
@@ -921,7 +923,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                         self._hist_transmission.append(100.0 * charge[0] / reference)
                         if self._hist_transmission[-1] <= transmission_threshold:
                             self._stop_correction()
-                            QMessageBox.warning(self, "Transmission below level!", "Transmission has reached the threshold. Stoping the correction now, and leaving correctors at current values.")
+                            QMessageBox.warning(self, "Transmission below level!",
+                                                "Transmission has reached the threshold. Stoping the correction now, and leaving correctors at current values.")
                     else:
                         self._hist_transmission.append(np.nan)
                 if it == 0:
@@ -960,7 +963,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                 UNCOMMENT AFTER SANITY CHECKS 
                 '''
 
-                if it==0:
+                if it == 0:
                     if self.orbit_at_first_start_click_x is None and self.orbit_at_first_start_click_y is None:
                         B0x = O0x.copy()
                         B0y = O0y.copy()
@@ -969,7 +972,6 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     else:
                         B0x = self.orbit_at_first_start_click_x
                         B0y = self.orbit_at_first_start_click_y
-
 
                 if self.reset_ref_orb == True:
                     B0x = O0x.copy()
@@ -993,8 +995,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     bpms1 = state1.get_bpms(bpms)
                     x1_vals = np.asarray(bpms1["x"], dtype=float)
                     y1_vals = np.asarray(bpms1["y"], dtype=float)
-                    err_dx = np.sqrt(np.square(np.asarray(O0["stdx"], dtype=float)) / x0_vals.shape[0] + np.square(np.asarray(O1["stdx"], dtype=float)) / x1_vals.shape[0])
-                    err_dy = np.sqrt(np.square(np.asarray(O0["stdy"], dtype=float)) / y0_vals.shape[0] + np.square(np.asarray(O1["stdy"], dtype=float)) / y1_vals.shape[0])
+                    err_dx = np.sqrt(np.square(np.asarray(O0["stdx"], dtype=float)) / x0_vals.shape[0] + np.square(
+                        np.asarray(O1["stdx"], dtype=float)) / x1_vals.shape[0])
+                    err_dy = np.sqrt(np.square(np.asarray(O0["stdy"], dtype=float)) / y0_vals.shape[0] + np.square(
+                        np.asarray(O1["stdy"], dtype=float)) / y1_vals.shape[0])
                     Dx = np.array([1e3 * dx * dP_P for dx in target_disp_x]).reshape(-1, 1)
                     Dy = np.array([1e3 * dy * dP_P for dy in target_disp_y]).reshape(-1, 1)
                     plt.clf()
@@ -1069,10 +1073,10 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                                  color='orange', label="measured y", capsize=3)
                     plt.xlabel("BPM index")
                     plt.ylabel(f"Orbit difference [{self.bpm_unit}]")
-                    plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it+1}/{iters}")
+                    plt.title(f"DFS: measured orbit difference vs target dispersion (x, y): iteration {it + 1}/{iters}")
                     plt.legend()
                     plt.grid(True, alpha=0.3)
-                    dfs_plot_ax = plt.gca() # get current axis, don't mistake for other plot
+                    dfs_plot_ax = plt.gca()  # get current axis, don't mistake for other plot
                     Bx.append(wgt_dfs * ((O1x - O0x) - Dx))
                     By.append(wgt_dfs * ((O1y - O0y) - Dy))
 
@@ -1174,7 +1178,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                         for name, target, actual in zip(selected_correctors, current_bdes, current_bact)
                         if abs(actual - target) > readback_tolerance
                     ]
-                    raise RuntimeError("Corrector readback differs from its setpoint before correction: " + ", ".join(failed))
+                    raise RuntimeError(
+                        "Corrector readback differs from its setpoint before correction: " + ", ".join(failed))
 
                 max_vals_x = np.full(delta_x.shape, max_curr_h, dtype=float)
                 max_vals_y = np.full(delta_y.shape, max_curr_v, dtype=float)
@@ -1187,7 +1192,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     after_corrs = self.interface.get_correctors(selected_correctors)
                     after_names = list(after_corrs["names"])
                     after_bact_map = {
-                        name: val for name, val in zip(after_names, np.asarray(after_corrs["bact"], dtype=float).ravel())
+                        name: val for name, val in
+                        zip(after_names, np.asarray(after_corrs["bact"], dtype=float).ravel())
                     }
                     after_bact = np.array([after_bact_map[name] for name in selected_correctors], dtype=float)
                     if set_ok is not False and np.allclose(after_bact, new_bdes, rtol=0.0, atol=readback_tolerance):
@@ -1199,7 +1205,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                         for name, target, actual in zip(selected_correctors, new_bdes, after_bact)
                         if abs(actual - target) > readback_tolerance
                     ]
-                    raise RuntimeError("BBA stopped: correctors did not reach their requested currents (the correction is not reliable): " + ", ".join(failed))
+                    raise RuntimeError(
+                        "BBA stopped: correctors did not reach their requested currents (the correction is not reliable): " + ", ".join(
+                            failed))
 
                 after_names = list(after_corrs["names"])
                 after_vals = np.asarray(after_corrs["bdes"], dtype=float).ravel()
@@ -1215,12 +1223,14 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 
                 if w2 > 0 and O1x is not None and O1y is not None and prev_Dx is not None and prev_Dy is not None:
                     dfs_start = n if w1 > 0 else 0
-                    dfs_rows = slice(dfs_start, dfs_start + n) # slice of an array start:end
+                    dfs_rows = slice(dfs_start, dfs_start + n)  # slice of an array start:end
                     applied_x = applied_delta[:nh]
                     applied_y = applied_delta[nh:]
-                    dfs_prediction_x = (prev_Dx + (Axx_it[dfs_rows, :] @ applied_x + Axy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
-                    dfs_prediction_y = (prev_Dy + (Ayx_it[dfs_rows, :] @ applied_x + Ayy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
-                    dfs_plot_ax.plot(range(n), dfs_prediction_x, color="blue", linestyle = "--" , label="R prediction x")
+                    dfs_prediction_x = (
+                                prev_Dx + (Axx_it[dfs_rows, :] @ applied_x + Axy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
+                    dfs_prediction_y = (
+                                prev_Dy + (Ayx_it[dfs_rows, :] @ applied_x + Ayy_it[dfs_rows, :] @ applied_y) / wgt_dfs)
+                    dfs_plot_ax.plot(range(n), dfs_prediction_x, color="blue", linestyle="--", label="R prediction x")
                     dfs_plot_ax.plot(range(n), dfs_prediction_y, color="orange", linestyle="--", label="R prediction y")
                     dfs_plot_ax.legend()
                     dfs_plot_ax.figure.canvas.draw_idle()
@@ -1234,7 +1244,8 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
                     if write_header:
                         file.write("time\titeration\tcorrector\tbdes_before\tapplied_kick\tbdes_after\n")
                     time = datetime.now().isoformat(timespec="seconds")
-                    for corrector, before, kick, after in zip(selected_correctors, current_bdes, applied_delta, after_bdes):
+                    for corrector, before, kick, after in zip(selected_correctors, current_bdes, applied_delta,
+                                                              after_bdes):
                         file.write(f"{time}\t{it + 1}\t{corrector}\t{before:.12g}\t{kick:.12g}\t{after:.12g}\n")
                 # new bdes and after bdes should be the same
 
@@ -1340,7 +1351,9 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
             else:
                 self.log("Correction finished.")
             if not silent:
-                self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta, self.max_horizontal_current_spinbox.value(), self.max_vertical_current_spinbox.value(),
+                self.save_session_settings(w1, w2, w3, rcond, iters, gain, beta,
+                                           self.max_horizontal_current_spinbox.value(),
+                                           self.max_vertical_current_spinbox.value(),
                                            bool(self.triangular_checkbox.isChecked()), self.bpm_weights, Axx, Ayy, Axy,
                                            Ayx, Bx, By, bool(self.subtract_jitter_checkbox.isChecked()))
             if preserve_plots and plot_snapshot is not None:
@@ -1510,6 +1523,7 @@ class MainWindow(QMainWindow, SaveOrLoad, ResponseMatrix_DFS_WFS):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     from Backend import SelectInterface
+
     dialog = SelectInterface.choose_acc_and_interface()
     if dialog is None:
         print("Selection cancelled.")
@@ -1517,13 +1531,6 @@ if __name__ == "__main__":
 
     I = dialog
     project_name = I.get_name()
-
-
-    # # ================ for a test!!
-    # from Backend.State import State
-    # state = State(filename="/Users/wiktoriamalek/CERN-Flight_Simulator-Data/CLEAR_BBA_260821/BBA_CLEAR260821163644_session_settings/machine_status.pkl")
-    # I.restore_quadrupoles_state(state)
-    # # ===============================
 
     nominal_state = None
     start_state = I.get_state()

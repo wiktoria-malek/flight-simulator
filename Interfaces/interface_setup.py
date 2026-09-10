@@ -31,6 +31,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [0.005, 0.15],
                 "beta_y0": [0.5, 8.0],
                 "alpha_y0": [-4.0, 6.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -56,6 +57,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [0.005, 0.15],
                 "beta_y0": [0.5, 8.0],
                 "alpha_y0": [-4.0, 6.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -92,6 +94,7 @@ INTERFACE_SETUP = {
                     "emit_y_norm": [0.005, 0.12],
                     "beta_y0": [2.0, 20.0],
                     "alpha_y0": [-8.0, 2.0],
+                    "energy_pref": [1000.0, 2000.0],
                 }
         },
         {
@@ -120,6 +123,7 @@ INTERFACE_SETUP = {
             "emit_y_norm": [0.01, 5.0],
             "beta_y0": [0.001, 60.0],
             "alpha_y0": [-15, 15.0],
+            "energy_pref": [1000.0, 2000.0],
         }
 
         },
@@ -152,6 +156,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [1e-4, 0.05],
                 "beta_y0": [0.2, 8.0],
                 "alpha_y0": [-15.0, 2.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -174,6 +179,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [1e-4, 0.05],
                 "beta_y0": [0.2, 8.0],
                 "alpha_y0": [-15.0, 2.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
         {
@@ -199,6 +205,7 @@ INTERFACE_SETUP = {
                 "emit_y_norm": [1e-4, 0.05],
                 "beta_y0": [0.2, 8.0],
                 "alpha_y0": [-15.0, 2.0],
+                "energy_pref": [1000.0, 2000.0],
             }
         },
     ],
@@ -289,15 +296,15 @@ INTERFACE_SETUP = {
                     "bba_max_h_strength": 9.99,
                     "bba_max_v_strength": 9.99,
                 },
-            "bounds":
-                {
-                    "emit_x_norm": [0.5, 10.0],
-                    "beta_x0": [0.2, 20.0],
-                    "alpha_x0": [-4.0, 2.0],
-                    "emit_y_norm": [0.5, 10.0],
-                    "beta_y0": [10.0, 30.0],
-                    "alpha_y0": [-8.0, 2.0],
-                }
+            "bounds": {
+                "emit_x_norm": [0.0, 50.0],
+                "beta_x0": [0.001, 200.0],
+                "alpha_x0": [-100.0, 100.0],
+                "emit_y_norm": [0.0, 50.0],
+                "beta_y0": [0.001, 200.0],
+                "alpha_y0": [-100.0, 100.0],
+                "energy_pref": [150.0, 250.0],
+            }
         },
         {
             "display_name": "CLEAR RFTrack",
@@ -308,7 +315,7 @@ INTERFACE_SETUP = {
                 "energy": {"label": "Change energy", "tooltip": "Multiplies RFTrack reference momentum Pref for the DFS measurement.", "test": {"label": "Pref factor", "attribute": "dfs_test_energy", "default": 0.90}},
                 "intensity": {"label": "Change intensity", "tooltip": "Multiplies the RFTrack bunch charge for the WFS measurement.", "test": {"label": "Charge factor", "attribute": "wfs_test_charge", "default": 0.90}},
             },
-            "settings": {"jitter": 0.0, "bpm_resolution": 0.05, "nsamples": 1},
+            "settings": {"jitter": 0.0, "bpm_resolution": 0.0, "nsamples": 1},
             "units":
                 {
                     "corrector_strength": "gauss*m",
@@ -318,12 +325,13 @@ INTERFACE_SETUP = {
                     "bba_max_v_strength": 9.99,
                 },
             "bounds": {
-                "emit_x_norm": [0.0, 20.0],
+                "emit_x_norm": [0.0, 50.0],
                 "beta_x0": [0.001, 200.0],
-                "alpha_x0": [-50.0, 50.0],
-                "emit_y_norm": [0.0, 20.0],
+                "alpha_x0": [-100.0, 100.0],
+                "emit_y_norm": [0.0, 50.0],
                 "beta_y0": [0.001, 200.0],
-                "alpha_y0": [-50.0, 50.0],
+                "alpha_y0": [-100.0, 100.0],
+                "energy_pref": [150.0, 250.0],
             }
         },
     ],
