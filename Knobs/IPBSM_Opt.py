@@ -1876,7 +1876,7 @@ class Optimizer:
         y1 = np.asarray(y_hist, float)
         axis_ls = max(1e-6, float(self._gp_length_scales()[axis]))
         gp = SimpleGP(GPParams(
-            kernel=self._gp_zscan_kernel(),
+            kernel="rbf",
             length_scale=np.array([axis_ls], dtype=float),
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
@@ -1949,7 +1949,7 @@ class Optimizer:
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
             zscan_axes=self._zscan_axis_indices(),
-            zscan_kernel=self._gp_zscan_kernel(),
+            zscan_kernel="rbf",
         ))
         gp.fit(X, y)
 
@@ -2006,7 +2006,7 @@ class Optimizer:
             signal_var=self.cfg.gp_signal_var,
             noise_var=self.cfg.gp_noise_var,
             zscan_axes=self._zscan_axis_indices(),
-            zscan_kernel=self._gp_zscan_kernel(),
+            zscan_kernel="rbf",
         ))
         gp.fit(X, y)
 

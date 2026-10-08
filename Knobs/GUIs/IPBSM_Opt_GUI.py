@@ -638,20 +638,6 @@ class MainWindow(QMainWindow):
         self.kernel_box.addItems(["rbf", "matern52", "matern32"])
         self.kernel_box.setCurrentText("rbf")
 
-        self.hyperparameter_mode_box = QComboBox()
-        self.hyperparameter_mode_box.addItems(["learned_fixed", "legacy_fixed"])
-        self.hyperparameter_mode_box.setCurrentText("learned_fixed")
-        self.hyperparameter_mode_box.setToolTip(
-            "learned_fixed uses BO2026 conservative ARD priors; legacy_fixed preserves init_sigma ARD values."
-        )
-        self.zscan_kernel_box = QComboBox()
-        self.zscan_kernel_box.addItems(["rbf", "matern32", "matern52"])
-        self.zscan_kernel_box.setCurrentText("rbf")
-        self.zscan_initial_points_box = QSpinBox()
-        self.zscan_initial_points_box.setRange(3, 5)
-        self.zscan_initial_points_box.setSingleStep(2)
-        self.zscan_initial_points_box.setValue(5)
-
         self.bounds_sigma_mult = QDoubleSpinBox()
         self.bounds_sigma_mult.setRange(0.5, 10.0)
         self.bounds_sigma_mult.setDecimals(2)

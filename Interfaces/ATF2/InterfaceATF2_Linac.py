@@ -459,3 +459,5 @@ class InterfaceATF2_Linac(AbstractMachineInterface):
         else:
             out["Ttot"] = float("nan")
         return out
+
+
